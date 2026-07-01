@@ -264,7 +264,7 @@ class Store {
     }
 
     _getServerUrl() {
-        return `http://${location.hostname}:8082`;
+        return '';
     }
 
     setAuth(token, user) {
