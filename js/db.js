@@ -134,6 +134,7 @@ function initSchema() {
             profundidade_mm REAL DEFAULT 0,
             lastUpdateDate TEXT,
             lastUpdateTitle TEXT,
+            grupoSiemens TEXT DEFAULT '',
             createdAt TEXT
         );
 
