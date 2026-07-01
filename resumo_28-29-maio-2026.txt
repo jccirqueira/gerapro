@@ -1,0 +1,70 @@
+RESUMO DAS ALTERAÇÕES – 28 e 29 de maio de 2026
+=================================================
+
+1. CORREÇÃO: ABA EQUIPAMENTOS DA PROPOSTA TÉCNICA
+--------------------------------------------------
+- Erro: "p?._aiChanges?.equipments?.[this.activeEquipmentIndex]?.has is not a function"
+- Causa: JSON.stringify/parse não preserva objetos Set. _aiChanges.equipments[i]
+  virava um objeto plano {} sem método .has().
+- Solução: 4 funções em js/propostaTecnica.js foram corrigidas para aceitar
+  tanto Set quanto objeto plano:
+  - _hasAiForEq(): usa instanceof Set ? .has(sentinel) : sentinel in eq
+  - clearAiFieldForEq(): usa instanceof Set ? .delete(sentinel) : delete eq[sentinel]
+  - renderTabEquipments(): converte plain obj → new Set(Object.keys(...))
+  - handleDSSelect(): usa instanceof Set ? .delete(field) : delete s[field]
+
+2. NOVO: CAMPO VENDEDOR NAS PROPOSTAS
+--------------------------------------
+- js/propostaTecnica.js: Campo "Vendedor" na aba Dados Gerais com <datalist>
+  populado por store.getState().vendedores. Capturado no save() e sincronizado
+  com pipeline_item via API.
+- js/propostaComercial.js: Mesmo campo adicionado ao formulário com captura
+  e sync pipeline após salvar.
+
+3. CORREÇÃO: FILTROS DO RELATÓRIO DE PROPOSTAS
+-----------------------------------------------
+- js/relatorioPropostas.js: Filtros "Eng. Resp." e "Vendedor" convertidos de
+  <input>+<datalist> para <select> (pasta suspensa) com evento 'change'.
+  Opções populadas dinamicamente por _loadVendedorOptions() e
+  _loadEngRespOptions().
+
+4. NOVA FUNCIONALIDADE: IMPORTAÇÃO GERAL
+-----------------------------------------
+- js/importacao_new.js: Adicionado suporte às colunas modelo, icms, ipi.
+- _parseNumber() robusto: aceita formato BR (1.234,56), US (1234.56) e texto.
+- 'r$' adicionado ao findKey de custo para detectar coluna de preço.
+- Preview exibe valores de preço formatados.
+- Taxas ICMS/IPI: se valor ≤ 1, multiplica por 100 automaticamente (0.12 → 12).
+- Fabricante preserva case original (sem toTitleCase) para compatibilidade
+  com dropdown de edição (case-sensitive).
+- Dados importados são persistidos via _syncCreate/_syncUpdate.
+
+5. PERSISTÊNCIA: SYNC CLIENT-SERVER
+------------------------------------
+- js/state.js: Adicionados _loadFromServer, _syncCreate, _syncUpdate para
+  sincronizar dados entre store (cliente) e SQLite (servidor).
+- Adicionados addTipico() e updateTipico() para persistir dados típicos.
+- Logs de diagnóstico em cada método de sync.
+
+6. PERSISTÊNCIA: TÍPICOS
+-------------------------
+- js/tipicos.js: save() utiliza store.addTipico()/store.updateTipico().
+- pendingMaterial (objeto runtime) removido antes de enviar ao servidor.
+
+7. CORREÇÃO: DB.JS (SERVER-SIDE)
+----------------------------------
+- js/db.js: create() e update() só adicionam updatedAt quando info.dados === true
+  (apenas na tabela propostas). Materiais e típicos não têm coluna dados.
+
+8. CONFIRMAÇÃO
+--------------
+- Logs no console: "materiais:11, tipicos:1" confirmam dados persistidos.
+- 11 materiais WEG importados e 1 típico PD-5 sincronizados com sucesso.
+- Sync de 11 materiais confirmado: "[Sync] materiais ... updated OK".
+
+OBSERVAÇÕES
+-----------
+- js/db.js é server-side (require em server_new.js) → requer reinício do servidor.
+- importacao_new.js, tipicos.js, state.js são client-side → Ctrl+F5 recarrega.
+- Materiais importados antes da correção de sync (limite 500 por updatedAt)
+  foram perdidos permanentemente e precisam ser reimportados.

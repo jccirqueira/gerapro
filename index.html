@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeraPro - Sistema de Propostas Técnicas / Comerciais</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" href="/favicon.ico">
+    <link rel="stylesheet" href="css/theme-industrial.css">
+    <!-- Icons (using Phosphor Icons for technical look, via CDN for now, but valid in vanilla) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/pizzip@3.1.1/dist/pizzip.js"></script>
+    <script src="https://unpkg.com/docxtemplater@3.21.2/build/docxtemplater.js"></script>
+    <script src="https://unpkg.com/docxtemplater-image-module-free@1.1.1/build/imagemodule.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="js/dxf-writer.js"></script>
+    <style>
+        /* Quick layout overrides */
+        .hidden-module {
+            display: none !important;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0.95;
+                transform: translateY(2px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Login Screen */
+        .login-view {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            z-index: 99999;
+        }
+        .login-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 40px;
+            width: 380px;
+            max-width: 95vw;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        .login-card .login-logo {
+            text-align: center;
+            font-size: 28px;
+            font-weight: 800;
+            color: #38bdf8;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .login-card .login-subtitle {
+            text-align: center;
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 32px;
+        }
+        .login-card .form-group {
+            margin-bottom: 20px;
+        }
+        .login-card .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .login-card .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .login-card .form-group input:focus {
+            border-color: #38bdf8;
+        }
+        .login-card .form-group input::placeholder {
+            color: #475569;
+        }
+        .login-card .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: #38bdf8;
+            color: #0f172a;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 8px;
+        }
+        .login-card .btn-login:hover {
+            background: #7dd3fc;
+        }
+        .login-card .btn-login:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .login-card .login-error {
+            color: #ef4444;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 12px;
+            min-height: 20px;
+        }
+        .login-card .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #475569;
+        }
+        .login-card .login-footer a {
+            color: #38bdf8;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .login-card .login-footer a:hover {
+            text-decoration: underline;
+        }
+        .login-card .login-footer .login-powered {
+            margin-top: 14px;
+            font-size: 10px;
+            opacity: 0.55;
+            line-height: 1.4;
+        }
+        .login-card .login-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #0f172a;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* User Manager Modal */
+        .user-manager-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .user-manager-table th {
+            text-align: left;
+            padding: 10px 12px;
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .user-manager-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .user-level-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .user-level-badge.admin { background: #fef2f2; color: #dc2626; }
+        .user-level-badge.engenheiro { background: #eff6ff; color: #2563eb; }
+        .user-level-badge.visualizador { background: #f8fafc; color: #64748b; }
+        .dropdown-item:hover { background: #f8fafc; }
+    </style>
+</head>
+
+<body>
+
+    <!-- LOGIN VIEW (hidden when authenticated) -->
+    <div id="view-login" class="login-view hidden-module">
+        <div class="login-card" id="login-card">
+            <img id="login-logo-img" style="display:none;max-height:64px;margin:0 auto 8px;">
+            <div class="login-logo" id="login-logo-text">GeraPro</div>
+            <div class="login-subtitle" id="login-subtitle-text">Sistema de Propostas Técnicas / Comerciais</div>
+            <form id="form-login" onsubmit="return false;">
+                <div class="form-group" id="login-name-group" style="display:none;">
+                    <label>Nome</label>
+                    <input type="text" id="login-name" placeholder="Seu nome">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Senha</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-login" id="btn-login-submit" onclick="app.handleLogin()">
+                    Entrar
+                </button>
+                <div class="login-error" id="login-error"></div>
+            </form>
+            <div class="login-footer">
+                <a id="login-register-link" onclick="app.toggleRegisterMode()">Primeiro acesso? Criar conta master</a>
+                <div class="login-powered">2026 | Powered By<br>Cacir Soluções Tecnológicas</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="app-sidebar">
+            <div class="sidebar-brand">
+                <i class="ph ph-lightning" style="margin-right: 8px; color: #38bdf8;"></i>
+                GeraPro <span
+                    style="font-size: 10px; opacity: 0.5; margin-left: 6px; border: 1px solid #ffffff40; padding: 1px 4px; border-radius: 4px;">v1.0</span>
+            </div>
+            <nav class="sidebar-nav" id="main-nav">
+                <a href="#" class="nav-item active" data-target="dashboard">
+                    <i class="ph ph-squares-four"></i> Dashboard
+                </a>
+                </a>
+                <div
+                    style="margin: 10px 16px 5px; font-size: 10px; text-transform: uppercase; color: white; letter-spacing: 0.5px; font-weight: 700;">
+                    Cadastros</div>
+                <a href="#" class="nav-item" data-target="clientes">
+                    <i class="ph ph-users"></i> Clientes
+                </a>
+                <a href="#" class="nav-item" data-target="fornecedores">
+                    <i class="ph ph-truck"></i> Fornecedores
+                </a>
+
+                <div
+                    style="margin: 10px 16px 5px; font-size: 10px; text-transform: uppercase; color: white; letter-spacing: 0.5px; font-weight: 700;">
+                    Comercial</div>
+
+                <a href="#" class="nav-item" data-target="crm">
+                    <i class="ph ph-funnel"></i> CRM
+                    <span id="crm-badge" style="display:none;margin-left:auto;background:#ef4444;color:white;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700;"></span>
+                </a>
+                <a href="#" class="nav-item" data-target="pipeline-comercial">
+                    <i class="ph ph-stack"></i> Gestão de Propostas
+                    <span id="pipeline-badge" style="display:none;margin-left:auto;background:#ef4444;color:white;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700;"></span>
+                </a>
+                <a href="#" class="nav-item" data-target="proposta-tecnica">
+                    <i class="ph ph-file-text"></i> Proposta Técnica
+                </a>
+                <a href="#" class="nav-item" data-target="proposta-comercial">
+                    <i class="ph ph-briefcase"></i> Proposta Comercial
+                </a>
+                <a href="#" class="nav-item" data-target="proposta-completa">
+                    <i class="ph ph-file"></i> Proposta Completa
+                </a>
+                <a href="#" class="nav-item" data-target="precificacao">
+                    <i class="ph ph-calculator"></i> Precificação
+                </a>
+
+                <div
+                    style="margin: 15px 16px 5px; font-size: 10px; text-transform: uppercase; color: white; letter-spacing: 0.5px; font-weight: 700;">
+                    Engenharia</div>
+                <a href="#" class="nav-item" data-target="materiais">
+                    <i class="ph ph-package"></i> Materiais
+                </a>
+                <a href="#" class="nav-item" data-target="paineis">
+                    <i class="ph ph-rows"></i> Tipos de Painéis
+                </a>
+                <a href="#" class="nav-item" data-target="tipicos">
+                    <i class="ph ph-circuitry"></i> Típicos de Partida
+                </a>
+                <a href="#" class="nav-item" data-target="cubiculos">
+                    <i class="ph ph-grid-nine"></i> Típicos de Cubículo
+                </a>
+                <a href="#" class="nav-item" data-target="composicoes">
+                    <i class="ph ph-wrench"></i> Composições Mão de Obra
+                </a>
+                <a href="#" class="nav-item" data-target="regras-derivacao">
+                    <i class="ph ph-git-branch"></i> Regras de Derivação
+                </a>
+                <a href="#" class="nav-item" data-target="mao-de-obra">
+                    <i class="ph ph-hard-hat"></i> Mão de Obra
+                </a>
+                <a href="#" class="nav-item dvt-only" data-target="manufatura" style="display:none;">
+                    <i class="ph ph-wrench"></i> Manufatura
+                </a>
+
+                <div
+                    style="margin: 15px 16px 5px; font-size: 10px; text-transform: uppercase; color: white; letter-spacing: 0.5px; font-weight: 700;">
+                    RELATÓRIOS</div>
+                <a href="#" class="nav-item" data-target="relatorio-propostas">
+                    <i class="ph ph-article"></i> Relatório de Propostas
+                </a>
+                <a href="#" class="nav-item" data-target="relatorio-cadastros">
+                    <i class="ph ph-clipboard-text"></i> Relatório de Cadastros
+                </a>
+                <a href="#" class="nav-item" data-target="relatorio-tipicos">
+                    <i class="ph ph-faders"></i> Relatório de Típicos
+                </a>
+                <a href="#" class="nav-item" data-target="relatorio-manufatura">
+                    <i class="ph ph-wrench"></i> Relatório de Manufatura
+                </a>
+
+                <div
+                    style="margin: 15px 16px 5px; font-size: 10px; text-transform: uppercase; color: white; letter-spacing: 0.5px; font-weight: 700;">
+                    Configurações</div>
+                <a href="#" class="nav-item" data-target="importacao">
+                    <i class="ph ph-upload-simple"></i> Importar Dados
+                </a>
+                <a href="#" class="nav-item" data-target="configuracoes">
+                    <i class="ph ph-gear"></i> Configurações
+                </a>
+            </nav>
+            <div style="margin-top: auto; padding: 12px 16px; font-size: 10px; color: rgba(255,255,255,0.5); text-align: center; border-top: 1px solid rgba(255,255,255,0.1); background: var(--color-accent);">
+                2026 | Powered By<br>Cacir Soluções Tecnológicas
+            </div>
+        </aside>
+
+        <!-- HEADER -->
+        <header class="app-header">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button class="btn btn-ghost" id="toggle-sidebar" style="padding: 4px;"><i class="ph ph-list"
+                        style="font-size: 20px;"></i></button>
+                <h2 id="page-title" class="text-sm font-bold" style="margin: 0;">GeraPro_1.0</h2>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div id="active-ptc-badge"
+                        style="display: none; background-color: rgb(45, 45, 45); color: rgb(255, 255, 255); padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; white-space: nowrap;">
+                        <i class="ph ph-folder-open" style="margin-right: 4px;"></i> <span id="active-ptc-text"></span>
+                    </div>
+                    <button class="btn btn-primary" id="btn-buscar-ptc" onclick="app.openSearchPtcModal()"
+                        style="display: flex; align-items: center; gap: 8px;">
+                        <i class="ph ph-magnifying-glass"></i> Buscar PTC
+                    </button>
+                    <button class="btn btn-primary" id="btn-iniciar-ptc" onclick="app.openPtcModal()"
+                        style="display: flex; align-items: center; gap: 8px;">
+                        <i class="ph ph-plus"></i> Iniciar Nova PTC
+                    </button>
+                </div>
+                <button class="btn btn-ghost" id="toggle-theme" title="Alternar Tema Claro/Escuro"
+                    style="padding: 4px;">
+                    <i class="ph ph-moon" id="theme-icon"></i>
+                </button>
+                <button class="btn btn-ghost" id="btn-help" title="Ajuda (F1)" onclick="app.ajuda?.open()" style="padding: 4px;">
+                    <i class="ph ph-question" style="font-size: 20px;"></i>
+                </button>
+                <div class="text-xs text-muted">
+                    Dólar: <b class="text-main">R$ 5,80</b> | Base: <b class="text-main">Jan/26</b>
+                </div>
+                <div id="sync-indicator" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#94a3b8;">
+                    <span id="sync-dot" style="width:7px;height:7px;border-radius:50%;display:inline-block;background:#94a3b8;"></span>
+                    <span id="sync-text">...</span>
+                </div>
+                <div style="height: 20px; width: 1px; background: var(--color-border);"></div>
+                <div id="company-badge" style="display:none;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--color-primary);color:white;align-items:center;gap:4px;">
+                    <i class="ph ph-buildings" style="font-size:12px;"></i>
+                    <span id="company-badge-text"></span>
+                </div>
+                <div id="user-badge" style="display: flex; align-items: center; gap: 8px;">
+                    <div id="user-avatar"
+                        style="width: 28px; height: 28px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #475569;">
+                        JC
+                    </div>
+                    <div style="display:flex; flex-direction:column;">
+                        <span id="user-name" style="font-size:12px; font-weight:500;">José C.</span>
+                        <span id="user-level-badge" style="font-size:10px; color:#64748b; text-transform:uppercase;">Admin</span>
+                    </div>
+                    <div style="position:relative; display:inline-block;">
+                        <button class="btn btn-ghost" id="btn-user-menu" title="Usuário" style="padding:4px;font-size:14px;" onclick="document.getElementById('user-dropdown').classList.toggle('hidden-module')">
+                            <i class="ph ph-caret-down"></i>
+                        </button>
+                        <div id="user-dropdown" class="hidden-module" style="position:absolute; right:0; top:100%; background:#fff; border:1px solid #e2e8f0; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.1); z-index:999; min-width:180px; padding:6px;">
+
+                            <button class="dropdown-item" onclick="app.handleLogout()" style="display:flex; align-items:center; gap:8px; width:100%; padding:8px 12px; border:none; background:none; cursor:pointer; font-size:13px; color:#dc2626; text-align:left;">
+                                <i class="ph ph-sign-out"></i> Sair
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="app-content" id="main-content">
+            <!-- MODULE: DASHBOARD -->
+            <div id="view-dashboard" class="module-view fade-in">
+                <div style="height: calc(100vh - 120px); display: flex; flex-direction: column; background: white; margin: -20px; position: relative;">
+                    <div class="module-header-sticky" style="color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-squares-four"></i> Dashboard
+                            </h2>
+                            <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">Visão geral de indicadores e métricas do sistema</div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-sm btn-ghost" onclick="app.refreshDashboard()" style="color: white; border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; gap: 6px;"><i class="ph ph-arrows-clockwise"></i> Atualizar</button>
+                        </div>
+                    </div>
+
+                    <div style="padding: 24px; overflow-y: auto; flex: 1;">
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+                            <div class="card" style="padding: 16px;">
+                                <div class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600;">Total de
+                                    Propostas</div>
+                                <div style="font-size: 24px; font-weight: 700; color: var(--color-primary); margin-top: 4px;">12
+                                </div>
+                                <div class="text-xs text-success" style="margin-top: 4px;">+3 essa semana</div>
+                            </div>
+                            <div class="card" style="padding: 16px;">
+                                <div class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600;">Valor em
+                                    Negociação</div>
+                                <div style="font-size: 24px; font-weight: 700; color: var(--color-primary); margin-top: 4px;">R$
+                                    450k</div>
+                                <div class="text-xs text-muted" style="margin-top: 4px;">Ticket médio R$ 37k</div>
+                            </div>
+                            <div class="card" style="padding: 16px;">
+                                <div class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600;">Projetos em
+                                    Engenharia</div>
+                                <div style="font-size: 24px; font-weight: 700; color: var(--color-primary); margin-top: 4px;">5
+                                </div>
+                                <div class="text-xs text-warning" style="margin-top: 4px;">2 próximos do prazo</div>
+                            </div>
+                            <!-- CARD: PIPELINE COMERCIAL -->
+                            <div class="card" style="padding: 16px;">
+                                <div class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600;">Pipeline
+                                    Comercial</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #6366f1; margin-top: 4px;" id="dash-pipeline-valor">R$ 0</div>
+                                <div class="text-xs text-muted" style="margin-top: 4px;" id="dash-pipeline-count">0 oportunidades ativas</div>
+                                <div style="position: relative; height: 60px; width: 100%; margin-top: 8px;">
+                                    <canvas id="chart-pipeline-funnel"></canvas>
+                                </div>
+                                <a href="#" onclick="app.navigateTo('pipeline-comercial'); return false;" style="display: block; text-align: center; font-size: 11px; color: #6366f1; margin-top: 6px;">Ver Pipeline <i class="ph ph-arrow-right"></i></a>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px;">
+                            <div class="card" style="height: 340px;">
+                                <h3 class="card-title text-sm" style="margin-bottom: 10px;">Evolução das Propostas (Últimos 6 meses)
+                                </h3>
+                                <canvas id="chart-sales" style="height:200px;"></canvas>
+                                <div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+                                    <label style="font-size:11px;font-weight:600;">Período:</label>
+                                    <input type="month" id="filter-sales-start" style="width:150px;font-size:11px;">
+                                    <span style="color:#94a3b8;">a</span>
+                                    <input type="month" id="filter-sales-end" style="width:150px;font-size:11px;">
+                                    <button class="btn btn-sm btn-outline" onclick="app.applySalesFilter()" style="font-size:11px;">Filtrar</button>
+                                </div>
+                            </div>
+                            <div class="card" style="height: 300px;">
+                                <h3 class="card-title text-sm" style="margin-bottom: 10px;">Status das Propostas</h3>
+                                <div style="position: relative; height: 220px;">
+                                    <canvas id="chart-status"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-top:16px;">
+                            <div id="dash-atividades-container"
+                                style="font-size: 13px; color: #64748b; padding: 20px; border: 1px dashed #e2e8f0;">
+                                <h3 style="margin:0;font-size:15px;font-weight:700;">Atividades Recentes</h3>
+                                <div style="display: flex; justify-content: center; align-items: center; width: 100%; min-height:60px;">
+                                    <span class="text-muted">Acompanhe aqui o andamento das suas propostas.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: CLIENTES -->
+            <div id="view-clientes" class="module-view hidden-module fade-in">
+                <!-- Will be injected by JS -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-users"></i> Gerenciamento de Clientes
+                        </h3>
+                        <button class="btn btn-primary" onclick="app.clientes.openNewModal()"><i class="ph ph-plus"></i>
+                            Novo Cliente</button>
+                    </div>
+                    <div id="clientes-list-container">
+                        <!-- Table goes here -->
+                        <div class="table-container">
+                            <table id="clientes-table">
+                                <thead>
+                                    <tr>
+                                        <th>Razão Social</th>
+                                        <th>CNPJ</th>
+                                        <th>Cidade/UF</th>
+                                        <th>Contato</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; padding: 20px;">Carregando
+                                            clientes...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: FORNECEDORES -->
+            <div id="view-fornecedores" class="module-view hidden-module fade-in">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-truck"></i> Gerenciamento de Fornecedores
+                        </h3>
+                        <button class="btn btn-primary" onclick="app.fornecedores.openNewModal()"><i
+                                class="ph ph-plus"></i>
+                            Novo Fornecedor</button>
+                    </div>
+                    <div id="fornecedores-list-container">
+                        <!-- Table goes here -->
+                        <div class="table-container">
+                            <table id="fornecedores-table">
+                                <thead>
+                                    <tr>
+                                        <th>Razão Social</th>
+                                        <th>CNPJ</th>
+                                        <th>Cidade/UF</th>
+                                        <th>Contato</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; padding: 20px;">Carregando
+                                            fornecedores...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: MATERIAIS -->
+            <div id="view-materiais" class="module-view hidden-module fade-in">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-package"></i> Catálogo de Materiais
+                        </h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-primary" onclick="app.materiais.openNewModal()"><i
+                                    class="ph ph-plus"></i> Novo Material</button>
+                        </div>
+                    </div>
+                    <!-- Table goes here -->
+                    <div class="table-container">
+                        <table id="materiais-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Fabricante</th>
+                                    <th>Descrição</th>
+                                    <th>Preço Custo</th>
+                                    <th>Estoque</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 20px;">Carregando materiais...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: PAINÉIS -->
+            <div id="view-paineis" class="module-view hidden-module fade-in">
+                <!-- Content injected by JS -->
+            </div>
+
+            <!-- MODULE: ORCAMENTOS -->
+            <div id="view-orcamentos" class="module-view hidden-module fade-in">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-briefcase"></i> Propostas Comerciais
+                        </h3>
+                        <button class="btn btn-primary" onclick="app.orcamentos.create()"><i class="ph ph-plus"></i>
+                            Nova Proposta</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nº Proposta</th>
+                                    <th>Cliente</th>
+                                    <th>Obra/Projeto</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Emissão</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 20px;">Nenhuma proposta
+                                        encontrada.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: CUBÍCULOS -->
+            <div id="view-cubiculos" class="module-view hidden-module fade-in">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-grid-nine"></i> Biblioteca de Cubículos
+                        </h3>
+                        <button class="btn btn-primary" onclick="app.cubiculos.create()"><i class="ph ph-plus"></i> Novo
+                            Cubículo</button>
+                    </div>
+                    <p class="text-muted text-sm">Gerencie os modelos de cubículos de média tensão.</p>
+                </div>
+            </div>
+
+            <!-- MODULE: TÍPICOS -->
+            <div id="view-tipicos" class="module-view hidden-module fade-in">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-circuitry"></i> Biblioteca de Típicos
+                        </h3>
+                        <button class="btn btn-primary" onclick="app.tipicos.create()"><i class="ph ph-plus"></i> Novo
+                            Típico</button>
+                    </div>
+                    <p class="text-muted text-sm">Gerencie os modelos de partidas (Direta, Soft-Starter, Inversor) para
+                        agilizar orçamentos.</p>
+                </div>
+            </div>
+
+
+            <!-- MODULE: IMPORTACAO -->
+            <div id="view-importacao" class="module-view hidden-module fade-in" style="background: white; margin: -20px;">
+                <div style="height: calc(100vh - 120px); display: flex; flex-direction: column; position: relative;">
+                    <!-- Header -->
+                    <div class="module-header-sticky" style="color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-upload-simple"></i> Importação de Database
+                            </h2>
+                            <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">Sincronização de Dados via Excel e CSV</div>
+                        </div>
+                    </div>
+
+                    <div style="padding: 24px; overflow-y: auto; flex: 1;">
+                        <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 40px; text-align: center; margin-bottom: 24px;">
+                            <i class="ph ph-file-csv" style="font-size: 48px; color: #94a3b8; margin-bottom: 16px;"></i>
+                            <h4 style="margin: 0; color: #9932CC; font-weight: 700;">Arraste seu arquivo CSV ou Excel aqui</h4>
+                            <p class="text-xs text-muted" style="margin: 8px 0 16px;">Formatos suportados: .csv (Recomendado), .xlsx, .xls</p>
+                            <label class="btn btn-secondary" style="background: #9932CC; color: white; border: none; padding: 10px 24px;">
+                                Escolher Arquivo
+                                <input type="file" id="file-import" accept=".csv, .xlsx, .xls" style="display: none;">
+                            </label>
+                        </div>
+
+                        <div id="import-preview" style="display: none;">
+                            <div class="card" style="padding: 20px;">
+                                <h4 class="text-sm font-bold" style="margin-bottom: 12px; color: var(--color-primary); display: flex; align-items: center; gap: 8px;">
+                                    <i class="ph ph-eye"></i> Pré-visualização e Mapeamento
+                                </h4>
+                                <div class="table-container" style="max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                    <table id="table-import-preview">
+                                        <thead style="background: #f1f5f9; position: sticky; top: 0;"></thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                                    <button class="btn btn-primary" id="btn-process-import" style="background: #9932CC; border: none;">
+                                        <i class="ph ph-check"></i> Processar Importação
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: CARGAS -->
+            <div id="view-cargas" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: REGRAS DERIVAÇÃO -->
+            <div id="view-regras-derivacao" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: COMPOSIÇÕES -->
+            <div id="view-composicoes" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: MÃO DE OBRA -->
+            <div id="view-mao-de-obra" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: DESPESAS -->
+            <div id="view-despesas" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: CALCULOS ELÉTRICOS -->
+            <div id="view-calculos-eletricos" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: CALCULOS MECÂNICOS -->
+            <div id="view-calculos-mecanicos" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: CONFIGURACOES -->
+            <div id="view-configuracoes" class="module-view hidden-module fade-in" style="background: white; margin: -20px;">
+                <div style="height: calc(100vh - 120px); display: flex; flex-direction: column; position: relative;">
+                    <!-- Header -->
+                    <div class="module-header-sticky" style="color: white; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-gear"></i> Configurações do Sistema
+                            </h2>
+                            <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">Preferências Globais, Dados da Empresa e Segurança</div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-sm btn-ghost" onclick="app.saveSettings()" style="color: white; border: 1px solid rgba(255,255,255,0.3);"><i class="ph ph-floppy-disk"></i> Salvar Alterações</button>
+                        </div>
+                    </div>
+
+                    <div style="padding: 24px; overflow-y: auto; flex: 1;">
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #00008B; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-buildings"></i> Dados da Empresa (Para Impressão)
+                            </h4>
+                            <form id="form-settings">
+                                <div class="row" style="display: flex; gap: 16px; margin-bottom: 16px;">
+                                    <div class="form-group" style="flex: 2;">
+                                        <label class="form-label">Nome da Empresa</label>
+                                        <input type="text" id="conf-name" class="form-control" placeholder="Sua Empresa Ltda">
+                                    </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        <label class="form-label">CNPJ</label>
+                                        <input type="text" id="conf-cnpj" class="form-control" placeholder="00.000.000/0000-00">
+                                    </div>
+                                </div>
+                                <div class="row" style="display: flex; gap: 16px; margin-bottom: 16px;">
+                                    <div class="form-group" style="flex: 2;">
+                                        <label class="form-label">Logradouro</label>
+                                        <input type="text" id="conf-logradouro" class="form-control" placeholder="Rua da Tecnologia">
+                                    </div>
+                                    <div class="form-group" style="flex: 0 0 100px;">
+                                        <label class="form-label">Número</label>
+                                        <input type="text" id="conf-numero" class="form-control" placeholder="1000">
+                                    </div>
+                                    <div class="form-group" style="flex: 0 0 140px;">
+                                        <label class="form-label">CEP</label>
+                                        <input type="text" id="conf-cep" class="form-control" placeholder="14.176-130">
+                                    </div>
+                                </div>
+                                <div class="row" style="display: flex; gap: 16px; margin-bottom: 16px;">
+                                    <div class="form-group" style="flex: 2;">
+                                        <label class="form-label">Cidade</label>
+                                        <input type="text" id="conf-cidade" class="form-control" placeholder="Sertãozinho">
+                                    </div>
+                                    <div class="form-group" style="flex: 0 0 80px;">
+                                        <label class="form-label">UF</label>
+                                        <input type="text" id="conf-uf" class="form-control" placeholder="SP" maxlength="2">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 16px;">
+                                    <label class="form-label">E-mail de Contato</label>
+                                    <input type="email" id="conf-email" class="form-control" placeholder="contato@empresa.com.br">
+                                </div>
+                                <div class="row" style="display: flex; gap: 16px;">
+                                    <div class="form-group" style="flex: 2;">
+                                        <label class="form-label">Regime Tributário</label>
+                                        <select id="conf-regime" class="form-control">
+                                            <option value="Lucro Real">Lucro Real</option>
+                                            <option value="Lucro Presumido">Lucro Presumido</option>
+                                            <option value="Simples Nacional">Simples Nacional</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        <label class="form-label">IPI Padrão (%)</label>
+                                        <input type="number" id="conf-ipi" class="form-control" placeholder="Ex: 9.75" step="0.01">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-top:16px;display:flex;align-items:center;gap:12px;">
+                                    <label class="form-label" style="margin-bottom:0;">Cor do Badge da Empresa</label>
+                                    <input type="color" id="conf-company-color" value="#0055AA" style="width:48px;height:36px;border:1px solid #e2e8f0;border-radius:6px;padding:2px;cursor:pointer;">
+                                    <span style="font-size:11px;color:#94a3b8;">Cor de fundo no topo da tela</span>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #7c3aed; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-buildings"></i> Empresas (Templates)
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Gerencie as empresas cadastradas no sistema. Cada empresa pode ter seus próprios templates, dados e usuários.
+                            </p>
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: end;">
+                                <div class="form-group" style="flex:1; margin-bottom:0;">
+                                    <label class="form-label" style="font-size:11px;">Nome da Empresa</label>
+                                    <input type="text" id="conf-empresa-nome" class="form-control" placeholder="Razão Social">
+                                </div>
+                                <div class="form-group" style="flex:1; margin-bottom:0;">
+                                    <label class="form-label" style="font-size:11px;">CNPJ</label>
+                                    <input type="text" id="conf-empresa-cnpj" class="form-control" placeholder="00.000.000/0001-00">
+                                </div>
+                                <div class="form-group" style="flex:0 0 100px; margin-bottom:0;">
+                                    <label class="form-label" style="font-size:11px;">Sigla</label>
+                                    <input type="text" id="conf-empresa-sigla" class="form-control" placeholder="EX" maxlength="6">
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="app.addEmpresa()" style="white-space:nowrap;">
+                                    <i class="ph ph-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <table class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
+                                <thead>
+                                    <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                                        <th style="padding:8px 12px; text-align:left;">Nome</th>
+                                        <th style="padding:8px 12px; text-align:left;">CNPJ</th>
+                                        <th style="padding:8px 12px; text-align:left;">Sigla</th>
+                                        <th style="padding:8px 12px; text-align:left;">Plano</th>
+                                        <th style="padding:8px 12px; text-align:left;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="conf-empresas-tbody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #00008B; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-file-doc"></i> Modelos de Documentos (Templates)
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Selecione os arquivos .docx usados como template na exportação das propostas. Faça upload dos arquivos para a sua empresa.
+                            </p>
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+                                <div class="form-group">
+                                    <label class="form-label">Proposta Técnica</label>
+                                    <select id="conf-template-tecnica" class="form-control">
+                                        <option value="">— Selecione —</option>
+                                    </select>
+                                    <div style="display:flex;gap:4px;margin-top:4px;">
+                                        <button class="btn btn-sm btn-outline" onclick="app.uploadTemplate('tecnica')" title="Upload de template">
+                                            <i class="ph ph-upload"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline" onclick="app.deleteSelectedTemplate('tecnica')" title="Excluir template selecionado" style="color:#dc2626;">
+                                            <i class="ph ph-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Proposta Comercial</label>
+                                    <select id="conf-template-comercial" class="form-control">
+                                        <option value="">— Selecione —</option>
+                                    </select>
+                                    <div style="display:flex;gap:4px;margin-top:4px;">
+                                        <button class="btn btn-sm btn-outline" onclick="app.uploadTemplate('comercial')" title="Upload de template">
+                                            <i class="ph ph-upload"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline" onclick="app.deleteSelectedTemplate('comercial')" title="Excluir template selecionado" style="color:#dc2626;">
+                                            <i class="ph ph-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Proposta Completa</label>
+                                    <select id="conf-template-completa" class="form-control">
+                                        <option value="">— Selecione —</option>
+                                    </select>
+                                    <div style="display:flex;gap:4px;margin-top:4px;">
+                                        <button class="btn btn-sm btn-outline" onclick="app.uploadTemplate('completa')" title="Upload de template">
+                                            <i class="ph ph-upload"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline" onclick="app.deleteSelectedTemplate('completa')" title="Excluir template selecionado" style="color:#dc2626;">
+                                            <i class="ph ph-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #059669; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-shield-check"></i> Usuários
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Gerencie os usuários do sistema e seus níveis de acesso.
+                            </p>
+                            <button class="btn btn-primary" onclick="app.openUserManager()">
+                                <i class="ph ph-shield-check"></i> Gerenciar Usuários
+                            </button>
+                        </div>
+
+
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #b45309; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-user-circle"></i> Vendedores
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Gerencie a equipe de vendas para associar às propostas.
+                            </p>
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: end;">
+                                <div class="form-group" style="flex:1; margin-bottom:0;">
+                                    <label class="form-label" style="font-size:11px;">Nome</label>
+                                    <input type="text" id="conf-vendedor-nome" class="form-control" placeholder="Nome do vendedor">
+                                </div>
+                                <div class="form-group" style="flex:1; margin-bottom:0;">
+                                    <label class="form-label" style="font-size:11px;">E-mail</label>
+                                    <input type="email" id="conf-vendedor-email" class="form-control" placeholder="email@exemplo.com">
+                                </div>
+                                <div class="form-group" style="flex:1; margin-bottom:0;">
+                                    <label class="form-label" style="font-size:11px;">Telefone</label>
+                                    <input type="tel" id="conf-vendedor-telefone" class="form-control" placeholder="(00) 00000-0000">
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="app.addVendedor()" style="white-space:nowrap;">
+                                    <i class="ph ph-plus"></i> Adicionar
+                                </button>
+                            </div>
+                            <table class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
+                                <thead>
+                                    <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                                        <th style="padding:8px 12px; text-align:left;">Nome</th>
+                                        <th style="padding:8px 12px; text-align:left;">E-mail</th>
+                                        <th style="padding:8px 12px; text-align:left;">Telefone</th>
+                                        <th style="padding:8px 12px; text-align:center;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="conf-vendedores-tbody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #6d28d9; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-robot"></i> Inteligência Artificial
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Configure o provedor de IA para extração automática de dados de documentos (PDF, DOCX, XLSX).
+                            </p>
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label class="form-label">Provedor</label>
+                                <select id="conf-ai-provider" class="form-control" onchange="app.onAiProviderChange()">
+                                    <option value="ollama">Ollama (IA Local — Gratuito)</option>
+                                    <option value="openai">OpenAI (API Paga — GPT-4o / GPT-4o-mini)</option>
+                                </select>
+                            </div>
+                            <div id="ai-openai-fields" style="display: none;">
+                                <div class="form-group" style="margin-bottom: 12px;">
+                                    <label class="form-label">API Key</label>
+                                    <div style="display: flex; gap: 8px;">
+                                        <input type="password" id="conf-ai-key" class="form-control" placeholder="sk-..." style="flex:1;">
+                                        <button type="button" class="btn btn-sm btn-ghost" onclick="app.toggleAiKeyVisibility()" title="Mostrar/ocultar chave" style="padding:4px 8px;">
+                                            <i class="ph ph-eye" id="ai-key-eye-icon"></i>
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-muted" style="margin-top: 4px;">Sua chave é salva apenas no servidor local. Use uma chave com escopo limitado.</p>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 12px;">
+                                    <label class="form-label">Modelo</label>
+                                    <select id="conf-ai-model-openai" class="form-control">
+                                        <option value="gpt-4o-mini">GPT-4o mini (Rápido e econômico)</option>
+                                        <option value="gpt-4o">GPT-4o (Mais preciso)</option>
+                                        <option value="gpt-4.1">GPT-4.1 (Última geração)</option>
+                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legado)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="ai-ollama-fields">
+                                <div class="form-group" style="margin-bottom: 12px;">
+                                    <label class="form-label">Modelo</label>
+                                    <select id="conf-ai-model-ollama" class="form-control">
+                                        <option value="qwen2.5:14b">qwen2.5:14b (Recomendado)</option>
+                                        <option value="qwen2.5:7b">qwen2.5:7b (Leve)</option>
+                                        <option value="qwen2.5:32b">qwen2.5:32b (Potente)</option>
+                                        <option value="llama3.1:8b">llama3.1:8b</option>
+                                        <option value="mistral:7b">mistral:7b</option>
+                                        <option value="deepseek-r1:14b">deepseek-r1:14b</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 12px;">
+                                    <label class="form-label">URL do Ollama</label>
+                                    <input type="text" id="conf-ai-ollama-url" class="form-control" placeholder="http://localhost:11434">
+                                    <p class="text-xs text-muted" style="margin-top: 4px;">Padrão: http://localhost:11434. Altere se o Ollama estiver em outra máquina.</p>
+                                </div>
+                                <div style="font-size: 11px; color: #64748b; padding: 8px 12px; background: #f0fdf4; border-radius: 6px; border-left: 3px solid #16a34a;">
+                                    <b>Dica:</b> Com Ollama, seus documentos não saem do seu computador. Ideal para dados confidenciais.
+                                </div>
+                            </div>
+                            <div id="ai-test-result" style="display: none; margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px;"></div>
+                            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                                <button class="btn btn-primary" id="btn-ai-save" onclick="app.saveAiSettings()" style="background: #6d28d9; border-color: #6d28d9;">
+                                    <i class="ph ph-floppy-disk"></i> Salvar Configurações
+                                </button>
+                                <button class="btn btn-outline" onclick="app.testAiConnection()">
+                                    <i class="ph ph-plugs"></i> Testar Conexão
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #0088cc; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-telegram-logo"></i> Telegram
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Configure o Bot do Telegram para receber notificações das ações do Pipeline Comercial.
+                            </p>
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label class="form-label" style="font-size:11px;">Token do Bot</label>
+                                <input type="text" id="conf-telegram-token" class="form-control" placeholder="1234567890:ABCdefGHIjklmNOPqrstUVwxyz">
+                            </div>
+                            <p class="text-xs text-muted" style="margin-bottom: 12px;">
+                                Usuários com perfil Admin ou Engenheiro — informe o Chat ID de cada um para receber notificações.
+                            </p>
+                            <div class="table-container" style="border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <table class="w-full" style="font-size: 13px; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="background: #0088cc; color: #fff;">
+                                            <th style="padding: 10px; text-align: left;">Nome</th>
+                                            <th style="padding: 10px; text-align: left;">Email</th>
+                                            <th style="padding: 10px; text-align: left;">Perfil</th>
+                                            <th style="padding: 10px; text-align: left;">Chat ID</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="conf-telegram-users-tbody"></tbody>
+                                </table>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="app.saveTelegramSettings()" style="margin-top: 16px;">
+                                <i class="ph ph-floppy-disk"></i> Salvar Configurações do Telegram
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="app.testTelegram()" style="margin-top: 16px; margin-left: 8px;">
+                                <i class="ph ph-paper-plane-tilt"></i> Testar
+                            </button>
+                            <span id="conf-telegram-status" style="margin-left: 12px; font-size: 12px; color: #64748b;"></span>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-envelope"></i> E-mail
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Configure o provedor de e-mail para envio pelo CRM. Suporta SMTP direto ou APIs nativas como SendGrid.
+                            </p>
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label class="form-label" style="font-size:11px;">Provedor</label>
+                                <select id="conf-mail-provider" class="form-control" onchange="app.onMailProviderChange()">
+                                    <option value="smtp">SMTP (Servidor de E-mail)</option>
+                                    <option value="sendgrid">SendGrid (API)</option>
+                                </select>
+                            </div>
+                            <div id="mail-smtp-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size:11px;">Servidor SMTP</label>
+                                    <input type="text" id="conf-mail-host" class="form-control" placeholder="smtp.empresa.com.br">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size:11px;">Porta</label>
+                                    <input type="number" id="conf-mail-port" class="form-control" placeholder="587">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0; display: flex; align-items: center; gap: 8px; padding-top: 20px;">
+                                    <input type="checkbox" id="conf-mail-secure" style="width: 16px; height: 16px; cursor: pointer;">
+                                    <label class="form-label" style="margin-bottom: 0; font-size:11px; cursor: pointer;">SSL/TLS (porta 465)</label>
+                                </div>
+                                <div></div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size:11px;">Usuário</label>
+                                    <input type="text" id="conf-mail-user" class="form-control" placeholder="contato@empresa.com.br">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size:11px;">Senha</label>
+                                    <div style="display: flex; gap: 8px;">
+                                        <input type="password" id="conf-mail-pass" class="form-control" placeholder="********" style="flex:1;">
+                                        <button type="button" class="btn btn-sm btn-ghost" onclick="app.toggleMailPassVisibility()" title="Mostrar/ocultar senha" style="padding:4px 8px;">
+                                            <i class="ph ph-eye" id="mail-pass-eye-icon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="mail-sendgrid-fields" style="display: none; margin-bottom: 16px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size:11px;">API Key</label>
+                                    <div style="display: flex; gap: 8px;">
+                                        <input type="password" id="conf-mail-api-key" class="form-control" placeholder="SG.xxxxxxxxxxxx" style="flex:1;">
+                                        <button type="button" class="btn btn-sm btn-ghost" onclick="app.toggleMailApiKeyVisibility()" title="Mostrar/ocultar chave" style="padding:4px 8px;">
+                                            <i class="ph ph-eye" id="mail-apikey-eye-icon"></i>
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-muted" style="margin-top: 4px;">A chave é criptografada ao salvar no servidor.</p>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 4px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size:11px;">Nome do Remetente</label>
+                                    <input type="text" id="conf-mail-from-name" class="form-control" placeholder="GeraPro CRM">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size:11px;">E-mail do Remetente</label>
+                                    <input type="email" id="conf-mail-from-email" class="form-control" placeholder="crm@empresa.com.br">
+                                </div>
+                            </div>
+                            <div style="margin-top: 20px; display: flex; gap: 10px; align-items: center;">
+                                <button class="btn btn-primary btn-sm" onclick="app.saveMailSettings()">
+                                    <i class="ph ph-floppy-disk"></i> Salvar Configurações de E-mail
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="app.testMailSettings()">
+                                    <i class="ph ph-paper-plane-tilt"></i> Testar
+                                </button>
+                                <span id="conf-mail-status" style="margin-left: 12px; font-size: 12px; color: #64748b;"></span>
+                            </div>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color:var(--color-accent); border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-funnel"></i> Funil CRM
+                            </h4>
+                            <p class="text-xs text-muted" style="margin-bottom: 16px;">
+                                Configure os estágios do funil de vendas do CRM. É possível renomear, reordenar, adicionar e remover estágios, além de configurar cores, ícones e regras de negócio.
+                            </p>
+                            <div id="crm-stages-manager">
+                                <div style="text-align:center;padding:20px;color:#94a3b8">
+                                    <i class="ph ph-spinner ph-spin" style="font-size:24px"></i>
+                                    <p style="font-size:12px;margin-top:8px">Carregando configuração do funil...</p>
+                                </div>
+                            </div>
+                            <div style="margin-top: 16px; display: flex; gap: 10px; align-items: center;">
+                                <button class="btn btn-primary btn-sm" onclick="app.stageManager.add()">
+                                    <i class="ph ph-plus-circle"></i> Adicionar Estágio
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="app.stageManager.saveAll()">
+                                    <i class="ph ph-floppy-disk"></i> Salvar Todas as Alterações
+                                </button>
+                                <button class="btn btn-ghost btn-sm text-danger" onclick="app.stageManager.resetToDefaults()" style="color:#dc2626">
+                                    <i class="ph ph-arrow-counter-clockwise"></i> Restaurar Padrões
+                                </button>
+                                <span id="crm-stages-status" style="margin-left: 12px; font-size: 12px; color: #64748b;"></span>
+                            </div>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #7c3aed; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-palette"></i> Personalização da Tela de Login
+                            </h4>
+                            <div id="login-theme-form" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                                <div>
+                                    <label class="form-label">Logo da Empresa</label>
+                                    <div style="display:flex;gap:8px;align-items:center;">
+                                        <input type="file" id="lt-logo-file" accept="image/*" style="display:none;" onchange="app.previewLoginLogo(this)">
+                                        <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('lt-logo-file').click()" style="font-size:11px;"><i class="ph ph-upload"></i> Upload Logo</button>
+                                        <button type="button" class="btn btn-sm btn-ghost text-danger" onclick="app.clearLoginLogo()" style="font-size:11px;"><i class="ph ph-x"></i></button>
+                                    </div>
+                                    <img id="lt-logo-preview" style="display:none;max-height:48px;margin-top:6px;border:1px solid #e2e8f0;border-radius:4px;padding:4px;">
+                                </div>
+                                <div>
+                                    <label class="form-label">Nome (título)</label>
+                                    <input type="text" id="lt-company-name" class="form-control" placeholder="GeraPro">
+                                </div>
+                                <div>
+                                    <label class="form-label">Subtítulo</label>
+                                    <input type="text" id="lt-subtitle" class="form-control" placeholder="Sistema de Propostas Técnicas / Comerciais">
+                                </div>
+                                <div>
+                                    <label class="form-label">Cor do Nome (título)</label>
+                                    <input type="color" id="lt-title-color" class="form-control" style="height:38px;padding:4px;" value="#38bdf8">
+                                </div>
+                                <div>
+                                    <label class="form-label">Tipo de Background</label>
+                                    <select id="lt-bg-type" class="form-control" onchange="app.onLoginBgTypeChange()">
+                                        <option value="gradient">Gradiente</option>
+                                        <option value="color">Cor Sólida</option>
+                                        <option value="image">Imagem</option>
+                                    </select>
+                                </div>
+                                <div id="lt-bg-color-field">
+                                    <label class="form-label">Cor de Fundo</label>
+                                    <input type="color" id="lt-bg-color" class="form-control" style="height:38px;padding:4px;" value="#0f172a">
+                                </div>
+                                <div id="lt-gradient-start-field">
+                                    <label class="form-label">Gradiente — Início</label>
+                                    <input type="color" id="lt-gradient-start" class="form-control" style="height:38px;padding:4px;" value="#0f172a">
+                                </div>
+                                <div id="lt-gradient-end-field">
+                                    <label class="form-label">Gradiente — Fim</label>
+                                    <input type="color" id="lt-gradient-end" class="form-control" style="height:38px;padding:4px;" value="#1e293b">
+                                </div>
+                                <div id="lt-bg-image-field" style="display:none;">
+                                    <label class="form-label">Imagem de Fundo</label>
+                                    <div style="display:flex;gap:8px;align-items:center;">
+                                        <input type="file" id="lt-bg-image-file" accept="image/*" style="display:none;" onchange="app.previewLoginBgImage(this)">
+                                        <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('lt-bg-image-file').click()" style="font-size:11px;"><i class="ph ph-upload"></i> Upload Imagem</button>
+                                        <button type="button" class="btn btn-sm btn-ghost text-danger" onclick="app.clearLoginBgImage()" style="font-size:11px;"><i class="ph ph-x"></i></button>
+                                    </div>
+                                    <img id="lt-bg-image-preview" style="display:none;max-height:48px;margin-top:6px;border:1px solid #e2e8f0;border-radius:4px;">
+                                </div>
+                                <div>
+                                    <label class="form-label">Cor do Card</label>
+                                    <input type="color" id="lt-card-bg" class="form-control" style="height:38px;padding:4px;" value="#1e293b">
+                                </div>
+                                <div>
+                                    <label class="form-label">Borda do Card</label>
+                                    <input type="color" id="lt-card-border" class="form-control" style="height:38px;padding:4px;" value="#334155">
+                                </div>
+                                <div>
+                                    <label class="form-label">Cor do Botão (Primary)</label>
+                                    <input type="color" id="lt-primary-color" class="form-control" style="height:38px;padding:4px;" value="#38bdf8">
+                                </div>
+                                <div>
+                                    <label class="form-label">Hover do Botão</label>
+                                    <input type="color" id="lt-primary-hover" class="form-control" style="height:38px;padding:4px;" value="#7dd3fc">
+                                </div>
+                                <div>
+                                    <label class="form-label">Cor do Texto</label>
+                                    <input type="color" id="lt-text-color" class="form-control" style="height:38px;padding:4px;" value="#ffffff">
+                                </div>
+                                <div>
+                                    <label class="form-label">Cor do Subtítulo</label>
+                                    <input type="color" id="lt-subtitle-color" class="form-control" style="height:38px;padding:4px;" value="#64748b">
+                                </div>
+                                <div>
+                                    <label class="form-label">Fundo dos Inputs</label>
+                                    <input type="color" id="lt-input-bg" class="form-control" style="height:38px;padding:4px;" value="#0f172a">
+                                </div>
+                                <div>
+                                    <label class="form-label">Borda dos Inputs</label>
+                                    <input type="color" id="lt-input-border" class="form-control" style="height:38px;padding:4px;" value="#334155">
+                                </div>
+                            </div>
+                            <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e2e8f0;padding-top:16px;">
+                                <button type="button" class="btn btn-sm btn-ghost" onclick="app.resetLoginTheme()" style="font-size:11px;"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar Padrão</button>
+                                <button type="button" class="btn btn-sm" onclick="app.saveLoginTheme()" style="background:#0f172a;color:white;font-size:11px;border-radius:4px;padding:6px 16px;font-weight:700;"><i class="ph ph-check"></i> Salvar Personalização</button>
+                            </div>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #00008B; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-wrench"></i> Tabela de Custos de Mão de Obra
+                            </h4>
+                            <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
+                                Os valores preenchidos aqui serão usados como padrão em Proposta Técnica → Equipamentos → Mão de Obra.
+                            </div>
+                            <div class="table-container" style="border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <table class="w-full" style="font-size: 13px; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="background: var(--color-accent); color: #fff;">
+                                            <th style="padding: 10px; text-align: left; width: 210px;">Área</th>
+                                            <th style="padding: 10px; text-align: left;">Função / Atividade</th>
+                                            <th style="padding: 10px; text-align: right; width: 140px;">Valor/h (R$)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="conf-labor-rates-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card" style="padding: 30px; margin-bottom: 24px;">
+                            <h4 class="text-sm font-bold" style="margin-bottom: 20px; color: #00008B; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-shield-check"></i> Segurança e Backup
+                            </h4>
+                            <div class="form-group" style="background: #f8fafc; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                                    <button class="btn btn-secondary" onclick="app.backup()"><i class="ph ph-download-simple"></i> Baixar Backup JSON</button>
+                                    <label class="btn btn-warning" style="cursor: pointer; margin: 0;">
+                                        <i class="ph ph-upload-simple"></i> Restaurar Backup
+                                        <input type="file" id="file-restore" accept=".json" style="display: none;" onchange="app.restoreBackup(this)">
+                                    </label>
+                                    <p class="text-xs text-muted" style="margin: 0;"><b>Atenção:</b> A restauração substituirá todos os dados atuais.</p>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px;">
+                                <button class="btn btn-ghost text-danger" onclick="window.app.confirm('Isso apagará tudo e reiniciará o banco. Continuar?', 'Resetar Fábrica').then(ok => { if(ok) { localStorage.clear(); location.reload(); } })">
+                                    <i class="ph ph-trash"></i> Resetar Fábrica
+                                </button>
+                                <button class="btn btn-secondary" onclick="loadDemoData()"><i class="ph ph-database"></i> Carregar Dados de Exemplo</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE: LM -->
+            <div id="view-lm" class="module-view hidden-module fade-in">
+                <!-- Injected by js/lm.js -->
+            </div>
+
+            <!-- MODULE: PROPOSTA TECNICA -->
+            <div id="view-proposta-tecnica" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: PROPOSTA COMERCIAL -->
+            <div id="view-proposta-comercial" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: PROPOSTA COMPLETA -->
+            <div id="view-proposta-completa" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: PIPELINE COMERCIAL -->
+            <div id="view-pipeline-comercial" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: PRECIFICACAO -->
+            <div id="view-precificacao" class="module-view hidden-module fade-in" style="background: white; margin: -20px; height: calc(100vh - 80px);"></div>
+
+            <!-- MODULE: RELATORIO DE PROPOSTAS -->
+            <div id="view-relatorio-propostas" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: RELATORIO DE CADASTROS -->
+            <div id="view-relatorio-cadastros" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: RELATORIO DE TIPICOS -->
+            <div id="view-relatorio-tipicos" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: RELATORIO DE MANUFATURA -->
+            <div id="view-relatorio-manufatura" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: MANUFATURA -->
+            <div id="view-manufatura" class="module-view hidden-module fade-in"></div>
+
+            <!-- MODULE: CRM -->
+            <div id="view-crm" class="module-view hidden-module fade-in">
+                <div id="crm-app"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Dynamic Module Loader (Auto-Cache-Buster) -->
+    <!-- Excel Processing Library (SheetJS) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
+
+    <script>
+        (function () {
+            const modules = [
+                'js/state.js',
+                'js/app.js',
+                'js/clientes.js',
+                'js/materiais.js',
+                'js/maoDeObra.js',
+                'js/despesas.js',
+                'js/fornecedores.js',
+                'js/importacao_new.js',
+                'js/importacaoCadastros.js',
+                'js/paineis.js',
+                'js/tipicos.js',
+                'js/cubiculos.js',
+                'js/cargas.js',
+                'js/orcamentos.js',
+                'js/seed.js',
+                'js/lm.js',
+                'js/composicoes.js',
+                'js/regrasDerivacao.js',
+                'js/automacaoMaoDeObra.js',
+                'js/propostaTecnica.js',
+                'js/propostaComercial.js',
+                'js/propostaCompleta.js',
+                'js/pipelineComercial.js',
+                'js/importacaoET.js',
+                'js/precificacao.js',
+                'js/calculosEletricos.js',
+                'js/calculosMecanicos.js',
+                'js/relatorioProposta.js',
+                'js/relatorioPropostas.js',
+                'js/relatorioCadastros.js',
+                'js/relatorioTipicos.js',
+                'js/relatorioManufatura.js',
+                'js/ajuda-conteudo.js',
+                'js/ajuda.js',
+                'js/crm.js',
+                'js/manufatura.js'
+            ];
+
+            // Unique version per reload to force update
+            const v = Date.now();
+
+            console.log(`[System] Loader: Forcing updates with v=${v}`);
+
+            modules.forEach(src => {
+                const s = document.createElement('script');
+                s.type = 'module';
+                s.src = `${src}?v=${v}`;
+                s.async = false; // Execute in order
+                s.onload = () => console.log(`[System] Loader: Loaded ${src}`);
+                s.onerror = (e) => console.error(`[System] Loader: FAILED to load ${src}`, e);
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
+
+    <script>
+        // Proxy-based app: primeiro verifica target (métodos vinculados por App.init()),
+        // depois tenta window.__realApp, senão avisa.
+        window.app = new Proxy(window.app || {}, {
+            get(target, prop) {
+                if (prop in target) return target[prop];
+                if (prop === 'backup') {
+                    return () => {
+                        const data = localStorage.getItem('gerapro_db_v1');
+                        const blob = new Blob([data], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `gerapro_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    };
+                }
+                return (...args) => {
+                    const real = window.__realApp;
+                    if (real && typeof real[prop] === 'function') {
+                        return real[prop].call(real, ...args);
+                    }
+                    console.warn(`app["${prop}"]() não disponível`);
+                };
+            }
+        });
+    </script>
+</body>
+
+</html>

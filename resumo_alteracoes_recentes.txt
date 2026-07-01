@@ -1,0 +1,131 @@
+RESUMO DE ALTERAÇÕES RECENTES - GeraPro
+=========================================
+Data: 28/05/2026
+
+======================================================================
+1. LOGO DO CLIENTE NO CADASTRO (NOVA FUNCIONALIDADE)
+======================================================================
+
+Objetivo:
+- Salvar a logo do cliente no cadastro (clientes) e carregá-la automaticamente
+  quando o cliente for selecionado em Proposta Técnica ou Proposta Comercial.
+
+Arquivos alterados:
+
+a) js/db.js
+   - Adicionada coluna "logo TEXT DEFAULT ''" no CREATE TABLE clientes
+   - Adicionada migração: ALTER TABLE clientes ADD COLUMN logo TEXT DEFAULT ''
+   (linhas ~63 e ~316)
+
+b) js/clientes.js
+   - Nova aba "Logo" no formulário de cadastro de cliente (botão + conteúdo)
+   - Upload de imagem (PNG/JPEG) via FileReader → base64
+   - Preview da logo com opção "Remover Logo"
+   - Hidden input name="logo" salvo junto com os demais campos
+   - Métodos: handleLogoUpload(input), removeClientLogo()
+   - Exportados via app.clientes.handleLogoUpload e app.clientes.removeClientLogo
+
+c) js/propostaTecnica.js
+   - handleClientChange() passo 5: ao selecionar cliente, carrega
+     client.logo nos elementos pt_client_logo_preview,
+     pt_client_logo_preview_container e pt_client_logo_base64
+   - Busca do cliente alterada de comparacao exata (===) para slug comparison,
+     ignorando acentos, maiúsculas e espaços
+
+d) js/propostaComercial.js
+   - updateContactDropdown() passos finais: mesmo carregamento automático
+     da logo do cliente nos elementos client_logo_preview,
+     client_logo_preview_container e client_logo_base64
+
+e) js/_chunk2.js
+   - Espelhada a mesma alteração do handleClientChange (slug + logo load)
+
+
+======================================================================
+2. IMPORTAÇÃO IA - NORMALIZAÇÃO E MAPEAMENTO DE CAMPOS
+======================================================================
+
+Arquivos alterados: js/importacaoET.js, js/propostaTecnica.js,
+                     js/server_new.js, js/_chunk2.js
+
+a) Normalização com _norm()
+   - Método _norm(s): NFD + remove acentos + remove nao alfanumericos
+   - Usado em: clean() de normas, vendor dedup, _mapEquipmentType
+
+b) _normalizeField(val, options)
+   - Normalizador genérico para dropdowns
+   - Usa _norm() + bidirecional includes para matching
+   - Substitui _normalizeForma e _normalizeTensaoOperacao
+
+c) _parseFabricante(str)
+   - "COBRECOM / SIMILAR" → brand=COBRECOM, opt=__SIMILAR__
+   - "WEG / SIEMENS / ABB" → brand=WEG, opt=__OUTRO__,
+     optEspecifique="WEG / SIEMENS / ABB"
+
+d) _findVendorMatch(aiComp, existingList)
+   - Fuzzy matching: todas as palavras do AI devem encontrar match
+   - Evita colisões tipo "CABOS REDE" vs "CABOS DE COMANDO/POTÊNCIA"
+
+e) fieldMappings loop (importacaoET.js:433-456)
+   - Mapeia 21 campos novos do prompt camelCase para chaves técnicas
+     snake_case com normalização de dropdown:
+     montagem, instalacao, camadaPintura, placaMontagem,
+     entradaCabos, saidaCabos, acessoFrontal, acessoTraseiro,
+     acessoManutencao, caboComunicacao, arcoInterno, iluminacao,
+     tomada, termostato, ventilacao, barramentoTratamento,
+     termoretratil, comandoFonte, auxiliar, auxiliarFonte
+
+f) Novos campos no Ficha Técnica:
+   - "Tensão de Operação" dropdown (690V, 480V, 440V, 380V, 220V)
+   - "Corrente Nominal" dropdown (50A a 6300A, 25 opções)
+   - Excluídos para CUB-MT, ELETROCENTRO, SEU, TR-MT
+
+g) Capacidade Curto (Icc):
+   - Adicionados "31,5kA" e "40kA" ao dropdown
+
+h) Separação decimal:
+   - .replace('.', ',') para tensao, icc, correnteNominal
+
+i) Normas:
+   - Busca por número apenas ("60529" → nbr_iec_60529)
+   - Normas desconhecidas → auto-criação como custom norms
+
+j) Vendor list:
+   - Categorias com fuzzy matching (_findCategory)
+   - Itens sem categoria → linhas extras
+   - Brand fora do VENDOR_MAP → opt=__OUTRO__ + optEspecifique
+   - Vendor dedup: atualiza existing items em vez de pular
+   - opt='fornecido' alterado para '__PADRAO__'
+
+k) Partida Direta:
+   - Código "PD" (não "D")
+
+l) tipoPartida, protocolo, cor RAL:
+   - Mapeamento completo no _applyDataToProposal
+
+m) AI Prompt (server_new.js):
+   - Text limit: 12000 → 60000 caracteres
+   - +21 novos campos no schema
+   - Tabela VALORES ESPERADOS para inferência de campo pelo valor
+
+
+======================================================================
+3. CORREÇÕES ADICIONAIS
+======================================================================
+
+- propostaTecnica.js:2620 - '80 õm' corrigido para '80 um' (+ 90, 100)
+- handleClientChange auto-trigger em renderModal (propostaTecnica.js:1744)
+- Tensão padrão em cargas alterada de '440' para '380'
+
+
+======================================================================
+ARQUIVOS MODIFICADOS (lista completa)
+======================================================================
+
+C:\Users\jcc\Documents\Workspace_A\GeraPro\js\propostaTecnica.js
+C:\Users\jcc\Documents\Workspace_A\GeraPro\js\importacaoET.js
+C:\Users\jcc\Documents\Workspace_A\GeraPro\js\server_new.js
+C:\Users\jcc\Documents\Workspace_A\GeraPro\js\_chunk2.js
+C:\Users\jcc\Documents\Workspace_A\GeraPro\js\clientes.js
+C:\Users\jcc\Documents\Workspace_A\GeraPro\js\propostaComercial.js
+C:\Users\jcc\Documents\Workspace_A\GeraPro\js\db.js

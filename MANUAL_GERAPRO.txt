@@ -1,0 +1,148 @@
+MANUAL DE UTILIZAÇÃO - GERAPRO
+================================================================================
+VERSÃO DO DOCUMENTO: 1.1
+DATA: 19/03/2026
+================================================================================
+
+SUMÁRIO
+1. INTRODUÇÃO
+2. INTERFACE GERAL
+3. DASHBOARD (VISÃO GERAL)
+4. MÓDULO: ENGENHARIA
+    4.1. Lista de Cargas
+    4.2. Lista de Materiais (BOM)
+5. MÓDULO: COMERCIAL
+    5.1. Orçamentos
+    5.2. Proposta Técnica
+    5.3. Proposta Comercial
+6. MÓDULO: CADASTROS
+    6.1. Clientes
+    6.2. Materiais
+    6.3. Típicos
+7. CONFIGURAÇÕES E SISTEMA
+    7.1. Sincronização de Arquivos
+
+================================================================================
+1. INTRODUÇÃO
+================================================================================
+O GeraPro é um sistema web integrado para gestão de engenharia e processos comerciais da DRIVETECH Engenharia. Ele foi desenvolvido para facilitar a criação de listas de cargas, geração automática de listas de materiais, elaboração de propostas técnicas e comerciais, e gestão de clientes.
+
+O sistema opera localmente e sincroniza automaticamente os dados com a estrutura de pastas DVT no seu computador.
+
+================================================================================
+2. INTERFACE GERAL
+================================================================================
+A interface é dividida em duas áreas principais:
+
+2.1. BARRA LATERAL (MENU)
+Localizada à esquerda, contém a navegação principal do sistema.
+- Topo: Exibe o nome "GeraPro" e a versão.
+- Categorias:
+    - Principal: Acesso ao Dashboard.
+    - Engenharia: Ferramentas técnicas (Cargas, Materiais).
+    - Comercial: Ferramentas de vendas (Orçamentos, Propostas).
+    - Cadastros: Gestão de banco de dados (Clientes, Materiais, Típicos).
+    - Sistema: Configurações globais.
+
+2.2. ÁREA DE CONTEÚDO
+Ocupa o restante da tela à direita. É onde as janelas e ferramentas são carregadas conforme a seleção no menu.
+
+================================================================================
+3. DASHBOARD (VISÃO GERAL)
+================================================================================
+Ao iniciar o sistema, a tela de Dashboard é apresentada.
+Ela contém cards informativos com o resumo do sistema:
+- Total de Clientes Cadastrados
+- Total de Propostas Emitidas
+- Resumo de Materiais no Banco de Dados
+
+================================================================================
+4. MÓDULO: ENGENHARIA
+================================================================================
+
+4.1. LISTA DE CARGAS
+Este módulo permite o dimensionamento de cargas elétricas do projeto.
+
+--- FUNCIONALIDADES E CAMPOS ---
+- Tabela de Cargas: Lista todas as cargas cadastradas.
+    - Colunas: TAG, Descrição, Potência (CV/kW), Tensão, Típico Associado.
+- Botão "Adicionar Carga": Abre um formulário para nova carga para cadastro manual.
+- Botão "Importar Excel": Permite carregar uma lista de cargas em massa via planilha (.xlsx).
+- Ações por Linha:
+    - Editar: Altera os dados da carga.
+    - Excluir: Remove a carga da lista.
+
+4.2. LISTA DE MATERIAIS (BOM)
+Gera automaticamente a lista de materiais baseada nas cargas cadastradas e seus típicos.
+
+--- FUNCIONALIDADES ---
+- Agrupamento Inteligente: Os materiais são agrupados por "Carga", facilitando a visualização do que é necessário para cada motor/equipamento.
+- Exportação:
+    - Exportar Excel: Gera um download direto de uma planilha (.xlsx) com todos os materiais, quantidades e códigos, formatada para compra. O arquivo é nomeado com o número da DVT e data/hora da exportação.
+
+================================================================================
+5. MÓDULO: COMERCIAL
+================================================================================
+
+5.1. PROPOSTA TÉCNICA
+Ferramenta poderosa para geração de documentos formais de especificação técnica.
+
+--- TELA INICIAL (LISTAGEM) ---
+- Exibe uma tabela com todas as propostas técnicas encontradas nas pastas DVT do computador.
+- Sincronização Automática: A lista é atualizada sempre que o sistema inicia e logo após salvar uma nova proposta.
+- Botões de Ação: Editar (Lápis) e Excluir (Lixeira).
+
+--- FORMULÁRIO DE CRIAÇÃO/EDIÇÃO ---
+O formulário é dividido em seções para compor o documento Word (.docx):
+
+A) DADOS DO CLIENTE E PROJETO
+    - Cliente (Dropdown): Lista suspensa que puxa automaticamente os clientes cadastrados.
+    - Nome do Projeto (Texto): Campo livre para identificar a obra.
+
+B) IMAGENS E IDENTIDADE VISUAL
+    - Logomarca (PNG): Aparece na capa do documento.
+    - Marca D'água (PNG): Aparece no centro de todas as páginas. Se vazio, usa a Logomarca.
+
+C) SEÇÕES DO DOCUMENTO
+    - 1.1 ESCOPO DE FORNECIMENTO: Descrição detalhada do que está sendo ofertado.
+    - 1.2 DOCUMENTOS DE REFERÊNCIA: Permite inserir imagens (prints) dos arquivos enviados pelo cliente.
+        - Dica: Você pode colar uma imagem diretamente do clipboard (Ctrl+V) no campo indicado.
+    - 1.3 DOCUMENTOS A SEREM ENTREGUES: Lista de manuais, desenhos e certificados previstos.
+
+D) ESPECIFICAÇÕES ELÉTRICAS
+    - Seleção de Sistema Elétrico, Tensão, Frequência, Icc, etc. Usando botões de seleção rápida.
+
+--- BOTÕES DO RODAPÉ ---
+- Gerar Word: Gera e baixa o arquivo .docx baseado no template TEMPLATE_TEC.docx.
+- Salvar: Grava fisicamente na pasta da DVT (ex: Documentação Drivetech/PropostaTecnica.json).
+
+5.2. PROPOSTA COMERCIAL
+- Funcionalidade para gestão de preços e condições comerciais.
+- Permite vincular a proposta a uma DVT específica para versionamento automático.
+
+================================================================================
+6. MÓDULO: CADASTROS
+================================================================================
+
+6.1. CLIENTES
+- Gerenciamento completo (Inserção, Edição, Exclusão).
+
+6.2. MATERIAIS
+- Banco de dados de componentes com preços e fabricantes.
+
+6.3. TÍPICOS
+- Definição de padrões técnicos que automatizam a geração da Lista de Materiais.
+
+================================================================================
+7. CONFIGURAÇÕES E SISTEMA
+================================================================================
+
+7.1. SINCRONIZAÇÃO DE ARQUIVOS
+O GeraPro agora possui "inteligência de disco":
+- Ao abrir, ele lê todas as propostas salvas nas pastas de Documentos.
+- Ao salvar, ele cria as pastas de revisão (Rev1, Rev2...) conforme a necessidade.
+- Se o servidor Node.js for reiniciado, a lista é refrescada automaticamente.
+
+================================================================================
+FIM DO MANUAL
+================================================================================

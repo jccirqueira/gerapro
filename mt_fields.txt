@@ -1,0 +1,15 @@
+﻿
+C:\Users\jose.cirqueira.DRIVETECH\.gemini\antigravity\brain\e575de44-d833-4220-81fa-c6e432a12afc\.system_generated\logs
+\overview.txt:146:{"step_index":396,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-05-15
+T16:19:11Z","content":"Refatorei o fluxo de criação e a Ficha Técnica para torná-los mais claros e específicos para 
+cada tipo de equipamento, conforme solicitado.\n\n### 🛠️ O que foi implementado:\n\n1.  **Wizard de Criação de 
+Equipamento**:\n    *   Ao clicar no botão `+`, agora abre um **modal dedicado**.\n    *   Neste modal, você define a 
+**TAG** e o **Tipo de Painel** (CCM-BT, QGBT ou Cubículo MT) antes de ele ser adicionado à lista.\n    *   Isso evita 
+a criação de equipamentos \"genéricos\" e já pré-configura as normas e campos técnicos corretos.\n\n2.  **Fichas 
+Técnicas Diferenciadas**:\n    *   **Para Cubículos MT**: O formulário agora exibe campos específicos de alta/média 
+tensão, como *Nível de Isolamento (kV)*, *Frequência*, *Curto Térmico (kA/1s)*, *Curto Dinâmico (kAp)* e 
+*Classificação de Arco (IAC)*.\n    *   **Para CCM-BT / QGBT**: O formulário foca em baixa tensão, incluindo *Tensão 
+de Comando*, *Corrente de Curto* e um seletor para a *Forma de Segregação* (Formas 1, 2a/b, 3a/b, 4a/b).\n\n<truncated 
+477 bytes>"}
+
+

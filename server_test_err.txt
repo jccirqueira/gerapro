@@ -1,0 +1,50 @@
+ExperimentalWarning: SQLite is an experimental feature and might change at any time
+    at emitExperimentalWarning (node:internal/util:331:11)
+    at node:sqlite:4:1
+    at BuiltinModule.compileForInternalLoader (node:internal/bootstrap/realm:398:7)
+    at BuiltinModule.compileForPublicLoader (node:internal/bootstrap/realm:337:10)
+    at loadBuiltinModule (node:internal/modules/helpers:125:7)
+    at loadBuiltinWithHooks (node:internal/modules/cjs/loader:1202:15)
+    at Module._load (node:internal/modules/cjs/loader:1254:50)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (C:\Users\jcc\Documents\Workspace_A\GeraPro\js\db.js:7:26)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (C:\Users\jcc\Documents\Workspace_A\GeraPro\server_new.js:27:12)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+node:events:486
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::8082
+    at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+    at listenInCluster (node:net:2005:12)
+    at Server.listen (node:net:2110:7)
+    at Object.<anonymous> (C:\Users\jcc\Documents\Workspace_A\GeraPro\server_new.js:1792:8)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1984:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 8082
+}
+
+Node.js v24.14.1

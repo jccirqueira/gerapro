@@ -1,0 +1,208 @@
+ALTERAÇÕES E CORREÇÕES — 22/06/2026
+=====================================
+Arquivo: js/propostaTecnica.js
+Repositório: GeraPro
+
+ÍNDICE
+  1. Canaleta (quadro) não aparecia no layout
+  2. PDF exportado fora de escala
+  3. Cotas verticais no layout
+  4. Comprimento do trilho DIN ajustável
+  5. Leitura do config por armário (per-cabinet)
+  6. Fallbacks divergentes dos defaults
+  7. Preservar IDs originais das linhas
+  8. Botão "+ Adicionar Linha" quebrado (escaping)
+  9. Botão "Remover" para Linhas / Faixas
+ 10. PDF em branco na primeira exportação
+
+================================================================================
+1. CANALETA (QUADRO) NÃO APARECIA NO LAYOUT
+================================================================================
+
+Problema:
+  _saveLayoutConfig() para configuração por armário (per-cabinet) substituía
+  todo o layoutConfig sem preservar canaletas e retalhosCanaleta.
+
+Correção:
+  Linha 4053-4062 — no bloco if (isPerCabinet), preservar canaletas e
+  retalhosCanaleta do existingCabCfg, similar ao path global.
+
+  if (isPerCabinet) {
+      const existingCabCfg = eq.layoutConfig.cabinetAssignments[cabId].layoutConfig || {};
+      eq.layoutConfig.cabinetAssignments[cabId].layoutConfig = {
+          ...newConfig,
+          canaletas: existingCabCfg.canaletas || [],
+          retalhosCanaleta: existingCabCfg.retalhosCanaleta || []
+      };
+  }
+
+================================================================================
+2. PDF EXPORTADO FORA DE ESCALA
+================================================================================
+
+Problema:
+  style="width:100%" nas tags <img> do print overlay forçava estiramento
+  da imagem, conflitando com max-height:100% do CSS. Sem object-fit:contain,
+  o aspect ratio não era preservado, distorcendo o layout no PDF.
+
+Correções:
+  Linhas 12104, 12108, 12114 — trocar style="width:100%" por:
+    style="max-width:100%;max-height:100vh;object-fit:contain;display:block;margin:0 auto;"
+
+  Linha 12130 (CSS) — adicionar object-fit: contain e trocar max-height:100%
+  para max-height:100vh:
+    #_layout_print_overlay img { max-width: 100%; max-height: 100vh; object-fit: contain; }
+
+================================================================================
+3. COTAS VERTICAIS NO LAYOUT
+================================================================================
+
+Funcionalidade adicionada:
+  Novo método _drawVerticalDimensions(ctx, cab, x, y, scale, fontMult)
+  inserido após _drawCanaletaSegment (~linha 4482).
+
+  Desenha uma régua vertical no lado esquerdo de cada armário com:
+  - Y positions (0, 300, início/fim de cada linha, canaletas, barra terra 2100,
+    base 2200, fundo 2300)
+  - Distâncias em mm entre landmarks consecutivos
+  - Nomes das zonas (Proteções, Acionamentos, etc.)
+  - Canaletas destacadas em azul-petróleo (#0e7490)
+
+  Chamada em _drawLayoutInternal na linha 4300 (antes de x += cabW).
+
+  Posicionamento:
+  - Se canaletaEsq >= 20mm: dentro do armário, centralizado na faixa esquerda
+  - Se canaletaEsq < 20mm: ligeiramente à esquerda do armário
+
+================================================================================
+4. COMPRIMENTO DO TRILHO DIN AJUSTÁVEL
+================================================================================
+
+Problema:
+  O comprimento do trilho DIN era fixo = cab.width - canaletaEsq - canaletaDir,
+  sem possibilidade de ajuste manual.
+
+Correções:
+  4a. _getDefaultLayoutConfig (linha 4367) — adicionar comprimentoTrilho: 0
+      (0 = automático = largura total)
+
+  4b. _showLayoutConfigPanel (linha 3865) — grid alterado para 5 colunas;
+      novo campo "Comp. Trilho (mm)" com tooltip "0 = largura total do armário"
+      e id="lcfg_compTrilho"
+
+  4c. _saveLayoutConfig (linha 4053) — salvar comprimentoTrilho:
+      comprimentoTrilho: parseInt(document.getElementById('lcfg_compTrilho')?.value) || 0
+
+  4d. _layoutCabinetRows (linha 5367) — calcular railLen:
+      const railLen = (layoutConfig.comprimentoTrilho || 0) > 0
+          ? layoutConfig.comprimentoTrilho : cabWidth;
+
+  4e. _layoutCabinetRows — usar railLen como constraint de empacotamento
+      (linhas 5408, 5409, 5427) e para row.trilho.w (linha 5461)
+
+================================================================================
+5. LEITURA DO CONFIG POR ARMÁRIO (PER-CABINET)
+================================================================================
+
+Problema:
+  _getCanaletaTarget(eq) lia lcfg_cabId do DOM (document.getElementById),
+  mas este elemento não existia quando chamado de _showLayoutConfigPanel
+  porque o overlay ainda não havia sido criado. Resultado: retornava o config
+  global em vez do config por armário, pré-preenchendo o overlay com valores
+  errados e sobrescrevendo o config por armário ao salvar.
+
+Correção:
+  Linha 3840-3842 — substituir:
+    const cfg = isPerCabinet ? this._getCanaletaTarget(eq) : ...
+  por:
+    const cfg = isPerCabinet
+        ? (eq.layoutConfig?.cabinetAssignments?.[cabId]?.layoutConfig
+            || this._getDefaultLayoutConfig())
+        : (eq.layoutConfig || this._getDefaultLayoutConfig());
+
+================================================================================
+6. FALLBACKS DIVERGENTES DOS DEFAULTS
+================================================================================
+
+Problema:
+  Em _saveLayoutConfig, os fallbacks de parseInt eram 40 para canaletaEsq/Dir,
+  mas o default real em _getDefaultLayoutConfig era 0. Input vazio/inválido
+  salvava 40 onde deveria ser 0.
+
+Correção:
+  Linhas 4054-4055 — trocar || 40 por || 0:
+    canaletaEsq: parseInt(...) || 0
+    canaletaDir: parseInt(...) || 0
+
+================================================================================
+7. PRESERVAR IDs ORIGINAIS DAS LINHAS
+================================================================================
+
+Problema:
+  Cada save gerava novos IDs para todas as linhas
+  ('linha_' + Date.now() + '_' + i), perdendo o vínculo.
+
+Correções:
+  7a. _showLayoutConfigPanel (linha 3849) — adicionar hidden input em cada linha:
+      <td style="display:none;"><input type="hidden" class="lcfg_id"
+          value="${l.id || ''}"></td>
+
+  7b. _saveLayoutConfig (linhas 4032-4033) — preservar ID original:
+      const origId = row.querySelector('.lcfg_id')?.value;
+      linhas.push({ id: origId || 'linha_' + Date.now() + '_' + linhas.length, ... });
+
+  7c. Botão "+ Adicionar Linha" (linha 3897) — mesmo hidden input com value=""
+      (novas linhas ganham ID gerado automaticamente)
+
+  7d. Método _adicionarLinhaLayout (linha 4597) — mesmo hidden input no template
+
+================================================================================
+8. BOTÃO "+ ADICIONAR LINHA" QUEBRADO (ESCAPING)
+================================================================================
+
+Problema:
+  O onclick do botão tinha JavaScript inline com 3 camadas de aninhamento
+  (template outer → atributo HTML " → template inner). As sequências \\\"
+  e \\\\" produziam \" na HTML, que não é um escape válido em atributos HTML.
+  O navegador interpretava \" como fim do atributo, truncando o código e
+  causando SyntaxError: Unexpected end of input.
+
+  Além disso, o <input type="hidden"> era filho direto de <tr> (HTML inválido),
+  o que também contribuía para o erro.
+
+Correções:
+  8a. Linha 3893 — substituir onclick inline por chamada simples:
+      onclick="window.propostaTecnicaModule._adicionarLinhaLayout()"
+
+  8b. Linhas 4589-4605 — novo método _adicionarLinhaLayout() no módulo,
+      com template literal limpa (sem escapes aninhados) que insere a linha
+      via insertAdjacentHTML.
+
+  8c. Hidden input sempre dentro de <td style="display:none;"> (válido).
+
+================================================================================
+9. BOTÃO "REMOVER" PARA LINHAS / FAIXAS
+================================================================================
+
+Funcionalidade adicionada:
+  9a. Linha 3904 — coluna "Ações" no <thead> da tabela
+  9b. Linha 3854 — botão ✕ no template de linhas existentes (linhasHtml)
+  9c. Linha 4602 — botão ✕ no método _adicionarLinhaLayout() (novas linhas)
+  9d. O botão usa this.closest('tr').remove() — remove a linha do DOM.
+      Ao salvar, _saveLayoutConfig processa apenas as linhas restantes.
+
+================================================================================
+10. PDF EM BRANCO NA PRIMEIRA EXPORTAÇÃO
+================================================================================
+
+Problema:
+  O <style> com @media print estava dentro do innerHTML do overlay.
+  window.print() era chamado antes do navegador parsear e aplicar o CSS.
+  No primeiro clique após F5, as regras @media print não estavam ativas →
+  overlay ficava com display:none (regra @media screen) → tela em branco.
+  No segundo clique, o <style> já estava em cache e funcionava.
+
+Correção:
+  Linha 12268 — envolver window.print() em requestAnimationFrame:
+    requestAnimationFrame(() => { window.print(); });
+  Garante que o navegador aplique o CSS antes de abrir a caixa de impressão.

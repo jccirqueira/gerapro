@@ -1,0 +1,78 @@
+ALTERAÇÕES REALIZADAS EM 25/06/2026
+=====================================
+
+Arquivo modificado: js/propostaTecnica.js
+
+----------------------------------------------------------------------
+1. Botões "Alocar" e "Alocar Carga" — Adicionado type="button"
+----------------------------------------------------------------------
+- Linha 5366: Adicionado type="button" ao botão "Alocar" (alocação individual de material)
+- Linha 5383: Adicionado type="button" ao botão "Alocar Carga" (alocação de carga inteira)
+- Linha 5385: Adicionado type="button" ao botão "Remover Carga"
+
+Motivo: Botões sem type definido dentro de um <form> assumem type="submit"
+por padrão, o que pode causar comportamento indesejado de submissão.
+
+----------------------------------------------------------------------
+2. Método _recalcularLayout() — Substituída chamada de renderSubTab()
+   por atualização direcionada
+----------------------------------------------------------------------
+Antes:
+    if (this.activeSubTab === 'layout') this.renderSubTab();
+
+Depois:
+    if (this.activeSubTab === 'layout') {
+        this._redrawLayoutCanvas();
+        this._recarregarBOM();
+    }
+
+Motivo: renderSubTab() chama renderModal(), que substitui TODO o HTML
+do container (#view-proposta-tecnica) via innerHTML. Isso causava:
+  - Fechamento/colapso da seção "Lista de Materiais" (BOM)
+  - Scroll da página para o topo
+  - Perda de foco e estado dos elementos da UI
+
+Agora, _recalcularLayout() apenas:
+  - Atualiza o canvas do layout via _redrawLayoutCanvas()
+  - Atualiza o conteúdo da seção BOM in-place via _recarregarBOM()
+
+Isso preserva o scroll, o estado expandido/recolhido da BOM e o foco.
+
+----------------------------------------------------------------------
+3. Novo método _recarregarBOM()
+----------------------------------------------------------------------
+Adicionado na linha 5744.
+
+Função: Re-renderiza apenas o HTML interno do elemento da seção de
+Lista de Materiais (bom_body ou bom_body_empty), sem substituir o
+restante da página.
+
+Funcionamento:
+  - Obtém o equipment ativo do store
+  - Gera a árvore de materiais via _geraArvoreMateriais()
+  - Obtém armários via suggestLayout()
+  - Gera o HTML da BOM via _renderBOMAlocacao()
+  - Substitui o innerHTML do elemento #bom_body ou #bom_body_empty
+
+----------------------------------------------------------------------
+4. Métodos _confirmAdicionarArmario() e _removerArmario() —
+   Re-render completo explícito
+----------------------------------------------------------------------
+- Linha 4816: Adicionado this.renderSubTab() após _recalcularLayout()
+- Linha 4832: Adicionado this.renderSubTab() após _recalcularLayout()
+
+Motivo: Adicionar ou remover armários altera a estrutura de armários
+(controles de largura, botão de remover, etc.), sendo necessário um
+re-render completo da aba de layout para refletir essas mudanças.
+Como são operações pouco frequentes, o re-render completo é aceitável
+nestes casos específicos.
+
+----------------------------------------------------------------------
+Resumo do comportamento esperado
+----------------------------------------------------------------------
+- Clicar em "Alocar Carga" ou "Alocar": página permanece na mesma
+  posição, BOM não colapsa, layout visual é atualizado.
+- Clicar em "Salvar a Proposta": comportamento inalterado (fecha o
+  modal normalmente).
+- Adicionar/Remover armário: re-renderiza completamente a aba de
+  layout (comportamento inalterado).

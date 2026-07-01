@@ -1,0 +1,330 @@
+================================================================================
+  MÓDULO CRM — HISTÓRICO DE REVISÕES E CONTEXTO TÉCNICO
+  Data: 2026-06-27
+================================================================================
+
+Este documento registra as últimas modificações no módulo CRM para referência
+futura durante manutenção ou desenvolvimento de novas funcionalidades.
+
+
+ÍNDICE
+  1. Correção no esquema do banco — colunas empresa_id
+  2. Arquivos de documentação do CRM
+  3. Substituição global da cor da marca
+  4. Renomeação do módulo — "Pipeline Comercial" → "Gestão de Propostas"
+  5. Reordenação da sidebar
+  6. Visão geral da estrutura do módulo CRM
+  7. Envio de e-mail via templates no CRM (NOVO)
+  8. Problemas conhecidos e tarefas pendentes
+
+
+================================================================================
+1. CORREÇÃO NO ESQUEMA DO BANCO — COLUNAS empresa_id
+================================================================================
+
+  PROBLEMA:
+    Criar uma interação (crmInteracoes) falhava com:
+    "table crm_interacoes has no column named empresa_id"
+
+  CAUSA RAIZ:
+    O método db.create() do servidor adiciona automaticamente o empresa_id
+    do token JWT em todo registro antes do INSERT. Três tabelas do CRM foram
+    criadas sem a coluna empresa_id, causando SQLITE_ERROR na inserção:
+      - crm_interacoes  ← AUSENTE (apenas crm_leads e crm_email_templates tinham)
+      - crm_tarefas     ← AUSENTE
+      - crm_email_templates ← já tinha (sem correção necessária)
+
+  ARQUIVOS ALTERADOS:
+    Arquivo: js/db.js
+    Linhas alteradas:
+      - CREATE TABLE crm_interacoes: adicionado empresa_id após id (linha 475)
+      - CREATE TABLE crm_tarefas: adicionado empresa_id após id (linha 493)
+      - Adicionadas migrações ALTER TABLE para bancos existentes (linhas 567-568)
+
+  CÓDIGO DE MIGRAÇÃO ADICIONADO:
+      try { db.exec("ALTER TABLE crm_interacoes ADD COLUMN
+            empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) {}
+      try { db.exec("ALTER TABLE crm_tarefas ADD COLUMN
+            empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) {}
+
+  REQUISITO PARA CORREÇÃO:
+    É necessário reiniciar o servidor para que a migração seja executada.
+    As instruções CREATE TABLE já possuem a coluna para bancos novos.
+
+  VERIFICAÇÃO:
+    Verifique o console do navegador (F12) após reiniciar. O erro
+    "table crm_interacoes has no column named empresa_id"
+    não deve mais aparecer ao salvar uma interação.
+
+
+================================================================================
+2. ARQUIVOS DE DOCUMENTAÇÃO DO CRM
+================================================================================
+
+  Dois novos arquivos de ajuda foram criados, seguindo o mesmo estilo e tom
+  dos arquivos "explicacao-precificacao.txt/html" existentes:
+
+  LISTA DE ARQUIVOS:
+    docs/explicacao-crm.txt     (588 linhas, estilo ASCII com caixas)
+    docs/explicacao-crm.html    (793 linhas, HTML com Phosphor Icons + CSS)
+
+  ESTRUTURA DE CONTEÚDO (14 seções):
+    1.  O que é o CRM
+    2.  Os Status do Funil (com tabela)
+    3.  Visão Kanban
+    4.  Visão Lista
+    5.  Visão 360° do Lead (6 abas: Dados, Interações, Tarefas, Propostas, Score, Ações)
+    6.  Score do Lead (detalhamento da pontuação automática e manual)
+    7.  Handoff para Gestão de Propostas
+    8.  Relatórios
+    9.  Exportando Dados (CSV e XLSX)
+    10. Tarefas (Aba Separada)
+    11. Passo a Passo na Tela
+    12. Dicas Importantes
+    13. Glossário
+    14. Problemas Comuns e Soluções
+
+  NOTAS DE ESTILO:
+    - O arquivo HTML usa Phosphor Icons v1.4.2 (carregado via CDN)
+    - As variáveis CSS são idênticas ao estilo da precificação
+    - Esquema de cores: primary=#0f4c5c, accent=#e67e22
+    - Layout responsivo para celular
+    - O arquivo TXT usa caracteres Unicode de desenho de caixas (mesmo da precificação)
+
+
+================================================================================
+3. SUBSTITUIÇÃO GLOBAL DA COR DA MARCA
+================================================================================
+
+  Todas as ocorrências de rgb(67, 101, 17) (antiga cor verde da marca) foram
+  substituídas por rgb(3, 92, 169) (nova cor azul da marca) em TODOS os
+  arquivos fonte.
+
+  EXECUTADO VIA POWERSHELL:
+      Get-ChildItem -Recurse -Include *.js, *.html, *.css, *.txt, *.json
+      | Select-String -Pattern "rgb\(67, 101, 17\)" -SimpleMatch
+      | ForEach-Object { (Get-Content $_.Path) -replace
+        'rgb\(67, 101, 17\)', 'rgb(3, 92, 169)' | Set-Content $_.Path }
+
+  IMPACTO:
+    - Arquivos CSS de tema: fundo do .crm-tab.active alterado para a cor de destaque da marca
+    - Estilos específicos do CRM atualizados
+    - Nenhuma instância restante da cor verde antiga (verificado)
+
+
+================================================================================
+4. RENOMEAÇÃO DO MÓDULO — "Pipeline Comercial" → "Gestão de Propostas"
+================================================================================
+
+  Todas as referências visíveis ao usuário para "Pipeline Comercial" foram
+  renomeadas para "Gestão de Propostas":
+
+  ARQUIVOS ALTERADOS:
+    js/pipelineComercial.js:
+      - Título do cabeçalho alterado: "Pipeline Comercial" → "Gestão de Propostas"
+      - Subtítulo do cabeçalho atualizado
+      - Ícone alterado de ph-trend-up para ph-stack
+
+    js/ajuda-conteudo.js:
+      - Todas as ocorrências "Pipeline Comercial" → "Gestão de Propostas"
+      - Artigos corrigidos: "do/da Pipeline" → "do/da Gestão"
+      - Artigos definidos: "O Pipeline" → "A Gestão", "O/A" → "A"
+
+    index.html:
+      - Texto do item da sidebar alterado
+      - Título do nav atualizado
+
+    docs/explicacao-gestao-propostas.txt (renomeado de explicacao-pipeline-comercial.txt):
+      - Arquivo renomeado
+      - Texto interno atualizado
+
+    docs/explicacao-gestao-propostas.html (renomeado de .html):
+      - Arquivo renomeado
+      - Texto interno atualizado
+
+  IMPORTANTE:
+    - Referências internas (nomes de função, nomes de variável, rotas) NÃO
+      foram alteradas — apenas strings visíveis ao usuário
+    - Os valores de status na tabela pipeline_items NÃO foram alterados
+      (ex: "prospect", "proposta_enviada", "ganho", "perdido" permanecem
+      como estão porque pertencem à Gestão de Propostas)
+
+
+================================================================================
+5. REORDENAÇÃO DA SIDEBAR
+================================================================================
+
+  A ordem do menu lateral foi alterada de:
+    Dashboard → Cadastros → Pipeline Comercial → Proposta Técnica → ...
+
+  Para:
+    Dashboard → Cadastros → CRM → Gestão de Propostas → Proposta Técnica → ...
+
+  Isso foi feito reordenando os itens de navegação no index.html e atualizando
+  o roteamento de views no app.js e crm.js.
+
+  O cabeçalho acima do CRM usa um module-header sticky (classe:
+  module-header-sticky) com botão "Novo Lead", título "CRM" e subtítulo
+  "Gestão de Leads e Oportunidades".
+
+
+================================================================================
+6. VISÃO GERAL DA ESTRUTURA DO MÓDULO CRM
+================================================================================
+
+  ARQUIVO              FUNÇÃO
+  ─────────────────────  ─────────────────────────────────────────────────
+  js/crm.js              Módulo principal do CRM (~1600 linhas). Contém:
+                           - Dashboard (cards de resumo, gráfico de funil, alertas)
+                           - Kanban (cartões com arrastar e soltar)
+                           - Lista (tabela ordenável com filtros + exportação)
+                           - Tarefas (cartões de tarefas pendentes/concluídas)
+                           - Relatórios (métricas, tabela por vendedor, funil)
+                           - Modal 360° do Lead (6 abas)
+                           - Handoff para Gestão de Propostas
+                           - Score do lead (automático + manual)
+                           - Métodos de exportação CSV/XLSX
+                           - Método de impressão de relatório
+
+  js/state.js            Métodos CRUD do CRM adicionados:
+                           - addCrmLead, updateCrmLead, deleteCrmLead
+                           - addCrmInteracao, updateCrmInteracao, deleteCrmInteracao
+                           - addCrmTarefa, updateCrmTarefa, deleteCrmTarefa
+                           - addCrmEmailTemplate, updateCrmEmailTemplate, deleteCrmEmailTemplate
+                           - populateFromSync para todas as entidades CRM
+
+  js/db.js               Esquema do CRM (4 tabelas com índices):
+                           - crm_leads
+                           - crm_interacoes
+                           - crm_tarefas
+                           - crm_email_templates
+                         Adicionado ao TABLE_MAP e getFullSync()
+
+  js/server_new.js       Entidades CRM adicionadas ao validEntities
+
+  js/app.js              CRM adicionado ao titleMap e allowedViews
+
+  index.html             Item de nav do CRM, container da view, carregador de script
+
+  css/theme-industrial.css  Estilos específicos do CRM (~250 linhas)
+
+  REGRAS ARQUITETURAIS IMPORTANTES:
+    - O CRM gerencia APENAS estes status:
+        novo, tentando_contato, contato_realizado, qualificado,
+        agendado_visita, visita_realizada, virou_proposta, desqualificado
+    - A Gestão de Propostas gerencia APENAS estes status:
+        prospect, proposta_enviada, ganho, perdido
+    - O CRM NUNCA escreve em proposta_enviada/ganho/perdido
+    - O Vendedor NUNCA cria propostas — apenas sinaliza via "Solicitar Proposta"
+    - Handoff: o CRM escreve um pipeline_item via store API, a Gestão captura
+
+
+================================================================================
+7. ENVIO DE E-MAIL VIA TEMPLATES NO CRM (NOVO — 2026-06-27)
+================================================================================
+
+  ARQUITETURA:
+
+    Configuração SMTP → Settings (sidebar > Configurações > E-mail SMTP)
+    Templates          → CRM (dentro do modal 360° do lead, aba E-mail)
+    Envio              → POST /api/send-email (server_new.js)
+
+  BACKEND (server_new.js):
+    - nodemailer adicionado ao package.json (npm install nodemailer)
+    - Tabela mail_settings em db.js: host, port, secure, user, pass, from_name, from_email
+    - Funções findMailSettings() e upsertMailSettings() em db.js
+    - GET /api/settings/mail — retorna config SMTP (sem o campo pass)
+    - PUT /api/settings/mail — salva config com senha criptografada (AES-256-CBC)
+    - POST /api/send-email — recebe {to, cc, assunto, corpo, lead_id, attachments}
+        - Decripta senha SMTP
+        - Envia e-mail via nodemailer
+        - Se lead_id informado, registra interação automaticamente (tipo: email)
+    - POST /api/test-email — envia e-mail de teste para verificar config SMTP
+    - Criptografia AES-256-CBC via crypto.createCipheriv (Node built-in)
+    - Funções helpers: encryptMailPass(), decryptMailPass()
+
+  FRONTEND — CONFIGURAÇÕES (index.html + app.js):
+    - Novo card "E-mail SMTP" na tela de Configurações (após Telegram)
+    - Campos: Servidor, Porta, SSL/TLS (checkbox), Usuário, Senha, Nome/E-mail Remetente
+    - Botões: Salvar Configurações, Testar
+    - loadMailSettingsForm(), saveMailSettings(), testMailSettings() em app.js
+    - toggleMailPassVisibility() para mostrar/ocultar senha
+
+  FRONTEND — CRM (crm.js):
+    - Nova aba "E-mail" no modal 360° do lead (após Ações)
+    - Select de templates carregado de store.state.crmEmailTemplates
+    - Campos: Para, Cc, Assunto, Corpo (textarea)
+    - Anexos: input file múltiplo com preview de nomes
+    - Placeholders substituíveis: {{nome}}, {{empresa}}, {{cargo}}, {{email}},
+      {{telefone}}, {{celular}}, {{cidade}}, {{estado}}, {{vendedor}},
+      {{valor_estimado}}, {{observacoes}}, {{origem}}, {{lead_id}}
+    - Prévia do corpo em tempo real
+    - Botão Enviar → chama POST /api/send-email
+    - Botão "Gerenciar Templates" → abre modal CRUD de templates
+      - Lista em tabela (nome, assunto, categoria, ações editar/excluir)
+      - Novo/Editar: nome, categoria, assunto, corpo HTML
+      - Usa store.addCrmEmailTemplate / updateCrmEmailTemplate / deleteCrmEmailTemplate
+
+    METHODS ADICIONADOS EM crm.js:
+      - _renderModalTabEmail(lead)
+      - _updateAttachmentsList()
+      - _onTemplateChange(leadId)
+      - _substituirPlaceholders(leadId, text)
+      - _updateEmailPreview()
+      - _enviarEmail(leadId)
+      - abrirGerenciadorTemplates()
+      - _renderTemplateList()
+      - abrirModalTemplateNovo()
+      - abrirModalTemplateEditar(templateId)
+      - _abrirModalTemplate(template)
+      - _salvarTemplate(templateId)
+      - _excluirTemplate(templateId)
+
+  SEGURANÇA:
+    - Senha SMTP criptografada com AES-256-CBC (chave derivada de app secret + salt)
+    - GET /api/settings/mail NÃO retorna o campo pass
+    - PUT /api/settings/mail: se pass vier vazio, mantém a existente
+    - Qualquer usuário autenticado pode enviar e-mail (conforme solicitado)
+
+
+================================================================================
+8. PROBLEMAS CONHECIDOS E TAREFAS PENDENTES
+================================================================================
+
+  PENDENTE (a ser testado pelo usuário):
+    1. Exportação CSV — usuário reportou que o botão CSV também exporta XLSX.
+       try/catch + console.log adicionados em ambos _exportCSV() e _exportXLSX()
+       para depuração. Usuário deve testar com console F12 aberto.
+
+    2. Exportação XLSX — verificar se o SheetJS (global XLSX) está carregado
+       corretamente via CDN e se a exportação produz um arquivo .xlsx válido.
+
+    3. Envio de e-mail — testar fluxo completo:
+       - Configurar SMTP em Configurações > E-mail SMTP
+       - Clicar "Testar" para verificar conexão
+       - Criar um template na aba E-mail do lead
+       - Selecionar template, preencher para/cc, enviar
+       - Verificar interação registrada automaticamente
+
+  COMPORTAMENTO CONHECIDO:
+    - Os botões de exportação só aparecem quando _renderTabela() renderiza leads
+      (não no estado vazio)
+    - O filtro de data usa os campos created_at ou data_ultimo_contato
+    - A impressão abre uma nova janela com relatório estilizado + window.print() automático
+    - O cálculo automático do score é executado ao registrar uma interação
+    - O envio de e-mail requer SMTP configurado (card nas Configurações Gerais)
+    - Anexos são convertidos para base64 antes do envio
+    - Se o servidor SMTP exigir SSL (porta 465), marcar checkbox SSL/TLS
+
+  MELHORIAS FUTURAS POTENCIAIS:
+    - Adicionar ações em lote (mudança de status em massa, exportação em massa)
+    - Adicionar importação de leads de CSV/XLSX
+    - Adicionar configuração de estágios personalizados do funil
+    - Adicionar sistema de notificação para tarefas/follow-ups atrasados
+    - Adicionar integração com e-mail externo (SendGrid, etc.)
+    - Adicionar log de e-mails enviados (tabela separada)
+    - Adicionar rastreamento de abertura de e-mail (pixel tracking)
+
+================================================================================
+FIM DO DOCUMENTO
+================================================================================

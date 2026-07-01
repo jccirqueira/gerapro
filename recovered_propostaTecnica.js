@@ -1,0 +1,2 @@
+"import { store } from './state.js';\nimport { calculateBusbar, BUSBAR_DATA, MULTI_BAR_DATA } from './busbarCalculator.js';\n\nconst COMMON_NORMS = [\n    { id: 'nbr_iec_61439', label: 'ABNT NBR IEC 61439-1 e 2', description: 'Conjuntos de manobra e comand
+<truncated 32542 bytes>

@@ -1,0 +1,155 @@
+RELATÓRIO DE DESENVOLVIMENTO - GeraPro
+Período: Junho/2026
+Data: 13/06/2026
+
+================================================================================
+SUMÁRIO DAS ALTERAÇÕES REALIZADAS
+================================================================================
+
+
+1. CONFIGURAÇÃO DE TEMPLATES POR EMPRESA
+------------------------------------------------------------------------------
+Arquivo: js/empresaConfig.js
+
+- Adicionado campo 'templateTecnica' com valor 'TEMPLATE_TEC_EMP1.docx'
+- Adicionado campo 'templateComercial' com valor 'TEMPLATE_COM.docx'
+- Adicionado campo 'templateCompleta' com valor 'TEMPLATE_TEC_COM.docx'
+
+Objetivo: Permitir que cada empresa configurada no sistema use um template
+DOCX diferente para suas propostas, centralizado em um único arquivo de
+configuração.
+
+
+2. ENDPOINT /api/save-file NO SERVIDOR
+------------------------------------------------------------------------------
+Arquivo: server_new.js
+
+- Criada função handleSaveFile(data, res)
+- Registrada rota POST /api/save-file
+
+Funcionamento:
+- Recebe: { ptcFolder, filename, content (base64), isBase64, revisionFolder }
+- Salva o arquivo em: {BASE_DIR}/{ptcFolder}/Documentação Minha_Empresa/{revisionFolder}/{filename}
+- Cria o diretório se não existir
+- Suporta arquivos binários (via base64) e texto (via utf-8)
+
+Objetivo: Permitir que o cliente salve documentos gerados (DOCX) diretamente
+na estrutura de pastas da PTC no servidor.
+
+
+3. EXPORTAÇÃO WORD DA PROPOSTA TÉCNICA - TEMPLATE DINÂMICO
+------------------------------------------------------------------------------
+Arquivo: js/propostaTecnica.js
+
+- Adicionado import da config EMPRESA (linha 7)
+- Template agora é carregado de EMPRESA.templateTecnica com fallback para
+  'TEMPLATE_TEC.docx' (linha 11424)
+
+Objetivo: Usar o template configurado por empresa em vez do fixo.
+
+
+4. EXPORTAÇÃO WORD DA PROPOSTA TÉCNICA - SALVAR NO SERVIDOR
+------------------------------------------------------------------------------
+Arquivo: js/propostaTecnica.js
+
+- Substituído FileReader por geração direta de base64 via PizZip
+  (doc.getZip().generate({ type: "base64" })) - linhas 11541-11545
+- Adicionado fetch para /api/save-file após o download (linhas 11569-11595)
+- Adicionado toast de feedback para sucesso/erro no salvamento
+
+Objetivo: Salvar automaticamente o DOCX gerado na pasta da PTC no servidor,
+sem depender de FileReader (que era instável com Blob do PizZip).
+
+
+5. PADRÃO DE NOMES DE ARQUIVO UNIFICADO
+------------------------------------------------------------------------------
+Arquivos:
+- js/propostaTecnica.js (linha 11549)
+- js/propostaComercial.js (linha 1911)
+- js/propostaCompleta.js (linha 734)
+
+Novo formato:
+- Proposta Técnica: {numeroPTC}-PT-Rev{nn}.docx (ex: 26061209-PT-Rev00.docx)
+- Proposta Comercial: {numeroPTC}-PC-Rev{nn}.docx (ex: 26061209-PC-Rev00.docx)
+- Proposta Completa: {numeroPTC}-PTC-Rev{nn}.docx (ex: 26061209-PTC-Rev00.docx)
+
+O número PTC é extraído do folder name (primeiros 8-10 dígitos).
+A revisão é extraída do currentPtc.revision.
+
+Objetivo: Padronizar a nomenclatura dos arquivos para facilitar identificação
+e organização.
+
+
+6. MIME TYPES - SUPORTE A .docx
+------------------------------------------------------------------------------
+Arquivo: server_new.js
+
+- Adicionado '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ao objeto MIME_TYPES (linha 67)
+
+Objetivo: Garantir que o servidor sirva arquivos .docx com o Content-Type
+correto.
+
+
+7. CÓPIA DE ARQUIVOS AO SUBIR REVISÃO - EXCLUSÃO DE .docx
+------------------------------------------------------------------------------
+Arquivo: server_new.js (linha 968)
+
+- Modificado o handleUprevisionPtc para NÃO copiar arquivos .docx ao criar
+  uma nova revisão
+
+Antes: fs.copyFileSync(srcPath, destPath) - copiava TODOS os arquivos
+Depois: if (!item.name.endsWith('.docx')) - ignora .docx
+
+Objetivo: Evitar que arquivos DOCX de revisões anteriores se acumulem nas
+pastas de revisões mais recentes. Cada revisão mantém apenas seu próprio DOCX.
+
+
+8. CORREÇÃO DE FORMATAÇÃO NO TELEGRAM
+------------------------------------------------------------------------------
+Arquivo: server_new.js (linha 1575)
+
+- Alterado formato da mensagem de notificação do Telegram
+
+Antes: _*{codigo}*_ (itálico + negrito - não funcionava)
+Depois: *{codigo}* (apenas negrito)
+
+Objetivo: Corrigir a exibição do código da proposta nas notificações do
+Telegram, que estava mostrando os asteriscos literalmente.
+
+
+9. LOG DAS REVISÕES - COLUNA VALOR CONDICIONAL
+------------------------------------------------------------------------------
+Arquivos:
+- server_new.js (handleExportPipelineLog)
+- js/pipelineComercial.js (modal log, CSV export, XLSX client)
+
+- Coluna "Valor" agora só aparece quando tipo !== 'tecnica'
+- Ou seja: aparece apenas para PC (Proposta Comercial) e PTC (Completa)
+- Não aparece para PT (Proposta Técnica)
+
+Locais modificados:
+- Modal do cartão: <th>Valor> e <td> condicionados (pipelineComercial.js)
+- Export CSV: header e linhas ajustados (pipelineComercial.js)
+- Export XLSX client: enviado tipo no payload (pipelineComercial.js)
+- Export XLSX server: headers, células, formatação e autoFilter dinâmicos
+  (server_new.js)
+
+Objetivo: Propostas técnicas não possuem valor financeiro, portanto a coluna
+não deve ser exibida nos logs de revisão.
+
+
+================================================================================
+ARQUIVOS MODIFICADOS
+================================================================================
+
+1. js/empresaConfig.js
+2. server_new.js
+3. js/propostaTecnica.js
+4. js/propostaComercial.js
+5. js/propostaCompleta.js
+6. js/pipelineComercial.js
+
+================================================================================
+FIM DO RELATÓRIO
+================================================================================

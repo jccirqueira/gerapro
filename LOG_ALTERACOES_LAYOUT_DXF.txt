@@ -1,0 +1,193 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   LOG DE ALTERAÇÕES — Layout Sugerido / Exportação DXF                          ║
+║   Projeto: GeraPro                                                              ║
+║   Período: Junho 2026                                                           ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+================================================================================
+1. EXPORTAÇÃO DXF (FUNCIONALIDADE NOVA — OK)
+================================================================================
+
+O que foi implementado:
+  - Gerador DXF standalone em js/dxf-writer.js (formato AC1009 / R12)
+  - Botão "Exportar DXF" nas views normal e Back-to-Back do Layout Sugerido
+  - Suporte a BLOCK + INSERT para peças com DXF associado
+  - Fallback para retângulo + label quando a peça não tem DXF
+  - Layers: CABINETE, BARRAMENTO, CANALETA, TRILHO_DIN, COMPONENTE,
+    BARRA_TERRA, BASE, DIMENSAO, TEXTO
+  - Coordenadas Y invertidas (layout Y-down -> DXF Y-up)
+
+Arquivos criados/modificados:
+  - NOVO:  js/dxf-writer.js           (gerador DXF standalone)
+  - MOD:   index.html                 (script tag removida - dxf-writer.js é local)
+  - MOD:   js/propostaTecnica.js      (_exportLayoutDXF, _drawDxfEntity, botões)
+  - MOD:   docs/explicacao-layout-sugerido.html
+  - MOD:   docs/explicacao-layout-sugerido.txt
+
+Testado:
+  - Abre no Autodesk Viewer (viewer.autodesk.com) — OK
+  - Formato AC1009 com POLYLINE+VERTEX+SEQEND — OK
+  - AC1015 com LWPOLYLINE NÃO funciona no Autodesk Viewer (testado)
+
+
+================================================================================
+2. UPLOAD DE DXF POR MATERIAL (FUNCIONALIDADE NOVA — OK)
+================================================================================
+
+O que foi implementado:
+  - Coluna dxf_block TEXT na tabela materiais (SQLite)
+  - Endpoint PUT /api/materiais/:id/dxf  — upload + parse com dxf-parser
+  - Endpoint GET /api/materiais/:id/dxf   — recuperar bloco
+  - Endpoint DELETE /api/materiais/:id/dxf — remover bloco
+  - UI de upload na aba Técnico do formulário de material
+  - Preview com contagem de entidades
+
+Arquivos:
+  - MOD:   js/db.js                 (ALTER TABLE + getMaterialDxf/setMaterialDxf)
+  - MOD:   server_new.js            (3 endpoints + import dxf-parser)
+  - MOD:   js/materiais.js          (uploadDxf, removeDxf, _renderDxfPreview)
+  - ADD:   package.json             (dxf-parser como dependência)
+
+Testado:
+  - Upload de arquivo .dxf — OK (parseia e armazena)
+  - Upload de arquivo inválido — rejeita com erro
+  - Remoção — OK
+
+
+================================================================================
+3. BOM AGRUPADA POR CARGA (REFATORAÇÃO — OK)
+================================================================================
+
+O que foi implementado:
+  - _geraArvoreMateriais: chave do tree vira load.id (antes era typical.id)
+  - _renderBOMAlocacao: seções por carga com expandir/colapsar
+  - Botão "Alocar Carga" — aloca todos os materiais da carga no mesmo armário
+  - Alocação individual por material dentro da carga expandida
+  - Badge 🔧 Manual / ⚙️ Auto por material
+  - Schema loads[loadId][matId] no cabinetAssignments + compatibilidade com assigned legado
+
+Arquivos:
+  - MOD:   js/propostaTecnica.js    (múltiplas funções)
+
+Problemas encontrados e corrigidos:
+  - _atribuirCarga chamava _atribuirMaterial em loop, que re-renderizava o DOM
+    a cada iteração — apenas o primeiro material era alocado.
+    FIX: reescrito para alocar todos os materiais direto no estado e chamar
+    _recalcularLayout uma única vez no final. (linha 5510)
+
+
+================================================================================
+4. REMOÇÃO DO AUTO-SUGGEST (REFATORAÇÃO — OK)
+================================================================================
+
+O que foi feito:
+  - Removido todo o bloco else do suggestLayout que criava armários
+    automaticamente agrupando materiais por categoria
+  - Quando não há cabinetAssignments, retorna cabinets vazio
+  - Tela mostra "Nenhum armário definido" + instruções para usar BOM
+
+Arquivos:
+  - MOD:   js/propostaTecnica.js    (linhas ~5031-5083 removidas)
+
+Motivo:
+  - Usuário não quer que o sistema crie armários sem permissão
+  - O correto é: usuário insere armário manualmente ou usa "Alocar Carga"
+
+
+================================================================================
+5. BUGS ENCONTRADOS E CORRIGIDOS
+================================================================================
+
+5.1. Erro de sintaxe — else if sem fechar bloco
+  Arquivo: js/propostaTecnica.js
+  Local:   ~linha 5072
+  Sintoma: "Uncaught SyntaxError: Unexpected token ','" no F12
+  Causa:   Ao trocar else por else if, faltou fechar o bloco com }.
+           O for logo abaixo foi engolido pelo else if, e a estrutura
+           de chaves ficou inconsistente.
+  Fix:     Adicionado } na linha 5074 para fechar o else if.
+
+5.2. Armário "Disjuntor Geral" fictício
+  Arquivo: js/propostaTecnica.js
+  Local:   ~linha 5072 (auto-suggest, já removido)
+  Sintoma: 1 carga gerava 2 armários no layout (1 fictício + 1 real)
+  Causa:   Auto-suggest criava cabinet com "Disjuntor Geral" fake
+  Fix:     N/A — o auto-suggest foi removido completamente
+
+5.3. _atribuirCarga só alocava primeiro material
+  Arquivo: js/propostaTecnica.js
+  Local:   ~linha 5510
+  Sintoma: "Alocar Carga" só alocava o primeiro material da carga
+  Causa:   Loop chamava _atribuirMaterial que re-renderizava o DOM
+           a cada iteração — elementos dos materiais seguintes
+           não existiam mais após o primeiro render
+  Fix:     Reescrever _atribuirCarga para atualizar estado diretamente
+           e chamar _recalcularLayout apenas uma vez
+
+5.4. Erro ao carregar proposta — "edit is not a function"
+  Arquivo: js/propostaTecnica.js
+  Local:   ~linha 5092 (syntax error cascateou)
+  Sintoma: TypeError: window.app.propostaTecnica.edit is not a function
+  Causa:   O syntax error do 5.1 impedia o módulo de carregar,
+           então window.app.propostaTecnica não tinha os métodos
+  Fix:     Correção do 5.1 resolveu este erro
+
+
+================================================================================
+6. PENDÊNCIAS / OBSERVAÇÕES
+================================================================================
+
+6.1. Dados persistentes no servidor
+  - Propostas salvas ANTES das alterações ainda têm cabinetAssignments
+    com o schema antigo (apenas assigned, sem loads)
+  - Para testar limpo: deletar PropostaTecnica.json do servidor
+    em C:\Users\jcc\Documents\GeraPro\DEF_default\<PTC>\Documentação Minha_Empresa\
+  - Alternativa: usar botão "Resetar Alocações" no topo da BOM
+
+6.2. Canaletas no layout
+  - A seção "Canaletas" na BOM aparece mesmo sem armários definidos
+  - É esperado — canaletas são configuradas no layout config, não dependem de alocação
+
+6.3. Layout visual (canvas) vs BOM
+  - Canvas só mostra armários quando há cabinetAssignments com dados
+  - BOM mostra cargas independente de haver armários ou não
+  - O fluxo esperado: usuário aloca carga na BOM -> armário criado -> canvas exibe
+
+
+================================================================================
+7. ARQUIVOS MODIFICADOS (RESUMO)
+================================================================================
+
+  js/dxf-writer.js                  NOVO      ~200 linhas
+  js/db.js                          MOD       +15 linhas
+  server_new.js                     MOD       +55 linhas
+  js/materiais.js                   MOD       +120 linhas
+  js/propostaTecnica.js             MOD       ~400 linhas alteradas
+  package.json                      MOD       +1 dependência (dxf-parser)
+  index.html                        MOD       +1 script tag
+  docs/explicacao-layout-sugerido.html  NOVO  ~500 linhas
+  docs/explicacao-layout-sugerido.txt   NOVO  ~400 linhas
+  LOG_ALTERACOES_LAYOUT_DXF.txt     ESTE ARQUIVO
+
+
+================================================================================
+8. COMO TESTAR (FLUXO COMPLETO)
+================================================================================
+
+  1. Criar PTC nova (nome único para evitar dados residuais)
+  2. Adicionar equipamento (ex: CCM-BT)
+  3. Na aba Cargas, adicionar 1 carga com típico
+  4. Ir em Layout Sugerido:
+     - Canvas: "Nenhum armário definido"
+     - BOM: 1 seção com a carga
+  5. Clicar [Alocar Carga] selecionando armário (ou criar novo):
+     - Canvas: 1 armário com os materiais
+  6. Verificar indicador 🔧 Manual ao lado do material
+  7. Exportar DXF: deve baixar arquivo .dxf
+     - Abrir em viewer.autodesk.com — deve mostrar o layout
+  8. Voltar ao material, aba Técnico, importar DXF da peça
+  9. Re-exportar DXF — material deve aparecer com desenho real (BLOCK)
+

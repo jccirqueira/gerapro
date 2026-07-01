@@ -1,0 +1,141 @@
+RESUMO DE ALTERAÇÕES — MÓDULO LAYOUT
+Data: 23/06/2025
+Arquivo: js/propostaTecnica.js
+
+================================================================================
+1. CORREÇÃO: Gap entre primeiro e segundo item de cada linha
+================================================================================
+  Arquivo: propostatecnica.js
+  Função: packLinhaRow (dentro de _layoutCabinetRows)
+  Problema: O gap não era aplicado entre o primeiro e segundo item de cada linha.
+            O x do segundo item era calculado sem incluir o gap, que só era somado
+            ao usedWidth DEPOIS do push.
+  Correção: O gap agora é somado ao usedWidth ANTES de calcular o x do item.
+  Antes:    const rowGap = rowItems.length > 0 ? gap : 0;
+            rowItems.push({ x: usedWidth + leftMargin, ... });
+            usedWidth += rowGap + iw;
+  Depois:   if (rowItems.length > 0) usedWidth += gap;
+            rowItems.push({ x: usedWidth + leftMargin, ... });
+            usedWidth += iw;
+
+================================================================================
+2. CORREÇÃO: Falso overflow na detecção de sobreposição
+================================================================================
+  Função: packLinhaRow (dentro de _layoutCabinetRows)
+  Problema: Itens com posicionamento correto eram detectados como "overflow"
+            devido a erro de ponto flutuante acumulado nas somas sequenciais.
+  Correção: Adicionado epsilon de tolerância 0.01mm nas comparações.
+  Antes:    if (it.x + it.w > railEnd) → overflow
+            if (rowItems[i].x < rowItems[i-1].x + rowItems[i-1].w) → overflow
+  Depois:   if (it.x + it.w - 0.01 > railEnd) → overflow
+            if (rowItems[i].x + 0.01 < rowItems[i-1].x + rowItems[i-1].w) → overflow
+
+================================================================================
+3. NOVA FUNCIONALIDADE: Fracionamento de quantidade entre linhas (Split)
+================================================================================
+  Descrição: Permite dividir a quantidade de um material entre múltiplas linhas
+             do layout dentro do mesmo armário.
+  Novas funções:
+    - _resolveTarget(matId, cabId) — resolve o objeto assignment
+    - _saveEq() — salva equipment no store e re-renderiza
+    - _toggleSplitMode(matId, cabId) — ativa/desativa split
+    - _addSplitEntry(matId, cabId) — adiciona linha ao split
+    - _removeSplitEntry(matId, cabId, index) — remove linha do split
+    - _updateSplitEntry(matId, cabId, index, field, value) — altera qtd/linha
+  Modelo de dados:
+    target.linhaSplit = [
+      { linhaId: 'acionamentos1', qtd: 2 },
+      { linhaId: 'acionamentos2', qtd: 2 }
+    ]
+  UI: Botão [⊕] ao lado do "Linha:" na BOM. Ao clicar, exibe inputs de
+      quantidade + dropdown de linha para cada entrada do split.
+  suggestLayout(): Quando ass.linhaSplit existe, expande em múltiplos itens
+    (um por linha) em vez de um item único.
+
+================================================================================
+4. REMOÇÃO: Botão "Duplicar Armário"
+================================================================================
+  Motivo: Não faz sentido duplicar armários com materiais, pois a lista de
+          cargas define o que vai em cada armário.
+  Removido:
+    - Função _duplicarArmario() — deletada
+    - Botão 📋 na vista Back to Back
+    - Botão 📋 na vista Normal
+    - Botão 📋 no modal de Configuração
+
+================================================================================
+5. REFATORAÇÃO: Configuração independente por armário
+================================================================================
+  Descrição: Cada armário passou a ter seu próprio layoutConfig completo
+             (dimensões, linhas, gaps, canaletas), sem dependência de config
+             global.
+  Estrutura de dados:
+    cabinetAssignments[cabId].layoutConfig = {
+      canaletaEsq: 0,
+      canaletaDir: 0,
+      larguraTrilhoDIN: 35,
+      espacamentoLinhas: 10,
+      comprimentoTrilho: 0,
+      linhas: [ { id, nome, yCentroTrilho, categorias } ],
+      gapsTermicos: { DISJUNTOR: 10, ... },
+      canaletas: [],
+      retalhosCanaleta: []
+    }
+  Funções alteradas:
+    - _showLayoutConfigPanel() — reescrita: sem seções globais
+    - _saveLayoutConfig() — reescrita: salva por cabinet block
+    - _adicionarLinhaLayout(cabId) — aceita cabId
+    - _getCanaletaTarget(eq, cabId) — aceita cabId
+    - _adicionarQuadroCanaleta(cabId) — aceita cabId
+    - _adicionarPecaRetaCanaleta(cabId) — aceita cabId
+    - _removerCanaleta(canId, cabId) — aceita cabId
+    - _confirmQuadroCanaleta() — lê cabId do dialog
+    - _confirmPecaRetaCanaleta() — lê cabId do dialog
+    - suggestLayout() — usa cabData.layoutConfig diretamente
+    - _confirmAdicionarArmario() — cria cabinet com layoutConfig padrão
+    - _toggleSplitMode() — lê linhas do per-cabinet
+    - _addSplitEntry() — lê linhas do per-cabinet
+    - _renderBOMAlocacao() — usa linhas do matchCab.layoutConfig
+
+================================================================================
+6. CORREÇÃO: _setManualX lendo do top-level em vez do per-cabinet
+================================================================================
+  Função: _setManualX
+  Problema: Após a refatoração (item 5), _setManualX continuava lendo
+            comprimentoTrilho, canaletaEsq, canaletaDir e gapsTermicos do
+            top-level eq.layoutConfig, que não os possui mais.
+  Correção: Agora lê de cabinetAssignments[realCabId].layoutConfig.
+  Antes:    const railLen = layoutConfig.comprimentoTrilho || ...
+            const gap = this._getGapTermico(layoutConfig, ...)
+  Depois:   const cabCfg = cabData?.layoutConfig || {};
+            const railLen = cabCfg.comprimentoTrilho || ...
+            const gap = this._getGapTermico(cabCfg, ...)
+
+================================================================================
+7. CORREÇÃO: _setManualX usando qtd total em vez da qtd por linha no split
+================================================================================
+  Função: _setManualX (linha 5448)
+  Problema: Quando o material tem split (ex: 2+2=4), o X máximo era calculado
+            com qtd=4, travando o X em 15mm para inversores de 185mm.
+  Correção: Usar a maior qtd entre as split entries.
+  Antes:    const qtd = target.qtd || 1;
+  Depois:   const qtd = target.linhaSplit?.length
+                ? Math.max(...target.linhaSplit.map(s => s.qtd))
+                : (target.qtd || 1);
+  Exemplo:  Split 2+2 → qtd=2 → 2×185+1×15=385 → maxX=415mm (antes 15mm)
+
+================================================================================
+8. SIMPLIFICAÇÃO: Removida seção "Materiais" do modal de Configuração
+================================================================================
+  Motivo: Havia redundância: "Linha:", split e X apareciam tanto no modal
+          quanto na BOM, mas não sincronizavam entre si.
+  Decisão: Modal de Configuração contém APENAS:
+    - Dimensões
+    - Linhas / Faixas
+    - Gaps Térmicos
+    - Canaletas
+  BOM (Lista de Materiais) contém APENAS:
+    - Linha: dropdown
+    - Split [⊕]/[⊖]
+    - X offset
+================================================================================

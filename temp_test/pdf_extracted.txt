@@ -1,0 +1,338 @@
+--- PAGINA 1 ---
+    Usina São Francisco S/A.            ESPECIFICAÇÃO TÉCNICA Nº 062/25 
+ 
+ 
+Usina São Francisco S/A 
+Fazenda São Francisco. Caixa Postal 537 
+CEP 14.174-000 – Sertãozinho SP 
+Tel: 16-3946-7000    Fax: 16-3946-7014 
+03/12/2025 1                                                                                                                                                                                                                                                          
+ESPECIFICAÇÃO PARA CONTRATAÇÃO DE FORNECIMENTO DE PAINEL 
+ELÉTRICO DE BAIXA TENSÃO TIPO CCM PARA PROJETO AUMENTO DO 
+MIX DE AÇÚCAR. 
+ 
+Esta especificação técnica fixa condições básicas, mínimas exigíveis para fornecimento de 
+Painel Elétrico de Baixa Tensão tipo CCM na forma construtiva 2B, back to back, instalação 
+abrigada, grau de proteção IP-42, tensão de operação 440 V, 60 Hz, corrente nominal 800 A, 
+nível de curto 31,5 kA, Protocolo de Comunicação Profibus DP, tensão auxiliar 220 V, 
+pintura epóxi cinza RAL 7032. 
+A relação de carga contempla 13 partidas descritas no projeto do CCM. 
+ 
+Recolhimento da ART da prestação do serviço de montagem. 
+ 
+Referências: 
+ NBR 5410- Norma Brasileira de Instalações Elétricas de Baixa Tensão;  
+ NBR IEC 60529 – Definição de Grau de Proteção dos Equipamentos; 
+ NBR IEC 62208 – Invólucros vazios destinados a conjunto de manobra e controle de 
+baixa tensão;  
+ NR 10 - Segurança em Instalações e Serviços com Eletricidade;  
+ NR 12 – Segurança de trabalho máquinas e equipamentos;  
+ 
+É recomendado as empresas que concorrerão a estes serviços a máxima observância dos 
+preceitos aqui estabelecidos.  
+ 
+Eventuais itens que o proponente venha a divergir deverão ser claramente evidenciados na 
+proposta e citados em documentos específicos: Lista de divergência, o qual devera estar 
+anexo a proposta.   
+ 
+2- Referências do Cliente 
+ 
+Razão Social:- Usina São Francisco S./A. 
+ 
+Endereço: Fazenda São Francisco, Caixa Postal 537  
+Sertãozinho – SP 
+                   
+3.  Descrições dos serviços:  
+3.1- Fornecimento de Painel Elétrico de Baixa Tensão tipo CCM na forma construtiva 2B, 
+back to back, instalação abrigada, grau de proteção IP-42, tensão de operação 440 V, 60 
+Hz, corrente nominal 800 A, nível de curto 31,5 kA, Protocolo de Comunicação Profibus DP, 
+tensão auxiliar 220 V, pintura epóxi cinza RAL 7032. É de fornecimento da CONTRATADA 
+
+--- PAGINA 2 ---
+    Usina São Francisco S/A.            ESPECIFICAÇÃO TÉCNICA Nº 062/25 
+ 
+ 
+Usina São Francisco S/A 
+Fazenda São Francisco. Caixa Postal 537 
+CEP 14.174-000 – Sertãozinho SP 
+Tel: 16-3946-7000    Fax: 16-3946-7014 
+03/12/2025 2todos os materiais e equipamentos para construção e correta operação e funcionamento dos 
+painéis. 
+ 
+Os painéis deverão ser formados de seções verticais denominadas "colunas", autos 
+sustentáveis, montadas justapostas, formando um conjunto contínuo de mesma altura.  
+As colunas deverão ser fabricadas de acordo com as mais modernas exigências do mercado 
+internacional, baseadas no conceito da norma NBR IEC 61439-1 e 2: 2017.  
+As seções verticais deverão ser construídas em chapas de aço carbono e devidamente 
+estruturadas.  
+Os painéis deverão garantir a segurança das pessoas e dos bens com uma continuidade de 
+serviço onde:  
+Requisitos de segurança e de manutenção deverão ser garantidos por uma forma de 
+compartimentação conforme a norma NBR IEC 61439-1 e 2: 2017 e deverão ser conforme 
+projeto de referência.  
+Os dispositivos de seccionamento e proteção deverão ter indicação de posição de estado.  
+Com objetivo de reduzir os riscos de choques elétricos, o circuito de potência e o circuito de 
+comando deverão ser separados e completamente isolados. 
+ 
+Os painéis deverão conter sistema de iluminação com lâmpada de 10W – 220V e sistema de 
+desumidificação capaz de evitar condensação quando a temperatura abaixar 
+excessivamente em todas as colunas autoportantes, esse sistema de aquecimento será 
+comandado por termostato e composto de resistências 220V capazes de elevarem a 
+temperatura a um nível que evite condensação. Além disso, deve ser previsto, uma tomada 
+universal 2P+T 10A - 250V por painel, preferencialmente na coluna de entrada. As colunas 
+que tiverem acionamentos via soft starter ou inversor devem conter exaustores para 
+dissipação do ar quente gerado pelos equipamentos e garantir que a temperatura interna do 
+painel não exceda o limite recomendado para funcionamento correto e seguro dos 
+equipamentos em questão. 
+ 
+Todos os barramentos deverão ser de seção retangular em cobre eletrolítico pintado de boa 
+qualidade, grau de pureza 99,95%, e os isoladores devem ser de epóxi montados de tal 
+forma a suportar o nível de curto desejado. Deverá ser fornecido barramento específico para 
+Terra (PEN) constituído de uma barra de cobre eletrolítico, interligando toda estrutura 
+metálica que compõe o conjunto. Aterrar todas as estruturas metálicas diretamente ao 
+barramento terra. 
+ 
+O projeto deverá conter o desenho esquemático da rede de comunicação Profibus DP e 
+componentes desta. Estes diagramas deverão conter o diagrama trifilar, apresentando toda 
+a fiação de controle e considerando todo o tipo de comando transmitido através de rede 
+PROFIBUS/DP. Vale ressaltar que todos os componentes, cabos, repetidores e 
+terminadores ativos necessários devem estar inclusos no escopo. 
+ 
+
+--- PAGINA 3 ---
+    Usina São Francisco S/A.            ESPECIFICAÇÃO TÉCNICA Nº 062/25 
+ 
+ 
+Usina São Francisco S/A 
+Fazenda São Francisco. Caixa Postal 537 
+CEP 14.174-000 – Sertãozinho SP 
+Tel: 16-3946-7000    Fax: 16-3946-7014 
+03/12/2025 3Os Painéis deverão ser submetidos à inspeção e ensaios pelo fabricante, na presença  do 
+inspetor da Usina São Francisco.  
+Todos os testes devem ser feitos de acordo com o plano de inspeção (PIT).  
+A Usina São Francisco se reserva o direito de inspecionar e ensaiar os Painéis, seja no 
+período de fabricação, antes do embarque ou a qualquer momento que julgar necessário.  
+O fabricante deverá propiciar todas as facilidades quanto ao livre acesso aos laboratórios, 
+dependências onde estão sendo fabricados os painéis, local de embalagem, etc., bem como 
+disponibilizar pessoal qualificado para prestar informações e executar os ensaios.  
+Todos os instrumentos e aparelhos de medição, máquinas de ensaios, etc., deverão possuir 
+certificado de aferição validos na ocasião da inspeção, emitido por instituições acreditadas 
+pelo INMETRO. Podendo acarretar desqualificação do laboratório o não cumprimento dessa 
+exigência.  
+ 
+O fabricante deverá avisar a Usina São Francisco em tempo hábil, as datas em que os 
+painéis estarão prontos para inspeção e ensaios.  
+A aceitação dos Painéis pela Usina São Francisco, com base nos ensaios ou nos relatórios 
+que o substituam, não eximirá o fabricante de sua responsabilidade em fornecer os painéis 
+em plena concordância com a Ordem de Compra, Contrato e com esta especificação, nem 
+invalidará ou comprometerá qualquer reclamação que a Usina São Francisco venha a fazer, 
+baseada na existência de material ou equipamento inadequado ou defeituoso.  
+ 
+Todas as peças do produto rejeitadas pertencentes a um equipamento aceito devem ser 
+substituídas por peças novas e perfeitas, por conta do fabricante e sem qualquer ônus para 
+a Usina São Francisco.  
+ 
+A rejeição dos painéis em virtude de falhas constatadas por meio de inspeção e ensaios, ou 
+por discordância com a Ordem de Compra, Contrato ou esta especificação não eximirá o 
+fabricante de sua responsabilidade em fornecer os painéis na data de entrega acordada. 
+ 
+Comissionamento e Start-up , considerar as despesas de 44 (QUARENTA E QUATRO) 
+horas técnicas de 01 (UM) Técnico para os serviços descritos acima. 
+ 
+Considerar os componentes do Vendor List  conforme a tabela: 
+ 
+ITEM EQUIPAMENTOS  FABRICANTES  
+1  BOTÕES E CHAVES COMUTADORAS  WEG  
+2  BORNE E CONECTORES  PHOENIX CONTACT  
+3  CABOS DE COMANDO/POTÊNCIA  COBRECOM / SIMILAR  
+4  CABOS REDE  PHOENIX / SIMILAR  
+5  CAPACITORES  WEG  
+6 CONTATORES DE COMANDO/POTÊNCIA  WEG  
+
+--- PAGINA 4 ---
+    Usina São Francisco S/A.            ESPECIFICAÇÃO TÉCNICA Nº 062/25 
+ 
+ 
+Usina São Francisco S/A 
+Fazenda São Francisco. Caixa Postal 537 
+CEP 14.174-000 – Sertãozinho SP 
+Tel: 16-3946-7000    Fax: 16-3946-7014 
+03/12/2025 47  DISJUNTOR ABERTO EXTRAIVEL  WEG  
+8  DISJUNTOR CAIXA MOLDADA  WEG  
+9  DISJUNTOR MOTOR  WEG  
+10  FONTES  WEG  
+11  FUSIVEL  WEG  
+12  INVERSORES  WEG / SIEMENS / ABB 
+13  MINIDISJUNTOR  WEG  
+14  RELÉ INTELIGENTE  WEG  
+15  MULTIMEDIDOR  SIEMENS  
+16  SECCIONADORES  WEG  
+17  SOFTSTARTER  WEG / SIEMENS / ABB 
+18  DISPOSITIVO DE PROTEÇÃO CONTRA SURTO  CLAMPER / SIMILAR  
+19  BORNE RELÉS  WEG / SIMILAR  
+20  CHAVE DE AFERIÇÃO  WEG / SIMILAR  
+ 
+Características Técnicas: 
+ 
+Classe de tensão  440 Vca 
+Tensão de isolação 1.000 Vca 
+NBI 6 kV 
+Tensão nominal – rede 440 V 
+Tensão de comando 220 V 
+Frequência nominal  60 Hz 
+Corrente nominal - unidade de entrada  800 A 
+Corrente nom. barramento vertical 1.200 A 
+Icc 31,5 kA 
+Cor  Cinza Ral 7035 
+Ventilação Sim 
+Protocolo Comunicação Profibus DP 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGINA 5 ---
+    Usina São Francisco S/A.            ESPECIFICAÇÃO TÉCNICA Nº 062/25 
+ 
+ 
+Usina São Francisco S/A 
+Fazenda São Francisco. Caixa Postal 537 
+CEP 14.174-000 – Sertãozinho SP 
+Tel: 16-3946-7000    Fax: 16-3946-7014 
+03/12/2025 5A relação de carga contempla 13 partidas, sendo: 
+ 
+Item Descrição CV Partida Painel 
+1 AGITADOR COZEDOR Nº7 75 INVERSOR N3 
+2 BOMBA CONDENSADO CONDENSADOR 
+EVAPORATIVO 10 DIRETA N3 
+3 BOMBA LODO DEC 1 7,5 INVERSOR N3 
+4 BB LODO DEC 2 10 INVERSOR N3 
+5 BB LODO DEC 3 7,5 INVERSOR N3 
+6 BB LODO F1 E F2 15 INVERSOR N3 
+7 BB LODO F3 15 INVERSOR N3 
+8 BB RECIRCULAÇÃO CONDENSADOR 
+EVAPORATIVO  30 INVERSOR N3 
+9 BB VÁCUO CONDENSADOR EVAPORATIVO 60 SOFT STARTER  N3 
+10 EXAUSTOR CONDENSADOR EVAPORATIVO 40 SOFT STARTER  N3 
+11 AGITADOR 1 DO CRISTALIZADOR MASSA B 3 DIRETA N3 
+12 AGITADOR 2 DO CRISTALIZADOR MASSA B 3 DIRETA N3 
+13 AGITADOR MAGMEIRA 3 DIRETA N3 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+--- PAGINA 6 ---
+    Usina São Francisco S/A.            ESPECIFICAÇÃO TÉCNICA Nº 062/25 
+ 
+ 
+Usina São Francisco S/A 
+Fazenda São Francisco. Caixa Postal 537 
+CEP 14.174-000 – Sertãozinho SP 
+Tel: 16-3946-7000    Fax: 16-3946-7014 
+03/12/2025 64-      Responsabilidades da Contratada. 
+ 
+ Cópia contrato social, Firma Individual; 
+ Cópia do CNPJ; 
+ Cópia do Termo de Opção para o Sistema SIMPLES de Tributação como prestadora 
+de Serviço; 
+ Cópia comprovante de endereço do responsável; 
+ Apresentar CND(INSS), CNDT(Trabalhista) e CRF (FGTS), documento essencial; 
+ Seguro de vida com cobertura para todos os funcionários. 
+ Cópia PCMSO; 
+ Cópia PGR; 
+4.1 - Documentos dos funcionários. 
+ Cópia do Registro do Empregado 
+ Cópia da CTPS, RG e CPF 
+ ASO (ATESTADO de SAUDE OCUPACIONAL) 
+ Cópias dos laudos dos exames (São os exames que constam no ASO do prestador); 
+ Cópia do documento constante da entrega do EPI - Atualizada 
+ Cópia do certificado de capacitação de acordo com as Normas Regulamentadoras do 
+MTE, para trabalhos de risco (Altura, Eletricidade, Equipamentos de guindar, Espaço 
+confinado e integração de segurança específico da atividade) 
+ Carteira de Vacinação - Covid-19 
+ Teste do Covid -19 - Obrigatório.  
+TODA A DOCUMENTAÇÃO - EMPRESA E EMPREGADOS - DEVEM SER ELETRÔNICA. 
+Quando houver operação em veículo automotor; 
+ Documento do veículo; 
+ CNH do Motorista; 
+ Contrato de prestação de serviço de veículo – Terceiro; 
+ Relação com as Ferramentas de Trabalho;  
+ 
+
+--- PAGINA 7 ---
+    Usina São Francisco S/A.            ESPECIFICAÇÃO TÉCNICA Nº 062/25 
+ 
+ 
+Usina São Francisco S/A 
+Fazenda São Francisco. Caixa Postal 537 
+CEP 14.174-000 – Sertãozinho SP 
+Tel: 16-3946-7000    Fax: 16-3946-7014 
+03/12/2025 74.2 - Documentações a ser entregue mensalmente, para serviço executados no 
+interior da empresa acima de 30 dias. 
+ 
+ Folha de pagamento dos funcionários. 
+ Relatório de segurança com estatística de acidentes. 
+ Recolhimento do INSS, GFIP e IPI.  
+ Fichas de recebimento e entrega de E.P.I.  
+ 
+Nota:- 
+- Agendar previamente reunião de integração para:   
+- Apresentação do programa de segurança e metodologia de prevenção aplicada na  
+Execução dos trabalhos. 
+ 
+ 
+6- Por conta do contratante 
+- Acompanhamento técnico. 
+- Energia Elétrica 
+ 
+ 
+7- Prazo de entrega/execução do serviço. 
+ 
+A Combinar. 
+ 
+8- Condições de pagamento. 
+ 
+A Combinar. 
+ 
+9- Multas. 
+ 
+ Será cobrada a título de multa 0,25% do valor do contrato para cada dia de atraso, 
+contado á partir do 15º dia após o vencimento da entrega do serviço. Caberá a 
+contratada elaborar um relatório com ciência do responsável legal do contratante 
+sempre que tiver motivo para alegar prejuízo ao andamento do serviço que levará o 
+provável atraso da obra. Os dias relatados será acrescido aos 15 dias de tolerância 
+citados acima. 
+ 
+ Caso não se concretizar a entrega prevista, a contra parcela correspondente será 
+adiada.  
+ 
+ 
+
+
+Total paginas: 7

@@ -1,0 +1,51 @@
+=== DESENVOLVIMENTO GeraPro — 14/06/2026 ===
+
+--------------------------------------------------------------
+1. PIPELINE COMERCIAL — Toast "Proposta Enviada para RevXX"
+--------------------------------------------------------------
+- Arquivo: js/pipelineComercial.js (linha 545)
+- Alterado toast de "Revisão XX — cartão retornou para Aguardando Início"
+  para "Proposta Enviada para RevXX" (com padding de 2 dígitos).
+- Acionado ao subir revisão não consolidada de cartão em Negociação.
+
+--------------------------------------------------------------
+2. PIPELINE COMERCIAL — Telegram "Proposta Enviada para RevXX"
+--------------------------------------------------------------
+- Arquivo: server_new.js (linhas 2144-2145)
+- Adicionada condição específica para oldSt === 'negociacao' && newSt === 'prospect'
+  com mensagem "Proposta Enviada para Rev{paddedRev}" no Telegram.
+
+--------------------------------------------------------------
+3. TELEGRAM — Bold no *FECHADO*
+--------------------------------------------------------------
+- Arquivo: server_new.js (linha 1702)
+- Removido escapeMarkdown() do campo "acao" na mensagem Telegram.
+- Agora *FECHADO* e *PERDIDO* renderizam corretamente em negrito.
+
+--------------------------------------------------------------
+4. TELEGRAM — Persistência do Token
+--------------------------------------------------------------
+- Arquivo: js/db.js (linhas 978-993)
+- saveSettings agora mescla dados parciais com os existentes no banco
+  antes de salvar. Antes, salvar apenas telegram_bot_token zerava
+  todas as outras configurações (empresa, templates, tema, IA, etc.).
+
+--------------------------------------------------------------
+5. TELEGRAM — Log de inicialização
+--------------------------------------------------------------
+- Arquivo: server_new.js (linhas 2670-2672)
+- Adicionado console.log("[Telegram] Token não encontrado — bot não inicializado.")
+  quando o token está vazio na inicialização, facilitando diagnóstico.
+
+--------------------------------------------------------------
+6. TEMPLATES WORD — Correção de resolução de pasta
+--------------------------------------------------------------
+- Arquivos: js/db.js, js/state.js, js/propostaTecnica.js,
+            js/propostaComercial.js, js/propostaCompleta.js
+- Problema: Frontend usava empresa_id (UUID) na URL de fetch do template,
+  mas os templates estavam em pastas nomeadas com folder_name (ex: WEG_xxx).
+- Solução:
+  a) db.js: Adicionado folderName ao objeto company no sync
+  b) state.js: Adicionado folderName: '' ao estado inicial
+  c) PropostaTécnica/Comercial/Completa: Usam company.folderName no fetch,
+     com fallback para empresaId (UUID) para compatibilidade retroativa.
