@@ -1,5 +1,104 @@
 import { store } from './state.js';
 
+const CAMPOS_MATERIAIS = [
+    { key: 'codigoInterno', label: 'Código Interno', required: false },
+    { key: 'codigoFabricante', label: 'Cód. Fabricante', required: false },
+    { key: 'descricao', label: 'Descrição *', required: true },
+    { key: 'custo', label: 'Custo (R$)', required: false },
+    { key: 'fabricante', label: 'Fabricante', required: false },
+    { key: 'unidade', label: 'Unidade', required: false },
+    { key: 'categoria', label: 'Categoria', required: false },
+    { key: 'ncm', label: 'NCM', required: false },
+    { key: 'icms', label: 'ICMS (%)', required: false },
+    { key: 'ipi', label: 'IPI (%)', required: false },
+    { key: 'ufFornecedor', label: 'UF Fornecedor', required: false },
+    { key: 'grupoSiemens', label: 'Grupo Siemens', required: false },
+    { key: 'area', label: 'Área', required: false },
+    { key: 'modelo', label: 'Modelo', required: false },
+    { key: 'peso', label: 'Peso (kg)', required: false },
+    { key: 'largura_mm', label: 'Largura (mm)', required: false },
+    { key: 'altura_mm', label: 'Altura (mm)', required: false },
+    { key: 'profundidade_mm', label: 'Profundidade (mm)', required: false }
+];
+
+const _escapeCSV = v => {
+    if (v == null) return '';
+    const s = String(v);
+    if (s.includes(';') || s.includes('"') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+};
+
+const _downloadBlob = (content, filename, type = 'text/csv;charset=utf-8;') => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const _today = () => new Date().toISOString().split('T')[0];
+
+const _generateCSV = (headers, rows) => {
+    const header = headers.map(h => _escapeCSV(h.label)).join(';');
+    const body = rows.map(item =>
+        headers.map(h => _escapeCSV(item[h.key] ?? '')).join(';')
+    ).join('\n');
+    return '\uFEFF' + header + '\n' + body + '\n';
+};
+
+const _generateXLSX = (headers, rows, sheetName = 'Materiais') => {
+    const ws = XLSX.utils.aoa_to_sheet([
+        headers.map(h => h.label),
+        ...rows.map(item => headers.map(h => item[h.key] ?? ''))
+    ]);
+    ws['!cols'] = headers.map(() => ({ wch: 20 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+};
+
+const _downloadBoth = (headers, rows, baseName, sheetName) => {
+    const xlsxData = _generateXLSX(headers, rows, sheetName);
+    _downloadBlob(xlsxData, `${baseName}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    setTimeout(() => {
+        _downloadBlob(_generateCSV(headers, rows), `${baseName}.csv`);
+    }, 500);
+};
+
+const _getExampleRow = () => {
+    const ex = {};
+    CAMPOS_MATERIAIS.forEach(c => {
+        switch (c.key) {
+            case 'codigoInterno': ex[c.key] = 'MAT-001'; break;
+            case 'codigoFabricante': ex[c.key] = '3RT2017-1AP00'; break;
+            case 'descricao': ex[c.key] = 'Contator Siemens 22A 220V'; break;
+            case 'custo': ex[c.key] = 150.00; break;
+            case 'fabricante': ex[c.key] = 'Siemens'; break;
+            case 'unidade': ex[c.key] = 'un'; break;
+            case 'categoria': ex[c.key] = 'Contator'; break;
+            case 'ncm': ex[c.key] = '8536.50.00'; break;
+            case 'icms': ex[c.key] = 18; break;
+            case 'ipi': ex[c.key] = 10; break;
+            case 'ufFornecedor': ex[c.key] = 'SP'; break;
+            case 'grupoSiemens': ex[c.key] = 'LV10'; break;
+            case 'area': ex[c.key] = 'Comando'; break;
+            case 'modelo': ex[c.key] = '3RT2017'; break;
+            case 'peso': ex[c.key] = 0.35; break;
+            case 'largura_mm': ex[c.key] = 45; break;
+            case 'altura_mm': ex[c.key] = 80; break;
+            case 'profundidade_mm': ex[c.key] = 100; break;
+            default: ex[c.key] = '';
+        }
+    });
+    return ex;
+};
+
 /**
  * Materiais Module
  */
@@ -34,7 +133,9 @@ const MateriaisModule = {
             toggleFavorito: this.toggleFavorito.bind(this),
             goToPage: this.goToPage.bind(this),
             uploadDxf: this.uploadDxf.bind(this),
-            removeDxf: this.removeDxf.bind(this)
+            removeDxf: this.removeDxf.bind(this),
+            downloadTemplateMateriais: this.downloadTemplateMateriais.bind(this),
+            exportarMateriaisCSV: this.exportarMateriaisCSV.bind(this)
         };
 
         this.viewMode = 'list';
@@ -118,6 +219,12 @@ const MateriaisModule = {
                             </button>
                             <button class="btn btn-secondary btn-sm" onclick="app.materiais.openImportPricesModal()" style="background: #f0fdf4; color: #166534; border-color: #bbf7d0;">
                                 <i class="ph ph-file-xls"></i> Importar
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="app.materiais.downloadTemplateMateriais()" title="Baixar modelo CSV/XLSX para preencher">
+                                <i class="ph ph-download-simple"></i> Modelo
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="app.materiais.exportarMateriaisCSV()" title="Exportar materiais cadastrados">
+                                <i class="ph ph-upload"></i> Exportar
                             </button>
 ${store.canDelete() ? `                            <button class="btn btn-ghost btn-sm" onclick="app.materiais.cleanupDuplicates()" style="color: #ef4444;" title="Limpar Duplicados">
                                 <i class="ph ph-broom"></i>
@@ -1721,6 +1828,22 @@ ${store.canDelete() ? `                            <button class="btn btn-ghost 
             try { entityCount = JSON.parse(data.dxf_block).entities.length; } catch (e) { entityCount = 0; }
             document.getElementById('dxf-entity-count').textContent = entityCount + ' entidades geométricas';
         }
+    },
+
+    downloadTemplateMateriais() {
+        const exampleRow = _getExampleRow();
+        _downloadBoth(CAMPOS_MATERIAIS, [exampleRow], 'modelo_materiais', 'Modelo');
+        app.toast('Modelo de materiais baixado (CSV + XLSX).', 'success');
+    },
+
+    exportarMateriaisCSV() {
+        const materiais = store.getState().materiais || [];
+        if (materiais.length === 0) {
+            app.toast('Nenhum material para exportar.', 'info');
+            return;
+        }
+        _downloadBoth(CAMPOS_MATERIAIS, materiais, `materiais_${_today()}`, 'Materiais');
+        app.toast(`${materiais.length} material(is) exportado(s).`, 'success');
     }
 };
 
