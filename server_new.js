@@ -2282,7 +2282,7 @@ const server = http.createServer(async (req, res) => {
                         origemTipo: body.tipo || '',
                         revisao: body.revisao,
                         engenheiro_responsavel: body.engenheiro_responsavel || '',
-                        dataHora: new Date().toLocaleString('pt-BR'),
+                        dataHora: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
                         data_entrega: body.data_entrega || ''
                     });
                 }
@@ -2347,7 +2347,7 @@ const server = http.createServer(async (req, res) => {
                             origemTipo: item.tipo || oldItem?.tipo || '',
                             revisao: item.revisao ?? oldItem?.revisao,
                             engenheiro_responsavel: item.engenheiro_responsavel || oldItem?.engenheiro_responsavel || '',
-                            dataHora: new Date().toLocaleString('pt-BR'),
+                            dataHora: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
                             data_entrega: item.data_entrega || ''
                         });
                     }
@@ -2380,7 +2380,7 @@ const server = http.createServer(async (req, res) => {
                         origemTipo: item.tipo || '',
                         revisao: item.revisao,
                         engenheiro_responsavel: item.engenheiro_responsavel || '',
-                        dataHora: new Date().toLocaleString('pt-BR'),
+                        dataHora: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
                         data_entrega: item.data_entrega || ''
                     });
                 }
@@ -3360,7 +3360,7 @@ const server = http.createServer(async (req, res) => {
 
                 if (chatIds.length === 0) { sendJson(res, 200, { success: true, notified: false, reason: 'No chat IDs' }); return; }
 
-                const text = `🏭 *Manufatura - ${body.evento || 'Notificação'}*\n\n${body.mensagem || ''}\n\n_${new Date().toLocaleString('pt-BR')}_`;
+                const text = `🏭 *Manufatura - ${body.evento || 'Notificação'}*\n\n${body.mensagem || ''}\n\n_${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}_`;
 
                 for (const chatId of chatIds) {
                     try {
