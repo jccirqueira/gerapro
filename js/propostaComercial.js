@@ -1333,7 +1333,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         if (currentPtc && currentPtc.folder) {
             console.log('Salvando Proposta Comercial no servidor...', currentPtc.folder);
             const _tkPC1335 = store.getState().auth?.token;
-            fetch('http://localhost:8082/api/save-proposal', {
+            fetch('/api/save-proposal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(_tkPC1335 ? { 'Authorization': 'Bearer ' + _tkPC1335 } : {}) },
                 body: JSON.stringify({
@@ -1493,7 +1493,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const select = document.getElementById('sas-com-ptc-select');
         if (!select) return;
         const _tkPC1495 = store.getState().auth?.token;
-        fetch('http://localhost:8082/api/list-ptcs', { headers: { ...(_tkPC1495 ? { 'Authorization': 'Bearer ' + _tkPC1495 } : {}) } })
+        fetch('/api/list-ptcs', { headers: { ...(_tkPC1495 ? { 'Authorization': 'Bearer ' + _tkPC1495 } : {}) } })
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.dvts) {
@@ -1574,7 +1574,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                             revisions: []
                         };
                         const _tkPC1575 = store.getState().auth?.token;
-                        const res = await fetch('http://localhost:8082/api/save-proposal', {
+                        const res = await fetch('/api/save-proposal', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...(_tkPC1575 ? { 'Authorization': 'Bearer ' + _tkPC1575 } : {}) },
                             body: JSON.stringify({ ptcFolder: targetFolder, type: 'tecnica', content: empty, revisionFolder: '0' })
@@ -1954,7 +1954,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 const reader = new FileReader();
                 reader.onloadend = function() {
                     const base64data = reader.result.split(',')[1];
-                    fetch('http://localhost:8082/api/save-file', {
+                    fetch('/api/save-file', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', ...(_tkPC1947 ? { 'Authorization': 'Bearer ' + _tkPC1947 } : {}) },
                         body: JSON.stringify({
@@ -2124,7 +2124,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         try {
             const _tkPCL = store.getState().auth?.token;
             const _hPCL = _tkPCL ? { 'Authorization': 'Bearer ' + _tkPCL } : {};
-            const res = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaComercial.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hPCL });
+            const res = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaComercial.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hPCL });
             const data = await res.json();
             if (data && !data.error && Object.keys(data).length > 0) {
                 if (!data.cliente && window.app.currentPtc?.client) {

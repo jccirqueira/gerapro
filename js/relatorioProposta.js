@@ -25,15 +25,15 @@ const RelatorioProposta = {
             const _tkREL = store.getState().auth?.token;
             const _hREL = _tkREL ? { 'Authorization': 'Bearer ' + _tkREL } : {};
             const [tecRes, comRes] = await Promise.all([
-                fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaTecnica.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hREL }),
-                fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaComercial.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hREL })
+                fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaTecnica.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hREL }),
+                fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaComercial.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hREL })
             ]);
 
             const tecData = tecRes.ok ? await tecRes.json().catch(() => ({})) : {};
             const comData = comRes.ok ? await comRes.json().catch(() => ({})) : {};
 
             let precData = {};
-            const precRes = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=Precificacao_Map.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hREL });
+            const precRes = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=Precificacao_Map.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hREL });
             const precResult = precRes.ok ? await precRes.json().catch(() => ({})) : {};
             if (precResult && !precResult.error) precData = precResult;
 

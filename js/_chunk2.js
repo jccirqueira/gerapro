@@ -3355,7 +3355,7 @@ const PropostaTecnicaModule = {
 
 
 
-            const response = await fetch('http://localhost:8082/api/export-lm', {
+            const response = await fetch('/api/export-lm', {
 
                 method: 'POST',
 
@@ -3657,7 +3657,7 @@ const PropostaTecnicaModule = {
             console.log("[PropostaTecnica] Data to be saved:", JSON.stringify(data.equipments.map(e => e.tag)));
 
             const _tkCHUNK3659 = store.getState().auth?.token;
-            const res = await fetch('http://localhost:8082/api/save-proposal', {
+            const res = await fetch('/api/save-proposal', {
 
                 method: 'POST',
 

@@ -1795,7 +1795,7 @@ const App = {
                 telegram_chat_id: inp.value.trim()
             }));
             await store.saveTelegramSettings({ botToken, users });
-            const res = await fetch(`http://localhost:8082/api/notify-telegram`, {
+            const res = await fetch(`/api/notify-telegram`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (store.getState().auth?.token || '') },
                 body: JSON.stringify({ cliente: 'Teste', projeto: 'Mensagem de teste', acao: 'Notificação de teste', responsavel: store.getState().auth?.user?.name || '', vendedor: '', tipo: 'movimentacao' })
@@ -2685,7 +2685,7 @@ const App = {
             const token = store.getState().auth?.token;
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = 'Bearer ' + token;
-            const res = await fetch('http://localhost:8082/api/next-proposal-number-preview', { headers });
+            const res = await fetch('/api/next-proposal-number-preview', { headers });
             const data = await res.json();
             if (data.success && data.numero) ptcNum = data.numero;
         } catch (e) {
@@ -2898,7 +2898,7 @@ const App = {
             const token = store.getState().auth?.token;
             const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = 'Bearer ' + token;
-            const res = await fetch('http://localhost:8082/api/next-proposal-number', { headers });
+            const res = await fetch('/api/next-proposal-number', { headers });
             const data = await res.json();
             if (data.success && data.numero) return data.numero;
         } catch (e) {
@@ -2955,7 +2955,7 @@ const App = {
             // Call Backend to create folders
             // 8082 Hardcoded to match server
             const _tkC2387 = store.getState().auth?.token;
-            const response = await fetch('http://localhost:8082/api/create-ptc', {
+            const response = await fetch('/api/create-ptc', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(_tkC2387 ? { 'Authorization': 'Bearer ' + _tkC2387 } : {}) },
                 body: JSON.stringify(payload)
@@ -3042,7 +3042,7 @@ const App = {
             window.app._searchPtcOnClose = null;
 
             const _tkLP2474 = store.getState().auth?.token;
-            const res = await fetch('http://localhost:8082/api/list-ptcs', { headers: { ...(_tkLP2474 ? { 'Authorization': 'Bearer ' + _tkLP2474 } : {}) } });
+            const res = await fetch('/api/list-ptcs', { headers: { ...(_tkLP2474 ? { 'Authorization': 'Bearer ' + _tkLP2474 } : {}) } });
             const data = await res.json();
 
             if (!data.success) {
@@ -3184,7 +3184,7 @@ const App = {
 
         try {
             const _tkR2616 = store.getState().auth?.token;
-            const res = await fetch(`http://localhost:8082/api/ptc-revisions-folders?ptc=${encodeURIComponent(ptcFolder)}`, { headers: { ...(_tkR2616 ? { 'Authorization': 'Bearer ' + _tkR2616 } : {}) } });
+            const res = await fetch(`/api/ptc-revisions-folders?ptc=${encodeURIComponent(ptcFolder)}`, { headers: { ...(_tkR2616 ? { 'Authorization': 'Bearer ' + _tkR2616 } : {}) } });
             const data = await res.json();
 
             if (!data.success) {
@@ -3247,7 +3247,7 @@ const App = {
         try {
             const _tkALV = store.getState().auth?.token;
             const _hALV = _tkALV ? { 'Authorization': 'Bearer ' + _tkALV } : {};
-            const res = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=${encodeURIComponent(filename)}&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hALV });
+            const res = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=${encodeURIComponent(filename)}&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hALV });
             let data = await res.json();
 
             // Store current PTC context EVEN IF content fails to load, so you can save a NEW one in this revision
@@ -3374,12 +3374,12 @@ const App = {
             const _tkALP = store.getState().auth?.token;
             const _hALP = _tkALP ? { 'Authorization': 'Bearer ' + _tkALP } : {};
             // Tenta carregar o novo formato (Map por TAG) primeiro
-            let res = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=Precificacao_Map.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hALP });
+            let res = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=Precificacao_Map.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hALP });
             let data = await res.json();
 
             // Se não encontrar o Map, tenta o formato antigo (Global)
             if (!data || data.error || Object.keys(data).length === 0) {
-                res = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=Precificacao.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hALP });
+                res = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=Precificacao.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hALP });
                 data = await res.json();
             }
 
@@ -3568,7 +3568,7 @@ const App = {
         console.log("[App] Syncing proposals with filesystem...");
         try {
             const _tkSP2996 = store.getState().auth?.token;
-            const response = await fetch('http://localhost:8082/api/list-all-proposals', { headers: { ...(_tkSP2996 ? { 'Authorization': 'Bearer ' + _tkSP2996 } : {}) } });
+            const response = await fetch('/api/list-all-proposals', { headers: { ...(_tkSP2996 ? { 'Authorization': 'Bearer ' + _tkSP2996 } : {}) } });
             if (!response.ok) { console.warn("[App] Sync proposals returned", response.status); return; }
             const data = await response.json();
 
@@ -3607,7 +3607,7 @@ const App = {
             };
 
             const _tkC3034 = store.getState().auth?.token;
-            fetch('http://localhost:8082/api/create-ptc', {
+            fetch('/api/create-ptc', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(_tkC3034 ? { 'Authorization': 'Bearer ' + _tkC3034 } : {}) },
                 body: JSON.stringify(payload)
@@ -3658,7 +3658,7 @@ const App = {
             const _tkAPP3079 = store.getState().auth?.token;
             const _authHeaders = _tkAPP3079 ? { 'Authorization': 'Bearer ' + _tkAPP3079, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
             const filename = sourceType === 'tecnica' ? 'PropostaTecnica.json' : 'PropostaComercial.json';
-            const res = await fetch('http://localhost:8082/api/save-proposal', {
+            const res = await fetch('/api/save-proposal', {
                 method: 'POST',
                 headers: _authHeaders,
                 body: JSON.stringify({
@@ -3674,10 +3674,10 @@ const App = {
 
             if (options && options.includePrecificacao && sourceData._origPtcFolder) {
                 try {
-                    const precRes = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(sourceData._origPtcFolder)}&file=Precificacao_Map.json&revisionFolder=0`, { headers: _authHeaders });
+                    const precRes = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(sourceData._origPtcFolder)}&file=Precificacao_Map.json&revisionFolder=0`, { headers: _authHeaders });
                     const precData = await precRes.json();
                     if (precData && !precData.error) {
-                        await fetch('http://localhost:8082/api/save-proposal', {
+                        await fetch('/api/save-proposal', {
                             method: 'POST',
                             headers: _authHeaders,
                             body: JSON.stringify({

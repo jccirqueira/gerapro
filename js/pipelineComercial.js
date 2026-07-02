@@ -998,7 +998,7 @@ const PipelineComercialModule = {
         const items = state.pipelineItems || [];
         try {
             const _tkPC1000 = store.getState().auth?.token;
-            const res = await fetch('http://localhost:8082/api/list-ptcs', { headers: { ...(_tkPC1000 ? { 'Authorization': 'Bearer ' + _tkPC1000 } : {}) } });
+            const res = await fetch('/api/list-ptcs', { headers: { ...(_tkPC1000 ? { 'Authorization': 'Bearer ' + _tkPC1000 } : {}) } });
             const data = await res.json();
             if (!data.success) { window.app.toast('Erro ao consultar servidor.', 'error'); return; }
             const pastas = new Set((data.ptcs || []).map(p => p.toLowerCase().trim()));

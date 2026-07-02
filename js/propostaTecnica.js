@@ -9212,7 +9212,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             }
         });
         try {
-            await fetch('http://localhost:8082/api/settings/vendor-defaults', {
+            await fetch('/api/settings/vendor-defaults', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ vendorDefaults: merged })
@@ -10054,7 +10054,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
 
 
 
-            const response = await fetch('http://localhost:8082/api/export-lm', {
+            const response = await fetch('/api/export-lm', {
 
                 method: 'POST',
 
@@ -10418,7 +10418,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             console.log("[PropostaTecnica] Data to be saved:", JSON.stringify(data.equipments.map(e => e.tag)));
 
             const _tk = store.getState().auth?.token;
-            const res = await fetch('http://localhost:8082/api/save-proposal', {
+            const res = await fetch('/api/save-proposal', {
 
                 method: 'POST',
 
@@ -10598,7 +10598,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         const select = document.getElementById('sas-ptc-select');
         if (!select) return;
         const _tkPT6398 = store.getState().auth?.token;
-        fetch('http://localhost:8082/api/list-ptcs', { headers: { ...(_tkPT6398 ? { 'Authorization': 'Bearer ' + _tkPT6398 } : {}) } })
+        fetch('/api/list-ptcs', { headers: { ...(_tkPT6398 ? { 'Authorization': 'Bearer ' + _tkPT6398 } : {}) } })
             .then(r => r.json())
             .then(data => {
                 if (data.success && data.dvts) {
@@ -10679,7 +10679,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                         revisions: []
                     };
                     const _tk6478 = store.getState().auth?.token;
-                    const res = await fetch('http://localhost:8082/api/save-proposal', {
+                    const res = await fetch('/api/save-proposal', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', ...(_tk6478 ? { 'Authorization': 'Bearer ' + _tk6478 } : {}) },
                         body: JSON.stringify({ ptcFolder: targetFolder, type: 'comercial', content: empty, revisionFolder: '0' })
@@ -14294,7 +14294,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         try {
             const _tkPTL = store.getState().auth?.token;
             const _hPTL = _tkPTL ? { 'Authorization': 'Bearer ' + _tkPTL } : {};
-            const res = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaTecnica.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hPTL });
+            const res = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(ptcFolder)}&file=PropostaTecnica.json&revisionFolder=${encodeURIComponent(revisionFolder)}`, { headers: _hPTL });
             const data = await res.json();
             if (data && !data.error && Object.keys(data).length > 0) {
                 this.viewMode = 'form';
@@ -16521,7 +16521,7 @@ ${dataRows}
             const currentPtc = window.app.currentPtc;
             if (currentPtc && currentPtc.folder) {
                 const _token_sf = store.getState().auth?.token;
-            fetch('http://localhost:8082/api/save-file', {
+            fetch('/api/save-file', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(_token_sf ? { 'Authorization': 'Bearer ' + _token_sf } : {}) },
                     body: JSON.stringify({

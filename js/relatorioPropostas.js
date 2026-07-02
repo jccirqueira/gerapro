@@ -696,7 +696,7 @@ const RelatorioPropostas = {
         if (!select) return;
         try {
             const _tkRP698 = store.getState().auth?.token;
-            const res = await fetch('http://localhost:8082/api/list-ptcs', { headers: { ...(_tkRP698 ? { 'Authorization': 'Bearer ' + _tkRP698 } : {}) } });
+            const res = await fetch('/api/list-ptcs', { headers: { ...(_tkRP698 ? { 'Authorization': 'Bearer ' + _tkRP698 } : {}) } });
             const data = await res.json();
             if (data.success && data.ptcs) {
                 select.innerHTML = '<option value="">Selecione uma PTC...</option>'
@@ -729,7 +729,7 @@ const RelatorioPropostas = {
             const filename = proposal.type === 'tecnicas' ? 'PropostaTecnica.json' : 'PropostaComercial.json';
             const _tkRPL = store.getState().auth?.token;
             const _hRPL = _tkRPL ? { 'Authorization': 'Bearer ' + _tkRPL } : {};
-            const loadRes = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(proposal.ptcFolder)}&file=${encodeURIComponent(filename)}&revisionFolder=${encodeURIComponent(proposal.revision || '0')}`, { headers: _hRPL });
+            const loadRes = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(proposal.ptcFolder)}&file=${encodeURIComponent(filename)}&revisionFolder=${encodeURIComponent(proposal.revision || '0')}`, { headers: _hRPL });
             const sourceData = await loadRes.json();
             if (!sourceData || sourceData.error) throw new Error('Proposta original não encontrada no servidor.');
 

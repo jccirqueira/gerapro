@@ -173,7 +173,7 @@ const LMModule = {
 
         try {
             const ptcNumber = store.getState().activePtc?.folder || 'LM';
-            const response = await fetch('http://localhost:8082/api/export-lm', {
+            const response = await fetch('/api/export-lm', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 

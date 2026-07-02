@@ -115,7 +115,7 @@ const ImportacaoETModule = {
             stepEl.textContent = 'Consultando IA para extrair dados técnicos...';
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 660000);
-            const res = await fetch('http://localhost:8082/api/import-document', {
+            const res = await fetch('/api/import-document', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -710,7 +710,7 @@ const ImportacaoETModule = {
 
     async _exportExcel(data) {
         try {
-            const res = await fetch('http://localhost:8082/api/export-ai-extraction', {
+            const res = await fetch('/api/export-ai-extraction', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)

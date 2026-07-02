@@ -89,7 +89,7 @@ const PropostaCompletaModule = {
             const _tkLP = store.getState().auth?.token;
             const _hLP = _tkLP ? { 'Authorization': 'Bearer ' + _tkLP } : {};
             const fileName = type === 'tecnica' ? 'PropostaTecnica.json' : 'PropostaComercial.json';
-            const res = await fetch(`http://localhost:8082/api/load-proposal?ptc=${encodeURIComponent(folder)}&file=${fileName}&revisionFolder=`, { headers: _hLP });
+            const res = await fetch(`/api/load-proposal?ptc=${encodeURIComponent(folder)}&file=${fileName}&revisionFolder=`, { headers: _hLP });
             const data = await res.json();
             if (data && !data.error && Object.keys(data).length > 0) {
                 if (!data.ptc_folder) data.ptc_folder = folder;
@@ -828,7 +828,7 @@ const PropostaCompletaModule = {
             const currentPtc = window.app.currentPtc;
             if (currentPtc && currentPtc.folder) {
                 const _tkSFPC = store.getState().auth?.token;
-                fetch('http://localhost:8082/api/save-file', {
+                fetch('/api/save-file', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(_tkSFPC ? { 'Authorization': 'Bearer ' + _tkSFPC } : {}) },
                     body: JSON.stringify({
