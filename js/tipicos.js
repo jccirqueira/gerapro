@@ -157,6 +157,7 @@ const TipicosModule = {
             icc: '',
             protecao: '',
             drives: '',
+            tensaoComando: '',
             descricao_word: ''
         };
         this.viewMode = 'form';
@@ -420,9 +421,23 @@ const TipicosModule = {
                                     </select>
                                 </div>
                                 <div class="form-group" style="flex: 1;">
-                                    <label class="form-label">Reserva</label>
-                                    <select id="t-reserva" class="form-control">
+                                    <label class="form-label">Sinalização/Comando Porta</label>
+                                    <select id="t-reserva" class="form-control" onchange="app.tipicos.updateAutoName()">
                                         <option value="">Selecione...</option>
+                                        <option value="SF">Sinaleiro Falha</option>
+                                        <option value="SF-CS-BDI">Sinaleiro Falha + Comutadora 2 pos. + Botão duplo iluminado</option>
+                                        <option value="SF-CS-BL-BD">Sinaleiro Falha + Comutadora 2 pos. + Botão Liga + Botão Desliga</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row" style="display: flex; gap: 10px;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">Tensão de Comando</label>
+                                    <select id="t-tensaoComando" class="form-control" onchange="app.tipicos.updateAutoName()">
+                                        <option value="">Selecione...</option>
+                                        <option value="220VCA">220vca</option>
+                                        <option value="24VCC">24vcc</option>
+                                        <option value="220VCA-24VCC">220vca/24vcc</option>
                                     </select>
                                 </div>
                             </div>
@@ -462,6 +477,7 @@ const TipicosModule = {
                                     <option value="EtherCAT">EtherCAT</option>
                                     <option value="Ethernet/IP">Ethernet/IP</option>
                                     <option value="IO-LINK">IO-LINK</option>
+                                    <option value="I/O">I/O</option>
                                     <option value="Modbus RTU">Modbus RTU</option>
                                     <option value="Modbus TCP">Modbus TCP</option>
                                     <option value="Profibus DP">Profibus DP</option>
@@ -557,6 +573,7 @@ const TipicosModule = {
         document.getElementById('t-frequencia').value = state.frequencia || '60';
         document.getElementById('t-rendimento').value = state.rendimento || '0.90';
         document.getElementById('t-reserva').value = state.reserva || '';
+        document.getElementById('t-tensaoComando').value = state.tensaoComando || '';
         document.getElementById('t-descricao_word').value = state.descricao_word || '';
 
         // Handle initial potency visibility
@@ -1166,6 +1183,7 @@ const TipicosModule = {
         this.currentBuilderState.frequencia = document.getElementById('t-frequencia').value;
         this.currentBuilderState.rendimento = document.getElementById('t-rendimento').value;
         this.currentBuilderState.reserva = document.getElementById('t-reserva').value;
+        this.currentBuilderState.tensaoComando = document.getElementById('t-tensaoComando').value;
         this.currentBuilderState.descricao_word = document.getElementById('t-descricao_word').value;
 
         const total = this.currentBuilderState.items.reduce((acc, i) => acc + (i.custo * i.qtd), 0);
@@ -1213,6 +1231,8 @@ const TipicosModule = {
         const comunicacao = document.getElementById('t-comunicacao').value || '';
         const protecao = document.getElementById('t-protecao').value || '';
         const drives = document.getElementById('t-drives').value || '';
+        const reserva = document.getElementById('t-reserva').value || '';
+        const tensaoComando = document.getElementById('t-tensaoComando').value || '';
         const regime = document.getElementById('t-regimeAcionamento').value || 'standard';
         let regimeSuffix = regime === 'pesado' ? 'PES' : 'STD';
         if (tipo === 'PNMT') regimeSuffix = '';
@@ -1220,7 +1240,7 @@ const TipicosModule = {
         // Prioritize Kvar for BC types, otherwise use CV
         const selectedPotencia = (tipo === 'BC' && potenciaKvar) ? potenciaKvar : potenciaCV;
 
-        const parts = [tipo, selectedPotencia, tensao, icc, comunicacao, protecao, drives, regimeSuffix].filter(p => p !== '');
+        const parts = [tipo, selectedPotencia, tensao, icc, comunicacao, protecao, drives, reserva, tensaoComando, regimeSuffix].filter(p => p !== '');
 
         if (parts.length > 0) {
             document.getElementById('t-nome').value = parts.join('-');
@@ -1304,11 +1324,13 @@ const TipicosModule = {
         const comunicacao = document.getElementById('t-comunicacao').value || '';
         const protecao = document.getElementById('t-protecao').value || '';
         const drives = document.getElementById('t-drives').value || '';
+        const reserva = document.getElementById('t-reserva').value || '';
+        const tensaoComando = document.getElementById('t-tensaoComando').value || '';
         const regime = document.getElementById('t-regimeAcionamento').value || 'standard';
         const regimeSuffix = regime === 'pesado' ? 'PES' : 'STD';
 
         const selectedPotencia = (tipo === 'BC' && potenciaKvar) ? potenciaKvar : potenciaCV;
-        const parts = [tipo, selectedPotencia, tensao, icc, comunicacao, protecao, drives, regimeSuffix].filter(p => p !== '');
+        const parts = [tipo, selectedPotencia, tensao, icc, comunicacao, protecao, drives, reserva, tensaoComando, regimeSuffix].filter(p => p !== '');
 
         if (parts.length > 0) {
             document.getElementById('t-nome').value = parts.join('-');

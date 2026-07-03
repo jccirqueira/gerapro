@@ -189,6 +189,7 @@ function initSchema() {
             fs REAL,
             rendimento REAL,
             reserva TEXT,
+            tensaoComando TEXT,
             protecao TEXT,
             drives TEXT,
             aplicacao TEXT,
@@ -806,6 +807,9 @@ function initSchema() {
 
     // Migration: reset markup to 0 for all existing materials
     try { db.exec("UPDATE materiais SET markup = 0 WHERE markup IS NULL OR markup > 0"); } catch (e) { /* ignore */ }
+
+    // Migration: add tensaoComando to tipicos table
+    try { db.exec("ALTER TABLE tipicos ADD COLUMN tensaoComando TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add cubiculos columns
     try { db.exec("ALTER TABLE cubiculos ADD COLUMN correnteNominal TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
