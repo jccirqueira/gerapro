@@ -804,6 +804,9 @@ function initSchema() {
     // Migration: add dxf_block to materiais table
     try { db.exec("ALTER TABLE materiais ADD COLUMN dxf_block TEXT"); } catch (e) { /* column may already exist */ }
 
+    // Migration: reset markup to 0 for all existing materials
+    try { db.exec("UPDATE materiais SET markup = 0 WHERE markup IS NULL OR markup > 0"); } catch (e) { /* ignore */ }
+
     // Migration: add cubiculos columns
     try { db.exec("ALTER TABLE cubiculos ADD COLUMN correnteNominal TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE cubiculos ADD COLUMN nbi TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }

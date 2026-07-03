@@ -534,7 +534,7 @@ ${store.canDelete() ? `                            <button class="btn btn-ghost 
                                         <input type="number" step="1" name="altura_mm" class="form-control" value="${data.altura_mm || ''}" placeholder="0">
                                     </div>
                                     <div class="form-group" style="flex: 1;">
-                                        <label class="form-label">Prof. (mm)</label>
+                                        <label class="form-label">Profundidade (mm)</label>
                                         <input type="number" step="1" name="profundidade_mm" class="form-control" value="${data.profundidade_mm || ''}" placeholder="0">
                                     </div>
                                  </div>
@@ -597,7 +597,7 @@ ${store.canDelete() ? `                            <button class="btn btn-ghost 
                                     </div>
                                     <div class="form-group" style="flex: 1;">
                                         <label class="form-label">Markup Padrão (%)</label>
-                                        <input type="number" step="0.1" id="input-markup" name="markup" class="form-control" value="${data.markup || '50'}" oninput="app.materiais.calculatePrice()">
+                                        <input type="number" step="0.1" id="input-markup" name="markup" class="form-control" value="${data.markup || '0'}" oninput="app.materiais.calculatePrice()">
                                     </div>
                                 </div>
                                 <div class="form-group">

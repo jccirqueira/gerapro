@@ -25,17 +25,15 @@ export const loadDemoData = () => {
 
     const demoMaterials = [
         // --- POWER COMPONENTS ---
-        { id: 'mat-dj-32', codigoInterno: 'DJ-C32', codigoFabricante: '10076442', modelo: 'MDW-C32', fabricante: 'WEG', categoria: 'Disjuntor', descricao: 'Disjuntor Miniatura MDW Tripolar 32A Curva C', unidade: 'un', custo: 58.50, markup: 40, createdAt: new Date() },
-        { id: 'mat-djm-10', codigoInterno: 'MPW-18', codigoFabricante: '12429285', modelo: 'MPW18-3-U010', fabricante: 'WEG', categoria: 'Disjuntor Motor', descricao: 'Disjuntor Motor MPW18 6.3-10A', unidade: 'un', custo: 155.00, markup: 35, createdAt: new Date() },
-        { id: 'mat-ct-18', codigoInterno: 'CT-18A', codigoFabricante: '12242501', modelo: 'CWB18-11-30D23', fabricante: 'WEG', categoria: 'Contator', descricao: 'Contator CWB18 18A 1NA+1NF 220V 60Hz', unidade: 'un', custo: 115.00, markup: 45, createdAt: new Date() },
-        { id: 'mat-ss-10', codigoInterno: 'SS-10', codigoFabricante: '10041234', modelo: 'SSW050010T2246', fabricante: 'WEG', categoria: 'Soft-Starter', descricao: 'Soft-Starter SSW05 10A 5CV 380V', unidade: 'un', custo: 1250.00, markup: 30, createdAt: new Date() },
-        { id: 'mat-inv-5', codigoInterno: 'INV-05', codigoFabricante: '11223344', modelo: 'CFW500A0500T4', fabricante: 'WEG', categoria: 'Inversor', descricao: 'Inversor CFW500 5CV 380V Trifásico', unidade: 'un', custo: 2450.00, markup: 30, createdAt: new Date() },
-
-        // --- CONTROL & COMMS ---
-        { id: 'mat-com-pnet', codigoInterno: 'COM-PNET', codigoFabricante: '14556677', modelo: 'CFW500-CPN', fabricante: 'WEG', categoria: 'Módulo Com.', descricao: 'Módulo de Comunicação Profinet para CFW500', unidade: 'un', custo: 450.00, markup: 40, createdAt: new Date() },
-        { id: 'mat-btn-gr', codigoInterno: 'BTN-IMP', codigoFabricante: '12882294', modelo: 'CSW-BF1-30', fabricante: 'WEG', categoria: 'Comando', descricao: 'Botão Impulso Verde Faceado 1NA', unidade: 'un', custo: 18.50, markup: 50, createdAt: new Date() },
-        { id: 'mat-btn-red', codigoInterno: 'BTN-RET', codigoFabricante: '12882295', modelo: 'CSW-BF2-30', fabricante: 'WEG', categoria: 'Comando', descricao: 'Botão Impulso Vermelho Faceado 1NF', unidade: 'un', custo: 18.50, markup: 50, createdAt: new Date() },
-        { id: 'mat-lp-white', codigoInterno: 'LP-220', codigoFabricante: '11002233', modelo: 'CEW-SM2-D23', fabricante: 'WEG', categoria: 'Sinalização', descricao: 'Sinaleiro Monobloco LED Branco 220V', unidade: 'un', custo: 12.90, markup: 50, createdAt: new Date() }
+        { id: 'mat-dj-32', codigoInterno: 'DJ-C32', codigoFabricante: '10076442', modelo: 'MDW-C32', fabricante: 'WEG', categoria: 'Disjuntor', descricao: 'Disjuntor Miniatura MDW Tripolar 32A Curva C', unidade: 'un', custo: 58.50, markup: 0, createdAt: new Date() },
+        { id: 'mat-djm-10', codigoInterno: 'MPW-18', codigoFabricante: '12429285', modelo: 'MPW18-3-U010', fabricante: 'WEG', categoria: 'Disjuntor Motor', descricao: 'Disjuntor Motor MPW18 6.3-10A', unidade: 'un', custo: 155.00, markup: 0, createdAt: new Date() },
+        { id: 'mat-ct-18', codigoInterno: 'CT-18A', codigoFabricante: '12242501', modelo: 'CWB18-11-30D23', fabricante: 'WEG', categoria: 'Contator', descricao: 'Contator CWB18 18A 1NA+1NF 220V 60Hz', unidade: 'un', custo: 115.00, markup: 0, createdAt: new Date() },
+        { id: 'mat-ss-10', codigoInterno: 'SS-10', codigoFabricante: '10041234', modelo: 'SSW050010T2246', fabricante: 'WEG', categoria: 'Soft-Starter', descricao: 'Soft-Starter SSW05 10A 5CV 380V', unidade: 'un', custo: 1250.00, markup: 0, createdAt: new Date() },
+        { id: 'mat-inv-5', codigoInterno: 'INV-05', codigoFabricante: '11223344', modelo: 'CFW500A0500T4', fabricante: 'WEG', categoria: 'Inversor', descricao: 'Inversor CFW500 5CV 380V Trifásico', unidade: 'un', custo: 2450.00, markup: 0, createdAt: new Date() },
+        { id: 'mat-com-pnet', codigoInterno: 'COM-PNET', codigoFabricante: '14556677', modelo: 'CFW500-CPN', fabricante: 'WEG', categoria: 'Módulo Com.', descricao: 'Módulo de Comunicação Profinet para CFW500', unidade: 'un', custo: 450.00, markup: 0, createdAt: new Date() },
+        { id: 'mat-btn-gr', codigoInterno: 'BTN-IMP', codigoFabricante: '12882294', modelo: 'CSW-BF1-30', fabricante: 'WEG', categoria: 'Comando', descricao: 'Botão Impulso Verde Faceado 1NA', unidade: 'un', custo: 18.50, markup: 0, createdAt: new Date() },
+        { id: 'mat-btn-red', codigoInterno: 'BTN-RET', codigoFabricante: '12882295', modelo: 'CSW-BF2-30', fabricante: 'WEG', categoria: 'Comando', descricao: 'Botão Impulso Vermelho Faceado 1NF', unidade: 'un', custo: 18.50, markup: 0, createdAt: new Date() },
+        { id: 'mat-lp-white', codigoInterno: 'LP-220', codigoFabricante: '11002233', modelo: 'CEW-SM2-D23', fabricante: 'WEG', categoria: 'Sinalização', descricao: 'Sinaleiro Monobloco LED Branco 220V', unidade: 'un', custo: 12.90, markup: 0, createdAt: new Date() }
     ];
 
     const demoTypicals = [

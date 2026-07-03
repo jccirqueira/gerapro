@@ -17,7 +17,11 @@ const MAPPABLE_FIELDS = [
     { key: 'ufFornecedor', label: 'UF Fornecedor', hint: 'uf, estado, state' },
     { key: 'grupoSiemens', label: 'Grupo Siemens', hint: 'grupo de material 2, grupo material 2, grupo siemens' },
     { key: 'area', label: 'Área', hint: 'area, área, setor, local, departamento' },
-    { key: 'modelo', label: 'Modelo', hint: 'modelo, model' }
+    { key: 'modelo', label: 'Modelo', hint: 'modelo, model' },
+    { key: 'peso', label: 'Peso (kg)', hint: 'peso, weight, kg, massa' },
+    { key: 'largura_mm', label: 'Largura (mm)', hint: 'largura, larg, largura mm, width, w' },
+    { key: 'altura_mm', label: 'Altura (mm)', hint: 'altura, alt, altura mm, height, h' },
+    { key: 'profundidade_mm', label: 'Profundidade (mm)', hint: 'profundidade, prof, profundidade mm, depth, d' }
 ];
 
 const SIEMENS_PRESET_MAP = {
@@ -447,7 +451,11 @@ const ImportacaoModule = {
                 })(),
                 ufFornecedor: getVal('ufFornecedor') ? String(getVal('ufFornecedor')).trim().toUpperCase().substring(0, 2) : '',
                 grupoSiemens: getVal('grupoSiemens') ? String(getVal('grupoSiemens')).trim() : '',
-                markup: 50,
+                peso: this._parseNumber(getVal('peso')) || 0,
+                largura_mm: this._parseNumber(getVal('largura_mm')) || 0,
+                altura_mm: this._parseNumber(getVal('altura_mm')) || 0,
+                profundidade_mm: this._parseNumber(getVal('profundidade_mm')) || 0,
+                markup: 0,
                 createdAt: new Date()
             };
             if (icmsInclusoChecked && item.icms > 0) {

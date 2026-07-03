@@ -127,7 +127,7 @@ const ImportacaoModule = {
                 unidade: row[findKey(['Unidade', 'Unit', 'unidade'])] || 'un',
                 categoria: 'Outros', // Default category
                 area: areaKey ? String(row[areaKey]).trim() : '',
-                markup: 50, // Default
+                markup: 0, // Default
                 createdAt: new Date()
             };
         }).filter(item => item !== null);
