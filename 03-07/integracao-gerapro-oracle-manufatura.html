@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Integração GeraPro &rarr; Oracle Manufacturing</title>
+<style>
+    :root {
+        --color-bg-app: #f0f2f5;
+        --color-bg-panel: #ffffff;
+        --color-bg-sidebar: #1e293b;
+        --color-primary: #0f172a;
+        --color-primary-light: #334155;
+        --color-accent: rgb(3, 92, 169);
+        --color-accent-hover: rgb(56, 86, 14);
+        --color-text-main: #1e293b;
+        --color-text-muted: #64748b;
+        --color-text-inverse: #f8fafc;
+        --color-border: #cbd5e1;
+        --color-border-strong: #94a3b8;
+        --color-success: #16a34a;
+        --color-warning: #ea580c;
+        --color-danger: #dc2626;
+        --font-family: 'Arial', sans-serif;
+        --font-size-xs: 11px;
+        --font-size-sm: 13px;
+        --font-size-base: 14px;
+        --font-size-lg: 16px;
+        --font-size-xl: 20px;
+        --font-size-2xl: 26px;
+        --spacing-xs: 4px;
+        --spacing-sm: 8px;
+        --spacing-md: 16px;
+        --spacing-lg: 24px;
+        --radius-sm: 3px;
+        --radius-md: 6px;
+        --radius-lg: 10px;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-family);
+        background-color: var(--color-bg-app);
+        color: var(--color-text-main);
+        font-size: var(--font-size-base);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+    }
+
+    /* Header */
+    .header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: var(--color-text-inverse);
+        padding: 0;
+        margin: -40px -24px 40px;
+        position: relative;
+    }
+
+    .header-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 48px 24px;
+    }
+
+    .header h1 {
+        font-size: var(--font-size-2xl);
+        margin: 0 0 8px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+    }
+
+    .header .subtitle {
+        font-size: var(--font-size-lg);
+        color: #94a3b8;
+        margin: 0;
+    }
+
+    .header .meta {
+        font-size: var(--font-size-xs);
+        color: #64748b;
+        margin-top: 12px;
+    }
+
+    /* Cards */
+    .card {
+        background: var(--color-bg-panel);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .card h2 {
+        font-size: var(--font-size-xl);
+        color: var(--color-primary);
+        margin: 0 0 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--color-accent);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .card h2 .icon {
+        color: var(--color-accent);
+        font-size: 22px;
+    }
+
+    .card h3 {
+        font-size: var(--font-size-lg);
+        color: var(--color-primary-light);
+        margin: 20px 0 10px;
+    }
+
+    .card h4 {
+        font-size: var(--font-size-base);
+        color: var(--color-text-main);
+        margin: 16px 0 8px;
+        font-weight: 600;
+    }
+
+    .card p {
+        margin: 0 0 12px;
+        color: var(--color-text-main);
+    }
+
+    /* Info Boxes */
+    .info-box {
+        background: #eff6ff;
+        border-left: 4px solid var(--color-accent);
+        padding: 16px 20px;
+        margin: 16px 0;
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        font-size: var(--font-size-sm);
+    }
+
+    .info-box.warning {
+        background: #fffbeb;
+        border-left-color: var(--color-warning);
+    }
+
+    .info-box.success {
+        background: #f0fdf4;
+        border-left-color: var(--color-success);
+    }
+
+    .info-box.danger {
+        background: #fef2f2;
+        border-left-color: var(--color-danger);
+    }
+
+    .info-box strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: var(--font-size-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Tables */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: var(--font-size-sm);
+    }
+
+    thead {
+        background: #f8fafc;
+    }
+
+    th {
+        text-align: left;
+        padding: 10px 12px;
+        font-weight: 600;
+        color: var(--color-primary-light);
+        border-bottom: 2px solid var(--color-border-strong);
+        font-size: var(--font-size-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--color-border);
+        vertical-align: top;
+    }
+
+    tr:hover td {
+        background: #f8fafc;
+    }
+
+    /* Code */
+    code {
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: var(--font-size-sm);
+    }
+
+    p > code, li > code {
+        background: #f1f5f9;
+        color: #0f172a;
+        padding: 2px 6px;
+        border-radius: 2px;
+        font-size: var(--font-size-xs);
+    }
+
+    /* Lists */
+    ul, ol {
+        margin: 8px 0 16px;
+        padding-left: 24px;
+    }
+
+    li {
+        margin-bottom: 4px;
+    }
+
+    /* Tags/badges */
+    .tag {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .tag.recommended {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .tag.mvp {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .tag.advanced {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    /* Severity dots */
+    .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+
+    .dot.green { background: var(--color-success); }
+    .dot.yellow { background: var(--color-warning); }
+    .dot.red { background: var(--color-danger); }
+
+    /* ============================================ */
+    /*   DIAGRAM: FLOWCHART BOXES                   */
+    /* ============================================ */
+    .flowchart {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        padding: 24px 8px;
+        flex-wrap: wrap;
+    }
+
+    .flow-box {
+        flex: 1;
+        min-width: 180px;
+        max-width: 280px;
+        padding: 20px 16px;
+        border-radius: var(--radius-lg);
+        text-align: center;
+        box-shadow: var(--shadow-md);
+        position: relative;
+    }
+
+    .flow-box .box-icon {
+        font-size: 28px;
+        margin-bottom: 8px;
+    }
+
+    .flow-box .box-title {
+        font-weight: 700;
+        font-size: var(--font-size-base);
+        margin-bottom: 4px;
+    }
+
+    .flow-box .box-sub {
+        font-size: var(--font-size-xs);
+        opacity: 0.85;
+        line-height: 1.4;
+    }
+
+    .flow-box.box-gerapro {
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        color: #f8fafc;
+    }
+
+    .flow-box.box-data {
+        background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+        color: #1e3a5f;
+        border: 2px dashed #93c5fd;
+    }
+
+    .flow-box.box-oracle {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: #fff;
+    }
+
+    .flow-box.box-fbdi {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        color: #fff;
+    }
+
+    .flow-box.box-rest {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #fff;
+    }
+
+    .flow-arrow {
+        flex-shrink: 0;
+        padding: 0 4px;
+        font-size: 24px;
+        color: var(--color-text-muted);
+        position: relative;
+    }
+
+    .flow-arrow.large {
+        font-size: 32px;
+        color: var(--color-accent);
+    }
+
+    .flow-path-label {
+        text-align: center;
+        font-size: var(--font-size-xs);
+        color: var(--color-text-muted);
+        padding: 2px 0 0;
+        font-weight: 600;
+    }
+
+    .flow-approach {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 0 8px;
+    }
+
+    .flow-approach-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        flex-wrap: wrap;
+    }
+
+    .flow-approach-row .flow-box {
+        min-width: 130px;
+        max-width: 200px;
+        padding: 12px 12px;
+    }
+
+    .flow-approach-row .flow-box .box-icon {
+        font-size: 20px;
+        margin-bottom: 4px;
+    }
+
+    .flow-approach-row .flow-box .box-title {
+        font-size: var(--font-size-sm);
+    }
+
+    .flow-approach-row .flow-box .box-sub {
+        font-size: 10px;
+    }
+
+    .approach-tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 3px 10px;
+        border-radius: 4px;
+        margin: 8px 0 4px;
+    }
+
+    .approach-tag.mvp {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .approach-tag.advanced {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    /* ============================================ */
+    /*   TIMELINE VERTICAL                          */
+    /* ============================================ */
+    .timeline {
+        position: relative;
+        padding: 8px 0 8px 40px;
+        margin: 16px 0;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 16px;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: linear-gradient(180deg, var(--color-accent) 0%, var(--color-success) 100%);
+        border-radius: 2px;
+    }
+
+    .timeline-step {
+        position: relative;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        background: #f8fafc;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        transition: box-shadow 0.2s;
+    }
+
+    .timeline-step:hover {
+        box-shadow: var(--shadow-sm);
+    }
+
+    .timeline-step .step-number {
+        position: absolute;
+        left: -34px;
+        top: 12px;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--color-accent);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+        box-shadow: 0 0 0 3px #fff;
+        z-index: 1;
+    }
+
+    .timeline-step .step-number.green {
+        background: var(--color-success);
+    }
+
+    .timeline-step .step-number.orange {
+        background: var(--color-warning);
+    }
+
+    .timeline-step .step-icon {
+        font-size: 18px;
+        margin-right: 8px;
+        float: left;
+        line-height: 1.4;
+    }
+
+    .timeline-step .step-title {
+        font-weight: 700;
+        font-size: var(--font-size-base);
+        color: var(--color-text-main);
+    }
+
+    .timeline-step .step-desc {
+        font-size: var(--font-size-sm);
+        color: var(--color-text-muted);
+        margin-top: 2px;
+    }
+
+    .timeline-step .step-detail {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-muted);
+        margin-top: 4px;
+        padding-left: 26px;
+    }
+
+    .timeline-step .step-detail code {
+        background: #e2e8f0;
+        padding: 1px 5px;
+        border-radius: 2px;
+        font-size: 11px;
+    }
+
+    /* ============================================ */
+    /*   ROADMAP: TWO-PHASE COMPARISON              */
+    /* ============================================ */
+    .roadmap {
+        display: flex;
+        gap: 20px;
+        margin: 16px 0;
+    }
+
+    .roadmap-phase {
+        flex: 1;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .roadmap-phase-header {
+        padding: 16px 20px;
+        font-weight: 700;
+        font-size: var(--font-size-base);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .roadmap-phase-header .phase-icon {
+        font-size: 20px;
+    }
+
+    .roadmap-phase-header .phase-tag {
+        margin-left: auto;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        opacity: 0.9;
+        background: rgba(255,255,255,0.2);
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+
+    .roadmap-phase-header.phase-now {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    }
+
+    .roadmap-phase-header.phase-future {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    }
+
+    .roadmap-phase-body {
+        padding: 16px 20px;
+        background: #fff;
+        flex: 1;
+    }
+
+    .roadmap-phase-body ul {
+        margin: 0;
+        padding-left: 18px;
+        list-style-type: none;
+    }
+
+    .roadmap-phase-body ul li {
+        position: relative;
+        padding: 4px 0 4px 16px;
+        font-size: var(--font-size-sm);
+    }
+
+    .roadmap-phase-body ul li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 11px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+
+    .roadmap-phase-body ul li.checked::before {
+        background: var(--color-success);
+    }
+
+    .roadmap-phase-body ul li.checked {
+        color: var(--color-text-main);
+    }
+
+    .roadmap-phase-body ul li.pending::before {
+        background: var(--color-border-strong);
+    }
+
+    .roadmap-phase-body ul li.pending {
+        color: var(--color-text-muted);
+    }
+
+    .roadmap-connector {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 0 16px;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-muted);
+        gap: 8px;
+    }
+
+    .roadmap-connector .line {
+        height: 2px;
+        flex: 1;
+        max-width: 120px;
+        background: repeating-linear-gradient(90deg, var(--color-border-strong) 0, var(--color-border-strong) 4px, transparent 4px, transparent 8px);
+    }
+
+    /* ============================================ */
+    /*   MOCKUP: INTERFACE PREVIEW                  */
+    /* ============================================ */
+    .mockup {
+        background: #f1f5f9;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-lg);
+        padding: 0;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+        margin: 16px 0;
+    }
+
+    .mockup-header {
+        background: var(--color-bg-sidebar);
+        color: var(--color-text-inverse);
+        padding: 12px 20px;
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .mockup-header .header-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .mockup-header .header-dot.red { background: #ef4444; }
+    .mockup-header .header-dot.yellow { background: #eab308; }
+    .mockup-header .header-dot.green { background: #22c55e; }
+
+    .mockup-header .header-url {
+        color: #94a3b8;
+        font-weight: 400;
+        font-size: var(--font-size-xs);
+        margin-left: auto;
+    }
+
+    .mockup-body {
+        padding: 20px;
+    }
+
+    /* Mockup tabs */
+    .mockup-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid var(--color-border);
+        margin-bottom: 16px;
+    }
+
+    .mockup-tab {
+        padding: 8px 16px;
+        font-size: var(--font-size-sm);
+        color: var(--color-text-muted);
+        cursor: default;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+    }
+
+    .mockup-tab.active {
+        color: var(--color-accent);
+        border-bottom-color: var(--color-accent);
+        font-weight: 600;
+    }
+
+    /* Mockup cards row */
+    .mockup-cards {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .mockup-stat {
+        flex: 1;
+        min-width: 120px;
+        background: #fff;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        padding: 14px 16px;
+        text-align: center;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .mockup-stat .stat-number {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--color-primary);
+    }
+
+    .mockup-stat .stat-label {
+        font-size: var(--font-size-xs);
+        color: var(--color-text-muted);
+        margin-top: 2px;
+    }
+
+    .mockup-stat .stat-icon {
+        font-size: 20px;
+        margin-bottom: 4px;
+    }
+
+    .mockup-stat.stat-items .stat-number { color: var(--color-accent); }
+    .mockup-stat.stat-boms .stat-number { color: var(--color-success); }
+    .mockup-stat.stat-wos .stat-number { color: var(--color-warning); }
+
+    /* Mockup actions */
+    .mockup-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .mockup-btn {
+        padding: 8px 18px;
+        border-radius: var(--radius-sm);
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        cursor: default;
+        border: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .mockup-btn.primary {
+        background: var(--color-accent);
+        color: #fff;
+    }
+
+    .mockup-btn.secondary {
+        background: #fff;
+        color: var(--color-text-main);
+        border: 1px solid var(--color-border);
+    }
+
+    /* Mockup history table */
+    .mockup-history {
+        background: #fff;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+
+    .mockup-history-title {
+        padding: 10px 14px;
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--color-text-muted);
+        border-bottom: 1px solid var(--color-border);
+        background: #fafbfc;
+    }
+
+    .mockup-history table {
+        margin: 0;
+        font-size: var(--font-size-xs);
+    }
+
+    .mockup-history th {
+        background: #fafbfc;
+        padding: 8px 14px;
+    }
+
+    .mockup-history td {
+        padding: 8px 14px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+
+    .status-badge.success {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .status-badge.error {
+        background: #fef2f2;
+        color: #991b1b;
+    }
+
+    .status-badge.pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    /* ============================================ */
+    /*   RESPONSIVE                                 */
+    /* ============================================ */
+    @media (max-width: 768px) {
+        .container { padding: 16px 12px 60px; }
+        .header { margin: -16px -12px 24px; }
+        .header-inner { padding: 32px 16px; }
+        .header h1 { font-size: var(--font-size-xl); }
+        table { font-size: var(--font-size-xs); }
+        th, td { padding: 6px 8px; }
+        .flowchart { flex-direction: column; gap: 8px; }
+        .flow-box { min-width: 100%; max-width: 100%; }
+        .flow-arrow { transform: rotate(90deg); padding: 4px 0; }
+        .flow-approach-row { flex-direction: column; gap: 8px; }
+        .flow-approach-row .flow-box { min-width: 100%; }
+        .roadmap { flex-direction: column; }
+        .mockup-cards { flex-direction: column; }
+    }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-inner">
+        <h1>Integração GeraPro &rarr; Oracle Manufacturing</h1>
+        <p class="subtitle">Análise técnica para alimentar o ERP Oracle com dados do GeraPro a partir do fechamento de uma proposta técnica</p>
+        <p class="meta">03 de Julho de 2026 &bull; Cliente: Drivetech</p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Contexto</h2>
+        <p>A <strong>Drivetech</strong> está implantando o ERP Oracle com o módulo de <strong>Manufacturing</strong> (Oracle Cloud SCM / E-Business Suite) e continuará usando o <strong>GeraPro</strong> para a fase de engenharia de propostas técnicas.</p>
+        <p>O ponto de integração natural é o <strong>fechamento (won)</strong> de uma proposta &mdash; todo o dado de engenharia gerado no GeraPro precisa ser consumido pelo Oracle para iniciar a produção dos painéis elétricos.</p>
+        <div class="info-box success">
+            <strong>Objetivo</strong>
+            Eliminar a redigitação manual entre sistemas, garantindo que itens, BOMs e ordens de produção criados na engenharia fluam automaticamente para o Oracle Manufacturing.
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Arquitetura da Integração</h2>
+        <p>O GeraPro permanece como <em>source of truth</em> da engenharia. O Oracle consome os dados estruturados para execução da manufatura. Duas abordagens possíveis:</p>
+
+        <!-- Fluxo principal: GeraPro -> Oracle -->
+        <div style="background:#f8fafc; border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:20px 16px; margin:12px 0;">
+            <div class="flowchart">
+                <div class="flow-box box-gerapro">
+                    <div class="box-icon">&#9881;</div>
+                    <div class="box-title">GeraPro</div>
+                    <div class="box-sub">Proposta Técnica<br>Fechada (Won)</div>
+                </div>
+                <div class="flow-arrow large">&rarr;</div>
+                <div class="flow-box box-data">
+                    <div class="box-icon">&#128451;</div>
+                    <div class="box-title">Dados Estruturados</div>
+                    <div class="box-sub">equipamentos[], materiais[],<br>loads + típicos, infraestrutura</div>
+                </div>
+                <div class="flow-arrow large">&rarr;</div>
+                <div class="flow-box box-oracle">
+                    <div class="box-icon">&#9729;</div>
+                    <div class="box-title">Oracle Manufacturing</div>
+                    <div class="box-sub">Item Master, BOM,<br>Work Orders, Sales Order</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Duas abordagens -->
+        <div style="display:flex; gap:20px; margin:12px 0; flex-wrap:wrap;">
+            <!-- Abordagem A -->
+            <div style="flex:1; min-width:240px; background:#f8fafc; border:2px solid #bbf7d0; border-radius:var(--radius-lg); padding:16px;">
+                <div class="approach-tag mvp">&#10003; MVP &mdash; FBDI</div>
+                <div class="flow-approach">
+                    <div class="flow-approach-row">
+                        <div class="flow-box box-gerapro" style="min-width:100px; padding:10px 10px;">
+                            <div class="box-icon" style="font-size:16px;">&#9881;</div>
+                            <div class="box-title" style="font-size:12px;">GeraPro</div>
+                            <div class="box-sub" style="font-size:10px;">Exportar FBDI</div>
+                        </div>
+                        <div class="flow-arrow" style="font-size:18px;">&rarr;</div>
+                        <div class="flow-box box-fbdi" style="min-width:100px; padding:10px 10px;">
+                            <div class="box-icon" style="font-size:16px;">&#128196;</div>
+                            <div class="box-title" style="font-size:12px;">3 arquivos .xlsx</div>
+                            <div class="box-sub" style="font-size:10px;">Formato FBDI Oracle</div>
+                        </div>
+                        <div class="flow-arrow" style="font-size:18px;">&rarr;</div>
+                        <div class="flow-box box-oracle" style="min-width:100px; padding:10px 10px;">
+                            <div class="box-icon" style="font-size:16px;">&#9729;</div>
+                            <div class="box-title" style="font-size:12px;">Oracle</div>
+                            <div class="box-sub" style="font-size:10px;">File Import</div>
+                        </div>
+                    </div>
+                    <div style="text-align:center; font-size:11px; color:var(--color-text-muted); margin-top:8px;">
+                        <span style="color:var(--color-success);">&#10003;</span> Simples, auditável, compatível com qualquer Oracle
+                        &bull; <span style="color:var(--color-warning);">&#9888;</span> Processo manual (upload)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Abordagem B -->
+            <div style="flex:1; min-width:240px; background:#f8fafc; border:2px solid #bfdbfe; border-radius:var(--radius-lg); padding:16px;">
+                <div class="approach-tag advanced">&#9733; Avançado &mdash; REST API</div>
+                <div class="flow-approach">
+                    <div class="flow-approach-row">
+                        <div class="flow-box box-gerapro" style="min-width:100px; padding:10px 10px;">
+                            <div class="box-icon" style="font-size:16px;">&#9881;</div>
+                            <div class="box-title" style="font-size:12px;">GeraPro</div>
+                            <div class="box-sub" style="font-size:10px;">Proposta Ganha</div>
+                        </div>
+                        <div class="flow-arrow" style="font-size:18px;">&rarr;</div>
+                        <div class="flow-box box-rest" style="min-width:100px; padding:10px 10px;">
+                            <div class="box-icon" style="font-size:16px;">&#9881;</div>
+                            <div class="box-title" style="font-size:12px;">Integration<br>Service</div>
+                            <div class="box-sub" style="font-size:10px;">Node.js + REST</div>
+                        </div>
+                        <div class="flow-arrow" style="font-size:18px;">&rarr;</div>
+                        <div class="flow-box box-oracle" style="min-width:100px; padding:10px 10px;">
+                            <div class="box-icon" style="font-size:16px;">&#9729;</div>
+                            <div class="box-title" style="font-size:12px;">Oracle Cloud</div>
+                            <div class="box-sub" style="font-size:10px;">REST APIs</div>
+                        </div>
+                    </div>
+                    <div style="text-align:center; font-size:11px; color:var(--color-text-muted); margin-top:8px;">
+                        <span style="color:var(--color-success);">&#10003;</span> Tempo real, zero intervenção manual
+                        &bull; <span style="color:var(--color-warning);">&#9888;</span> Requer Oracle Cloud + OAuth
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Princípio</strong>
+            O GeraPro permanece como <em>source of truth</em> da engenharia. O Oracle consome os dados estruturados para execução da manufatura. Não há escrita do Oracle de volta no GeraPro (apenas consulta de status, se desejado).
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Data Mapping: GeraPro &rarr; Oracle</h2>
+
+        <h3>Item Master (Materiais)</h3>
+        <p>Cada material único do catálogo do GeraPro utilizado na proposta vira um item no Oracle.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>GeraPro</th>
+                    <th>Oracle Tabela</th>
+                    <th>Coluna Oracle</th>
+                    <th>Exemplo</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>materiais[].codigoFabricante</code></td>
+                    <td><code>MTL_SYSTEM_ITEMS</code></td>
+                    <td><code>segment1</code> (Item Number)</td>
+                    <td><code>3RT2017-1AP00</code></td>
+                </tr>
+                <tr>
+                    <td><code>materiais[].descricao</code></td>
+                    <td><code>MTL_SYSTEM_ITEMS</code></td>
+                    <td><code>description</code></td>
+                    <td>Contator Siemens 22A 220V</td>
+                </tr>
+                <tr>
+                    <td><code>materiais[].fabricante</code></td>
+                    <td><code>MTL_SYSTEM_ITEMS</code></td>
+                    <td><code>manufacturer_part_number</code></td>
+                    <td>Siemens</td>
+                </tr>
+                <tr>
+                    <td><code>materiais[].unidade</code></td>
+                    <td><code>MTL_SYSTEM_ITEMS</code></td>
+                    <td><code>primary_uom_code</code></td>
+                    <td><code>EA</code></td>
+                </tr>
+                <tr>
+                    <td><code>materiais[].categoria</code></td>
+                    <td><code>MTL_SYSTEM_ITEMS</code></td>
+                    <td>Item Category (flexfield)</td>
+                    <td>Contator</td>
+                </tr>
+                <tr>
+                    <td><code>materiais[].custo</code></td>
+                    <td><code>CST_ITEM_COSTS</code></td>
+                    <td><code>item_cost</code></td>
+                    <td>150.00</td>
+                </tr>
+                <tr>
+                    <td><code>materiais[].ncm</code></td>
+                    <td><code>MTL_SYSTEM_ITEMS</code></td>
+                    <td><code>hs_code</code></td>
+                    <td><code>8536.50.00</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Bill of Materials (Estrutura dos Painéis)</h3>
+        <p>Cada equipamento/painel vira um <strong>Assembly</strong> no Oracle, e seus materiais associados viram <strong>Componentes</strong> do BOM.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>GeraPro</th>
+                    <th>Oracle Tabela</th>
+                    <th>Mapeamento</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>equipments[].tag</code></td>
+                    <td><code>BOM_BILL_OF_MATERIALS</code></td>
+                    <td>Assembly Item (ex: CCM-01)</td>
+                </tr>
+                <tr>
+                    <td><code>equipments[].materials[]</code></td>
+                    <td><code>BOM_COMPONENTS</code></td>
+                    <td>Componente + Quantidade</td>
+                </tr>
+                <tr>
+                    <td><code>equipments[].automationMaterials[]</code></td>
+                    <td><code>BOM_COMPONENTS</code></td>
+                    <td>Componentes derivados da I/O List</td>
+                </tr>
+                <tr>
+                    <td><code>loads[] + typical.items[]</code></td>
+                    <td><code>BOM_COMPONENTS</code></td>
+                    <td>Componentes dos típicos (resolvidos via BOM do típico)</td>
+                </tr>
+                <tr>
+                    <td><code>infraestrutura.disciplinas[].itens[]</code></td>
+                    <td><code>BOM_COMPONENTS</code> ou <code>WIP</code></td>
+                    <td>Materiais de infraestrutura (obra civil, cabos, etc.)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Work Orders (Ordens de Produção)</h3>
+        <p>Cada equipamento gera uma WO no Oracle para fabricação do painel.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>GeraPro</th>
+                    <th>Oracle Tabela</th>
+                    <th>Mapeamento</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>equipments[].tag</code></td>
+                    <td><code>WIP_DISCRETE_JOBS.wip_entity_name</code></td>
+                    <td>Nome da WO = Tag do equipamento</td>
+                </tr>
+                <tr>
+                    <td><code>equipments[].type</code></td>
+                    <td><code>WIP_DISCRETE_JOBS</code></td>
+                    <td>Classificação (CCM-BT, QGBT, Cubículo MT, etc.)</td>
+                </tr>
+                <tr>
+                    <td><code>quantidade</code> (sempre 1)</td>
+                    <td><code>WIP_DISCRETE_JOBS.quantity</code></td>
+                    <td>1 painel</td>
+                </tr>
+                <tr>
+                    <td><code>revisions[].data</code></td>
+                    <td><code>WIP_DISCRETE_JOBS.date_released</code></td>
+                    <td>Data de liberação</td>
+                </tr>
+                <tr>
+                    <td><code>projeto + codigo</code></td>
+                    <td><code>WIP_DISCRETE_JOBS</code></td>
+                    <td>Referência cruzada (proposal number)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Abordagem A &mdash; FBDI (File-Based Data Import) <span class="tag recommended">Recomendado para MVP</span></h2>
+
+        <p>Oracle fornece planilhas Excel padronizadas (FBDI) para carga de dados em lote. É o método mais usado, auditável e compatível com qualquer versão do Oracle (Cloud ou EBS).</p>
+
+        <div class="info-box success">
+            <strong>Fluxo</strong>
+            GeraPro (proposta ganha) &rarr; Botão "Exportar para Oracle" &rarr; Gera 3 arquivos .xlsx no formato FBDI &rarr; Usuário baixa e importa no Oracle via <em>File Import</em> &rarr; Oracle valida e processa
+        </div>
+
+        <h3>Arquivos Gerados</h3>
+
+        <h4>1. <code>Item_Master.xlsx</code> &mdash; <code>MTL_SYSTEM_ITEMS</code></h4>
+        <p>Materiais únicos extraídos do catálogo da proposta (combinando <code>equipments[].materials[]</code>, <code>automationMaterials[]</code>, <code>infraestrutura[].itens[]</code> e <code>loads &rarr; typicals</code>).</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>inventory_item_name</th>
+                    <th>description</th>
+                    <th>primary_uom_code</th>
+                    <th>item_category</th>
+                    <th>manufacturer_part</th>
+                    <th>unit_cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>3RT2017-1AP00</code></td>
+                    <td>Contator Siemens 22A 220V</td>
+                    <td>EA</td>
+                    <td>Contator</td>
+                    <td>Siemens</td>
+                    <td>150.00</td>
+                </tr>
+                <tr>
+                    <td><code>10076442</code></td>
+                    <td>Disjuntor Miniatura 32A</td>
+                    <td>EA</td>
+                    <td>Disjuntor</td>
+                    <td>WEG</td>
+                    <td>58.50</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h4>2. <code>BOM_Components.xlsx</code> &mdash; <code>BOM_BILL_OF_MATERIALS</code> + <code>BOM_COMPONENTS</code></h4>
+        <p>Cada equipamento vira um Assembly. Seus materiais viram linhas de componente com quantidade.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>assembly_item</th>
+                    <th>component_item</th>
+                    <th>quantity</th>
+                    <th>operation_seq</th>
+                    <th>equipment_tag</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>CCM-01</td>
+                    <td>3RT2017-1AP00</td>
+                    <td>1</td>
+                    <td>10</td>
+                    <td>CCM-01</td>
+                </tr>
+                <tr>
+                    <td>CCM-01</td>
+                    <td>10076442</td>
+                    <td>1</td>
+                    <td>20</td>
+                    <td>CCM-01</td>
+                </tr>
+                <tr>
+                    <td>QGBT-01</td>
+                    <td>3RT2017-1AP00</td>
+                    <td>3</td>
+                    <td>10</td>
+                    <td>QGBT-01</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h4>3. <code>Work_Orders.xlsx</code> &mdash; <code>WIP_DISCRETE_JOBS</code></h4>
+        <p>Ordem de fabricação para cada equipamento do escopo.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>wip_entity_name</th>
+                    <th>assembly_item</th>
+                    <th>quantity</th>
+                    <th>status</th>
+                    <th>date_released</th>
+                    <th>source_reference</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>CCM-01</td>
+                    <td>CCM-01</td>
+                    <td>1</td>
+                    <td>Released</td>
+                    <td>2026-07-15</td>
+                    <td>PT-0001</td>
+                </tr>
+                <tr>
+                    <td>QGBT-01</td>
+                    <td>QGBT-01</td>
+                    <td>1</td>
+                    <td>Released</td>
+                    <td>2026-07-20</td>
+                    <td>PT-0001</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Prós &amp; Contras</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:50%;"><span class="dot green"></span> Prós</th>
+                    <th style="width:50%;"><span class="dot red"></span> Contras</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Simples de implementar (Excel + template)</td>
+                    <td>Processo manual (upload no Oracle)</td>
+                </tr>
+                <tr>
+                    <td>Compatível com Oracle Cloud e EBS</td>
+                    <td>Batch &mdash; não é tempo real</td>
+                </tr>
+                <tr>
+                    <td>Auditável &mdash; arquivo pode ser versionado</td>
+                    <td>Download + upload externo ao sistema</td>
+                </tr>
+                <tr>
+                    <td>Não requer credenciais Oracle no GeraPro</td>
+                    <td>Erro de validação só descoberto no upload</td>
+                </tr>
+                <tr>
+                    <td>Qualquer usuário pode executar</td>
+                    <td>Depende do usuário lembrar de exportar</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Abordagem B &mdash; REST API (Oracle Cloud) <span class="tag advanced">Avançado</span></h2>
+
+        <p>Oracle Cloud SCM oferece REST APIs públicas. Um serviço de integração (Node.js separado ou módulo no próprio GeraPro) chama as APIs diretamente quando a proposta é ganha.</p>
+
+        <h3>APIs Oracle Necessárias</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Oracle REST Resource</th>
+                    <th>Método</th>
+                    <th>Finalidade</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>/fscmRestApi/resources/11.13.18.05/items</code></td>
+                    <td>POST</td>
+                    <td>Criar Item Master</td>
+                </tr>
+                <tr>
+                    <td><code>/fscmRestApi/resources/11.13.18.05/boms</code></td>
+                    <td>POST</td>
+                    <td>Criar BOM com componentes</td>
+                </tr>
+                <tr>
+                    <td><code>/fscmRestApi/resources/11.13.18.05/wipJobs</code></td>
+                    <td>POST</td>
+                    <td>Criar Ordem de Produção</td>
+                </tr>
+                <tr>
+                    <td><code>/fscmRestApi/resources/11.13.18.05/salesOrders</code></td>
+                    <td>POST</td>
+                    <td>Criar Pedido (opcional)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Arquitetura do Integration Service</h3>
+        <p>O fluxo completo da integração via REST API, desde o fechamento da proposta até o Oracle:</p>
+
+        <div class="timeline">
+            <div class="timeline-step">
+                <div class="step-number">1</div>
+                <div class="step-icon">&#10003;</div>
+                <div class="step-title">Proposta é fechada (won)</div>
+                <div class="step-desc">Usuário move o pipeline para "Fechado" ou clica em "Exportar para Oracle"</div>
+                <div class="step-detail">Aciona: <code>webhook /api/integration/oracle/export</code></div>
+            </div>
+
+            <div class="timeline-step">
+                <div class="step-number">2</div>
+                <div class="step-icon">&#128451;</div>
+                <div class="step-title">Coleta dados da proposta</div>
+                <div class="step-desc">Integration Service carrega o JSON completo da proposta e o catálogo de materiais</div>
+                <div class="step-detail">Fontes: <code>activeTechnicalProposal</code> + <code>store.state.materiais</code></div>
+            </div>
+
+            <div class="timeline-step">
+                <div class="step-number">3</div>
+                <div class="step-icon">&#9881;</div>
+                <div class="step-title">Transforma para payload Oracle REST</div>
+                <div class="step-desc">Converte a estrutura do GeraPro no formato esperado pelas APIs Oracle</div>
+                <div class="step-detail">Mapping: <code>equipments[].tag</code> &rarr; <code>assembly_item</code>, <code>materials[]</code> &rarr; <code>components[]</code></div>
+            </div>
+
+            <div class="timeline-step">
+                <div class="step-number green">4</div>
+                <div class="step-icon">&#9729;</div>
+                <div class="step-title">Envia para Oracle via REST</div>
+                <div class="step-desc">Chama sequencialmente as APIs: Itens &rarr; BOMs &rarr; Work Orders</div>
+                <div class="step-detail">Autenticação: <code>OAuth 2.0</code> &bull; Retry: <code>3 tentativas com backoff</code></div>
+            </div>
+
+            <div class="timeline-step">
+                <div class="step-number green">5</div>
+                <div class="step-icon">&#128202;</div>
+                <div class="step-title">Log + Dashboard de Integração</div>
+                <div class="step-desc">Registra status de cada etapa e disponibiliza dashboard no GeraPro</div>
+                <div class="step-detail">Campos: <code>proposta_id, data, usuario, status, payload, erro</code></div>
+            </div>
+        </div>
+
+        <h3>Prós &amp; Contras</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:50%;"><span class="dot green"></span> Prós</th>
+                    <th style="width:50%;"><span class="dot red"></span> Contras</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Tempo real &mdash; proposta ganha = itens criados</td>
+                    <td>Depende de Oracle Cloud (não funciona com EBS on-premise clássico)</td>
+                </tr>
+                <tr>
+                    <td>Zero intervenção manual</td>
+                    <td>Requer setup de OAuth / credenciais Oracle</td>
+                </tr>
+                <tr>
+                    <td>Log e rastreabilidade automáticos</td>
+                    <td>Mais complexo de implementar e testar</td>
+                </tr>
+                <tr>
+                    <td>Pode ser expandido para outros módulos (Financeiro, Supply Chain)</td>
+                    <td>Tratamento de erros e retry precisa ser robusto</td>
+                </tr>
+                <tr>
+                    <td>Dashboard de status da integração</td>
+                    <td>Manutenção contínua (versões da API Oracle)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Abordagem C &mdash; Híbrida <span class="tag recommended">Mais indicada para o cenário</span></h2>
+
+        <p>Dado que a Drivetech está <strong>implantando</strong> o Oracle (ou seja, ainda definindo processos e sem APIs em produção), a abordagem híbrida é a mais profissional e realista.</p>
+
+        <div class="roadmap">
+            <!-- Fase 1 -->
+            <div class="roadmap-phase">
+                <div class="roadmap-phase-header phase-now">
+                    <span class="phase-icon">&#9201;</span>
+                    Fase 1 &mdash; Agora (MVP)
+                    <span class="phase-tag">J&aacute; pode come&ccedil;ar</span>
+                </div>
+                <div class="roadmap-phase-body">
+                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; font-size:var(--font-size-sm);">
+                        <strong>Criar o módulo de exportação FBDI no GeraPro</strong><br>
+                        Entrega valor em <strong>dias</strong>, não em meses. A equipe Oracle da Drivetech pode começar a testar a importação imediatamente.
+                    </div>
+                    <ul>
+                        <li class="checked">Botão "Exportar para Oracle" na proposta ganha</li>
+                        <li class="checked">Coletor inteligente de materiais (unifica todas as fontes)</li>
+                        <li class="checked">Gerador dos 3 arquivos FBDI (.xlsx)</li>
+                        <li class="checked">Log de exportação (quem, quando, qual proposta)</li>
+                        <li class="checked">Configuração de mapeamento (categoria &rarr; item type)</li>
+                    </ul>
+                    <div class="roadmap-connector">
+                        <span class="line"></span>
+                        <span>GeraPro &rarr; .xlsx &rarr; Oracle</span>
+                        <span class="line"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fase 2 -->
+            <div class="roadmap-phase">
+                <div class="roadmap-phase-header phase-future">
+                    <span class="phase-icon">&#9202;</span>
+                    Fase 2 &mdash; 3 a 6 meses
+                    <span class="phase-tag">Quando Oracle est&aacute;vel</span>
+                </div>
+                <div class="roadmap-phase-body">
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; font-size:var(--font-size-sm);">
+                        <strong>Criar o Integration Service REST</strong><br>
+                        Quando o ambiente Oracle estiver estável e as APIs definidas, automatizar completamente.
+                    </div>
+                    <ul>
+                        <li class="pending">Microserviço Node.js separado (ou módulo no GeraPro)</li>
+                        <li class="pending">Autenticação OAuth 2.0 com Oracle Cloud</li>
+                        <li class="pending">Chamadas REST para Itens, BOMs e WOs</li>
+                        <li class="pending">Webhook no GeraPro para disparo automático</li>
+                        <li class="pending">Dashboard de status com histórico e retry</li>
+                    </ul>
+                    <div class="roadmap-connector">
+                        <span class="line"></span>
+                        <span>GeraPro &rarr; REST &rarr; Oracle</span>
+                        <span class="line"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Roadmap Visual</strong>
+            As duas fases podem coexistir. O fluxo FBDI continua funcionando mesmo depois do REST implementado &mdash; servindo como fallback manual.
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> O que construir no GeraPro</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Descrição</th>
+                    <th>Esforço</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Botão "Exportar Oracle"</strong></td>
+                    <td>Na tela da proposta ganha, integrado à barra de ações</td>
+                    <td>2 dias</td>
+                </tr>
+                <tr>
+                    <td><strong>Coletor de Materiais</strong></td>
+                    <td>Extrai materiais únicos de <code>equipments[].materials[]</code>, <code>automationMaterials[]</code>, <code>infraestrutura[].itens[]</code> e BOM de típicos</td>
+                    <td>1 dia</td>
+                </tr>
+                <tr>
+                    <td><strong>Gerador FBDI Item Master</strong></td>
+                    <td>Planilha no formato <code>MTL_SYSTEM_ITEMS</code> (cabeçalhos, validação, aba única)</td>
+                    <td>2 dias</td>
+                </tr>
+                <tr>
+                    <td><strong>Gerador FBDI BOM</strong></td>
+                    <td>Planilha no formato <code>BOM_BILL_OF_MATERIALS</code> + <code>BOM_COMPONENTS</code></td>
+                    <td>2 dias</td>
+                </tr>
+                <tr>
+                    <td><strong>Gerador FBDI Work Order</strong></td>
+                    <td>Planilha <code>WIP_DISCRETE_JOBS</code></td>
+                    <td>1 dia</td>
+                </tr>
+                <tr>
+                    <td><strong>Log de Exportação</strong></td>
+                    <td>Registra proposta, usuário, data/hora, arquivos gerados</td>
+                    <td>1 dia</td>
+                </tr>
+                <tr>
+                    <td><strong>Módulo de Configuração</strong></td>
+                    <td>Mapeamento de campos: categoria GeraPro &rarr; Oracle Item Type, unidade &rarr; UOM, etc.</td>
+                    <td>2 dias</td>
+                </tr>
+                <tr>
+                    <td style="text-align:right; font-weight:600;" colspan="2"><strong>Total estimado</strong></td>
+                    <td><strong>~11 dias</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Sugestão de Fluxo na Interface</h2>
+        <p>Preview de como a integração pode aparecer no GeraPro após o fechamento de uma proposta:</p>
+
+        <div class="mockup">
+            <div class="mockup-header">
+                <span class="header-dot red"></span>
+                <span class="header-dot yellow"></span>
+                <span class="header-dot green"></span>
+                <span>Proposta Técnica — CCM-01-CCM-02 (fechada)</span>
+                <span class="header-url">gerapro.app/proposta-tecnica</span>
+            </div>
+            <div class="mockup-body">
+                <div class="mockup-tabs">
+                    <span class="mockup-tab">Especificação</span>
+                    <span class="mockup-tab">Escopo</span>
+                    <span class="mockup-tab">Equipamentos</span>
+                    <span class="mockup-tab">Lista de Materiais</span>
+                    <span class="mockup-tab active">Integração Oracle</span>
+                    <span class="mockup-tab">Revisões</span>
+                </div>
+
+                <div class="mockup-cards">
+                    <div class="mockup-stat stat-items">
+                        <div class="stat-icon">&#128230;</div>
+                        <div class="stat-number">47</div>
+                        <div class="stat-label">Itens &uacute;nicos<br>para exportar</div>
+                    </div>
+                    <div class="mockup-stat stat-boms">
+                        <div class="stat-icon">&#128196;</div>
+                        <div class="stat-number">8</div>
+                        <div class="stat-label">BOMs (assemblies)<br>para criar</div>
+                    </div>
+                    <div class="mockup-stat stat-wos">
+                        <div class="stat-icon">&#9881;</div>
+                        <div class="stat-number">8</div>
+                        <div class="stat-label">Work Orders<br>para gerar</div>
+                    </div>
+                </div>
+
+                <div class="mockup-actions">
+                    <span class="mockup-btn primary">&#11015; Exportar para Oracle</span>
+                    <span class="mockup-btn secondary">&#128196; Hist&oacute;rico de Exporta&ccedil;&otilde;es</span>
+                    <span class="mockup-btn secondary">&#9881; Configurar Mapeamento</span>
+                </div>
+
+                <div class="mockup-history">
+                    <div class="mockup-history-title">&#9200; Últimas exportações</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Usu&aacute;rio</th>
+                                <th>Itens</th>
+                                <th>BOMs</th>
+                                <th>WOs</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>03/07/2026 14:30</td>
+                                <td>João Silva</td>
+                                <td>47</td>
+                                <td>8</td>
+                                <td>8</td>
+                                <td><span class="status-badge success">Sucesso</span></td>
+                            </tr>
+                            <tr>
+                                <td>02/07/2026 09:15</td>
+                                <td>Maria Souza</td>
+                                <td>35</td>
+                                <td>6</td>
+                                <td>6</td>
+                                <td><span class="status-badge success">Sucesso</span></td>
+                            </tr>
+                            <tr>
+                                <td>01/07/2026 16:42</td>
+                                <td>João Silva</td>
+                                <td>52</td>
+                                <td>10</td>
+                                <td>10</td>
+                                <td><span class="status-badge error">Erro</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Preview antes de exportar</strong>
+            O usuário vê um resumo dos dados antes de gerar os arquivos: quantidade de itens, BOMs e WOs. Pode revisar e confirmar. O histórico mostra o status de cada exportação.
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <div class="card">
+        <h2><span class="icon">&#9670;</span> Considerações Finais</h2>
+
+        <ul>
+            <li><strong>O GeraPro não precisa se conectar ao Oracle</strong> &mdash; ele apenas gera dados estruturados no formato que o Oracle espera consumir.</li>
+            <li><strong>O formato FBDI é padrão Oracle</strong> &mdash; qualquer implementação Oracle (Cloud ou EBS) suporta. Não há risco de incompatibilidade.</li>
+            <li><strong>A Drivetech está em fase de implantação</strong> &mdash; começar com FBDI permite que a equipe de Oracle da Drivetech valide o mapeamento antes de automatizar via API.</li>
+            <li><strong>O Integration Service REST pode ser desenvolvido posteriormente</strong> sem quebrar o fluxo FBDI &mdash; ambos podem coexistir.</li>
+            <li><strong>Manter o catálogo de materiais sincronizado</strong> é o ponto mais crítico &mdash; o codigoFabricante no GeraPro deve ser o mesmo item number no Oracle.</li>
+        </ul>
+
+        <div class="info-box success">
+            <strong>Próximo passo recomendado</strong>
+            Validar com a equipe Oracle da Drivetech: (1) qual versão do Oracle (Cloud ou EBS)? (2) quais os templates FBDI oficiais que eles usam? (3) há algum campo customizado no Item Master que precisamos mapear?
+        </div>
+    </div>
+
+    <div class="footer" style="text-align:center; padding:24px 0 0; color:var(--color-text-muted); font-size:var(--font-size-xs); border-top:1px solid var(--color-border); margin-top:32px;">
+        GeraPro &mdash; Análise de Integração &bull; 03 de Julho de 2026 &bull; Versão 2.0
+    </div>
+
+</div>
+
+</body>
+</html>

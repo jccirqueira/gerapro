@@ -97,6 +97,7 @@ const ManufaturaModule = {
     _associateParentType: null,
     _associateParentId: null,
     _scannerInstance: null,
+    historico: [],
     perfisTeste: [],
     resultadosTeste: [],
     anexos: [],
@@ -173,6 +174,7 @@ const ManufaturaModule = {
             this.colunas = s.manufaturaColunas || [];
             this.gavetas = s.manufaturaGavetas || [];
             this.componentes = s.manufaturaComponentes || [];
+            this.historico = s.manufaturaHistorico || [];
             this.perfisTeste = s.manufaturaPerfisTeste || [];
             this.resultadosTeste = s.manufaturaResultadosTeste || [];
             this.anexos = s.manufaturaAnexos || [];
@@ -181,6 +183,7 @@ const ManufaturaModule = {
             this.colunas = [];
             this.gavetas = [];
             this.componentes = [];
+            this.historico = [];
             this.perfisTeste = [];
             this.resultadosTeste = [];
             this.anexos = [];
@@ -503,7 +506,8 @@ const ManufaturaModule = {
         const colunaIds = projectColunas.map(c => c.id);
         const gavetas = this.gavetas.filter(g => colunaIds.includes(g.coluna_id));
         const gavetaIds = gavetas.map(g => g.id);
-        return this.componentes.filter(c => gavetaIds.includes(c.gaveta_id));
+        const entityIds = [projetoId, ...colunaIds, ...gavetaIds];
+        return this.historico.filter(h => entityIds.includes(h.entidade_id));
     },
 
     switchTab(tab) {
