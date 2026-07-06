@@ -742,7 +742,9 @@ const PropostaTecnicaModule = {
 
                     'barramento_tratamento', 'termoretratil', 'norma_teste',
 
-                    'alturaPainel', 'larguraPainel', 'profundidadePainel'
+                    'alturaPainel', 'larguraPainel', 'profundidadePainel',
+
+                    'fabricante'
 
                 ];
 
@@ -757,6 +759,10 @@ const PropostaTecnicaModule = {
                     eq.technical[field] = (val === 'Outro') ? (otherVal || '') : val;
 
                 });
+
+                // Capture painelTypeId (stored at eq root, not in eq.technical)
+                const pTypeId = formData.get('eq_painelTypeId');
+                eq.painelTypeId = pTypeId || null;
 
             }
 
@@ -1551,6 +1557,7 @@ const PropostaTecnicaModule = {
 
             loads: [],
             materials: [],
+            painelTypeId: null,
 
             ...(isAutomation ? {
                 ioList: {
@@ -1699,7 +1706,250 @@ const PropostaTecnicaModule = {
 
     },
 
+    _mapEqTypeToCategoria(eqType) {
+        const map = {
+            'CCM-BT': 'CCM',
+            'QGBT': 'QGBT',
+            'CUB-MT': 'CUB',
+            'QTA': 'QTA',
+            'PLC': 'PLC',
+            'BC': 'BC',
+            'REM': 'REM',
+            'QDL': 'QDL',
+            'QDF': 'QDF'
+        };
+        return map[eqType] || null;
+    },
 
+    _renderPainelTypeSelector(eq) {
+        const categoria = this._mapEqTypeToCategoria(eq.type);
+        const paineis = categoria ? (store.getState().painelTypes || []).filter(p => p.cat_categoria === categoria) : [];
+        const selecionado = eq.painelTypeId || '';
+        const painelSelecionado = paineis.find(p => p.id === selecionado);
+        if (paineis.length === 0 && !selecionado) return '';
+        return `
+            <div class="form-group" style="border: 1px solid #dbeafe; border-radius: 10px; padding: 16px; background: #eff6ff; margin-bottom: 20px;">
+                <label class="form-label" style="color: #1e40af; font-weight: 700;">Tipo de Painel (Estrutura)</label>
+                <select name="eq_painelTypeId" class="form-control" onchange="app.propostaTecnica._onPainelTypeChange(this.value)" style="max-width: 500px;">
+                    <option value="">${paineis.length > 0 ? 'Selecione um Tipo de Painel...' : 'Nenhum tipo disponível para esta categoria'}</option>
+                    ${paineis.map(p => `
+                        <option value="${p.id}" ${selecionado === p.id ? 'selected' : ''}>
+                            ${p.tipo}${p.descricao ? ' — ' + p.descricao : ''} (${p.largura || '?'}x${p.profundidade || '?'}mm)
+                        </option>
+                    `).join('')}
+                </select>
+                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                    ${selecionado && painelSelecionado
+                        ? 'Pré-carregado: ' + painelSelecionado.tipo + ' — ' + painelSelecionado.largura + 'x' + painelSelecionado.profundidade + 'mm, IP ' + (painelSelecionado.ip || '-')
+                        : 'Selecione para pré-carregar dimensões, IP, cor e BOM da chaparia automaticamente.'}
+                </div>
+            </div>
+        `;
+    },
+
+    _onPainelTypeChange(painelTypeId) {
+        const data = store.getState().activeTechnicalProposal;
+        if (!data || this.activeEquipmentIndex === -1) return;
+        const eq = data.equipments[this.activeEquipmentIndex];
+        if (!eq) return;
+
+        if (!painelTypeId) {
+            eq.painelTypeId = null;
+            store.setState({ activeTechnicalProposal: data });
+            this.renderSubTab();
+            return;
+        }
+
+        const painel = store.getState().painelTypes.find(p => p.id === painelTypeId);
+        if (!painel) return;
+
+        eq.painelTypeId = painel.id;
+        if (!eq.technical) eq.technical = {};
+        if (painel.altura) eq.technical.alturaPainel = painel.altura;
+        if (painel.largura) eq.technical.larguraPainel = painel.largura;
+        if (painel.profundidade) eq.technical.profundidadePainel = painel.profundidade;
+        if (painel.ip) eq.technical.ip = painel.ip;
+        if (painel.cor) eq.technical.cor_externa = painel.cor;
+
+        store.setState({ activeTechnicalProposal: data });
+        app.toast(`Tipo de painel "${painel.tipo}" aplicado. Dimensões e IP pré-carregados.`, 'success');
+        this.renderSubTab();
+    },
+
+    // ── Fase 2: Gerar materiais da chaparia a partir do layout ────────────────
+
+    _gerarMateriaisChaparia(eq) {
+        const painelType = (store.getState().painelTypes || []).find(p => p.id === eq.painelTypeId);
+        const cabinets = eq.layoutConfig?.cabinetAssignments;
+        if (!painelType || !cabinets || Object.keys(cabinets).length === 0) return null;
+
+        const bomBase = painelType.items || [];
+        if (bomBase.length === 0) return null;
+
+        // Group cabinets by width
+        const cabIds = Object.keys(cabinets);
+        const porLargura = {};
+        cabIds.forEach(cabId => {
+            const cab = cabinets[cabId];
+            const w = cab.width || 800;
+            if (!porLargura[w]) porLargura[w] = [];
+            porLargura[w].push(cab);
+        });
+
+        // Identify side panel items in BOM to handle separately
+        const bomSemLaterais = bomBase.filter(i => !(i.descricao || '').toLowerCase().includes('lateral'));
+        const bomLaterais = bomBase.filter(i => (i.descricao || '').toLowerCase().includes('lateral'));
+
+        const gerados = [];
+
+        // For each width group, replicate base BOM items
+        Object.entries(porLargura).forEach(([largura, cabs]) => {
+            const qtd = cabs.length;
+            bomSemLaterais.forEach(item => {
+                const descMatch = item.descricao ? item.descricao.match(/(\d{3,4})\s*mm/) : null;
+                const itemWidth = descMatch ? parseInt(descMatch[1]) : null;
+                const desc = itemWidth && itemWidth !== parseInt(largura)
+                    ? item.descricao.replace(String(itemWidth), String(largura))
+                    : item.descricao;
+                gerados.push({
+                    _origin: 'chaparia',
+                    materialId: item.materialId || '',
+                    descricao: desc || item.descricao,
+                    fabricante: item.fabricante || '',
+                    codigoFabricante: item.codigoFabricante || '',
+                    modelo: '',
+                    custo: item.custo || 0,
+                    qtd: (item.qtd || 1) * qtd
+                });
+            });
+        });
+
+        // Add side panels: always 2 regardless of cabinet count
+        if (bomLaterais.length > 0) {
+            const lat = bomLaterais[0];
+            gerados.push({
+                _origin: 'chaparia',
+                materialId: lat.materialId || '',
+                descricao: lat.descricao,
+                fabricante: lat.fabricante || '',
+                codigoFabricante: lat.codigoFabricante || '',
+                modelo: '',
+                custo: lat.custo || 0,
+                qtd: 2
+            });
+        } else {
+            // Fallback: generic side panel entry
+            gerados.push({
+                _origin: 'chaparia',
+                materialId: '',
+                descricao: 'Fechamento Lateral (par)',
+                fabricante: '',
+                codigoFabricante: '',
+                modelo: '',
+                custo: 0,
+                qtd: 2
+            });
+        }
+
+        // Consolidate items with same description+custo
+        const consolidado = {};
+        gerados.forEach(item => {
+            const key = item.descricao + '|' + item.custo + '|' + item.fabricante;
+            if (consolidado[key]) {
+                consolidado[key].qtd += item.qtd;
+            } else {
+                consolidado[key] = { ...item };
+            }
+        });
+
+        return Object.values(consolidado);
+    },
+
+    _aplicarMateriaisChaparia() {
+        const data = store.getState().activeTechnicalProposal;
+        if (!data || this.activeEquipmentIndex === -1) return;
+        const eq = data.equipments[this.activeEquipmentIndex];
+        if (!eq) return;
+
+        const itens = this._gerarMateriaisChaparia(eq);
+        if (!itens) {
+            app.toast('Defina um Tipo de Painel (Ficha Técnica) e crie armários no Layout primeiro.', 'warning');
+            return;
+        }
+
+        // Show preview modal
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.id = 'modal-chaparia-preview';
+        const total = itens.reduce((s, i) => s + (i.custo || 0) * i.qtd, 0);
+        modal.innerHTML = `
+            <div class="modal" style="width:700px;max-width:90vw;">
+                <div class="modal-header" style="background:var(--color-accent);color:white;">
+                    <h3><i class="ph ph-package"></i> Materiais da Chaparia — ${eq.tag}</h3>
+                    <button class="btn btn-ghost" style="color:white" onclick="this.closest('.modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div style="font-size:13px;color:#64748b;margin-bottom:16px;">
+                        Os seguintes materiais serão adicionados à Lista de Materiais do equipamento:
+                    </div>
+                    <div style="max-height:360px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
+                        <table class="w-full" style="font-size:12px;">
+                            <thead>
+                                <tr style="background:#f8fafc;">
+                                    <th style="padding:8px 10px;text-align:left;font-weight:700;">Descrição</th>
+                                    <th style="padding:8px 10px;text-align:center;width:60px;">Qtd</th>
+                                    <th style="padding:8px 10px;text-align:right;width:90px;">Custo Unit.</th>
+                                    <th style="padding:8px 10px;text-align:right;width:100px;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itens.map(i => `
+                                    <tr style="border-top:1px solid #f1f5f9;">
+                                        <td style="padding:8px 10px;">${i.descricao}</td>
+                                        <td style="padding:8px 10px;text-align:center;">${i.qtd}</td>
+                                        <td style="padding:8px 10px;text-align:right;">${app.formatCurrency(i.custo || 0)}</td>
+                                        <td style="padding:8px 10px;text-align:right;font-weight:700;">${app.formatCurrency((i.custo || 0) * i.qtd)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+                                    <td colspan="3" style="padding:10px;text-align:right;font-weight:700;text-transform:uppercase;">Total</td>
+                                    <td style="padding:10px;text-align:right;font-weight:800;color:#1e3a8a;font-size:15px;">${app.formatCurrency(total)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <span style="font-size:11px;color:#64748b;flex:1;">
+                        <i class="ph ph-info"></i> Materiais anteriores com origem "chaparia" serão substituídos.
+                    </span>
+                    <button class="btn btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="app.propostaTecnica._confirmarMateriaisChaparia()">
+                        <i class="ph ph-check"></i> Confirmar e Adicionar
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    },
+
+    _confirmarMateriaisChaparia() {
+        document.getElementById('modal-chaparia-preview')?.remove();
+        const data = store.getState().activeTechnicalProposal;
+        if (!data || this.activeEquipmentIndex === -1) return;
+        const eq = data.equipments[this.activeEquipmentIndex];
+        if (!eq) return;
+
+        const itens = this._gerarMateriaisChaparia(eq);
+        if (!itens) return;
+
+        // Remove old chaparia items and add new ones
+        eq.materials = [...(eq.materials || []).filter(m => m._origin !== 'chaparia'), ...itens];
+        store.setState({ activeTechnicalProposal: data });
+        app.toast(`${itens.length} itens de chaparia adicionados aos materiais de ${eq.tag}!`, 'success');
+    },
 
     removeEquipment(index) {
 
@@ -3179,6 +3429,8 @@ const PropostaTecnicaModule = {
 
                             ${this.renderDSGroup('Tratamento Barramento', 'barramento_tratamento', eq.technical?.barramento_tratamento, ['Cobre Nú', 'Termoretrátil', 'Prateado nas Conexões', 'Estanhado'])}
 
+                            ${this._renderPainelTypeSelector(eq)}
+
                         ` : eq.type === 'TR-MT' ? `
 
                             ${this.renderDSGroup('Tipo', 'tipo', eq.technical?.tipo, ['Trifásico Seco', 'Outro'])}
@@ -3289,6 +3541,8 @@ const PropostaTecnicaModule = {
 
                             ${this.renderDSGroup('Tipo de Execução', 'execucao', eq.technical?.execucao, ['Fixa', 'Extraível', 'Plug-in'])}
 
+                            ${this.renderDSGroup('Fabricante', 'fabricante', eq.technical?.fabricante, ['Genérico', 'KitFrame'])}
+
                             ${this.renderDSGroup('Tipo de Montagem', 'montagem', eq.technical?.montagem, ['Em Linha', 'Back to Back'])}
 
                             ${this.renderDSGroup('Local Instalação', 'instalacao', eq.technical?.instalacao, ['Abrigada', 'Tempo'])}
@@ -3300,6 +3554,8 @@ const PropostaTecnicaModule = {
                             ${this.renderDSGroup('Espessura Pintura', 'camada_pintura', eq.technical?.camada_pintura, ['80 um', '90 um', '100 um'])}
 
                             ${this.renderDSGroup('Placas de Montagem', 'placa_montagem', eq.technical?.placa_montagem, ['RAL 2003', 'RAL 7032', 'Galvanizada'])}
+
+                            ${this._renderPainelTypeSelector(eq)}
 
                             ${this.renderDSGroup('Altura do Painel (mm)', 'alturaPainel', eq.technical?.alturaPainel, ['1500', '1700', '1900', '2200'])}
 
@@ -3756,14 +4012,24 @@ const PropostaTecnicaModule = {
     renderLayoutSuggester(eq) {
         const isAutomation = eq.type === 'PLC' || eq.type === 'REM';
         if (isAutomation) return this._renderAutomationLayout(eq);
-        const validForms = ['Forma 1', 'Forma 2a', 'Forma 2b'];
+        const validForms = ['Forma 1', 'Forma 2a', 'Forma 2b', 'Forma 3a', 'Forma 3b', 'Forma 4a', 'Forma 4b'];
         const seg = eq.technical?.segregacao;
         if (!seg || !validForms.includes(seg)) {
             return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
                 <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
                 <br>
                 <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível</div>
-                <div style="font-size:13px;margin-top:6px;">Disponível apenas para Formas de Segregação <strong>Forma 1</strong>, <strong>Forma 2a</strong> ou <strong>Forma 2b</strong> na Ficha Técnica.</div>
+                <div style="font-size:13px;margin-top:6px;">Selecione uma Forma de Segregação na Ficha Técnica.</div>
+            </div>`;
+        }
+
+        const fabricante = eq.technical?.fabricante || 'Genérico';
+        if (this._isForma34(seg) && fabricante !== 'KitFrame') {
+            return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
+                <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
+                <br>
+                <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível para este fabricante</div>
+                <div style="font-size:13px;margin-top:6px;">Para Formas <strong>3a, 3b, 4a, 4b</strong>, selecione <strong>KitFrame</strong> como Fabricante na Ficha Técnica.</div>
             </div>`;
         }
 
@@ -3870,9 +4136,10 @@ const PropostaTecnicaModule = {
             this._drawLayoutCanvas(canvasT, cabsRear);
             const dataUrlT = canvasT.toDataURL('image/png');
 
-            const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+        const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+        const hasExternalViewB2B = isForma2 || seg === 'Forma 1';
             let dataUrlExtF = '', dataUrlExtR = '';
-            if (isForma2) {
+            if (hasExternalViewB2B) {
                 const offFE = document.createElement('canvas');
                 this._drawLayoutCanvasExternal(offFE, cabinets);
                 dataUrlExtF = offFE.toDataURL('image/png');
@@ -3887,7 +4154,16 @@ const PropostaTecnicaModule = {
                 </div>
             `).join('');
 
-            const isForma2b2b = seg === 'Forma 2a' || seg === 'Forma 2b';
+            const allExcess = cabinets.filter(c => c._excessLoads?.length > 0).flatMap(c => c._excessLoads);
+            const excessDataAttr = allExcess.length > 0 ? encodeURIComponent(JSON.stringify(allExcess.map(l => ({ tag: l.tag, desc: l.desc || l.tag, power: l.power, current: l.current })))) : '';
+            const excessWarning = allExcess.length > 0 ? `
+                <div style="background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#991b1b;">
+                    <strong>⚠️ Capacidade máxima atingida:</strong> ${allExcess.length} carga(s) não puderam ser alocadas.
+                    <button class="btn btn-xs btn-primary" data-excess='${excessDataAttr}' onclick="window.propostaTecnicaModule._showExcessLoadsDialog(JSON.parse(decodeURIComponent(this.dataset.excess)))" style="margin-left:8px;background:#dc2626;border-color:#dc2626;">Resolver</button>
+                </div>
+            ` : '';
+
+            const isForma2b2b = seg === 'Forma 2a' || seg === 'Forma 2b' || this._isForma34KitFrame(seg, eq.technical?.fabricante);
         const baseCabs = Object.entries(eq.layoutConfig?.cabinetAssignments || {}).map(([id, d]) => ({ id, name: d.name, width: d.width || 600, height: d.height, depth: d.depth || 600 }));
 
             return `
@@ -3902,19 +4178,26 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._showLayoutConfigPanel()" style="gap:4px;">
                                 <i class="ph ph-gear"></i> Configurar
                             </button>
+                            ${this._isForma34KitFrame(seg, eq.technical?.fabricante) ? `
+                            <button type="button" class="btn btn-sm btn-primary" onclick="window.propostaTecnicaModule._onCriarArranjoOtimizado()" style="gap:4px;background:#059669;border-color:#059669;">
+                                <i class="ph ph-stars"></i> Criar Arranjo Otimizado
+                            </button>` : ''}
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutPDF()" style="gap:4px;">
                                 <i class="ph ph-file-pdf"></i> Exportar PDF
                             </button>
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutDXF()" style="gap:4px;">
                                 <i class="ph ph-file"></i> Exportar DXF
                             </button>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;margin-left:4px;">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
+                                <i class="ph ph-package"></i> Gerar Chaparia
+                            </button>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_side_view_b2b" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
                     </div>
                     ${summaryCards}
-                    ${warningsF}
+                    ${warningsF}${excessWarning}
                     <div style="display:flex;flex-direction:column;gap:24px;">
                         <div>
                             <h5 style="margin:0 0 8px;color:#1e3a8a;font-size:14px;font-weight:700;">▸ VISTA FRONTAL INTERNA</h5>
@@ -3922,7 +4205,7 @@ const PropostaTecnicaModule = {
                                 <img id="layout-canvas-front" src="${dataUrlF}" style="display:block;margin:0 auto;" alt="Vista Frontal">
                             </div>
                         </div>
-                        ${isForma2 ? `
+                        ${hasExternalViewB2B ? `
                         <div>
                             <h5 style="margin:0 0 8px;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA FRONTAL EXTERNA</h5>
                             <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #7c3aed;">
@@ -3936,7 +4219,7 @@ const PropostaTecnicaModule = {
                                 <img id="layout-canvas-rear" src="${dataUrlT}" style="display:block;margin:0 auto;" alt="Vista Traseira">
                             </div>
                         </div>
-                        ${isForma2 ? `
+                        ${hasExternalViewB2B ? `
                         <div>
                             <h5 style="margin:0 0 8px;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA TRASEIRA EXTERNA</h5>
                             <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px dashed #7c3aed;">
@@ -4017,8 +4300,9 @@ const PropostaTecnicaModule = {
         const dataUrl = offscreen.toDataURL('image/png');
 
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+        const hasExternalView = isForma2 || seg === 'Forma 1';
         let dataUrlExt = '';
-        if (isForma2) {
+        if (hasExternalView) {
             const offscreenExt = document.createElement('canvas');
             this._drawLayoutCanvasExternal(offscreenExt, cabinets);
             dataUrlExt = offscreenExt.toDataURL('image/png');
@@ -4030,7 +4314,16 @@ const PropostaTecnicaModule = {
             </div>
         `).join('');
 
-        const externalViewHtml = isForma2 ? `
+        const allExcess = cabinets.filter(c => c._excessLoads?.length > 0).flatMap(c => c._excessLoads);
+        const excessDataAttr = allExcess.length > 0 ? encodeURIComponent(JSON.stringify(allExcess.map(l => ({ tag: l.tag, desc: l.desc || l.tag, power: l.power, current: l.current })))) : '';
+        const excessWarning = allExcess.length > 0 ? `
+                <div style="background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#991b1b;">
+                    <strong>⚠️ Capacidade máxima atingida:</strong> ${allExcess.length} carga(s) não puderam ser alocadas.
+                    <button class="btn btn-xs btn-primary" data-excess='${excessDataAttr}' onclick="window.propostaTecnicaModule._showExcessLoadsDialog(JSON.parse(decodeURIComponent(this.dataset.excess)))" style="margin-left:8px;background:#dc2626;border-color:#dc2626;">Resolver</button>
+                </div>
+            ` : '';
+
+        const externalViewHtml = hasExternalView ? `
                         <div style="margin-top:24px;">
                             <h5 style="margin:0 0 8px;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA FRONTAL EXTERNA</h5>
                             <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #7c3aed;">
@@ -4050,19 +4343,26 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._showLayoutConfigPanel()" style="gap:4px;">
                                 <i class="ph ph-gear"></i> Configurar
                             </button>
+                            ${this._isForma34KitFrame(seg, eq.technical?.fabricante) ? `
+                            <button type="button" class="btn btn-sm btn-primary" onclick="window.propostaTecnicaModule._onCriarArranjoOtimizado()" style="gap:4px;background:#059669;border-color:#059669;">
+                                <i class="ph ph-stars"></i> Criar Arranjo Otimizado
+                            </button>` : ''}
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutPDF()" style="gap:4px;">
                                 <i class="ph ph-file-pdf"></i> Exportar PDF
                             </button>
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutDXF()" style="gap:4px;">
                                 <i class="ph ph-file"></i> Exportar DXF
                             </button>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;margin-left:4px;">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
+                                <i class="ph ph-package"></i> Gerar Chaparia
+                            </button>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
                     </div>
                     ${summaryCards}
-                    ${warnings}
+                    ${warnings}${excessWarning}
                     <div style="background:white;border-radius:12px;overflow:auto;padding:16px;">
                         <img id="layout-canvas" src="${dataUrl}" style="display:block;margin:0 auto;" alt="Layout Sugerido">
                         <div style="text-align:center;margin-top:12px;font-size:13px;font-weight:700;color:#64748b;letter-spacing:2px;">LAYOUT ORIENTATIVO</div>
@@ -4085,9 +4385,14 @@ const PropostaTecnicaModule = {
                             const cabId = c._cabId || '';
                             const currentWidth = c._userWidth || c.width;
                             const cabH = c.segregacao ? null : (c.height || 2300);
-                            const isForma2Cab = c.segregacao === 'Forma 2a' || c.segregacao === 'Forma 2b';
+                            const isForma2Cab = c.segregacao === 'Forma 2a' || c.segregacao === 'Forma 2b' || this._isForma34KitFrame(c.segregacao, c._fabricante);
+                            const gavetas = c._gavetas || [];
+                            const gavInfo = gavetas.length > 0
+                                ? gavetas.length + ' gav. (' + gavetas.reduce((s, g) => s + g.height, 0) + '/1800mm)'
+                                : '';
                             return `<div style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;">
                                 <span style="font-weight:600;color:#1e3a8a;">${c.name}</span>
+                                ${gavInfo ? `<span style="color:#64748b;font-size:11px;background:#e2e8f0;border-radius:4px;padding:1px 6px;" title="${gavetas.map(g => g.cargaTag + ' (' + g.height + 'mm)').join(', ')}">${gavInfo}</span>` : ''}
                                 <span style="color:#94a3b8;">|</span>
                                 <span style="color:#64748b;">Largura:</span>
                                 <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
@@ -4214,6 +4519,9 @@ const PropostaTecnicaModule = {
                         </div>`;
                     }).join('');
 
+                const isKF = this._isForma34KitFrame(eq.technical?.segregacao || '', eq.technical?.fabricante);
+                const gavList = (cab.loads ? Object.keys(cab.loads) : []);
+                const ccwCab = cab.layoutConfig?.colunaCabosWidth || 200;
                 return `<div class="cab-config-block" data-cab-id="${blockCabId}" style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;overflow:hidden;">
                     <div class="cab-config-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f8fafc;cursor:pointer;user-select:none;"
                         onclick="const b=this.nextElementSibling;if(b){const d=b.style.display;b.style.display=d==='none'?'':'none';this.querySelector('.cab-arrow').textContent=b.style.display==='none'?'▶':'▼'}">
@@ -4222,20 +4530,43 @@ const PropostaTecnicaModule = {
                             <input type="text" value="${blockName}" data-cab-name="${blockCabId}"
                                 style="font-size:12px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:4px;width:130px;font-weight:600;"
                                 onchange="window.propostaTecnicaModule._setNomeArmario('${blockCabId}',this.value)" onclick="event.stopPropagation();">
-                            <span style="color:#64748b;font-size:11px;">${label ? label + ' — ' : ''}${qtdMats} materiais</span>
+                            <span style="color:#64748b;font-size:11px;">${label ? label + ' — ' : ''}${qtdMats} materiais${gavList.length > 0 ? ' — ' + gavList.length + ' gavetas' : ''}</span>
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;">
+                            ${isKF ? `<select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;font-weight:600;" onchange="window.propostaTecnicaModule._onChangeCcwArmario('${blockCabId}',this.value)" onclick="event.stopPropagation();">
+                                <option value="200" ${ccwCab === 200 ? 'selected' : ''}>200mm</option>
+                                <option value="300" ${ccwCab === 300 ? 'selected' : ''}>300mm</option>
+                                <option value="400" ${ccwCab === 400 ? 'selected' : ''}>400mm</option>
+                            </select>` : `
                             <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
                                 onchange="window.propostaTecnicaModule._setLarguraArmario('${blockCabId}',this.value)" onclick="event.stopPropagation();">
                                 <option value="400" ${largura == 400 ? 'selected' : ''}>400mm</option>
                                 <option value="600" ${largura == 600 || largura === 'auto' ? 'selected' : ''}>600mm</option>
                                 <option value="800" ${largura == 800 ? 'selected' : ''}>800mm</option>
                                 <option value="1000" ${largura == 1000 ? 'selected' : ''}>1000mm</option>
-                            </select>
-                            <button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();window.propostaTecnicaModule._removerArmario('${blockCabId}')" style="color:#ef4444;font-size:11px;">✕</button>
+                            </select>`}
+                            <button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();this.closest('.cab-config-block').remove()" style="color:#ef4444;font-size:11px;">✕</button>
                         </div>
                     </div>
                     <div class="cab-config-body" style="display:none;padding:10px 12px;border-top:1px solid #e2e8f0;background:#fff;">
+                        ${isKF ? `
+                        <div style="font-size:12px;color:#64748b;padding:8px 0;">
+                            <strong>Gavetas (${gavList.length})</strong>
+                            <div style="margin-top:4px;max-height:200px;overflow-y:auto;">
+                                ${gavList.map(tag => `<div style="padding:2px 4px;font-size:11px;border-bottom:1px solid #f1f5f9;">${tag}</div>`).join('')}
+                            </div>
+                            <div style="margin-top:8px;font-size:11px;color:#94a3b8;">KitFrame — 600mm (gavetas) + ${ccwCab}mm (coluna cabos) = ${largura}mm × 2300mm</div>
+                            <div style="margin-top:8px;">
+                                <label style="font-size:11px;color:#64748b;font-weight:600;">Modo:</label>
+                                <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
+                                    onchange="window.propostaTecnicaModule._onChangeGavetaMode('${blockCabId}',this.value)">
+                                    <option value="sequential" ${(cab.layoutConfig?.gavetaMode || 'sequential') === 'sequential' ? 'selected' : ''}>Automática (Sequencial)</option>
+                                    <option value="otimizada" ${cab.layoutConfig?.gavetaMode === 'otimizada' ? 'selected' : ''}>Automática (Otimizada)</option>
+                                    <option value="manual" ${cab.layoutConfig?.gavetaMode === 'manual' ? 'selected' : ''}>Manual</option>
+                                </select>
+                            </div>
+                        </div>
+                        ` : `
                         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;">
                             <div><label style="font-size:10px;">Margem Esq.</label><input type="number" class="form-control cab-dim" data-field="canaletaEsq" value="${lc.canaletaEsq ?? 0}" style="width:100%;font-size:11px;height:26px;"></div>
                             <div><label style="font-size:10px;">Margem Dir.</label><input type="number" class="form-control cab-dim" data-field="canaletaDir" value="${lc.canaletaDir ?? 0}" style="width:100%;font-size:11px;height:26px;"></div>
@@ -4292,6 +4623,7 @@ const PropostaTecnicaModule = {
                                 </tbody>
                             </table>
                         </div>
+                        `}
                     </div>
                 </div>`;
             });
@@ -4312,6 +4644,31 @@ const PropostaTecnicaModule = {
                     <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:11px;">+ Adicionar Armário</button>
                     <button class="btn btn-sm btn-ghost" onclick="if(confirm('Remover todas as alocações e voltar ao agrupamento automático?'))window.propostaTecnicaModule._resetarAlocacoes()" style="font-size:11px;">Auto</button>
                 </div>
+                ${(() => {
+                    const allLoads = eq.loads || [];
+                    const assignedTags = new Set();
+                    for (const cab of Object.values(ass || {})) {
+                        if (cab.loads) Object.keys(cab.loads).forEach(t => assignedTags.add(t));
+                        if (cab.faces) {
+                            for (const f of Object.values(cab.faces)) {
+                                if (f.loads) Object.keys(f.loads).forEach(t => assignedTags.add(t));
+                            }
+                        }
+                    }
+                    const unallocated = allLoads.filter(l => l.tag && !assignedTags.has(l.tag));
+                    if (unallocated.length === 0) return '';
+                    return `
+                    <div style="border:2px dashed #ef4444;border-radius:8px;padding:12px;margin-top:12px;">
+                        <strong style="color:#ef4444;font-size:13px;">⚠️ Cargas não alocadas (${unallocated.length})</strong>
+                        <div style="margin-top:6px;font-size:11px;color:#64748b;max-height:150px;overflow-y:auto;">
+                            ${unallocated.map(l => `
+                            <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f1f5f9;">
+                                <span>• ${l.tag} - ${l.desc || l.tag} (${this._getDrawerHeight(l)}mm)</span>
+                                <button class="btn btn-xs btn-ghost" style="color:#059669;font-size:10px;margin-left:auto;" onclick="window.propostaTecnicaModule._adicionarArmario()">+ Novo Armário</button>
+                            </div>`).join('')}
+                        </div>
+                    </div>`;
+                })()}
                 <div style="display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #e2e8f0;padding-top:14px;margin-top:14px;">
                     <button class="btn btn-cancel" onclick="this.closest('#_layout_config_overlay').remove()">Cancelar</button>
                     <button class="btn btn-primary" onclick="window.propostaTecnicaModule._saveLayoutConfig()">Aplicar</button>
@@ -4421,12 +4778,29 @@ const PropostaTecnicaModule = {
             }
         });
 
+        // Remove cabines cujo bloco DOM foi deletado (X)
+        const remainingCabIds = new Set();
+        overlay.querySelectorAll('.cab-config-block').forEach(block => {
+            const raw = block.dataset.cabId || '';
+            const baseId = raw.split('|')[0];
+            if (baseId) remainingCabIds.add(baseId);
+        });
+        for (const key of Object.keys(eq.layoutConfig.cabinetAssignments || {})) {
+            if (!remainingCabIds.has(key)) {
+                delete eq.layoutConfig.cabinetAssignments[key];
+            }
+        }
+        if (Object.keys(eq.layoutConfig.cabinetAssignments || {}).length === 0) {
+            delete eq.layoutConfig.cabinetAssignments;
+        }
+
         overlay.remove();
 
         const idx = this.activeEquipmentIndex;
         const eqs = [...(data.equipments || [])];
         eqs[idx] = eq;
-try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); if (typeof app?.toast === 'function') app.toast('Erro ao salvar configuração do layout', 'error'); }
+        this._syncLayoutToEnclosures(eq);
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); if (typeof app?.toast === 'function') app.toast('Erro ao salvar configuração do layout', 'error'); }
  
         if (this.activeSubTab === 'layout') {
             this.renderSubTab();
@@ -4950,6 +5324,452 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         ctx.fillText('P: ' + effectiveDepth + 'mm', xOff + cabW / 2, padding + cabH + 4);
     },
 
+    _isForma34(seg) {
+        return ['Forma 3a', 'Forma 3b', 'Forma 4a', 'Forma 4b'].includes(seg);
+    },
+
+    _isForma34KitFrame(seg, fabricante) {
+        return this._isForma34(seg) && (fabricante === 'KitFrame');
+    },
+
+    // Gaveta height table: smallest height that satisfies BOTH kW and A
+    _getDrawerHeight(carga) {
+        const kw = parseFloat(carga?.power) || 0;
+        const a = parseFloat(carga?.current) || 0;
+        const table = [
+            { height: 100, maxKw: 37,  maxA: 80 },
+            { height: 150, maxKw: 55,  maxA: 250 },
+            { height: 225, maxKw: 75,  maxA: 400 },
+            { height: 300, maxKw: 110, maxA: 630 },
+            { height: 375, maxKw: 132, maxA: 800 },
+            { height: 450, maxKw: 160, maxA: 1000 },
+        ];
+        for (const row of table) {
+            if (kw <= row.maxKw && a <= row.maxA) return row.height;
+        }
+        return 450;
+    },
+
+    // Auto-stack gavetas for a KitFrame coluna (max 1800mm total height per coluna)
+    _createReserveGavetas(remaining, cabNumber, gavIdx) {
+        const STD_H = [100, 150, 225, 300, 375, 450];
+        const reserve = [];
+        let space = remaining;
+        for (const h of STD_H) {
+            while (space >= h) {
+                gavIdx++;
+                reserve.push({
+                    id: 'gav-' + cabNumber + '.' + gavIdx,
+                    colunaIndex: -1,
+                    posicao: gavIdx - 1,
+                    height: h,
+                    cargaTag: 'TAG??',
+                    potencia: 'Gav. Reserva',
+                    _isReserva: true,
+                    materiais: {},
+                });
+                space -= h;
+            }
+        }
+        return { reserve, gavIdx };
+    },
+
+    _tryFillExact(space) {
+        const STD_H = [100, 150, 225, 300, 375, 450];
+        if (space === 0) return [];
+        const dp = new Array(space + 1).fill(null);
+        dp[0] = [];
+        for (let s = 0; s <= space; s++) {
+            if (dp[s] === null) continue;
+            for (const h of STD_H) {
+                if (s + h <= space && dp[s + h] === null) {
+                    dp[s + h] = [...dp[s], h];
+                }
+            }
+        }
+        return dp[space];
+    },
+
+    _getReserveOptions(space) {
+        const STD_H = [100, 150, 225, 300, 375, 450];
+        if (space < 100) return [[space]];
+        const MAX_PER_SLOT = 20;
+        const dp = new Array(space + 1).fill(null);
+        dp[0] = [[]];
+        for (let s = 0; s <= space; s++) {
+            if (!dp[s]) continue;
+            for (const h of STD_H) {
+                const ns = s + h;
+                if (ns > space) continue;
+                if (!dp[ns]) dp[ns] = [];
+                for (const combo of dp[s]) {
+                    if (dp[ns].length >= MAX_PER_SLOT) break;
+                    dp[ns].push([...combo, h]);
+                }
+            }
+        }
+        if (!dp[space] || dp[space].length === 0) return [[space]];
+        const seen = new Set();
+        const unique = [];
+        for (const combo of dp[space]) {
+            const key = [...combo].sort((a, b) => a - b).join(',');
+            if (!seen.has(key)) { seen.add(key); unique.push(combo); }
+        }
+        unique.sort((a, b) => a.length - b.length);
+        const result = [];
+        const usedCounts = new Set();
+        for (const combo of unique) {
+            if (result.length >= 6) break;
+            if (!usedCounts.has(combo.length)) {
+                result.push(combo);
+                usedCounts.add(combo.length);
+            }
+        }
+        return result;
+    },
+
+    _autoStackGavetas(cargas, cabLoads, cabNumber = 1, mode = 'sequential', reserveCombo = null) {
+        const MAX_HEIGHT = 1800;
+        const excessLoads = [];
+        let gavIdx = 0;
+        let usedH = 0;
+        const gavetas = [];
+
+        let cargasOrdered;
+        if (mode === 'otimizada') {
+            cargasOrdered = [...cargas].sort((a, b) => {
+                const pa = parseFloat(a.power) || 0;
+                const pb = parseFloat(b.power) || 0;
+                return pb - pa;
+            });
+        } else {
+            cargasOrdered = [...cargas];
+        }
+
+        for (const carga of cargasOrdered) {
+            if (!carga.tag) continue;
+            const h = this._getDrawerHeight(carga);
+            if (usedH + h > MAX_HEIGHT) {
+                excessLoads.push(carga);
+                continue;
+            }
+            const loadMats = cabLoads?.[carga.tag] || {};
+            gavetas.push({
+                id: 'gav-' + cabNumber + '.' + (gavIdx + 1),
+                colunaIndex: 0,
+                posicao: gavIdx,
+                height: h,
+                cargaTag: carga.tag,
+                cargaDesc: carga.desc || carga.tag,
+                potencia: carga.power || '',
+                corrente: carga.current || '',
+                materiais: loadMats,
+            });
+            usedH += h;
+            gavIdx++;
+        }
+
+        if (mode !== 'manual') {
+            const remaining = MAX_HEIGHT - usedH;
+            if (remaining >= 225) {
+                let fill;
+                if (reserveCombo) {
+                    fill = reserveCombo;
+                } else {
+                    fill = this._tryFillExact(remaining);
+                    if (!fill) fill = [remaining];
+                }
+                for (const h of fill) {
+                    gavIdx++;
+                    gavetas.push({
+                        id: 'gav-' + cabNumber + '.' + gavIdx,
+                        colunaIndex: 0,
+                        posicao: gavIdx - 1,
+                        height: h,
+                        cargaTag: 'TAG??',
+                        potencia: 'Gav. Reserva',
+                        _isReserva: true,
+                        materiais: {},
+                    });
+                    usedH += h;
+                }
+            }
+        }
+
+        return { colunas: [{ index: 0, gavetas, totalAltura: usedH }], excessLoads };
+    },
+
+    _distributeLoadsAcrossCabinets(cargas) {
+        const MAX = 1800;
+
+        const loads = cargas
+            .filter(c => c.tag)
+            .map(c => ({ ...c, h: this._getDrawerHeight(c) }))
+            .sort((a, b) => {
+                const pa = parseFloat(a.power) || 0;
+                const pb = parseFloat(b.power) || 0;
+                return pb - pa;
+            });
+
+        const result = [];
+        let currentGroup = [];
+        let currentHeight = 0;
+
+        for (const carga of loads) {
+            if (currentHeight + carga.h > MAX && currentGroup.length > 0) {
+                result.push({ loads: [...currentGroup], totalHeight: currentHeight });
+                currentGroup = [];
+                currentHeight = 0;
+            }
+            currentGroup.push(carga);
+            currentHeight += carga.h;
+        }
+
+        if (currentGroup.length > 0) {
+            result.push({ loads: [...currentGroup], totalHeight: currentHeight });
+        }
+
+        return result;
+    },
+
+    _rebalanceCabinets(arrangement) {
+        if (!arrangement || arrangement.length < 2) return arrangement;
+        const MAX = 1800;
+        const MIN_OK = 225;
+        let changed = true;
+        let safety = 0;
+
+        while (changed && safety < 50) {
+            changed = false;
+            safety++;
+
+            for (let i = 0; i < arrangement.length; i++) {
+                const donor = arrangement[i];
+                const donorRemaining = MAX - donor.totalHeight;
+                if (donorRemaining === 0 || donorRemaining >= MIN_OK) continue;
+                if (donor.loads.length === 0) continue;
+
+                const candidates = [...donor.loads].sort((a, b) => a.h - b.h);
+
+                for (const load of candidates) {
+                    let moved = false;
+                    for (let j = 0; j < arrangement.length; j++) {
+                        if (j === i) continue;
+                        const rec = arrangement[j];
+                        if (MAX - rec.totalHeight >= load.h) {
+                            donor.loads = donor.loads.filter(l => l !== load);
+                            donor.totalHeight -= load.h;
+                            rec.loads.push(load);
+                            rec.totalHeight += load.h;
+                            moved = true;
+                            changed = true;
+                            break;
+                        }
+                    }
+                    if (moved) break;
+                }
+            }
+        }
+
+        return arrangement.filter(c => c.loads.length > 0);
+    },
+
+    _drawCabinetForma34(ctx, cab, x, y, scale, fontMult, cabW, cabHeight, displayName) {
+        const ccw = cab.layoutConfig?.colunaCabosWidth || 200;
+        const L = cab.width || (600 + ccw);
+        const gavetasW = 600 * scale;
+        const colunaCabosW = ccw * scale;
+        const barraSecY = 300;
+        const gavetasSecY = barraSecY + 1800;
+        const colunaCabosSecY = barraSecY + 1900;
+        const baseSecY = colunaCabosSecY;
+
+        // ── Barramentos (Y=0 to 300) ──
+        const barY = y;
+        const barH = 300 * scale;
+        ctx.fillStyle = '#e0f2fe';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1;
+        ctx.fillRect(x, barY, cabW, barH);
+        ctx.strokeRect(x, barY, cabW, barH);
+        ctx.strokeStyle = '#93c5fd';
+        ctx.lineWidth = 0.3;
+        ctx.strokeRect(x + 3 * scale, barY + 3 * scale, cabW - 6 * scale, barH - 6 * scale);
+        ctx.fillStyle = '#0284c7';
+        ctx.font = `bold ${Math.round(8 * fontMult)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Barramentos', x + cabW / 2, barY + barH / 2);
+
+        // ── Exaustor de teto (500×100mm acima da área de gavetas) ──
+        const exW = 500 * scale;
+        const exH = 100 * scale;
+        const exX = x + cabW / 2 - exW / 2;
+        const exY = y - exH;
+        ctx.fillStyle = '#e0f2fe';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 0.5;
+        ctx.fillRect(exX, exY, exW, exH);
+        ctx.strokeRect(exX, exY, exW, exH);
+        ctx.strokeStyle = '#93c5fd';
+        ctx.lineWidth = 0.3;
+        ctx.strokeRect(exX + 3 * scale, exY - 3 * scale, exW - 6 * scale, exH - 6 * scale);
+        ctx.fillStyle = '#0284c7';
+        ctx.font = `${Math.round(6 * fontMult)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Exaustor', exX + exW / 2, exY + exH / 2);
+
+        // ── Coluna de Cabos (Y=300 to 2200, right side) ──
+        const colCabX = x + gavetasW;
+        const colCabY = y + barraSecY * scale;
+        const colCabH = (colunaCabosSecY - barraSecY) * scale;
+        ctx.fillStyle = '#e0f2fe';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([3, 3]);
+        ctx.fillRect(colCabX, colCabY, colunaCabosW, colCabH);
+        ctx.strokeRect(colCabX, colCabY, colunaCabosW, colCabH);
+        ctx.strokeStyle = '#93c5fd';
+        ctx.lineWidth = 0.3;
+        ctx.strokeRect(colCabX + 3 * scale, colCabY + 3 * scale, colunaCabosW - 6 * scale, colCabH - 6 * scale);
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#0284c7';
+        ctx.font = `${Math.round(6 * fontMult)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Coluna', colCabX + colunaCabosW / 2, colCabY + 30 * scale);
+        ctx.fillText('Cabos', colCabX + colunaCabosW / 2, colCabY + 50 * scale);
+
+        // ── Gavetas (Y=300 to 2100, left 600mm) ──
+        const gavY = y + barraSecY * scale;
+        const gavH = (gavetasSecY - barraSecY) * scale;
+        const gavetas = cab._gavetas || [];
+        if (gavetas.length > 0) {
+            let gavYOff = gavY;
+            for (const gav of gavetas) {
+                const gh = gav.height * scale;
+                ctx.fillStyle = '#e0f2fe';
+                ctx.strokeStyle = '#64748b';
+                ctx.lineWidth = 0.5;
+                ctx.fillRect(x, gavYOff, gavetasW, gh);
+                ctx.strokeRect(x, gavYOff, gavetasW, gh);
+                ctx.strokeStyle = '#93c5fd';
+                ctx.lineWidth = 0.3;
+                ctx.strokeRect(x + 3 * scale, gavYOff + 3 * scale, gavetasW - 6 * scale, gh - 6 * scale);
+                // Fecho for gavetas
+                {
+                    const fechoW = 20 * scale;
+                    const fechoH = 30 * scale;
+                    const fechoX = x + gavetasW - 40 * scale;
+                    const drawFecho = fy => {
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.strokeStyle = '#64748b';
+                        ctx.lineWidth = 0.5;
+                        ctx.fillRect(fechoX, fy, fechoW, fechoH);
+                        ctx.strokeRect(fechoX, fy, fechoW, fechoH);
+                        ctx.fillStyle = '#64748b';
+                        ctx.beginPath();
+                        ctx.arc(fechoX + fechoW / 2, fy + fechoH / 2, 5 * scale, 0, Math.PI * 2);
+                        ctx.fill();
+                    };
+                    if (gav.height === 100 || gav.height === 150) {
+                        drawFecho(gavYOff + gh / 2 - fechoH / 2);
+                    } else if (gav.height >= 200) {
+                        drawFecho(gavYOff + 50 * scale - fechoH / 2);
+                        drawFecho(gavYOff + gh - 50 * scale - fechoH / 2);
+                    }
+                }
+                // Comando Mecânico (70x70mm rect + 16mm circle)
+                {
+                    const cmW = 70 * scale;
+                    const cmH = 70 * scale;
+                    const cmX = x + gavetasW / 2 - cmW / 2;
+                    let cmY;
+                    if (gav.height === 100) {
+                        cmY = gavYOff + gh / 2 - cmH / 2;
+                    } else {
+                        cmY = gavYOff + gh - 50 * scale - cmH / 2;
+                    }
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.strokeStyle = '#64748b';
+                    ctx.lineWidth = 0.5;
+                    ctx.fillRect(cmX, cmY, cmW, cmH);
+                    ctx.strokeRect(cmX, cmY, cmW, cmH);
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath();
+                    ctx.arc(cmX + cmW / 2, cmY + cmH / 2, 8 * scale, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Gaveta id (top-left)
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = `${Math.round(4.5 * fontMult)}px sans-serif`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(gav.id, x + 2, gavYOff + 2);
+                // Carga tag (center)
+                ctx.fillStyle = '#1e293b';
+                ctx.font = `bold ${Math.round(6 * fontMult)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const cmCenterY = gav.height === 100 ? gavYOff + gh / 2 : gavYOff + gh - 50 * scale;
+                if (gav._isReserva) {
+                    ctx.fillText('TAG??', x + gavetasW / 2 + 147 * scale, cmCenterY + 8 * scale - 23.2 * scale);
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = `${Math.round(12 * fontMult)}px sans-serif`;
+                    ctx.fillText('Gav. Reserva', x + gavetasW / 2 + 147 * scale, cmCenterY + 8 * scale + 10 * fontMult + 20 * scale - 23.2 * scale);
+                } else {
+                    ctx.fillText(gav.cargaTag || '', x + gavetasW / 2 + 147 * scale, cmCenterY + 8 * scale - 23.2 * scale);
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = `${Math.round(12 * fontMult)}px sans-serif`;
+                    ctx.fillText(gav.potencia ? gav.potencia + 'kW' : '', x + gavetasW / 2 + 147 * scale, cmCenterY + 8 * scale + 10 * fontMult + 20 * scale - 23.2 * scale);
+                }
+                // Height label (bottom center)
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = `${Math.round(4.5 * fontMult)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(gav.height + 'mm', x + gavetasW / 2, gavYOff + gh - 2);
+                gavYOff += gh;
+            }
+        } else {
+            // No gavetas: show empty area with cabinet name
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(x, gavY, gavetasW, gavH);
+            ctx.fillStyle = '#475569';
+            ctx.font = `${Math.round(7 * fontMult)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(displayName, x + gavetasW / 2, gavY + 20 * scale);
+        }
+
+        // ── Barra Terra (Y=2100 to 2200, left 600mm) ──
+        const btY = y + gavetasSecY * scale;
+        const btH = (colunaCabosSecY - gavetasSecY) * scale;
+        ctx.fillStyle = '#e0f2fe';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 0.5;
+        ctx.fillRect(x, btY, gavetasW, btH);
+        ctx.strokeRect(x, btY, gavetasW, btH);
+        ctx.strokeStyle = '#93c5fd';
+        ctx.lineWidth = 0.3;
+        ctx.strokeRect(x + 3 * scale, btY + 3 * scale, gavetasW - 6 * scale, btH - 6 * scale);
+        ctx.fillStyle = '#0284c7';
+        ctx.font = `${Math.round(7 * fontMult)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Barra Terra', x + gavetasW / 2, btY + btH / 2);
+
+        // ── Dividers (vertical lines between gavetas section and cable column) ──
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(colCabX, colCabY);
+        ctx.lineTo(colCabX, colCabY + colCabH);
+        ctx.stroke();
+    },
+
     _drawLayoutInternal(ctx, cabinets, scale, fontMult, padding, externalOnly = false) {
         const CANVAS_WIDTH = ctx.canvas.width;
         const CANVAS_HEIGHT = ctx.canvas.height;
@@ -4990,21 +5810,23 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø)
-            const olhalSize = 60 * scale;
-            const furoR = 10 * scale;
-            const olhalTopY = y - olhalSize;
-            const olhalCenterY = y - olhalSize / 2;
-            ctx.strokeStyle = '#64748b';
-            ctx.lineWidth = 0.5;
-            ctx.strokeRect(x, olhalTopY, olhalSize, olhalSize);
-            ctx.beginPath();
-            ctx.arc(x + olhalSize / 2, olhalCenterY, furoR, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.strokeRect(x + cabW - olhalSize, olhalTopY, olhalSize, olhalSize);
-            ctx.beginPath();
-            ctx.arc(x + cabW - olhalSize / 2, olhalCenterY, furoR, 0, Math.PI * 2);
-            ctx.stroke();
+            // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø) — apenas Forma 1/2
+            if (!this._isForma34KitFrame(cab.segregacao, cab._fabricante)) {
+                const olhalSize = 60 * scale;
+                const furoR = 10 * scale;
+                const olhalTopY = y - olhalSize;
+                const olhalCenterY = y - olhalSize / 2;
+                ctx.strokeStyle = '#64748b';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(x, olhalTopY, olhalSize, olhalSize);
+                ctx.beginPath();
+                ctx.arc(x + olhalSize / 2, olhalCenterY, furoR, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.strokeRect(x + cabW - olhalSize, olhalTopY, olhalSize, olhalSize);
+                ctx.beginPath();
+                ctx.arc(x + cabW - olhalSize / 2, olhalCenterY, furoR, 0, Math.PI * 2);
+                ctx.stroke();
+            }
 
             const cabHeight = cab.height || 2300;
 
@@ -5094,6 +5916,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             } else {
                 // Vista Interna - conteúdo normal
                 const isForma2 = cab.segregacao === 'Forma 2a' || cab.segregacao === 'Forma 2b';
+                const isForma34 = this._isForma34KitFrame(cab.segregacao, cab._fabricante);
 
                 if (isForma2) {
                     // "Barramentos" centered at Y=150mm (middle of 0-300mm zone)
@@ -5113,6 +5936,10 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                     ctx.lineTo(x + cabW - 30 * scale, line300Y);
                     ctx.stroke();
                     ctx.restore();
+                }
+
+                if (isForma34) {
+                    this._drawCabinetForma34(ctx, cab, x, y, scale, fontMult, cabW, cabHeight, displayName);
                 }
 
                 // Cabinet name 20mm below top, centered
@@ -5181,7 +6008,8 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                     }
                 }
 
-                // Placa de montagem + borda 30mm (comum a todas as formas)
+                // Placa de montagem + borda 30mm (comum a todas as formas, exceto Forma 3A-4B)
+                if (!isForma34) {
                 const borderInset = 30;
                 const plateMargin = 50;
                 const plateW = (cab.width - plateMargin * 2) * scale;
@@ -5237,6 +6065,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                         ctx.fillText('Barra Terra', x + cabW / 2, barraTerraY + 50 * scale);
                     }
                 }
+                } // end !isForma34
             }
 
             // Base (cabHeight - 100mm) — comum a ambas as vistas
@@ -5298,8 +6127,9 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             ctx.fillText(titulo, padding + totalWidthDraw / 2, y + (cabMaxHeight + 180) * scale);
         }
 
-        // Legend (apenas vista interna)
-        if (!externalOnly) {
+        // Legend (apenas vista interna, exceto KitFrame)
+        const allKitFrame = cabinets.length > 0 && cabinets.every(c => this._isForma34KitFrame(c.segregacao, c._fabricante));
+        if (!externalOnly && !allKitFrame) {
             const legendY = CANVAS_HEIGHT - Math.round(14 * fontMult);
             ctx.font = `${Math.round(7 * fontMult)}px sans-serif`;
             ctx.textAlign = 'left';
@@ -5360,6 +6190,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             comprimentoTrilho: 0,
             showSideView: false,
             sideViewCabinetIndex: -1,
+            colunaCabosWidth: 200,
 
             doorLinhas: [
                 { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
@@ -5908,10 +6739,15 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
 
         const seg = eq.technical?.segregacao || '';
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+        const isKitFrame = this._isForma34KitFrame(seg, eq.technical?.fabricante);
         const defaultHeight = isForma2 ? 2300 : (parseInt(eq.technical?.alturaPainel) || 2200) + 100;
         const alturaOptions = [1600, 1800, 2000, 2300].map(h =>
             `<option value="${h}" ${h === defaultHeight ? 'selected' : ''}>${h} mm</option>`
         ).join('');
+
+        const currentCCW = 300;
+        const existingCount = Object.keys(layoutConfig.cabinetAssignments).length;
+        const defaultNome = isKitFrame ? 'Coluna ' + String(existingCount + 1).padStart(2, '0') : 'Novo Armário';
 
         const dlg = document.createElement('div');
         dlg.id = '_armario_add_dlg';
@@ -5919,7 +6755,25 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         dlg.innerHTML = `
             <div style="background:white;border-radius:12px;padding:24px;max-width:400px;width:90%;">
                 <h3 style="margin:0 0 16px;">Adicionar Armário</h3>
-                <div class="form-group"><label class="form-label">Nome do Armário</label><input type="text" id="arm_add_nome" class="form-control" value="Novo Armário" style="font-size:13px;"></div>
+                <div class="form-group"><label class="form-label">Nome do Armário</label><input type="text" id="arm_add_nome" class="form-control" value="${defaultNome}" style="font-size:13px;"></div>
+                ${isKitFrame ? `
+                <div class="form-group" style="margin-top:12px;"><label class="form-label">Altura</label>
+                    <div style="font-size:13px;padding:6px 0;color:#475569;font-weight:600;">2300 mm</div>
+                </div>
+                <div class="form-group" style="margin-top:12px;"><label class="form-label">Coluna de Cabos (mm)</label>
+                    <select id="arm_add_ccw" class="form-control" style="font-size:13px;">
+                        <option value="200" ${currentCCW === 200 ? 'selected' : ''}>200 mm</option>
+                        <option value="300" ${currentCCW === 300 ? 'selected' : ''}>300 mm</option>
+                        <option value="400" ${currentCCW === 400 ? 'selected' : ''}>400 mm</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top:12px;"><label class="form-label">Profundidade (mm)</label>
+                    <select id="arm_add_profundidade" class="form-control" style="font-size:13px;">
+                        <option value="600" selected>600 mm</option>
+                        <option value="800">800 mm</option>
+                    </select>
+                </div>
+                ` : `
                 <div class="form-group" style="margin-top:12px;"><label class="form-label">Altura (mm)</label>
                     <select id="arm_add_altura" class="form-control" style="font-size:13px;">
                         ${isForma2 ? `<option value="2300" selected>2300 mm</option>` : alturaOptions}
@@ -5942,6 +6796,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                         <option value="1200">1200 mm</option>
                     </select>
                 </div>
+                `}
                 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
                     <button class="btn btn-cancel" onclick="this.closest('#_armario_add_dlg').remove()">Cancelar</button>
                     <button class="btn btn-primary" onclick="window.propostaTecnicaModule._confirmAdicionarArmario()">Adicionar</button>
@@ -5958,25 +6813,46 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         if (!eq) return;
         const layoutConfig = eq.layoutConfig || this._getDefaultLayoutConfig();
         if (!layoutConfig.cabinetAssignments) layoutConfig.cabinetAssignments = {};
+        const seg = eq.technical?.segregacao || '';
+        const isKitFrame = this._isForma34KitFrame(seg, eq.technical?.fabricante);
 
         const nome = document.getElementById('arm_add_nome')?.value?.trim() || 'Armário';
-        const height = parseInt(document.getElementById('arm_add_altura')?.value) || 2300;
-        const width = parseInt(document.getElementById('arm_add_largura')?.value) || 600;
         const depth = parseInt(document.getElementById('arm_add_profundidade')?.value) || 600;
         const cabId = 'cab_' + Date.now();
+        const cabConfig = JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()));
+
+        let height, width;
+        if (isKitFrame) {
+            height = 2300;
+            const ccw = parseInt(document.getElementById('arm_add_ccw')?.value) || 200;
+            width = 600 + ccw;
+            cabConfig.colunaCabosWidth = ccw;
+            if (eq.layoutConfig) eq.layoutConfig.colunaCabosWidth = ccw;
+        } else {
+            height = parseInt(document.getElementById('arm_add_altura')?.value) || 2300;
+            width = parseInt(document.getElementById('arm_add_largura')?.value) || 600;
+        }
+
         layoutConfig.cabinetAssignments[cabId] = {
             name: nome, height, width, depth, assigned: {},
             faces: {
                 front: { assigned: {}, loads: {}, layoutConfig: null },
                 rear: { assigned: {}, loads: {}, layoutConfig: null }
             },
-            layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+            layoutConfig: cabConfig
         };
         if (!eq.layoutConfig) eq.layoutConfig = layoutConfig;
         else eq.layoutConfig.cabinetAssignments = layoutConfig.cabinetAssignments;
         dlg.remove();
+
+        const configOverlay = document.getElementById('_layout_config_overlay');
+        const wasInConfigMode = !!configOverlay;
+        if (wasInConfigMode) configOverlay.remove();
+
         this._recalcularLayout();
         this.renderSubTab();
+
+        if (wasInConfigMode) this._showLayoutConfigPanel();
     },
 
     _removerArmario(cabId) {
@@ -6200,8 +7076,10 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         const suf = isRear ? 'T' : 'F';
 
         const assignments = baseLayoutConfig.cabinetAssignments;
+        let cabIdx = 0;
         if (assignments && Object.keys(assignments).length > 0) {
             for (const [cabId, cabData] of Object.entries(assignments)) {
+                cabIdx++;
                 const items = [];
                 let maxD = 0;
                 const parent = face ? cabData.faces?.[face] : cabData;
@@ -6286,21 +7164,131 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                     const calcW = items.length > 0 ? this._simulateMinWidth(items, cabConfig) : 200;
                     const stdW = cabData.width ? getStdWidth(cabData.width) : getStdWidth(calcW);
                     const segregacaoCab = eq.technical?.segregacao || '';
-                    const cabPanelH = cabData.height || ((segregacaoCab === 'Forma 2a' || segregacaoCab === 'Forma 2b') ? 2300 : (parseInt(eq.technical?.alturaPainel) || 2200) + 100);
-                    cabinets.push({ _cabId: cabId, _assignData: cabData, name: cabData.name + suf, layoutConfig: cabConfig, items, doorItems: cabDoorItems, width: stdW, height: cabPanelH,                     depth: cabData.depth || maxD || 600, calculatedWidth: calcW, _userWidth: cabData.width || null, _face: face || null, segregacao: segregacaoCab });
+                    const isForma34 = this._isForma34KitFrame(segregacaoCab, eq.technical?.fabricante);
+                    const cabPanelH = cabData.height || (isForma34 ? 2300 : ((segregacaoCab === 'Forma 2a' || segregacaoCab === 'Forma 2b') ? 2300 : (parseInt(eq.technical?.alturaPainel) || 2200) + 100));
+                    if (isForma34) {
+                        const ccw = cabConfig.colunaCabosWidth || 200;
+                        const forma34width = 600 + ccw;
+                        cabData.width = forma34width;
+                        // Build colunas/gavetas for KitFrame
+                        const parentForLoads = face ? cabData.faces?.[face] : cabData;
+                        const cabLoads = parentForLoads?.loads || {};
+                        // Collect loads that have materials assigned to this cabinet
+                        const cargaList = (eq.loads || []).filter(l => l.tag && cabLoads[l.tag]);
+                        const reserveCombo = cabData._reserveCombo || (face ? cabData.faces?.[face]?._reserveCombo : null);
+                        const { colunas, excessLoads } = this._autoStackGavetas(cargaList, cabLoads, cabIdx, cabConfig.gavetaMode || 'sequential', reserveCombo);
+                        const gavetasFlat = colunas.flatMap(c => c.gavetas);
+                        cabinets.push({ _cabId: cabId, _assignData: cabData, name: cabData.name + suf, layoutConfig: cabConfig, items, doorItems: cabDoorItems, _fabricante: eq.technical?.fabricante, width: forma34width, height: cabPanelH,                     depth: cabData.depth || maxD || 600, calculatedWidth: forma34width, _userWidth: forma34width, _face: face || null, segregacao: segregacaoCab, _gavetas: gavetasFlat, _colunas: colunas, _excessLoads: excessLoads });
+                    } else {
+                    cabinets.push({ _cabId: cabId, _assignData: cabData, name: cabData.name + suf, layoutConfig: cabConfig, items, doorItems: cabDoorItems, _fabricante: eq.technical?.fabricante, width: stdW, height: cabPanelH,                     depth: cabData.depth || maxD || 600, calculatedWidth: calcW, _userWidth: cabData.width || null, _face: face || null, segregacao: segregacaoCab });
+                    }
                     totalCalculatedWidth += calcW;
                     totalSuggestedWidth += stdW;
                 }
             }
         } else {
-            return { cabinets: [], hasLoads: true };
+            // Auto-create cabinet for KitFrame when no assignments exist
+            const isForma34Auto = this._isForma34KitFrame(eq.technical?.segregacao || '', eq.technical?.fabricante);
+            if (isForma34Auto) {
+                if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
+                if (!eq.layoutConfig.cabinetAssignments) eq.layoutConfig.cabinetAssignments = {};
+                const cabId = 'cab_' + Date.now();
+                const ccwAuto = 200;
+                eq.layoutConfig.cabinetAssignments[cabId] = {
+                    name: eq.tag || 'KitFrame',
+                    width: 600 + ccwAuto,
+                    height: 2300,
+                    depth: 600,
+                    assigned: {},
+                    loads: {},
+                    faces: {
+                        front: { assigned: {}, loads: {}, layoutConfig: null },
+                        rear: { assigned: {}, loads: {}, layoutConfig: null }
+                    },
+                    layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+                };
+                // Assign all loads to the cabinet
+                const parent = eq.layoutConfig.cabinetAssignments[cabId];
+                for (const load of loadsWithTipico) {
+                    if (!load.tag) continue;
+                    if (!parent.loads[load.tag]) parent.loads[load.tag] = {};
+                    for (const bucket of Object.values(materialBuckets)) {
+                        if (bucket.loadTags.has(load.tag)) {
+                            const matId = bucket.material.id;
+                            if (!parent.loads[load.tag][matId]) parent.loads[load.tag][matId] = { qtd: 0 };
+                            parent.loads[load.tag][matId].qtd += bucket.totalQtd;
+                            if (!parent.assigned[matId]) parent.assigned[matId] = { qtd: 0, loadIds: [] };
+                            parent.assigned[matId].qtd += bucket.totalQtd;
+                            if (!parent.assigned[matId].loadIds.includes(load.tag)) parent.assigned[matId].loadIds.push(load.tag);
+                        }
+                    }
+                }
+                // Re-run the assignments loop
+                const newAssignments = eq.layoutConfig.cabinetAssignments;
+                if (newAssignments && Object.keys(newAssignments).length > 0) {
+                    for (const [cabId2, cabData2] of Object.entries(newAssignments)) {
+                        const items2 = [];
+                        let maxD2 = 0;
+                        const parent2 = face ? cabData2.faces?.[face] : cabData2;
+                        const mergedSource2 = {};
+                        const loadsMatIds2 = new Set();
+                        if (parent2?.loads) {
+                            for (const mats of Object.values(parent2.loads)) {
+                                for (const [matId, ass] of Object.entries(mats || {})) {
+                                    loadsMatIds2.add(matId);
+                                    if (!mergedSource2[matId]) mergedSource2[matId] = { qtd: 0 };
+                                    mergedSource2[matId].qtd += ass.qtd || 0;
+                                }
+                            }
+                        }
+                        if (parent2?.assigned) {
+                            for (const [matId, ass] of Object.entries(parent2.assigned)) {
+                                if (loadsMatIds2.has(matId)) continue;
+                                if (!mergedSource2[matId]) mergedSource2[matId] = { qtd: 0 };
+                                mergedSource2[matId].qtd += ass.qtd || 0;
+                            }
+                        }
+                        for (const [matId, ass] of Object.entries(mergedSource2)) {
+                            const bucket = materialBuckets[matId];
+                            if (!bucket) continue;
+                            const m = bucket.material;
+                            const cat = m.categoria || 'Outros';
+                            const w = parseFloat(m.largura_mm) || 0;
+                            const h2 = parseFloat(m.altura_mm) || 0;
+                            const d = parseFloat(m.profundidade_mm) || 0;
+                            if (d > maxD2) maxD2 = d;
+                            const qtd = ass.qtd || 0;
+                            if (qtd > 0 && w > 0 && h2 > 0) {
+                                items2.push({ desc: m.descricao || m.codigoInterno || '-', qtd, tags: [...(bucket.loadTags || [])].join(', '), category: cat, w, h: h2, d, color: this._getCategoryColor(cat), _matId: matId });
+                            }
+                        }
+                        const cabConfig2 = cabData2.layoutConfig || this._getDefaultLayoutConfig();
+                        const forma34width2 = 600 + ccwAuto;
+                        const cabPanelHAuto = 2300;
+                        const parentForLoadsAuto = face ? cabData2.faces?.[face] : cabData2;
+                        const cabLoadsAuto = parentForLoadsAuto?.loads || {};
+                        const cargaListAuto = (eq.loads || []).filter(l => l.tag && cabLoadsAuto[l.tag]);
+                        const reserveComboAuto = cabData2._reserveCombo || (face ? cabData2.faces?.[face]?._reserveCombo : null);
+                        const { colunas: colunasAuto, excessLoads: excessLoadsAuto } = this._autoStackGavetas(cargaListAuto, cabLoadsAuto, 1, cabConfig2.gavetaMode || 'sequential', reserveComboAuto);
+                        const gavetasFlatAuto = colunasAuto.flatMap(c => c.gavetas);
+                        cabinets.push({ _cabId: cabId2, _assignData: cabData2, name: (cabData2.name || cabId2) + suf, layoutConfig: cabConfig2, items: items2, doorItems: [], _fabricante: eq.technical?.fabricante, width: forma34width2, height: cabPanelHAuto, depth: cabData2.depth || maxD2 || 600, calculatedWidth: forma34width2, _userWidth: forma34width2, _face: face || null, segregacao: eq.technical?.segregacao || '', _gavetas: gavetasFlatAuto, _colunas: colunasAuto, _excessLoads: excessLoadsAuto });
+                        totalCalculatedWidth += forma34width2;
+                        totalSuggestedWidth += forma34width2;
+                    }
+                }
+            } else {
+                return { cabinets: [], hasLoads: true };
+            }
         }
 
         if (isRear) cabinets.reverse();
 
         for (const cab of cabinets) {
-            cab.rows = this._layoutCabinetRows(cab);
-            cab.doorRows = this._layoutDoorRows(cab);
+            const isCabForma34 = this._isForma34KitFrame(cab.segregacao, cab._fabricante);
+            if (!isCabForma34) {
+                cab.rows = this._layoutCabinetRows(cab);
+                cab.doorRows = this._layoutDoorRows(cab);
+            }
         }
 
         return { cabinets, totalCalculatedWidth, totalSuggestedWidth, hasLoads: true };
@@ -6406,14 +7394,24 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
     },
 
     _renderAutomationLayout(eq) {
-        const validForms = ['Forma 1', 'Forma 2a', 'Forma 2b'];
+        const validForms = ['Forma 1', 'Forma 2a', 'Forma 2b', 'Forma 3a', 'Forma 3b', 'Forma 4a', 'Forma 4b'];
         const seg = eq.technical?.segregacao;
         if (!seg || !validForms.includes(seg)) {
             return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
                 <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
                 <br>
                 <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível</div>
-                <div style="font-size:13px;margin-top:6px;">Disponível apenas para Formas de Segregação <strong>Forma 1</strong>, <strong>Forma 2a</strong> ou <strong>Forma 2b</strong> na Ficha Técnica.</div>
+                <div style="font-size:13px;margin-top:6px;">Selecione uma Forma de Segregação na Ficha Técnica.</div>
+            </div>`;
+        }
+
+        const fabricanteAE = eq.technical?.fabricante || 'Genérico';
+        if (this._isForma34(seg) && fabricanteAE !== 'KitFrame') {
+            return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
+                <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
+                <br>
+                <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível para este fabricante</div>
+                <div style="font-size:13px;margin-top:6px;">Para Formas <strong>3a, 3b, 4a, 4b</strong>, selecione <strong>KitFrame</strong> como Fabricante na Ficha Técnica.</div>
             </div>`;
         }
 
@@ -6490,8 +7488,9 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         const dataUrl = offscreen.toDataURL('image/png');
 
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+        const hasExternalViewAE = isForma2 || seg === 'Forma 1';
         let dataUrlExt = '';
-        if (isForma2) {
+        if (hasExternalViewAE) {
             const offscreenExt = document.createElement('canvas');
             this._drawLayoutCanvasExternal(offscreenExt, cabinets);
             dataUrlExt = offscreenExt.toDataURL('image/png');
@@ -6503,15 +7502,13 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             </div>
         `).join('');
 
-        const externalViewHtml = isForma2 ? `
+        const externalViewHtml = hasExternalViewAE ? `
                         <div style="margin-top:24px;">
                             <h5 style="margin:0 0 8px;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA FRONTAL EXTERNA</h5>
                             <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #7c3aed;">
                                 <img id="layout-canvas-external" src="${dataUrlExt}" style="display:block;margin:0 auto;" alt="Vista Frontal Externa">
                             </div>
                         </div>` : '';
-
-        const baseCabs = Object.entries(eq.layoutConfig?.cabinetAssignments || {}).map(([id, d]) => ({ id, name: d.name, width: d.width || 600, height: d.height, depth: d.depth || 600 }));
 
         return `
             <div style="animation:fadeIn 0.3s ease;padding:20px;">
@@ -6884,13 +7881,14 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                     let xInputHtml = '';
                     let alocEntryHtml = '';
                     const matchCab = cabinets.find(c => c._cabId === baseCabId);
+                    const isKitFrameCab = matchCab ? this._isForma34KitFrame(matchCab.segregacao, matchCab._fabricante) : false;
                     if (matchCab?._assignData) {
                         const cabLinhas = (matchCab.layoutConfig?.linhas || this._getDefaultLayoutConfig().linhas);
                         const cabDoorLinhas = (matchCab.layoutConfig?.doorLinhas || this._getDefaultLayoutConfig().doorLinhas);
                         const source = face ? matchCab._assignData.faces?.[face]?.loads?.[loadKey] : matchCab._assignData.loads?.[loadKey];
                         const sourceLegacy = face ? matchCab._assignData.faces?.[face]?.assigned : matchCab._assignData.assigned;
                         const matEntry = source?.[matId] || sourceLegacy?.[matId];
-                        if (matEntry) {
+                        if (matEntry && !isKitFrameCab) {
                             const isPorta = matEntry.porta === true;
                             const isSplit = matEntry.linhaSplit && matEntry.linhaSplit.length > 0;
                             const linhaOptions = cabLinhas.map(l =>
@@ -7383,11 +8381,35 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
         const idx = this.activeEquipmentIndex;
         const eqs = [...(data.equipments || [])];
         eqs[idx] = eq;
+        this._syncLayoutToEnclosures(eq);
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); if (typeof app?.toast === 'function') app.toast('Erro ao salvar configuração do layout', 'error'); }
         if (this.activeSubTab === 'layout') {
             this._redrawLayoutCanvas();
             this._recarregarBOM();
         }
+    },
+
+    _syncLayoutToEnclosures(eq) {
+        if (!eq || !eq.layoutConfig?.cabinetAssignments) return;
+        const cabinets = eq.layoutConfig.cabinetAssignments;
+        const cabIds = Object.keys(cabinets);
+        if (cabIds.length === 0) {
+            eq.enclosureItems = [];
+            return;
+        }
+        const ip = eq.technical?.ip || 'IP-42';
+        const color = eq.technical?.cor_externa || eq.technical?.cor || 'RAL 7035';
+        eq.enclosureItems = cabIds.map((cabId, i) => {
+            const cab = cabinets[cabId];
+            return {
+                col: cab.name || `C${i + 1}`,
+                type: eq.type || '',
+                dim: `${cab.height || 2200}x${cab.width || 800}x${cab.depth || 600}`,
+                ip: ip,
+                color: color,
+                side: 'Ambos'
+            };
+        });
     },
 
     _recarregarBOM() {
@@ -7429,7 +8451,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             const img = document.getElementById('layout-canvas');
             if (img) img.src = c.toDataURL('image/png');
             const seg = eq.technical?.segregacao;
-            if (seg === 'Forma 2a' || seg === 'Forma 2b') {
+            if (seg === 'Forma 1' || seg === 'Forma 2a' || seg === 'Forma 2b') {
                 const ce = document.createElement('canvas');
                 this._drawLayoutCanvasExternal(ce, result.cabinets);
                 const imgExt = document.getElementById('layout-canvas-external');
@@ -7454,7 +8476,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             const imgR = document.getElementById('layout-canvas-rear');
             if (imgR) imgR.src = cr.toDataURL('image/png');
             const seg = eq.technical?.segregacao;
-            if (seg === 'Forma 2a' || seg === 'Forma 2b') {
+            if (seg === 'Forma 1' || seg === 'Forma 2a' || seg === 'Forma 2b') {
                 const cfe = document.createElement('canvas');
                 this._drawLayoutCanvasExternal(cfe, f.cabinets);
                 const imgFE = document.getElementById('layout-canvas-external-front');
@@ -7474,7 +8496,7 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
             const img = document.getElementById('layout-canvas');
             if (img) img.src = c.toDataURL('image/png');
             const seg = eq.technical?.segregacao;
-            if (seg === 'Forma 2a' || seg === 'Forma 2b') {
+            if (seg === 'Forma 1' || seg === 'Forma 2a' || seg === 'Forma 2b') {
                 const ce = document.createElement('canvas');
                 this._drawLayoutCanvasExternal(ce, result.cabinets);
                 const imgExt = document.getElementById('layout-canvas-external');
@@ -7484,6 +8506,288 @@ try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } });
                 this._drawSideView(result.cabinets, 'side-view-container', 'layout-canvas-side', eq.layoutConfig?.sideViewCabinetIndex);
             }
         }
+    },
+
+    _onChangeCcwArmario(blockCabId, value) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        const parts = blockCabId ? blockCabId.split('|') : [];
+        const cabId = parts[0];
+        const cab = eq.layoutConfig?.cabinetAssignments?.[cabId];
+        if (!cab) return;
+        const ccw = parseInt(value, 10);
+        if (!cab.layoutConfig) cab.layoutConfig = this._getDefaultLayoutConfig();
+        cab.layoutConfig.colunaCabosWidth = ccw;
+        cab.width = 600 + ccw;
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); }
+        this._redrawLayoutCanvas();
+        // Update body text in config block
+        const block = document.querySelector(`.cab-config-block[data-cab-id="${blockCabId}"]`);
+        if (block) {
+            const bodyDiv = block.querySelector('.cab-config-body > div');
+            if (bodyDiv) {
+                const infoDiv = bodyDiv.querySelector('div:last-child');
+                if (infoDiv) {
+                    infoDiv.textContent = `KitFrame — 600mm (gavetas) + ${ccw}mm (coluna cabos) = ${600 + ccw}mm × 2300mm`;
+                }
+            }
+        }
+    },
+
+    _onChangeGavetaMode(blockCabId, value) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        const parts = blockCabId ? blockCabId.split('|') : [];
+        const cabId = parts[0];
+        const cab = eq.layoutConfig?.cabinetAssignments?.[cabId];
+        if (!cab) return;
+        if (!cab.layoutConfig) cab.layoutConfig = this._getDefaultLayoutConfig();
+        cab.layoutConfig.gavetaMode = value;
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); }
+        this._redrawLayoutCanvas();
+    },
+
+    async _showReserveSetupDialog(cabinetReserves) {
+        return new Promise((resolve) => {
+            const existing = document.getElementById('_reserve_setup_dlg');
+            if (existing) existing.remove();
+
+            const dlg = document.createElement('div');
+            dlg.id = '_reserve_setup_dlg';
+            dlg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+            dlg.innerHTML = `
+                <div style="background:#fff;border-radius:12px;padding:24px;max-width:560px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto;">
+                    <h3 style="margin:0 0 4px;color:#059669;font-size:16px;">📦 Personalizar Gavetas Reservas</h3>
+                    <p style="font-size:13px;color:#475569;margin:0 0 16px;">Escolha a distribuição de gavetas reservas para cada armário:</p>
+                    ${cabinetReserves.map(cr => `
+                        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-bottom:12px;">
+                            <div style="font-weight:600;font-size:14px;color:#166534;margin-bottom:6px;">${cr.cabName} — ${cr.space}mm disponível</div>
+                            ${cr.options.map((opt, oi) => {
+                                const label = opt.map(h => h + 'mm').join(' + ');
+                                return `<label style="display:block;padding:4px 0;font-size:13px;color:#374151;cursor:pointer;">
+                                    <input type="radio" name="reserve_${cr.cabIndex}" value="${oi}" ${oi === 0 ? 'checked' : ''} style="margin-right:6px;">
+                                    ${label} (${opt.length} gaveta${opt.length > 1 ? 's' : ''})
+                                </label>`;
+                            }).join('')}
+                        </div>
+                    `).join('')}
+                    <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e2e8f0;padding-top:16px;">
+                        <button class="btn btn-sm btn-ghost" id="btn_skip_reserves" style="color:#64748b;">Pular, usar default</button>
+                        <button class="btn btn-sm btn-primary" id="btn_apply_reserves" style="background:#059669;border-color:#059669;">✔ Aplicar</button>
+                    </div>
+                </div>`;
+
+            document.body.appendChild(dlg);
+
+            document.getElementById('btn_apply_reserves').onclick = () => {
+                const selections = {};
+                cabinetReserves.forEach(cr => {
+                    const sel = document.querySelector(`input[name="reserve_${cr.cabIndex}"]:checked`);
+                    if (sel) selections[cr.cabIndex] = parseInt(sel.value);
+                });
+                dlg.remove();
+                resolve(selections);
+            };
+
+            document.getElementById('btn_skip_reserves').onclick = () => {
+                dlg.remove();
+                resolve(null);
+            };
+        });
+    },
+
+    async _onCriarArranjoOtimizado() {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
+        eq.layoutConfig.cabinetAssignments = {};
+
+        const arrangement = this._rebalanceCabinets(this._distributeLoadsAcrossCabinets(eq.loads || []));
+        const tipicos = store.getState().tipicos || [];
+        const materiais = store.getState().materiais || [];
+        const MAX_H = 1800;
+        const defaultCCW = 200;
+        const cabWidth = 600 + defaultCCW;
+
+        const cabEntries = [];
+        for (let i = 0; i < arrangement.length; i++) {
+            const group = arrangement[i];
+            const cabId = 'cab_' + Date.now() + '_' + i;
+            const cabName = 'Coluna ' + (i + 1).toString().padStart(2, '0');
+
+            const cabEntry = {
+                name: cabName,
+                width: cabWidth,
+                height: 2300,
+                depth: 600,
+                assigned: {},
+                loads: {},
+                layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+            };
+            cabEntry.layoutConfig.colunaCabosWidth = defaultCCW;
+
+            for (const carga of group.loads) {
+                if (!carga.tag) continue;
+                if (!cabEntry.loads[carga.tag]) cabEntry.loads[carga.tag] = {};
+                if (carga.typicalId) {
+                    const typical = tipicos.find(t => t.id === carga.typicalId);
+                    if (typical?.items) {
+                        for (const item of typical.items) {
+                            const material = materiais.find(m => m.id === item.materialId);
+                            if (!material) continue;
+                            const w = parseFloat(material.largura_mm) || 0;
+                            const h = parseFloat(material.altura_mm) || 0;
+                            const d = parseFloat(material.profundidade_mm) || 0;
+                            if (w === 0 && h === 0 && d === 0) continue;
+                            const matId = material.id;
+                            if (!cabEntry.loads[carga.tag][matId]) cabEntry.loads[carga.tag][matId] = { qtd: 0 };
+                            cabEntry.loads[carga.tag][matId].qtd += item.qtd || 1;
+                        }
+                    }
+                }
+            }
+
+            cabEntries.push({ cabId, cabEntry, totalHeight: group.totalHeight });
+        }
+
+        // Collect reserve spaces for dialog
+        const cabReserves = [];
+        for (let i = 0; i < cabEntries.length; i++) {
+            const { cabEntry, totalHeight } = cabEntries[i];
+            const space = MAX_H - totalHeight;
+            if (space >= 225) {
+                cabReserves.push({
+                    cabIndex: i,
+                    cabName: cabEntry.name,
+                    space,
+                    options: this._getReserveOptions(space),
+                });
+            }
+        }
+
+        let selections = null;
+        if (cabReserves.length > 0) {
+            selections = await this._showReserveSetupDialog(cabReserves);
+        }
+
+        // Apply selections
+        if (selections) {
+            for (const cr of cabReserves) {
+                const optIdx = selections[cr.cabIndex];
+                if (optIdx !== undefined && cr.options[optIdx]) {
+                    cabEntries[cr.cabIndex].cabEntry._reserveCombo = cr.options[optIdx];
+                }
+            }
+        }
+
+        for (const { cabId, cabEntry } of cabEntries) {
+            eq.layoutConfig.cabinetAssignments[cabId] = cabEntry;
+        }
+
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Arranjo] store error:', e); }
+
+        this._redrawLayoutCanvas();
+        this._showLayoutConfigPanel();
+    },
+
+    _showExcessLoadsDialog(excessLoads) {
+        const existing = document.getElementById('_excess_loads_dlg');
+        if (existing) existing.remove();
+
+        const dlg = document.createElement('div');
+        dlg.id = '_excess_loads_dlg';
+        dlg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        dlg.innerHTML = `
+            <div style="background:#fff;border-radius:12px;padding:24px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <h3 style="margin:0 0 8px;color:#dc2626;font-size:16px;">⚠️ Capacidade máxima atingida</h3>
+                <p style="font-size:13px;color:#475569;margin:0 0 12px;">${excessLoads.length} carga(s) não puderam ser alocadas:</p>
+                <div style="font-size:12px;color:#64748b;margin-bottom:16px;">
+                    ${excessLoads.map(l => `<div style="padding:3px 0;">• ${l.tag} - ${l.desc || l.tag} (${this._getDrawerHeight(l)}mm)</div>`).join('')}
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e2e8f0;padding-top:16px;">
+                    <button class="btn btn-sm btn-ghost" onclick="this.closest('#_excess_loads_dlg').remove()" style="color:#64748b;">Cancelar</button>
+                    <button class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._showLayoutConfigPanel();this.closest('#_excess_loads_dlg').remove()" style="gap:4px;">
+                        ⚙️ Abrir Config Layout
+                    </button>
+                    <button class="btn btn-sm btn-primary" data-excess='${encodeURIComponent(JSON.stringify(excessLoads.map(l => ({ tag: l.tag, desc: l.desc || l.tag, power: l.power, current: l.current }))))}' onclick="window.propostaTecnicaModule._criarNovoArmarioParaExcedentes(JSON.parse(decodeURIComponent(this.dataset.excess)));this.closest('#_excess_loads_dlg').remove()" style="background:#059669;border-color:#059669;gap:4px;">
+                        ➕ Criar Novo Armário
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(dlg);
+    },
+
+    _criarNovoArmarioParaExcedentes(excessLoads) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+
+        const seg = eq.technical?.segregacao || '';
+        const isKF = this._isForma34KitFrame(seg, eq.technical?.fabricante);
+        if (!isKF || !eq.layoutConfig?.cabinetAssignments) return;
+        if (!excessLoads || excessLoads.length === 0) return;
+
+        const ass = eq.layoutConfig.cabinetAssignments;
+        const tagsToMove = new Set(excessLoads.map(l => l.tag).filter(Boolean));
+
+        // Remove excess load tags from all existing cabinets to prevent duplication
+        for (const cab of Object.values(ass)) {
+            for (const faceKey of ['front', 'rear']) {
+                const face = cab.faces?.[faceKey];
+                if (face?.loads) {
+                    for (const t of tagsToMove) delete face.loads[t];
+                }
+            }
+            if (cab.loads) {
+                for (const t of tagsToMove) delete cab.loads[t];
+            }
+        }
+
+        // Create a new cabinet for the excess loads
+        const cabId = 'cab_' + Date.now();
+        const cabCount = Object.keys(ass).length + 1;
+        const cabName = 'Coluna ' + cabCount.toString().padStart(2, '0');
+        const defaultCCW = 200;
+        const cabWidth = 600 + defaultCCW;
+
+        const cabEntry = {
+            name: cabName,
+            width: cabWidth,
+            height: 2300,
+            depth: 600,
+            assigned: {},
+            loads: {},
+            layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+        };
+        cabEntry.layoutConfig.colunaCabosWidth = defaultCCW;
+
+        for (const carga of excessLoads) {
+            if (!carga.tag) continue;
+            cabEntry.loads[carga.tag] = {};
+        }
+
+        ass[cabId] = cabEntry;
+
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[NovoArmario] store error:', e); }
+
+        this._redrawLayoutCanvas();
+        this._showLayoutConfigPanel();
     },
 
     _toggleSideView() {
@@ -14984,13 +16288,13 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const L_DIM = 'DIMENSAO';
         const L_TXT = 'TEXTO';
 
-        d.addLayer(L_CAB, 4, 'CONTINUOUS');
-        d.addLayer(L_BAR, 6, 'CONTINUOUS');
-        d.addLayer(L_CAN, 3, 'CONTINUOUS');
-        d.addLayer(L_CAN_SIDE, 3, 'DASHED');
-        d.addLayer(L_TRI, 2, 'CONTINUOUS');
+        d.addLayer(L_CAB, 7, 'CONTINUOUS');
+        d.addLayer(L_BAR, 7, 'CONTINUOUS');
+        d.addLayer(L_CAN, 7, 'CONTINUOUS');
+        d.addLayer(L_CAN_SIDE, 7, 'DASHED');
+        d.addLayer(L_TRI, 7, 'CONTINUOUS');
         d.addLayer(L_COMP, 7, 'CONTINUOUS');
-        d.addLayer(L_TERRA, 3, 'CONTINUOUS');
+        d.addLayer(L_TERRA, 7, 'CONTINUOUS');
         d.addLayer(L_BASE, 7, 'CONTINUOUS');
         d.addLayer(L_DIM, 7, 'CONTINUOUS');
         d.addLayer(L_TXT, 7, 'CONTINUOUS');
@@ -15010,11 +16314,13 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 d.setActiveLayer(L_CAB);
                 d.rect(x, yf(CAB_H), cabW, CAB_H);
 
-                // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø)
-                d.rect(x, yf(0), 60, 60);                              // canto esquerdo
-                d.rect(x + cabW - 60, yf(0), 60, 60);                 // canto direito
-                d.circle(x + 30, yf(-30), 10);                         // furo central esquerdo
-                d.circle(x + cabW - 30, yf(-30), 10);                  // furo central direito
+                // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø) — apenas Forma 1/2
+                if (!this._isForma34KitFrame(cab.segregacao, cab._fabricante)) {
+                    d.rect(x, yf(0), 60, 60);                              // canto esquerdo
+                    d.rect(x + cabW - 60, yf(0), 60, 60);                 // canto direito
+                    d.circle(x + 30, yf(-30), 10);                         // furo central esquerdo
+                    d.circle(x + cabW - 30, yf(-30), 10);                  // furo central direito
+                }
 
                 // Busbar zone label (apenas Forma 2)
                 if (isForma2) {
@@ -15026,101 +16332,200 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 d.setActiveLayer(L_TXT);
                 d.text(x + cabW / 2, yf(20), 20, 0, cab.name, 'ARIAL');
 
-                // Canaletas
-                d.setActiveLayer(L_CAN);
-                for (const can of cfg.canaletas || []) {
-                    if (can.tipo === 'quadro') {
-                        const cx = x + (can.x || 0);
-                        const cy = (can.y || 0);
-                        const cw = can.larguraQuadro || 500;
-                        const ch = can.alturaQuadro || 1800;
-                        const cl = can.largura_base || 50;
-                        d.rect(cx, yf(cy + ch), cw, ch);
-                        d.rect(cx + cl, yf(cy + ch - cl), cw - 2 * cl, ch - 2 * cl);
-                        d.line(cx, yf(cy), cx + cl, yf(cy + cl));
-                        d.line(cx + cw, yf(cy), cx + cw - cl, yf(cy + cl));
-                        d.line(cx + cw, yf(cy + ch), cx + cw - cl, yf(cy + ch - cl));
-                        d.line(cx, yf(cy + ch), cx + cl, yf(cy + ch - cl));
-                        if (cw > 60 && ch > 40) {
-                            const modeloTxt = can.modelo || (can.largura_base || '') + 'x' + (can.profundidade || '');
-                            if (modeloTxt) {
-                                d.setActiveLayer(L_TXT);
-                                d.text(cx + cw / 2, yf(cy + ch / 2), 30, 0, modeloTxt, 'ARIAL');
-                                d.setActiveLayer(L_CAN);
-                            }
-                        }
-                    } else if (can.tipo === 'linear') {
-                        const lx = x + (can.x || 0);
-                        const ly = (can.y || 0);
-                        const lw = can.orientacao === 'H' ? (can.comprimento || 0) : (can.largura_base || can.largura || 50);
-                        const lh = can.orientacao === 'H' ? (can.largura_base || can.largura || 50) : (can.comprimento || 0);
-                        d.rect(lx, yf(ly + lh), lw, lh);
-                        d.setActiveLayer(L_TXT);
-                        d.text(lx + lw / 2, yf(ly + lh / 2), 30, 0, 'TESTE', 'ARIAL');
-                        d.setActiveLayer(L_CAN);
-                    }
-                }
+                const isCabForma34 = this._isForma34KitFrame(cab.segregacao, cab._fabricante);
 
-                // DIN rails + components
-                for (const row of cab.rows || []) {
-                    if (row.trilho) {
-                        const t = row.trilho;
-                        d.setActiveLayer(L_TRI);
-                        d.rect(x + t.x, yf(t.y + t.h), t.w, t.h);
-                    }
-                    for (const item of row.items) {
-                        const ix = x + item.x;
-                        const iy = item.y;
-                        const iw = Math.max(item.w, 1);
-                        const ih = Math.max(item.h, 1);
-                        const matDxf = materialDxfMap[item._matId];
+                if (isCabForma34) {
+                    // ── KitFrame Forma 3A-4B: barramentos, gavetas, coluna cabos, barra terra ──
+                    const ccwDxf = cfg.colunaCabosWidth || 200;
+                    const gavWDxf = 600;
+                    const colCabWDxf = ccwDxf;
 
-                        if (matDxf && matDxf.entities && matDxf.entities.length > 0) {
-                            const rawId = item._matId;
-                            const blockName = 'B' + (rawId ? rawId.replace(/[^a-zA-Z0-9]/g, '_') : 'x_' + Math.random().toString(36).slice(2, 8));
-                            if (!addedBlocks.has(blockName)) {
-                                addedBlocks.add(blockName);
-                                d.addBlock(blockName, (b) => {
-                                    for (const ent of matDxf.entities) {
-                                        this._drawDxfEntity(b, ent);
-                                    }
-                                });
-                            }
-                            d.setActiveLayer(L_COMP);
-                            d.insertBlock(blockName, ix, yf(iy + ih), 1, 1, 0);
-                        } else {
-                            d.setActiveLayer(L_COMP);
-                            d.rect(ix, yf(iy + ih), iw, ih);
-                            if (iw > 20 && ih > 10) {
-                                const label = (item.desc || '').length > 5 ? (item.desc || '').slice(0, 4) + '.' : (item.desc || '');
-                                d.setActiveLayer(L_TXT);
-                                d.text(ix + iw / 2, yf(iy + ih / 2), 20, 0, label, 'ARIAL');
-                            }
-                        }
-                    }
-                }
-
-                // Placa de montagem + barra terra
-                const isCabForma2 = cab.segregacao === 'Forma 2a' || cab.segregacao === 'Forma 2b';
-                // Borda de 30mm + placa de montagem (comum a todas as formas)
-                d.setActiveLayer(L_CAB);
-                d.rect(x + 30, yf(panelH - 30), cabW - 60, panelH - 60);
-                d.setActiveLayer(L_TERRA);
-                if (isCabForma2) {
-                    d.rect(x + 50, yf(315 + 1840), cabW - 100, 1840);
-                } else {
-                    const plateH = panelH - 105;
-                    const plateYFront = 30 + (panelH - 60 - plateH) / 2;
-                    d.rect(x + 50, yf(plateYFront + plateH), cabW - 100, plateH);
-                }
-                d.setActiveLayer(L_TXT);
-                d.text(x + cabW / 2, yf(2135), 20, 0, 'Placa de Montagem', 'ARIAL');
-                // Barra terra: apenas CCM (não automação)
-                if (!isCabForma2 && !cab._isAutomation) {
-                    d.setActiveLayer(L_TERRA);
-                    d.line(x, yf(panelH - 100), x + cabW, yf(panelH - 100));
+                    // Barramentos (Y=0-300, full width)
+                    d.setActiveLayer(L_BAR);
+                    d.rect(x, yf(300), cabW, 300);
+                    d.rect(x + 3, yf(297), cabW - 6, 294);
+                    d.line(x, yf(300), x + cabW, yf(300));
                     d.setActiveLayer(L_TXT);
-                    d.text(x + cabW / 2, yf(panelH - 75), 20, 0, 'Barra Terra', 'ARIAL');
+                    d.text(x + cabW / 2, yf(150), 20, 0, 'Barramentos', 'ARIAL');
+
+                    // ── Exaustor de teto (500×100mm acima da área de gavetas) ──
+                    {
+                        const exWDxf = 500;
+                        const exHDxf = 100;
+                        const exXDxf = x + cabW / 2 - 250;
+                        d.setActiveLayer(L_CAB);
+                        d.rect(exXDxf, yf(0), exWDxf, exHDxf);
+                        d.rect(exXDxf + 3, yf(-3), exWDxf - 6, exHDxf - 6);
+                        d.setActiveLayer(L_TXT);
+                        d.text(exXDxf + exWDxf / 2, yf(-50), 12, 0, 'Exaustor', 'ARIAL');
+                    }
+
+                    // Coluna de Cabos (Y=300-2200, right side)
+                    const colCabXDxf = x + gavWDxf;
+                    d.setActiveLayer(L_CAB);
+                    d.rect(colCabXDxf, yf(2200), colCabWDxf, 1900);
+                    d.rect(colCabXDxf + 3, yf(2197), colCabWDxf - 6, 1894);
+                    d.setActiveLayer(L_TXT);
+                    d.text(colCabXDxf + colCabWDxf / 2, yf(2170), 15, 0, 'Coluna Cabos', 'ARIAL');
+
+                    // Gavetas area (Y=300-2100, left 600mm)
+                    const gavDxf = cab._gavetas || [];
+                    if (gavDxf.length > 0) {
+                        let gavYOffDxf = 300;
+                        for (const gav of gavDxf) {
+                            const ghDxf = gav.height;
+                            d.setActiveLayer(L_COMP);
+                            d.rect(x, yf(gavYOffDxf + ghDxf), gavWDxf, ghDxf);
+                            d.rect(x + 3, yf(gavYOffDxf + ghDxf - 3), gavWDxf - 6, ghDxf - 6);
+                            const fechoXDxf = x + gavWDxf - 40;
+                            if (gav.height === 100 || gav.height === 150) {
+                                const fy = gavYOffDxf + ghDxf / 2 - 15;
+                                d.rect(fechoXDxf, yf(fy + 30), 20, 30);
+                                d.circle(fechoXDxf + 10, yf(fy + 15), 5);
+                            } else if (gav.height >= 200) {
+                                const fy1 = gavYOffDxf + 50 - 15;
+                                const fy2 = gavYOffDxf + ghDxf - 50 - 15;
+                                d.rect(fechoXDxf, yf(fy1 + 30), 20, 30);
+                                d.circle(fechoXDxf + 10, yf(fy1 + 15), 5);
+                                d.rect(fechoXDxf, yf(fy2 + 30), 20, 30);
+                                d.circle(fechoXDxf + 10, yf(fy2 + 15), 5);
+                            }
+                            // Comando Mecânico (70x70mm rect + 16mm circle)
+                            {
+                                const cmWDxf = 70;
+                                const cmHDxf = 70;
+                                const cmXDxf = x + gavWDxf / 2 - 35;
+                                let cmYDxf;
+                                if (gav.height === 100) {
+                                    cmYDxf = gavYOffDxf + ghDxf / 2 - 35;
+                                } else {
+                                    cmYDxf = gavYOffDxf + ghDxf - 50 - 35;
+                                }
+                                d.setActiveLayer(L_COMP);
+                                d.rect(cmXDxf, yf(cmYDxf + cmHDxf), cmWDxf, cmHDxf);
+                                d.circle(cmXDxf + 35, yf(cmYDxf + 35), 8);
+                            }
+                            d.setActiveLayer(L_TXT);
+                            const cmCenterYDxf = gav.height === 100 ? gavYOffDxf + ghDxf / 2 : gavYOffDxf + ghDxf - 50;
+                            if (gav._isReserva) {
+                                d.text(x + gavWDxf / 2 + 147, yf(cmCenterYDxf + 8 - 23.2), 12, 0, 'TAG??', 'ARIAL');
+                                d.text(x + gavWDxf / 2 + 147, yf(cmCenterYDxf + 38 - 23.2), 12, 0, 'Gav. Reserva', 'ARIAL');
+                            } else {
+                                d.text(x + gavWDxf / 2 + 147, yf(cmCenterYDxf + 8 - 23.2), 12, 0, gav.cargaTag || '', 'ARIAL');
+                                d.text(x + gavWDxf / 2 + 147, yf(cmCenterYDxf + 38 - 23.2), 12, 0, (gav.potencia ? gav.potencia + 'kW' : ''), 'ARIAL');
+                            }
+                            d.text(x + 30, yf(gavYOffDxf + 10), 8, 0, gav.id, 'ARIAL');
+                            gavYOffDxf += ghDxf;
+                        }
+                    } else {
+                        d.setActiveLayer(L_CAB);
+                        d.rect(x, yf(2100), gavWDxf, 1800);
+                        d.setActiveLayer(L_TXT);
+                        d.text(x + gavWDxf / 2, yf(1200), 15, 0, 'Gavetas', 'ARIAL');
+                    }
+
+                    // Barra Terra (Y=2100-2200, left 600mm)
+                    d.setActiveLayer(L_TERRA);
+                    d.rect(x, yf(2200), gavWDxf, 100);
+                    d.rect(x + 3, yf(2197), gavWDxf - 6, 94);
+                    d.setActiveLayer(L_TXT);
+                    d.text(x + gavWDxf / 2, yf(2150), 15, 0, 'Barra Terra', 'ARIAL');
+                } else {
+                    // ── Forma 1 / Forma 2: canaletas, trilhos, componentes, placa de montagem ──
+                    // Canaletas
+                    d.setActiveLayer(L_CAN);
+                    for (const can of cfg.canaletas || []) {
+                        if (can.tipo === 'quadro') {
+                            const cx = x + (can.x || 0);
+                            const cy = (can.y || 0);
+                            const cw = can.larguraQuadro || 500;
+                            const ch = can.alturaQuadro || 1800;
+                            const cl = can.largura_base || 50;
+                            d.rect(cx, yf(cy + ch), cw, ch);
+                            d.rect(cx + cl, yf(cy + ch - cl), cw - 2 * cl, ch - 2 * cl);
+                            d.line(cx, yf(cy), cx + cl, yf(cy + cl));
+                            d.line(cx + cw, yf(cy), cx + cw - cl, yf(cy + cl));
+                            d.line(cx + cw, yf(cy + ch), cx + cw - cl, yf(cy + ch - cl));
+                            d.line(cx, yf(cy + ch), cx + cl, yf(cy + ch - cl));
+                            if (cw > 60 && ch > 40) {
+                                const modeloTxt = can.modelo || (can.largura_base || '') + 'x' + (can.profundidade || '');
+                                if (modeloTxt) {
+                                    d.setActiveLayer(L_TXT);
+                                    d.text(cx + cw / 2, yf(cy + ch / 2), 30, 0, modeloTxt, 'ARIAL');
+                                    d.setActiveLayer(L_CAN);
+                                }
+                            }
+                        } else if (can.tipo === 'linear') {
+                            const lx = x + (can.x || 0);
+                            const ly = (can.y || 0);
+                            const lw = can.orientacao === 'H' ? (can.comprimento || 0) : (can.largura_base || can.largura || 50);
+                            const lh = can.orientacao === 'H' ? (can.largura_base || can.largura || 50) : (can.comprimento || 0);
+                            d.rect(lx, yf(ly + lh), lw, lh);
+                            d.setActiveLayer(L_TXT);
+                            d.text(lx + lw / 2, yf(ly + lh / 2), 30, 0, 'TESTE', 'ARIAL');
+                            d.setActiveLayer(L_CAN);
+                        }
+                    }
+
+                    // DIN rails + components
+                    for (const row of cab.rows || []) {
+                        if (row.trilho) {
+                            const t = row.trilho;
+                            d.setActiveLayer(L_TRI);
+                            d.rect(x + t.x, yf(t.y + t.h), t.w, t.h);
+                        }
+                        for (const item of row.items) {
+                            const ix = x + item.x;
+                            const iy = item.y;
+                            const iw = Math.max(item.w, 1);
+                            const ih = Math.max(item.h, 1);
+                            const matDxf = materialDxfMap[item._matId];
+
+                            if (matDxf && matDxf.entities && matDxf.entities.length > 0) {
+                                const rawId = item._matId;
+                                const blockName = 'B' + (rawId ? rawId.replace(/[^a-zA-Z0-9]/g, '_') : 'x_' + Math.random().toString(36).slice(2, 8));
+                                if (!addedBlocks.has(blockName)) {
+                                    addedBlocks.add(blockName);
+                                    d.addBlock(blockName, (b) => {
+                                        for (const ent of matDxf.entities) {
+                                            this._drawDxfEntity(b, ent);
+                                        }
+                                    });
+                                }
+                                d.setActiveLayer(L_COMP);
+                                d.insertBlock(blockName, ix, yf(iy + ih), 1, 1, 0);
+                            } else {
+                                d.setActiveLayer(L_COMP);
+                                d.rect(ix, yf(iy + ih), iw, ih);
+                                if (iw > 20 && ih > 10) {
+                                    const label = (item.desc || '').length > 5 ? (item.desc || '').slice(0, 4) + '.' : (item.desc || '');
+                                    d.setActiveLayer(L_TXT);
+                                    d.text(ix + iw / 2, yf(iy + ih / 2), 20, 0, label, 'ARIAL');
+                                }
+                            }
+                        }
+                    }
+
+                    // Placa de montagem + barra terra
+                    const isCabForma2 = cab.segregacao === 'Forma 2a' || cab.segregacao === 'Forma 2b';
+                    d.setActiveLayer(L_CAB);
+                    d.rect(x + 30, yf(panelH - 30), cabW - 60, panelH - 60);
+                    d.setActiveLayer(L_TERRA);
+                    if (isCabForma2) {
+                        d.rect(x + 50, yf(315 + 1840), cabW - 100, 1840);
+                    } else {
+                        const plateH = panelH - 105;
+                        const plateYFront = 30 + (panelH - 60 - plateH) / 2;
+                        d.rect(x + 50, yf(plateYFront + plateH), cabW - 100, plateH);
+                    }
+                    d.setActiveLayer(L_TXT);
+                    d.text(x + cabW / 2, yf(2135), 20, 0, 'Placa de Montagem', 'ARIAL');
+                    if (!isCabForma2 && !cab._isAutomation) {
+                        d.setActiveLayer(L_TERRA);
+                        d.line(x, yf(panelH - 100), x + cabW, yf(panelH - 100));
+                        d.setActiveLayer(L_TXT);
+                        d.text(x + cabW / 2, yf(panelH - 75), 20, 0, 'Barra Terra', 'ARIAL');
+                    }
                 }
 
                 // Base
@@ -15212,10 +16617,11 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const showSide = eq.layoutConfig?.showSideView;
         const seg = eq.technical?.segregacao;
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
-        const panelH = isForma2 ? 2200 : parseInt(eq.technical?.alturaPainel) || 2200;
+        const isForma34dxf = this._isForma34KitFrame(seg, eq.technical?.fabricante);
+        const panelH = (isForma2 || isForma34dxf) ? 2200 : parseInt(eq.technical?.alturaPainel) || 2200;
         const panelW = parseInt(eq.technical?.larguraPainel) || 800;
         const panelD = parseInt(eq.technical?.profundidadePainel) || 600;
-        if (!isForma2) CAB_H = panelH + 100;
+        if (!isForma2 && !isForma34dxf) CAB_H = panelH + 100;
 
         let frontCabinets = [];
         let rearCabinets = [];
@@ -15230,7 +16636,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             frontCabinets = result.cabinets;
             drawCabinetGroup(frontCabinets, 0);
             const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
-            drawDoorCabinetGroup(frontCabinets, totalW + 200);
+            if (isForma2 || seg === 'Forma 1') drawDoorCabinetGroup(frontCabinets, totalW + 200);
         } else if (isB2B) {
             const resultF = this.suggestLayout(eq, 'front');
             const resultR = this.suggestLayout(eq, 'rear');
@@ -15243,7 +16649,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
                 drawCabinetGroup(rearCabinets, totalW + 200);
             }
-            if (isForma2 && frontCabinets.length > 0 && rearCabinets.length > 0) {
+            if ((isForma2 || seg === 'Forma 1') && frontCabinets.length > 0 && rearCabinets.length > 0) {
                 const doorStart = frontCabinets.reduce((s, c) => s + c.width, 0) + 200 + rearCabinets.reduce((s, c) => s + c.width, 0) + 200;
                 drawDoorCabinetGroup(frontCabinets, doorStart);
                 const doorFrontEnd = doorStart + frontCabinets.reduce((s, c) => s + c.width, 0) + 200;
@@ -15258,7 +16664,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             }
             frontCabinets = result.cabinets;
             drawCabinetGroup(frontCabinets, 0);
-            if (isForma2) {
+            if (isForma2 || seg === 'Forma 1') {
                 const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
                 drawDoorCabinetGroup(frontCabinets, totalW + 200);
             }
@@ -15285,12 +16691,14 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             d.setActiveLayer(L_CAB);
             d.rect(sx, yf(CAB_H), totalDepth, CAB_H);
 
-            // Olhais para içamento — vista lateral (corte): 4×60mm, faces internas distanciadas 485mm
-            const eyeW_dx = 4, eyeH_dx = 60, innerDist_dx = 485;
-            const marginEyeDx = (totalDepth - innerDist_dx - eyeW_dx * 2) / 2;
-            if (marginEyeDx > 0) {
-                d.rect(sx + marginEyeDx, yf(0), 4, 60);
-                d.rect(sx + marginEyeDx + eyeW_dx + innerDist_dx, yf(0), 4, 60);
+            // Olhais para içamento — vista lateral (corte): 4×60mm, faces internas distanciadas 485mm — apenas Forma 1/2
+            if (!isForma34Side) {
+                const eyeW_dx = 4, eyeH_dx = 60, innerDist_dx = 485;
+                const marginEyeDx = (totalDepth - innerDist_dx - eyeW_dx * 2) / 2;
+                if (marginEyeDx > 0) {
+                    d.rect(sx + marginEyeDx, yf(0), 4, 60);
+                    d.rect(sx + marginEyeDx + eyeW_dx + innerDist_dx, yf(0), 4, 60);
+                }
             }
 
             // Base
@@ -15301,126 +16709,88 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
             // Ground bar (apenas CCM Forma 1)
             const isForma2 = cabinets.some(c => c.segregacao === 'Forma 2a' || c.segregacao === 'Forma 2b');
+            const isForma34Side = cabinets.some(c => this._isForma34KitFrame(c.segregacao, c._fabricante));
             const isAutomationSide = cabinets.some(c => c._isAutomation);
-            if (!isForma2 && !isAutomationSide) {
+            if (!isForma2 && !isAutomationSide && !isForma34Side) {
                 d.setActiveLayer(L_TERRA);
                 d.line(sx, yf(panelH - 100), sx + totalDepth, yf(panelH - 100));
                 d.setActiveLayer(L_TXT);
                 d.text(sx + totalDepth / 2, yf(panelH - 75), 20, 0, 'Barra Terra', 'ARIAL');
             }
 
-            // Borda de 30mm + placa de montagem
-            // Front cabinet mounting plate Z
-            let minPlateZ_dx = null, minPlateD_dx = 0;
-            for (const cab of selectedCabins) {
-                const cd = cab._assignData;
-                const src = cd && cab._face ? (cd.faces?.[cab._face]?.assigned || {}) : (cd?.assigned || {});
-                for (const row of cab.rows || []) {
-                    for (const item of row.items || []) {
-                        const zo = item._matId ? (src[item._matId]?.zOffset ?? item._zOffset) : undefined;
-                        if (zo != null && (minPlateZ_dx === null || zo < minPlateZ_dx)) {
-                            minPlateZ_dx = zo;
-                            minPlateD_dx = item.d || 0;
-                        }
-                    }
-                }
-            }
-            const plateFaceDir_dx = minPlateZ_dx !== null ? minPlateZ_dx : 0;
-            // Rear cabinet mounting plate Z (B2B)
-            let minRearZ_dx = null, minRearD_dx = 0;
-            if (isB2B) {
-                for (const cab of rearCabinets) {
+            if (!isForma34Side) {
+                // Borda de 30mm + placa de montagem (apenas Forma 1 / Forma 2)
+                let minPlateZ_dx = null, minPlateD_dx = 0;
+                for (const cab of selectedCabins) {
                     const cd = cab._assignData;
                     const src = cd && cab._face ? (cd.faces?.[cab._face]?.assigned || {}) : (cd?.assigned || {});
                     for (const row of cab.rows || []) {
                         for (const item of row.items || []) {
                             const zo = item._matId ? (src[item._matId]?.zOffset ?? item._zOffset) : undefined;
-                            if (zo != null && (minRearZ_dx === null || zo < minRearZ_dx)) {
-                                minRearZ_dx = zo;
-                                minRearD_dx = item.d || 0;
+                            if (zo != null && (minPlateZ_dx === null || zo < minPlateZ_dx)) {
+                                minPlateZ_dx = zo;
+                                minPlateD_dx = item.d || 0;
                             }
                         }
                     }
                 }
-            }
-            const plateFaceDirRear_dx = minRearZ_dx !== null ? minRearZ_dx : 0;
-            if (isForma2) {
-                // Borda de 30mm (Forma 2a/2b)
-                d.setActiveLayer(L_CAB);
-                d.rect(sx + 30, yf(panelH - 30), totalDepth - 60, panelH - 60);
-                // Placa de montagem frontal (20mm espessura) — Forma 2
-                d.setActiveLayer(L_TERRA);
-                const plateLeft_dx = totalDepth - plateFaceDir_dx - 20;
-                d.rect(sx + plateLeft_dx, yf(315 + 1840), 20, 1840);
-                d.setActiveLayer(L_TXT);
-                d.text(sx + plateLeft_dx + 10, yf(335), 20, 0, 'PM', 'ARIAL');
-                // Placa de montagem traseira (B2B)
+                const plateFaceDir_dx = minPlateZ_dx !== null ? minPlateZ_dx : 0;
+                let minRearZ_dx = null, minRearD_dx = 0;
                 if (isB2B) {
-                    d.setActiveLayer(L_TERRA);
-                    d.rect(sx + plateFaceDirRear_dx, yf(315 + 1840), 20, 1840);
-                    d.setActiveLayer(L_TXT);
-                    d.text(sx + plateFaceDirRear_dx + 10, yf(335), 20, 0, 'PM', 'ARIAL');
-                }
-            } else {
-                // Borda de 30mm + placa de montagem proporcional (Forma 1)
-                d.setActiveLayer(L_CAB);
-                d.rect(sx + 30, yf(panelH - 30), totalDepth - 60, panelH - 60);
-                // Placa de montagem frontal em perfil (20mm espessura) — proporcional
-                d.setActiveLayer(L_TERRA);
-                const plateHSide = panelH - 105;
-                const plateYSide = 30 + (panelH - 60 - plateHSide) / 2;
-                const plateLeft_dx = totalDepth - plateFaceDir_dx - 20;
-                d.rect(sx + plateLeft_dx, yf(plateYSide + plateHSide), 20, plateHSide);
-                d.setActiveLayer(L_TXT);
-                d.text(sx + plateLeft_dx + 10, yf(35 + plateHSide / 2), 20, 0, 'PM', 'ARIAL');
-                // Placa de montagem traseira (B2B)
-                if (isB2B) {
-                    d.setActiveLayer(L_TERRA);
-                    d.rect(sx + plateFaceDirRear_dx, yf(plateYSide + plateHSide), 20, plateHSide);
-                    d.setActiveLayer(L_TXT);
-                    d.text(sx + plateFaceDirRear_dx + 10, yf(35 + plateHSide / 2), 20, 0, 'PM', 'ARIAL');
-                }
-            }
-
-            // Canaletas na vista lateral (retângulo tracejado: profundidade × comprimento)
-            // — Front cabinet wire ducts
-            d.setActiveLayer(L_CAN_SIDE);
-            for (const cab of selectedCabins) {
-                const cfgC = cab.layoutConfig || this._getDefaultLayoutConfig();
-                for (const can of cfgC.canaletas || []) {
-                    const profC = can.profundidade || can.largura_base || 50;
-                    const canZPos = isForma2 ? sx + totalDepth - plateFaceDir_dx : sx + totalDepth - profC;
-                    if (can.tipo === 'quadro') {
-                        for (const seg of can.segmentos || []) {
-                            if (seg.orientacao === 'V') {
-                                d.rect(canZPos, yf(seg.y + seg.comprimento), profC, seg.comprimento);
-                                const modeloTxt = can.modelo || (can.largura_base || '') + 'x' + (can.profundidade || '');
-                                if (modeloTxt) {
-                                    d.setActiveLayer(L_TXT);
-                                    d.text(canZPos + profC / 2, yf(seg.y + seg.comprimento / 2), 30, 0, modeloTxt, 'ARIAL');
-                                    d.setActiveLayer(L_CAN_SIDE);
+                    for (const cab of rearCabinets) {
+                        const cd = cab._assignData;
+                        const src = cd && cab._face ? (cd.faces?.[cab._face]?.assigned || {}) : (cd?.assigned || {});
+                        for (const row of cab.rows || []) {
+                            for (const item of row.items || []) {
+                                const zo = item._matId ? (src[item._matId]?.zOffset ?? item._zOffset) : undefined;
+                                if (zo != null && (minRearZ_dx === null || zo < minRearZ_dx)) {
+                                    minRearZ_dx = zo;
+                                    minRearD_dx = item.d || 0;
                                 }
                             }
                         }
-                    } else if (can.tipo === 'linear' && can.orientacao === 'V') {
-                        d.rect(canZPos, yf(can.y + can.comprimento), profC, can.comprimento);
-                        const modeloTxt = can.modelo || (can.largura_base || can.largura || '') + 'x' + (can.profundidade || can.altura || '');
-                        if (modeloTxt) {
-                            d.setActiveLayer(L_TXT);
-                            d.text(canZPos + profC / 2, yf(can.y + can.comprimento / 2), 30, 0, modeloTxt, 'ARIAL');
-                            d.setActiveLayer(L_CAN_SIDE);
-                        }
                     }
                 }
-            }
+                const plateFaceDirRear_dx = minRearZ_dx !== null ? minRearZ_dx : 0;
+                if (isForma2) {
+                    d.setActiveLayer(L_CAB);
+                    d.rect(sx + 30, yf(panelH - 30), totalDepth - 60, panelH - 60);
+                    d.setActiveLayer(L_TERRA);
+                    const plateLeft_dx = totalDepth - plateFaceDir_dx - 20;
+                    d.rect(sx + plateLeft_dx, yf(315 + 1840), 20, 1840);
+                    d.setActiveLayer(L_TXT);
+                    d.text(sx + plateLeft_dx + 10, yf(335), 20, 0, 'PM', 'ARIAL');
+                    if (isB2B) {
+                        d.setActiveLayer(L_TERRA);
+                        d.rect(sx + plateFaceDirRear_dx, yf(315 + 1840), 20, 1840);
+                        d.setActiveLayer(L_TXT);
+                        d.text(sx + plateFaceDirRear_dx + 10, yf(335), 20, 0, 'PM', 'ARIAL');
+                    }
+                } else {
+                    d.setActiveLayer(L_CAB);
+                    d.rect(sx + 30, yf(panelH - 30), totalDepth - 60, panelH - 60);
+                    d.setActiveLayer(L_TERRA);
+                    const plateHSide = panelH - 105;
+                    const plateYSide = 30 + (panelH - 60 - plateHSide) / 2;
+                    const plateLeft_dx = totalDepth - plateFaceDir_dx - 20;
+                    d.rect(sx + plateLeft_dx, yf(plateYSide + plateHSide), 20, plateHSide);
+                    d.setActiveLayer(L_TXT);
+                    d.text(sx + plateLeft_dx + 10, yf(35 + plateHSide / 2), 20, 0, 'PM', 'ARIAL');
+                    if (isB2B) {
+                        d.setActiveLayer(L_TERRA);
+                        d.rect(sx + plateFaceDirRear_dx, yf(plateYSide + plateHSide), 20, plateHSide);
+                        d.setActiveLayer(L_TXT);
+                        d.text(sx + plateFaceDirRear_dx + 10, yf(35 + plateHSide / 2), 20, 0, 'PM', 'ARIAL');
+                    }
+                }
 
-            // — Rear cabinet wire ducts (B2B)
-            if (isB2B) {
-                for (const cab of rearCabinets) {
+                // Canaletas na vista lateral (apenas Forma 1 / Forma 2)
+                d.setActiveLayer(L_CAN_SIDE);
+                for (const cab of selectedCabins) {
                     const cfgC = cab.layoutConfig || this._getDefaultLayoutConfig();
                     for (const can of cfgC.canaletas || []) {
                         const profC = can.profundidade || can.largura_base || 50;
-                        const canZPos = sx;
+                        const canZPos = isForma2 ? sx + totalDepth - plateFaceDir_dx : sx + totalDepth - profC;
                         if (can.tipo === 'quadro') {
                             for (const seg of can.segmentos || []) {
                                 if (seg.orientacao === 'V') {
@@ -15440,6 +16810,37 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                                 d.setActiveLayer(L_TXT);
                                 d.text(canZPos + profC / 2, yf(can.y + can.comprimento / 2), 30, 0, modeloTxt, 'ARIAL');
                                 d.setActiveLayer(L_CAN_SIDE);
+                            }
+                        }
+                    }
+                }
+
+                if (isB2B) {
+                    for (const cab of rearCabinets) {
+                        const cfgC = cab.layoutConfig || this._getDefaultLayoutConfig();
+                        for (const can of cfgC.canaletas || []) {
+                            const profC = can.profundidade || can.largura_base || 50;
+                            const canZPos = sx;
+                            if (can.tipo === 'quadro') {
+                                for (const seg of can.segmentos || []) {
+                                    if (seg.orientacao === 'V') {
+                                        d.rect(canZPos, yf(seg.y + seg.comprimento), profC, seg.comprimento);
+                                        const modeloTxt = can.modelo || (can.largura_base || '') + 'x' + (can.profundidade || '');
+                                        if (modeloTxt) {
+                                            d.setActiveLayer(L_TXT);
+                                            d.text(canZPos + profC / 2, yf(seg.y + seg.comprimento / 2), 30, 0, modeloTxt, 'ARIAL');
+                                            d.setActiveLayer(L_CAN_SIDE);
+                                        }
+                                    }
+                                }
+                            } else if (can.tipo === 'linear' && can.orientacao === 'V') {
+                                d.rect(canZPos, yf(can.y + can.comprimento), profC, can.comprimento);
+                                const modeloTxt = can.modelo || (can.largura_base || can.largura || '') + 'x' + (can.profundidade || can.altura || '');
+                                if (modeloTxt) {
+                                    d.setActiveLayer(L_TXT);
+                                    d.text(canZPos + profC / 2, yf(can.y + can.comprimento / 2), 30, 0, modeloTxt, 'ARIAL');
+                                    d.setActiveLayer(L_CAN_SIDE);
+                                }
                             }
                         }
                     }
