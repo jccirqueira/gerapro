@@ -16634,6 +16634,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 return;
             }
             frontCabinets = result.cabinets;
+            const maxH_auto = Math.max(...frontCabinets.map(c => c.height || 2300), 2300);
+            if (!isForma2 && !isForma34dxf) { CAB_H = maxH_auto; panelH = maxH_auto - 100; }
             drawCabinetGroup(frontCabinets, 0);
             const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
             if (isForma2 || seg === 'Forma 1') drawDoorCabinetGroup(frontCabinets, totalW + 200);
@@ -16642,6 +16644,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             const resultR = this.suggestLayout(eq, 'rear');
             frontCabinets = resultF.cabinets;
             rearCabinets = resultR.cabinets;
+            const maxH_b2b = Math.max(...[...frontCabinets, ...rearCabinets].map(c => c.height || 2300), 2300);
+            if (!isForma2 && !isForma34dxf) { CAB_H = maxH_b2b; panelH = maxH_b2b - 100; }
             if (resultF.hasLoads && frontCabinets.length > 0) {
                 drawCabinetGroup(frontCabinets, 0);
             }
@@ -16663,6 +16667,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 return;
             }
             frontCabinets = result.cabinets;
+            const maxH_single = Math.max(...frontCabinets.map(c => c.height || 2300), 2300);
+            if (!isForma2 && !isForma34dxf) { CAB_H = maxH_single; panelH = maxH_single - 100; }
             drawCabinetGroup(frontCabinets, 0);
             if (isForma2 || seg === 'Forma 1') {
                 const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
@@ -16685,6 +16691,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 ? Math.max(...rearCabinets.map(c => c.depth || 600))
                 : 0;
             const totalDepth = isB2B ? frontDepth : frontDepth + rearDepth;
+            const isForma34Side = cabinets.some(c => this._isForma34KitFrame(c.segregacao, c._fabricante));
             const sx = startX;
 
             // Cabinet outline (single combined box)
@@ -16709,7 +16716,6 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
             // Ground bar (apenas CCM Forma 1)
             const isForma2 = cabinets.some(c => c.segregacao === 'Forma 2a' || c.segregacao === 'Forma 2b');
-            const isForma34Side = cabinets.some(c => this._isForma34KitFrame(c.segregacao, c._fabricante));
             const isAutomationSide = cabinets.some(c => c._isAutomation);
             if (!isForma2 && !isAutomationSide && !isForma34Side) {
                 d.setActiveLayer(L_TERRA);

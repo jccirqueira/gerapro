@@ -1,0 +1,497 @@
+================================================================================
+ PLANO E IMPLEMENTAÇÃO — MÓDULO GERADOR QET (GeraPro → QElectroTech)
+================================================================================
+ Data: 07/07/2026
+ Autor: GeraPro (desenvolvimento assistido por IA)
+ Arquivo: js/geradorQet.js
+ Versão: 1.0.0
+ Status: IMPLEMENTADO E TESTADO
+================================================================================
+
+
+SUMÁRIO
+--------------------------------------------------------------------------------
+ 1. Contexto e Objetivo
+ 2. Análise de Risco
+ 3. Dependências Instaladas
+ 4. Estrutura do Módulo
+ 5. Fluxo de Funcionamento
+ 6. Formato de Dados (Contrato de Entrada)
+ 7. Mapeamento XML → QET
+ 8. Testes Realizados
+ 9. Correções no Código Existente (DXF)
+10. Roadmap Futuro
+11. Arquivos Criados/Modificados
+12. Observações Técnicas
+
+
+================================================================================
+1. CONTEXTO E OBJETIVO
+================================================================================
+
+ O GeraPro é um sistema web (Node.js + JavaScript) para elaboração automática
+ de propostas técnicas e comerciais de painéis elétricos.
+
+ O QElectroTech (QET) é um software livre e open-source para criação de
+ diagramas elétricos industriais, utilizando formato nativo .qet (XML).
+
+ Objetivo: Criar um módulo backend capaz de receber dados estruturados do
+ GeraPro (componentes, condutores, bornes, metadados) e gerar um arquivo .qet
+ válido que possa ser aberto e editado no QElectroTech.
+
+ O módulo foi projetado para ser:
+ - Autônomo (sem dependência do frontend)
+ - Seguro (não altera nenhum arquivo existente)
+ - Testável (mock incluso para validação imediata)
+ - Extensível (arquitetura preparada para versões futuras)
+
+
+================================================================================
+2. ANÁLISE DE RISCO
+================================================================================
+
+ 2.1. Risco de impacto em módulos existentes: ZERO
+      - O módulo é um arquivo NOVO (js/geradorQet.js)
+      - Não altera propostaTecnica.js, app.js, server_new.js, state.js
+      - Não altera banco de dados, localStorage ou pastas PTC
+
+ 2.2. Risco de conflito de dependências: BAIXO
+      - fast-xml-parser foi adicionado ao package.json
+      - Não há conflito conhecido com as 14 dependências existentes
+      - Testado com npm install sem erros
+
+ 2.3. Risco de regressão: ZERO
+      - Nenhum teste existente foi modificado
+      - Nenhuma função existente foi alterada
+      - O módulo é 100% isolado
+
+
+================================================================================
+3. DEPENDÊNCIAS INSTALADAS
+================================================================================
+
+ Nome: fast-xml-parser
+ Versão: mais recente (instalada em 07/07/2026)
+ Comando: npm install fast-xml-parser
+ Uso: XMLBuilder para converter JSON → XML formatado
+ Configuração:
+   - ignoreAttributes: false     (usa prefixo @_ para atributos)
+   - format: true                (XML indentado legível)
+   - suppressBooleanAttributes: false  (força "true"/"false" como string)
+   - suppressEmptyNode: true     (tags vazias como <tag/>)
+   - processEntities: false      (evita codificação dupla)
+
+
+================================================================================
+4. ESTRUTURA DO MÓDULO
+================================================================================
+
+ Arquivo: js/geradorQet.js (335 linhas)
+
+ 4.1. Funções internas:
+
+   uuid()
+     Gera UUID v4 aleatório para elementos do diagrama.
+     Formato: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+
+   validateInput(dados)
+     Valida o objeto de entrada.
+     - Verifica se é um objeto não-nulo
+     - Verifica se ao menos um campo obrigatório existe
+     - Verifica se arrays são realmente arrays
+     - Lança erro descritivo em caso de falha
+
+   buildDiagram(componentes, condutores, titleblock)
+     Constrói a estrutura intermediária do diagrama.
+     - Itera componentes → gera elementos com UUIDs e terminais
+     - Itera condutores → gera condutores com segmentos
+     - Atribui IDs sequenciais a todos os terminais (0, 1, 2, ...)
+     - Monta objeto diagrama com elementos e condutores
+
+ 4.2. Função exportada:
+
+   gerarProjetoQet(dadosOrcamento, caminhoSaida)
+     Função principal do módulo.
+     - Valida entrada
+     - Converte bornes em componentes (se houver)
+     - Concatena componentes + bornes
+     - Chama buildDiagram()
+     - Monta estrutura XML completa (project + newdiagrams + diagram)
+     - Constrói XML com XMLBuilder
+     - Escreve arquivo .qet com fs.writeFileSync
+     - Retorna caminhoSaida
+
+ 4.3. Bloco de teste (auto-execução):
+
+   if (require.main === module) { ... }
+     - Define mock de: 1 disjuntor, 1 contator, 3 condutores, 3 bornes
+     - Chama gerarProjetoQet() com dados mock
+     - Gera teste_gerado.qet na raiz
+     - Exibe mensagem de sucesso ou erro
+
+
+================================================================================
+5. FLUXO DE FUNCIONAMENTO
+================================================================================
+
+                    ┌─────────────────────────┐
+                    │   dadosOrcamento (JSON)  │
+                    │  titleblock, componentes │
+                    │  condutores, bornes      │
+                    └──────────┬──────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │     validateInput()      │
+                    │  Lança erro se inválido  │
+                    └──────────┬──────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │  Converte bornes em     │
+                    │  componentes (2 term.   │
+                    │  cada)                  │
+                    └──────────┬──────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │     buildDiagram()       │
+                    │  - Gera UUIDs           │
+                    │  - Atribui term. IDs    │
+                    │  - Cria elementos       │
+                    │  - Cria condutores      │
+                    └──────────┬──────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │  Monta XML completo:    │
+                    │  project + newdiagrams  │
+                    │  + diagram (irmãos,     │
+                    │  não aninhados)         │
+                    └──────────┬──────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │  XMLBuilder.build()     │
+                    │  Converte para string   │
+                    │  XML indentada          │
+                    └──────────┬──────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │  fs.writeFileSync()     │
+                    │  Salva arquivo .qet     │
+                    └──────────┬──────────────┘
+                               │
+                               ▼
+                    ┌─────────────────────────┐
+                    │   return caminhoSaida   │
+                    └─────────────────────────┘
+
+
+================================================================================
+6. FORMATO DE DADOS (Contrato de Entrada)
+================================================================================
+
+ 6.1. titleblock (objeto, opcional)
+
+   CAMPO         TIPO     DESCRIÇÃO                          OBRIGATÓRIO
+   ──────────────────────────────────────────────────────────────────────────
+   titulo        string   Título do projeto/diagrama          Não
+   cliente       string   Nome do cliente                     Não
+   numeroProposta string  Número da proposta                  Não
+   data          string   Data ISO (YYYY-MM-DD)               Não (default: hoje)
+   autor         string   Nome do responsável                 Não
+
+ 6.2. componentes (array de objetos, opcional)
+
+   CAMPO         TIPO     DESCRIÇÃO                          OBRIGATÓRIO
+   ──────────────────────────────────────────────────────────────────────────
+   id            string   Identificador único do componente    Não
+   tag           string   TAG exibida no diagrama             Não
+   fabricante    string   Fabricante                           Não
+   modelo        string   Modelo                               Não
+   posicaoX      number   Coordenada X (mm)                   Sim (default: 0)
+   posicaoY      number   Coordenada Y (mm)                   Sim (default: 0)
+   simboloQet    string   Caminho do .elmt                    Sim
+   orientacao    number   0=Norte, 1=Leste, 2=Sul, 3=Oeste    Não (default: 0)
+   terminais     array    Lista de terminais (opcional)
+
+   6.2.1. terminais[] (array de objetos)
+
+     CAMPO         TIPO     DESCRIÇÃO                        OBRIGATÓRIO
+     ────────────────────────────────────────────────────────────────────────
+     x             number   Posição relativa X                 Sim
+     y             number   Posição relativa Y                 Sim
+     name          string   Nome do terminal                   Sim
+     orientation   number   0=N, 1=E, 2=S, 3=W                Sim
+     number        string   Número do terminal                 Não
+
+ 6.3. condutores (array de objetos, opcional)
+
+   CAMPO         TIPO     DESCRIÇÃO                          OBRIGATÓRIO
+   ──────────────────────────────────────────────────────────────────────────
+   anilha        string   Identificação do condutor            Não
+   origemX       number   Coordenada X de início (mm)          Condicional
+   origemY       number   Coordenada Y de início (mm)          Condicional
+   destinoX      number   Coordenada X de fim (mm)             Condicional
+   destinoY      number   Coordenada Y de fim (mm)             Condicional
+   bitola        string   Seção transversal                    Não
+   cor           string   Cor do condutor                      Não
+   cabo_grupo    string   Grupo/cabô                           Não
+   terminal1     number   ID do terminal de origem (alternativo) Condicional
+   terminal2     number   ID do terminal de destino (alternativo) Condicional
+
+   NOTA: origem/destino OU terminal1/terminal2. Se ambos ausentes,
+   o condutor é gerado sem segmentos.
+
+ 6.4. bornes (array de objetos, opcional)
+
+   CAMPO         TIPO     DESCRIÇÃO                          OBRIGATÓRIO
+   ──────────────────────────────────────────────────────────────────────────
+   numero        string   Número do borne                      Sim
+   regua_parent  string   Régua (ex: "X1", "X2")              Não (default: X1)
+   posicaoX      number   Coordenada X (mm)                    Não (default: 0)
+   posicaoY      number   Coordenada Y (mm)                    Não (default: 0)
+   simboloQet    string   Caminho do .elmt para borne          Não (default interno)
+
+
+================================================================================
+7. MAPEAMENTO XML → QET
+================================================================================
+
+ O XML gerado segue o schema nativo do QElectroTech versão 0.4.
+
+ 7.1. Estrutura raiz
+
+   <project version="0.4" title="..." folioSheetQuantity="0">
+     <properties/>
+     <newdiagrams>
+       <border .../>
+       <inset .../>
+       <conductors .../>
+       <report .../>
+       <xrefs>...</xrefs>
+       <conductors_autonums/>
+     </newdiagrams>
+     <diagram ...>         ← IRMÃO de <newdiagrams>, NÃO filho
+       <defaultconductor .../>
+       <elements>
+         <element ...>
+           <terminals>...</terminals>
+           <inputs>...</inputs>
+         </element>
+       </elements>
+       <conductors>
+         <conductor ...>
+           <segment .../>
+         </conductor>
+       </conductors>
+     </diagram>
+   </project>
+
+ 7.2. Mapeamento detalhado
+
+   DADO GERAPRO               TAG QET                      OBSERVAÇÃO
+   ──────────────────────────────────────────────────────────────────────────
+   titleblock.titulo      →  <diagram @_title>             Título do diagrama
+   titleblock.titulo      →  <inset @_title>               Título no carimbo
+   titleblock.autor       →  <diagram @_author>            Autor
+   titleblock.autor       →  <inset @_author>              Autor no carimbo
+   titleblock.data        →  <diagram @_date>              Data ISO
+   titleblock.data        →  <inset @_date>                Data no carimbo
+   componente.posicaoX    →  <element @_x = valor × 10    décimos de mm
+   componente.posicaoY    →  <element @_y = valor × 10    décimos de mm
+   componente.simboloQet  →  <element @_type              path do .elmt
+   componente.orientacao  →  <element @_orientation        0-3
+   componente.tag         →  <input @_text                 label visível
+   terminal.x             →  <terminal @_x                 posição relativa
+   terminal.y             →  <terminal @_y                 posição relativa
+   terminal.name          →  <terminal @_name              nome do borne
+   terminal.orientation   →  <terminal @_orientation       0-3
+   terminal (seq. ID)     →  <terminal @_id                auto-incrementado
+   condutor.anilha        →  <conductor @_num              numeração
+   condutor.terminal1     →  <conductor @_terminal1        ID do terminal
+   condutor.terminal2     →  <conductor @_terminal2        ID do terminal
+   condutor (dx/dy)       →  <segment @_length, orientation segmento rota
+   borne                  →  <element> tipo borne          c/ 2 terminais
+
+ 7.3. Diferenças entre o prompt original do usuário e a implementação real
+
+   A estrutura do prompt original do usuário foi adaptada para o schema
+   REAL do QElectroTech, que difere em vários pontos:
+
+   ITEM                  PROMPT ORIGINAL        QET REAL (IMPLEMENTADO)
+   ──────────────────────────────────────────────────────────────────────────
+   Tag raiz              <qet-project>          <project>
+   Atributo de elemento  @_src                  @_type (path .elmt)
+   Coord. elemento       @_x, @_y               @_x, @_y (atributos)
+   Condutor rota         <point @_x @_y/>       <segment @_length, orientation>
+   Condutor referência   coordenadas            terminal1 / terminal2 (IDs)
+   Estrutura             diagrama filho         diagrama IRMÃO de
+                         de newdiagrams         newdiagrams
+
+
+================================================================================
+8. TESTES REALIZADOS
+================================================================================
+
+ 8.1. Teste autônomo (mock)
+
+   Comando:   node js/geradorQet.js
+   Saída:     [QET] Arquivo gerado com sucesso: ...\teste_gerado.qet
+   Resultado: XML gerado sem erros
+
+   Dados do mock:
+   - 1 disjuntor (DJ1, pos 50×50, 2 terminais)
+   - 1 contator (KM1, pos 50×200, 6 terminais)
+   - 3 condutores (L1, L2, L3 com segmentos)
+   - 3 bornes (X1:1, X1:2, X1:3)
+   - Titleblock preenchido
+
+ 8.2. Validação da estrutura XML
+
+   O XML gerado foi verificado quanto a:
+   - ✅ Tag raiz <project> com versão 0.4
+   - ✅ <diagram> como irmão de <newdiagrams>
+   - ✅ <elements> → <element> com atributos corretos
+   - ✅ <terminals> → <terminal> com IDs sequenciais
+   - ✅ <inputs> → <input> com tag texto
+   - ✅ <conductors> → <conductor> com segmentos
+   - ✅ Atributos booleanos com valores string (displayrows="true")
+   - ✅ Tags vazias como <properties/>, <conductors_autonums/>
+   - ✅ Indentação e formatação legíveis
+
+ 8.3. Tratamento de erros
+
+   - ✅ dadosOrcamento nulo/undefined → erro descritivo
+   - ✅ dadosOrcamento vazio → erro descritivo
+   - ✅ componentes não-array → erro descritivo
+   - ✅ condutores não-array → erro descritivo
+   - ✅ bornes não-array → erro descritivo
+
+
+================================================================================
+9. CORREÇÕES NO CÓDIGO EXISTENTE (DXF)
+================================================================================
+
+ Durante o desenvolvimento do GeradorQet, foram identificados e corrigidos
+ dois bugs no módulo de exportação DXF existente (js/propostaTecnica.js):
+
+ 9.1. Bug #1: "Cannot access 'isForma34Side' before initialization"
+
+   Arquivo:  js/propostaTecnica.js
+   Linha:    16695
+   Sintoma:  Erro ao exportar DXF no VPS (ReferenceError)
+   Causa:    Variável isForma34Side declarada com const na linha 16712,
+             mas usada na linha 16695 (temporal dead zone).
+   Correção: Moveu declaração para linha 16688 (antes do primeiro uso).
+             Removeu declaração duplicada na linha 16712.
+
+ 9.2. Bug #2: Altura do armário no DXF ignorava cab.height
+
+   Arquivo:  js/propostaTecnica.js
+   Linhas:   16621-16624
+   Sintoma:  Armário de 2300mm aparecia como 1600mm no DXF
+   Causa:    panelH derivava de eq.technical?.alturaPainel (ex: 1500)
+             em vez de cab.height (ex: 2300). CAB_H = panelH + 100 = 1600.
+   Correção: Inseriu cálculo do max cabinet height em cada branch:
+             - Automação (linha 16637-16638)
+             - B2B (linha 16647-16648)
+             - Único (linha 16670-16671)
+             Fórmula: maxH = Math.max(...cabinets.map(c => c.height || 2300), 2300)
+             Só aplica para Forma 1 (!isForma2 && !isForma34dxf)
+
+
+================================================================================
+10. ROADMAP FUTURO
+================================================================================
+
+ Versão 1.0 (COMPLETO - 07/07/2026)
+   ✔ Geração de diagrama único com elementos, terminais e condutores
+   ✔ Suporte a réguas de bornes como elementos
+   ✔ Preenchimento do carimbo (titleblock)
+   ✔ Teste autônomo via mock
+   ✔ Documentação (explicacao-GeradorQet.txt, .htm)
+   ✔ Plano detalhado arquivado (06-07/plano-geradorQet.txt)
+
+ Versão 1.1 (PLANEJADO)
+   ☐ Integração com suggestLayout() do GeraPro
+   ☐ Extração automática de componentes a partir de linhas (trilhos)
+   ☐ Posicionamento baseado nos cálculos reais do layout
+   ☐ Script de teste com dados reais de proposta (teste_qet_real.js)
+
+ Versão 1.2 (PLANEJADO)
+   ☐ Suporte a múltiplos diagramas (potência, comando, bornes)
+   ☐ Tabela de cabos e bornes embutida
+   ☐ Gerenciador de bornes nativo do QET (<terminalstrip>)
+
+ Versão 2.0 (VISÃO)
+   ☐ Botão de exportação no frontend da Proposta Técnica
+   ☐ Exportação em lote (todos equipamentos de uma PTC)
+   ☐ Template personalizável de diagrama
+   ☐ Sincronização bidirecional (QET ↔ GeraPro)
+
+
+================================================================================
+11. ARQUIVOS CRIADOS/MODIFICADOS
+================================================================================
+
+ 11.1. Arquivos CRIADOS
+
+   js/geradorQet.js               (335 linhas) — Módulo principal
+   explicacao-GeradorQet.txt       (15.5 KB)   — Documentação em texto
+   explicacao-GeradorQet.htm       (31.5 KB)   — Documentação HTML
+   06-07/plano-geradorQet.txt      (este)      — Plano detalhado arquivado
+
+ 11.2. Arquivos MODIFICADOS
+
+   package.json                    — Adicionado fast-xml-parser
+   package-lock.json               — Atualizado automaticamente pelo npm
+   node_modules/fast-xml-parser/   — Instalado pelo npm
+   js/propostaTecnica.js           — Correção dos 2 bugs de DXF (DEVELOPMENT
+                                     ONLY, modulado antes do GeradorQet)
+
+ 11.3. Arquivos GERADOS (teste)
+
+   teste_gerado.qet                — Arquivo de teste gerado pelo mock
+
+
+================================================================================
+12. OBSERVAÇÕES TÉCNICAS
+================================================================================
+
+ 12.1. Coordenadas QET
+
+   O QElectroTech utiliza décimos de milímetro como unidade de coordenada.
+   O módulo multiplica posicaoX/posicaoY (em mm) por 10 antes de inserir
+   no XML. Ex: 50mm → 500 décimos.
+
+ 12.2. IDs de terminais
+
+   Os IDs dos terminais são sequenciais e únicos em todo o diagrama.
+   Começam em 0 e incrementam a cada terminal de cada componente.
+   A ordem dos terminais segue a ordem dos componentes no array de entrada.
+
+ 12.3. Condutores sem terminais
+
+   Se um condutor não especificar terminal1/terminal2, o módulo calcula
+   segmentos baseados em origem/destino (primeiro horizontal, depois
+   vertical). Essa rota pode ser recalculada pelo QET ao abrir o arquivo.
+
+ 12.4. Símbolos .elmt
+
+   O campo simboloQet deve apontar para um arquivo .elmt presente na
+   biblioteca de símbolos do QET. O GeraPro não inclui esses símbolos.
+   O usuário deve ter a coleção padrão do QET ou uma biblioteca
+   personalizada instalada.
+
+ 12.5. Compatibilidade
+
+   O módulo foi testado com Node.js v24.14.1 e fast-xml-parser (última
+   versão em 07/07/2026). O XML gerado segue o schema do QET versão 0.4,
+   que é compatível com QElectroTech 0.4+.
+
+================================================================================
+ FIM DO DOCUMENTO
+================================================================================

@@ -1,0 +1,80 @@
+<project version="0.4" title="Painel CCM - Caldeira" folioSheetQuantity="0">
+  <properties/>
+  <newdiagrams>
+    <border displayrows="true" cols="15" displaycols="true" colsize="50" rows="6" rowsize="80"/>
+    <inset title="Painel CCM - Caldeira" folio="%id/%total" author="GeraPro" filename="" date="2026-07-07"/>
+    <conductors num="_" vertirotatetext="0" displaytext="1" type="multi" horizrotatetext="0" numsize="9" onetextperfolio="0"/>
+    <report label="/%f.%l%c"/>
+    <xrefs>
+      <xref snapto="label" switchprefix="" powerprefix="" displayhas="contacts" type="protection" showpowerctc="false" delayprefix=""/>
+      <xref snapto="bottom" switchprefix="" powerprefix="" displayhas="cross" type="coil" showpowerctc="false" delayprefix=""/>
+    </xrefs>
+    <conductors_autonums/>
+  </newdiagrams>
+  <diagram title="Painel CCM - Caldeira" displayrows="true" version="0.4" cols="15" folio="%id/%total" displaycols="true" height="500" colsize="50" order="1" rows="6" author="GeraPro" filename="" date="2026-07-07" rowsize="80">
+    <defaultconductor num="_" vertirotatetext="0" displaytext="1" type="multi" horizrotatetext="0" numsize="9" onetextperfolio="0"/>
+    <elements>
+      <element x="500" y="500" type="embed://import/industria/disjoncteur.elmt" uuid="e3322f12-ffe7-4240-ab91-d02b44d32f7b" orientation="0">
+        <terminals>
+          <terminal x="0" y="-15" nameHidden="0" number="1" id="0" name="1" orientation="0"/>
+          <terminal x="0" y="15" nameHidden="0" number="2" id="1" name="2" orientation="2"/>
+        </terminals>
+        <inputs>
+          <input x="-20" y="0" text="DJ1"/>
+        </inputs>
+      </element>
+      <element x="500" y="2000" type="embed://import/industrie/contacteur.elmt" uuid="93fa6e43-82a9-4b0c-a0d0-5f42fc2645cf" orientation="0">
+        <terminals>
+          <terminal x="-20" y="-10" nameHidden="0" number="A1" id="2" name="A1" orientation="0"/>
+          <terminal x="-20" y="10" nameHidden="0" number="A2" id="3" name="A2" orientation="2"/>
+          <terminal x="0" y="-10" nameHidden="0" number="1" id="4" name="1" orientation="0"/>
+          <terminal x="0" y="10" nameHidden="0" number="2" id="5" name="2" orientation="2"/>
+          <terminal x="20" y="-10" nameHidden="0" number="3" id="6" name="3" orientation="0"/>
+          <terminal x="20" y="10" nameHidden="0" number="4" id="7" name="4" orientation="2"/>
+        </terminals>
+        <inputs>
+          <input x="-20" y="0" text="KM1"/>
+        </inputs>
+      </element>
+      <element x="0" y="3500" type="embed://bornes/bornes_2_elmt" uuid="eb7957aa-0634-46c2-8b87-4c13d79736cb" orientation="0">
+        <terminals>
+          <terminal x="0" y="-10" nameHidden="0" number="1" id="8" name="1" orientation="0"/>
+          <terminal x="0" y="10" nameHidden="0" number="1" id="9" name="1" orientation="2"/>
+        </terminals>
+        <inputs>
+          <input x="-20" y="0" text="X1:1"/>
+        </inputs>
+      </element>
+      <element x="200" y="3500" type="embed://bornes/bornes_2_elmt" uuid="129a7d1a-ad46-4dbc-8d66-cea7254b1324" orientation="0">
+        <terminals>
+          <terminal x="0" y="-10" nameHidden="0" number="2" id="10" name="2" orientation="0"/>
+          <terminal x="0" y="10" nameHidden="0" number="2" id="11" name="2" orientation="2"/>
+        </terminals>
+        <inputs>
+          <input x="-20" y="0" text="X1:2"/>
+        </inputs>
+      </element>
+      <element x="400" y="3500" type="embed://bornes/bornes_2_elmt" uuid="daf1e52d-b394-4807-b761-3511936c38fa" orientation="0">
+        <terminals>
+          <terminal x="0" y="-10" nameHidden="0" number="3" id="12" name="3" orientation="0"/>
+          <terminal x="0" y="10" nameHidden="0" number="3" id="13" name="3" orientation="2"/>
+        </terminals>
+        <inputs>
+          <input x="-20" y="0" text="X1:3"/>
+        </inputs>
+      </element>
+    </elements>
+    <conductors>
+      <conductor num="L1" vertirotatetext="0" displaytext="1" type="multi" horizrotatetext="0" numsize="9" onetextperfolio="0" x="0" y="0">
+        <segment length="1250" orientation="vertical"/>
+      </conductor>
+      <conductor num="L2" vertirotatetext="0" displaytext="1" type="multi" horizrotatetext="0" numsize="9" onetextperfolio="0" x="0" y="0">
+        <segment length="1250" orientation="vertical"/>
+      </conductor>
+      <conductor num="L3" vertirotatetext="0" displaytext="1" type="multi" horizrotatetext="0" numsize="9" onetextperfolio="0" x="0" y="0">
+        <segment length="200" orientation="horizontal"/>
+        <segment length="1250" orientation="vertical"/>
+      </conductor>
+    </conductors>
+  </diagram>
+</project>
