@@ -4366,6 +4366,7 @@ const PropostaTecnicaModule = {
                                 <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
+                    </div>
                         ${summaryCards}
                     ${warnings}${excessWarning}
                     <div style="background:white;border-radius:12px;overflow:auto;padding:16px;">
