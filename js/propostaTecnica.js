@@ -17109,17 +17109,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                     });
                     borneY += 8;
                 } else {
-                    const cat = (m.categoria || m.descricao || '').toLowerCase();
-                    const simboloQet = cat.includes('contator') ? 'embed://import/industrie/contacteur.elmt'
-                        : cat.includes('disjuntor') || cat.includes('dijuntor') || cat.includes('breaker') ? 'embed://import/industrie/disjoncteur.elmt'
-                        : cat.includes('relé') || cat.includes('rele') || cat.includes('relay') ? 'embed://import/industrie/relais.elmt'
-                        : cat.includes('fusível') || cat.includes('fusivel') || cat.includes('fuse') ? 'embed://import/industrie/fusible.elmt'
-                        : cat.includes('fonte') || cat.includes('fonte_alimentacao') ? 'embed://import/industrie/transfo.elmt'
-                        : cat.includes('transformador') ? 'embed://import/industrie/transfo.elmt'
-                        : cat.includes('motor') ? 'embed://import/industrie/moteur.elmt'
-                        : cat.includes('botão') || cat.includes('botao') || cat.includes('push') ? 'embed://import/industrie/interrupteur.elmt'
-                        : cat.includes('sinal') || cat.includes('led') || cat.includes('lâmpada') || cat.includes('lampada') ? 'embed://import/industrie/voyant.elmt'
-                        : 'embed://import/industrie/boite.elmt';
+                    const simboloQet = 'embed://import/gerapro/box_60x80.elmt';
                     const tag = m.descricao || m.codigoInterno || m.id;
                     const altura = parseFloat(m.altura_mm) || 50;
                     componentes.push({
