@@ -2,7 +2,7 @@ const { XMLBuilder } = require('fast-xml-parser');
 const fs = require('fs');
 const path = require('path');
 
-const QET_VERSION = '0.7';
+const QET_VERSION = '0.80';
 const COORDS_MULT = 10;
 
 function uuid() {
