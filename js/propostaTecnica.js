@@ -17119,7 +17119,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                         : cat.includes('motor') ? 'embed://import/industrie/moteur.elmt'
                         : cat.includes('botão') || cat.includes('botao') || cat.includes('push') ? 'embed://import/industrie/interrupteur.elmt'
                         : cat.includes('sinal') || cat.includes('led') || cat.includes('lâmpada') || cat.includes('lampada') ? 'embed://import/industrie/voyant.elmt'
-                        : '';
+                        : 'embed://import/industrie/boite.elmt';
                     const tag = m.descricao || m.codigoInterno || m.id;
                     const altura = parseFloat(m.altura_mm) || 50;
                     componentes.push({
