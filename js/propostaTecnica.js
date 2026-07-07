@@ -17109,7 +17109,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                     });
                     borneY += 8;
                 } else {
-                    const cat = (m.categoria || '').toLowerCase();
+                    const cat = (m.categoria || m.descricao || '').toLowerCase();
                     const simboloQet = cat.includes('contator') ? 'embed://import/industrie/contacteur.elmt'
                         : cat.includes('disjuntor') || cat.includes('dijuntor') || cat.includes('breaker') ? 'embed://import/industrie/disjoncteur.elmt'
                         : cat.includes('relé') || cat.includes('rele') || cat.includes('relay') ? 'embed://import/industrie/relais.elmt'
