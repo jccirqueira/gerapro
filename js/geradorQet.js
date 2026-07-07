@@ -137,27 +137,15 @@ function buildDiagram(componentes, condutores, titleblock, totalRows) {
       el.terminals = { terminal: termEls };
     }
 
-    el.inputs = '';
-
-    const dynTextUuid = uuid();
-    const dynText = {
-      dynamic_elmt_text: {
-        '@_frame': 'false',
-        '@_Halignment': 'AlignLeft',
-        '@_x': '-28',
-        '@_y': '-5',
-        '@_rotation': '0',
-        '@_font': 'Liberation Sans,7,-1,5,50,0,0,0,0,0,Regular',
-        '@_text_width': '-1',
-        '@_uuid': `{${dynTextUuid}}`,
-        '@_keep_visual_rotation': 'false',
-        '@_text_from': 'ElementInfo',
-        '@_Valignment': 'AlignTop',
-        text: comp.tag || '',
-        info_name: 'label'
-      }
-    };
-    el.dynamic_texts = dynText;
+    const inputEls = [];
+    if (comp.tag) {
+      inputEls.push({ '@_x': 0, '@_y': 40, '@_text': comp.tag });
+    }
+    if (inputEls.length > 0) {
+      el.inputs = { input: inputEls };
+    } else {
+      el.inputs = '';
+    }
 
     elementList.push(el);
   }
