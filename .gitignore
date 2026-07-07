@@ -5,5 +5,6 @@ docs/
 *.sqlite
 .env
 *.log
+teste_gerado.qet
 .DS_Store
 Thumbs.db
