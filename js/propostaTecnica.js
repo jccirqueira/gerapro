@@ -4188,6 +4188,9 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutDXF()" style="gap:4px;">
                                 <i class="ph ph-file"></i> Exportar DXF
                             </button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutQET()" style="gap:4px;">
+                                <i class="ph ph-lightning"></i> Exportar QET
+                            </button>
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
@@ -4353,6 +4356,9 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutDXF()" style="gap:4px;">
                                 <i class="ph ph-file"></i> Exportar DXF
                             </button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutQET()" style="gap:4px;">
+                                <i class="ph ph-lightning"></i> Exportar QET
+                            </button>
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
@@ -4360,8 +4366,7 @@ const PropostaTecnicaModule = {
                                 <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
-                    </div>
-                    ${summaryCards}
+                        ${summaryCards}
                     ${warnings}${excessWarning}
                     <div style="background:white;border-radius:12px;overflow:auto;padding:16px;">
                         <img id="layout-canvas" src="${dataUrl}" style="display:block;margin:0 auto;" alt="Layout Sugerido">
@@ -7527,6 +7532,9 @@ const PropostaTecnicaModule = {
                             </button>
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutDXF()" style="gap:4px;">
                                 <i class="ph ph-file"></i> Exportar DXF
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutQET()" style="gap:4px;">
+                                <i class="ph ph-lightning"></i> Exportar QET
                             </button>
                             <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;margin-left:4px;">
                                 <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
@@ -17045,6 +17053,122 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         } catch (e) {
             console.error('[DXF Export Error]', e);
             if (typeof app?.toast === 'function') app.toast('Erro ao exportar DXF: ' + (e.message || e), 'error');
+        }
+    },
+
+    _exportLayoutQET() {
+        try {
+            const data = store.getState().activeTechnicalProposal;
+            const eq = data?.equipments?.[this.activeEquipmentIndex];
+            if (!eq) { app.toast('Nenhum equipamento ativo.', 'error'); return; }
+
+            const materiais = store.getState().materiais || [];
+            const componentes = [];
+            const bornes = [];
+            let compY = 50;
+            let borneY = 50;
+            const seen = new Set();
+
+            const cabAssignments = eq.layoutConfig?.cabinetAssignments || {};
+            const matIds = new Set();
+            for (const cab of Object.values(cabAssignments)) {
+                if (cab.assigned) Object.keys(cab.assigned).forEach(id => matIds.add(id));
+                if (cab.loads) {
+                    for (const loadTag of Object.keys(cab.loads)) {
+                        Object.keys(cab.loads[loadTag]).forEach(id => matIds.add(id));
+                    }
+                }
+                if (cab.faces) {
+                    for (const face of Object.values(cab.faces)) {
+                        if (face.assigned) Object.keys(face.assigned).forEach(id => matIds.add(id));
+                        if (face.loads) {
+                            for (const loadTag of Object.keys(face.loads)) {
+                                Object.keys(face.loads[loadTag]).forEach(id => matIds.add(id));
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (const m of materiais) {
+                if (!matIds.has(m.id)) continue;
+                if (seen.has(m.id)) continue;
+                seen.add(m.id);
+                const isBorne = (m.categoria || '').toLowerCase().includes('borne');
+                if (isBorne) {
+                    bornes.push({
+                        numero: String(bornes.length + 1),
+                        regua_parent: 'X1',
+                        posicaoX: 0,
+                        posicaoY: borneY
+                    });
+                    borneY += 20;
+                } else {
+                    const cat = (m.categoria || '').toLowerCase();
+                    const simboloQet = cat.includes('contator') ? 'embed://import/industrie/contacteur.elmt'
+                        : cat.includes('disjuntor') || cat.includes('dijuntor') || cat.includes('breaker') ? 'embed://import/industrie/disjoncteur.elmt'
+                        : cat.includes('relé') || cat.includes('rele') || cat.includes('relay') ? 'embed://import/industrie/relais.elmt'
+                        : cat.includes('fusível') || cat.includes('fusivel') || cat.includes('fuse') ? 'embed://import/industrie/fusible.elmt'
+                        : cat.includes('fonte') || cat.includes('fonte_alimentacao') ? 'embed://import/industrie/transfo.elmt'
+                        : cat.includes('transformador') ? 'embed://import/industrie/transfo.elmt'
+                        : cat.includes('motor') ? 'embed://import/industrie/moteur.elmt'
+                        : cat.includes('botão') || cat.includes('botao') || cat.includes('push') ? 'embed://import/industrie/interrupteur.elmt'
+                        : cat.includes('sinal') || cat.includes('led') || cat.includes('lâmpada') || cat.includes('lampada') ? 'embed://import/industrie/voyant.elmt'
+                        : '';
+                    const tag = m.descricao || m.codigoInterno || m.id;
+                    const altura = parseFloat(m.altura_mm) || 50;
+                    componentes.push({
+                        id: m.id,
+                        tag: tag.length > 30 ? tag.substring(0, 30) : tag,
+                        posicaoX: 50,
+                        posicaoY: compY,
+                        simboloQet,
+                        orientacao: 0,
+                        terminais: [
+                            { x: 0, y: -Math.round(altura / 2 / 10) * 10, name: '1', orientation: 0, number: '1' },
+                            { x: 0, y: Math.round(altura / 2 / 10) * 10, name: '2', orientation: 2, number: '2' }
+                        ]
+                    });
+                    compY += altura + 20;
+                }
+            }
+
+            const ptcFolder = window.app.currentPtc?.folder || data.codigo || '';
+            const titleblock = {
+                titulo: `Layout - ${eq.tag}`,
+                cliente: data.cliente || '',
+                numeroProposta: ptcFolder,
+                data: new Date().toISOString().split('T')[0],
+                autor: 'GeraPro'
+            };
+
+            fetch('/api/export-qet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ componentes, bornes, titleblock })
+            })
+            .then(res => {
+                if (!res.ok) return res.text().then(t => { throw new Error(t); });
+                return res.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${eq.tag || 'layout'}.qet`;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                a.remove();
+                app.toast('Arquivo QET exportado com sucesso!', 'success');
+            })
+            .catch(e => {
+                console.error(e);
+                app.toast('Erro: ' + e.message, 'error');
+            });
+        } catch (e) {
+            console.error(e);
+            app.toast('Erro ao exportar QET: ' + e.message, 'error');
         }
     },
 

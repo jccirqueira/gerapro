@@ -13,6 +13,7 @@ const nodemailer = require('nodemailer');
 const TelegramBot = require('node-telegram-bot-api');
 const DxfParser = require('dxf-parser');
 const crypto = require('crypto');
+const { gerarProjetoQet } = require('./js/geradorQet');
 
 // Mail encryption helpers
 const MAIL_ENCRYPTION_KEY = process.env.MAIL_ENCRYPTION_KEY || 'GeraPro-Mail-Encrypt-Key-2026!';
@@ -678,6 +679,31 @@ async function handleExportLM(data, res) {
         } else {
             res.end();
         }
+    }
+}
+
+async function handleExportQET(data, res) {
+    try {
+        if (!data || !data.componentes || !Array.isArray(data.componentes)) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, error: 'Nenhum componente para exportar.' }));
+            return;
+        }
+        const tmpDir = path.join(__dirname, 'tmp');
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+        const filename = `qet_${Date.now()}.qet`;
+        const filepath = path.join(tmpDir, filename);
+        gerarProjetoQet(data, filepath);
+        const content = fs.readFileSync(filepath);
+        res.writeHead(200, {
+            'Content-Type': 'application/xml',
+            'Content-Disposition': `attachment; filename="layout_${Date.now()}.qet"`
+        });
+        res.end(content);
+        fs.unlinkSync(filepath);
+    } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
     }
 }
 
@@ -3384,6 +3410,7 @@ const server = http.createServer(async (req, res) => {
         if (pathname === '/api/export-io-bom' && req.method === 'POST') { handleExportIOBOM(await readBody(req), res); return; }
         if (pathname === '/api/export-io-list' && req.method === 'POST') { handleExportIOList(await readBody(req), res); return; }
         if (pathname === '/api/export-lm' && req.method === 'POST') { handleExportLM(await readBody(req), res); return; }
+        if (pathname === '/api/export-qet' && req.method === 'POST') { handleExportQET(await readBody(req), res); return; }
         if (pathname === '/api/export-pipeline-log-xlsx' && req.method === 'POST') { handleExportPipelineLog(await readBody(req), res); return; }
 
         // === DXF BLOCK API ===
