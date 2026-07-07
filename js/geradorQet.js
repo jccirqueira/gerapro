@@ -30,7 +30,7 @@ function validateInput(dados) {
   }
 }
 
-function buildDiagram(componentes, condutores, titleblock) {
+function buildDiagram(componentes, condutores, titleblock, totalRows) {
   const elementList = [];
   const condutorList = [];
   let terminalIdCounter = 0;
@@ -109,6 +109,8 @@ function buildDiagram(componentes, condutores, titleblock) {
     condutorList.push(c);
   }
 
+  const rowHeight = 80;
+  const finalRows = Math.max(totalRows || 6, Math.ceil((componentes.length || 1) / 2) + 1);
   const diagramObj = {
     '@_title': titleblock.titulo || 'Diagrama',
     '@_displayrows': 'true',
@@ -116,14 +118,14 @@ function buildDiagram(componentes, condutores, titleblock) {
     '@_cols': '15',
     '@_folio': '%id/%total',
     '@_displaycols': 'true',
-    '@_height': '500',
+    '@_height': String(finalRows * rowHeight),
     '@_colsize': '50',
     '@_order': '1',
-    '@_rows': '6',
+    '@_rows': String(finalRows),
     '@_author': titleblock.autor || '',
     '@_filename': '',
     '@_date': titleblock.data || new Date().toISOString().split('T')[0],
-    '@_rowsize': '80',
+    '@_rowsize': String(rowHeight),
     defaultconductor: {
       '@_num': '_',
       '@_vertirotatetext': '0',
@@ -184,7 +186,8 @@ function gerarProjetoQet(dadosOrcamento, caminhoSaida) {
   }
 
   const todosComponentes = [...componentes, ...bornesComoComponentes];
-  const diagramData = buildDiagram(todosComponentes, condutores, titleblock);
+  const qetRows = Math.max(6, Math.ceil((todosComponentes.length || 1) / 2) + 1);
+  const diagramData = buildDiagram(todosComponentes, condutores, titleblock, qetRows);
 
   const xmlObj = {
     project: {
@@ -198,7 +201,7 @@ function gerarProjetoQet(dadosOrcamento, caminhoSaida) {
           '@_cols': '15',
           '@_displaycols': 'true',
           '@_colsize': '50',
-          '@_rows': '6',
+          '@_rows': String(qetRows),
           '@_rowsize': '80'
         },
         inset: {

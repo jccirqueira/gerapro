@@ -17066,8 +17066,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             const materiais = store.getState().materiais || [];
             const componentes = [];
             const bornes = [];
-            let compY = 50;
-            let borneY = 50;
+            let compY = 0;
+            let borneY = 0;
             const seen = new Set();
 
             const cabAssignments = eq.layoutConfig?.cabinetAssignments || {};
@@ -17107,7 +17107,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                         posicaoX: 0,
                         posicaoY: borneY
                     });
-                    borneY += 20;
+                    borneY += 8;
                 } else {
                     const cat = (m.categoria || '').toLowerCase();
                     const simboloQet = cat.includes('contator') ? 'embed://import/industrie/contacteur.elmt'
@@ -17134,7 +17134,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                             { x: 0, y: Math.round(altura / 2 / 10) * 10, name: '2', orientation: 2, number: '2' }
                         ]
                     });
-                    compY += altura + 20;
+                    compY += 8;
                 }
             }
 
