@@ -17091,6 +17091,10 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 }
             }
 
+            if (matIds.size === 0) {
+                for (const m of materiais) matIds.add(m.id);
+            }
+
             for (const m of materiais) {
                 if (!matIds.has(m.id)) continue;
                 if (seen.has(m.id)) continue;
