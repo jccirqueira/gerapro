@@ -15,6 +15,8 @@ const ClientesModule = {
             switchTab: this.switchTab.bind(this),
             filterClients: this.filterClients.bind(this),
             addContactRow: this.addContactRow.bind(this),
+            addUnidadeRow: this.addUnidadeRow.bind(this),
+            removeUnidadeRow: this.removeUnidadeRow.bind(this),
             handleLogoUpload: this.handleLogoUpload.bind(this),
             removeClientLogo: this.removeClientLogo.bind(this),
             resetView: this.resetView.bind(this)
@@ -154,6 +156,10 @@ const ClientesModule = {
         }
     },
 
+    getUnidadesByCliente(clienteId) {
+        return (store.getState().unidadesCliente || []).filter(u => u.cliente_id === clienteId);
+    },
+
     closeModal() {
         this.viewMode = 'list';
         this.render();
@@ -196,6 +202,7 @@ const ClientesModule = {
                         <button id="btn-tab-endereco" class="tab-btn" onclick="app.clientes.switchTab('endereco')">Endereço & Fiscal</button>
                         <button id="btn-tab-contato" class="tab-btn" onclick="app.clientes.switchTab('contato')">Contatos</button>
                         <button id="btn-tab-logo" class="tab-btn" onclick="app.clientes.switchTab('logo')">Logo</button>
+                        <button id="btn-tab-unidades" class="tab-btn" onclick="app.clientes.switchTab('unidades')">Unidades</button>
                     </div>
 
                     <div style="padding: 20px; flex: 1; overflow-y: auto;">
@@ -217,6 +224,11 @@ const ClientesModule = {
                                         <label class="form-label">CNPJ *</label>
                                         <input type="text" name="cnpj" class="form-control" value="${data.cnpj || ''}" placeholder="00.000.000/0000-00">
                                     </div>
+                                </div>
+                                <div class="form-group" style="max-width: 200px;">
+                                    <label class="form-label">Código do Cliente</label>
+                                    <input type="text" name="codigo_cliente" class="form-control" value="${data.codigo_cliente || ''}" placeholder="Ex: 008" maxlength="10" style="font-weight: bold;">
+                                    <small style="color: #64748b;">Usado na numeração AUTPRO (ex: 00801XXX)</small>
                                 </div>
                                 <div class="row" style="display: flex; gap: 16px;">
                                     <div class="form-group" style="flex: 1;">
@@ -314,6 +326,62 @@ const ClientesModule = {
                             </div>
 
                             <!-- TAB: CONTATO -->
+                            <div id="tab-unidades" class="tab-content" style="display: none;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <label class="form-label" style="margin-bottom: 0;">Unidades do Cliente</label>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="app.clientes.addUnidadeRow('${data.id || ''}')">+ Adicionar Unidade</button>
+                                </div>
+                                <div id="unidades-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                                    ${(data.id ? this.getUnidadesByCliente(data.id) : []).map((u, idx) => `
+                                        <div class="unidade-row" data-unidade-id="${u.id}" style="background: #fff; border: 1px solid var(--color-border); padding: 10px; border-radius: 6px; position: relative;">
+                                            <button type="button" onclick="app.clientes.removeUnidadeRow(this)" class="btn-icon" style="position: absolute; top: 10px; right: 10px; color: red;" title="Remover Unidade"><i class="ph ph-trash"></i></button>
+                                            <div class="row" style="display: flex; gap: 10px; margin-bottom: 8px; padding-right: 30px;">
+                                                <div class="form-group" style="width: 100px;">
+                                                    <label class="form-label" style="font-size: 11px;">Código</label>
+                                                    <input type="text" class="form-control unidade-codigo" value="${u.codigo_unidade}" placeholder="Ex: 01" maxlength="4" style="font-weight: bold;">
+                                                </div>
+                                                <div class="form-group" style="flex: 1;">
+                                                    <label class="form-label" style="font-size: 11px;">Nome da Unidade</label>
+                                                    <input type="text" class="form-control unidade-nome" value="${u.nome_unidade}" placeholder="Ex: Matriz, Filial SP, Moema...">
+                                                </div>
+                                            </div>
+                                            <div class="row" style="display: flex; gap: 10px;">
+                                                <div class="form-group" style="width: 100px;">
+                                                    <label class="form-label" style="font-size: 11px;">CEP</label>
+                                                    <input type="text" class="form-control unidade-cep" value="${u.cep || ''}" placeholder="CEP">
+                                                </div>
+                                                <div class="form-group" style="flex: 1;">
+                                                    <label class="form-label" style="font-size: 11px;">Logradouro</label>
+                                                    <input type="text" class="form-control unidade-logradouro" value="${u.logradouro || ''}" placeholder="Logradouro">
+                                                </div>
+                                                <div class="form-group" style="width: 80px;">
+                                                    <label class="form-label" style="font-size: 11px;">Número</label>
+                                                    <input type="text" class="form-control unidade-numero" value="${u.numero || ''}" placeholder="Nº">
+                                                </div>
+                                            </div>
+                                            <div class="row" style="display: flex; gap: 10px;">
+                                                <div class="form-group" style="flex: 1;">
+                                                    <label class="form-label" style="font-size: 11px;">Bairro</label>
+                                                    <input type="text" class="form-control unidade-bairro" value="${u.bairro || ''}" placeholder="Bairro">
+                                                </div>
+                                                <div class="form-group" style="flex: 1;">
+                                                    <label class="form-label" style="font-size: 11px;">Cidade</label>
+                                                    <input type="text" class="form-control unidade-cidade" value="${u.cidade || ''}" placeholder="Cidade">
+                                                </div>
+                                                <div class="form-group" style="width: 60px;">
+                                                    <label class="form-label" style="font-size: 11px;">UF</label>
+                                                    <input type="text" class="form-control unidade-estado" value="${u.estado || ''}" placeholder="UF" maxlength="2">
+                                                </div>
+                                            </div>
+                                            <input type="hidden" class="unidade-id" value="${u.id}">
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div style="padding: 10px; background: #f0f9ff; border: 1px dashed #93c5fd; border-radius: 6px; font-size: 12px; color: #1e40af;">
+                                    <i class="ph ph-info"></i> As unidades são salvas automaticamente ao salvar o cliente. O campo "Código" define a numeração das propostas (ex: código 01 = 00801XXX).
+                                </div>
+                            </div>
+
                             <div id="tab-contato" class="tab-content" style="display: none;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                     <label class="form-label" style="margin-bottom: 0;">Lista de Contatos</label>
@@ -418,17 +486,62 @@ const ClientesModule = {
             return;
         }
 
+        let clienteId = obj.id;
         let ok;
         if (obj.id) {
             ok = await store.updateClient(obj.id, obj);
         } else {
             delete obj.id;
-            ok = await store.addClient(obj);
+            const created = await store.addClient(obj);
+            ok = !!created;
+            if (created) clienteId = created.id;
         }
 
         if (!ok) {
             app.toast("Erro ao salvar. Verifique se o servidor está rodando.", "error");
             return;
+        }
+
+        // Save unidades do cliente
+        if (clienteId) {
+            const existingUnidades = this.getUnidadesByCliente(clienteId);
+            const unidadeRows = document.querySelectorAll('.unidade-row');
+            const currentUnidadeIds = [];
+
+            for (const row of unidadeRows) {
+                const id = row.querySelector('.unidade-id')?.value || '';
+                const codigo = row.querySelector('.unidade-codigo')?.value?.trim();
+                const nome = row.querySelector('.unidade-nome')?.value?.trim();
+                if (!codigo) continue;
+
+                const unidadeData = {
+                    empresa_id: store.getState().auth?.user?.empresa_id || 'default',
+                    cliente_id: clienteId,
+                    codigo_unidade: codigo,
+                    nome_unidade: nome || '',
+                    cep: row.querySelector('.unidade-cep')?.value || '',
+                    logradouro: row.querySelector('.unidade-logradouro')?.value || '',
+                    numero: row.querySelector('.unidade-numero')?.value || '',
+                    bairro: row.querySelector('.unidade-bairro')?.value || '',
+                    cidade: row.querySelector('.unidade-cidade')?.value || '',
+                    estado: row.querySelector('.unidade-estado')?.value || ''
+                };
+
+                if (id && existingUnidades.some(u => u.id === id)) {
+                    currentUnidadeIds.push(id);
+                    await store.updateUnidadeCliente(id, { ...unidadeData, updatedAt: new Date().toISOString() });
+                } else {
+                    const nova = await store.addUnidadeCliente(unidadeData);
+                    if (nova) currentUnidadeIds.push(nova.id);
+                }
+            }
+
+            // Remove unidades que foram deletadas da UI
+            for (const unid of existingUnidades) {
+                if (!currentUnidadeIds.includes(unid.id)) {
+                    await store.deleteUnidadeCliente(unid.id);
+                }
+            }
         }
 
         app.toast("Cliente salvo com sucesso!", "success");
@@ -520,6 +633,68 @@ const ClientesModule = {
             </div>
         `;
         container.insertAdjacentHTML('beforeend', html);
+    },
+
+    addUnidadeRow(clienteId) {
+        const container = document.getElementById('unidades-container');
+        if (!container) return;
+        const idx = new Date().getTime();
+        const html = `
+            <div class="unidade-row" style="background: #fff; border: 1px solid var(--color-border); padding: 10px; border-radius: 6px; position: relative; animation: fadeIn 0.3s ease;">
+                <button type="button" onclick="this.closest('.unidade-row').remove()" class="btn-icon" style="position: absolute; top: 10px; right: 10px; color: red;" title="Remover Unidade"><i class="ph ph-trash"></i></button>
+                <div class="row" style="display: flex; gap: 10px; margin-bottom: 8px; padding-right: 30px;">
+                    <div class="form-group" style="width: 100px;">
+                        <label class="form-label" style="font-size: 11px;">Código</label>
+                        <input type="text" class="form-control unidade-codigo" value="" placeholder="Ex: 01" maxlength="4" style="font-weight: bold;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label" style="font-size: 11px;">Nome da Unidade</label>
+                        <input type="text" class="form-control unidade-nome" placeholder="Ex: Matriz, Filial SP, Moema...">
+                    </div>
+                </div>
+                <div class="row" style="display: flex; gap: 10px;">
+                    <div class="form-group" style="width: 100px;">
+                        <label class="form-label" style="font-size: 11px;">CEP</label>
+                        <input type="text" class="form-control unidade-cep" placeholder="CEP">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label" style="font-size: 11px;">Logradouro</label>
+                        <input type="text" class="form-control unidade-logradouro" placeholder="Logradouro">
+                    </div>
+                    <div class="form-group" style="width: 80px;">
+                        <label class="form-label" style="font-size: 11px;">Número</label>
+                        <input type="text" class="form-control unidade-numero" placeholder="Nº">
+                    </div>
+                </div>
+                <div class="row" style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label" style="font-size: 11px;">Bairro</label>
+                        <input type="text" class="form-control unidade-bairro" placeholder="Bairro">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label" style="font-size: 11px;">Cidade</label>
+                        <input type="text" class="form-control unidade-cidade" placeholder="Cidade">
+                    </div>
+                    <div class="form-group" style="width: 60px;">
+                        <label class="form-label" style="font-size: 11px;">UF</label>
+                        <input type="text" class="form-control unidade-estado" placeholder="UF" maxlength="2">
+                    </div>
+                </div>
+                <input type="hidden" class="unidade-id" value="">
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    },
+
+    removeUnidadeRow(btn) {
+        const row = btn.closest('.unidade-row');
+        if (row) {
+            const id = row.querySelector('.unidade-id')?.value;
+            if (id) {
+                store.deleteUnidadeCliente(id);
+            }
+            row.remove();
+        }
     }
 };
 

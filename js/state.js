@@ -24,6 +24,7 @@ const initialState = {
     orcamentos: [],
     loadLists: [],
     chapariaLists: [],
+    unidadesCliente: [],
     propostasTecnicas: [],
     propostasComerciais: [],
     propostasCompletas: [],
@@ -92,6 +93,9 @@ const initialState = {
     crmLeads: [],
     crmInteracoes: [],
     crmTarefas: [],
+    crmNotas: [],
+    crmWebhooks: [],
+    crmSequencias: [],
     crmEmailTemplates: [],
     crmStages: []
 };
@@ -148,7 +152,7 @@ class Store {
             if (data.success && data.data) {
                 const sd = data.data;
                 console.log('[Load] Got data:', Object.keys(sd).map(k => `${k}:${Array.isArray(sd[k]) ? sd[k].length : '?'}`).join(', '));
-                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas',    'orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos']) {
+                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas',    'orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente']) {
                     if (Array.isArray(sd[key])) this.state[key] = sd[key];
                 }
                 if (sd.settings) this.state.settings = { ...this.state.settings, ...sd.settings };
@@ -601,6 +605,37 @@ class Store {
         const ok = await this._syncDelete('clientes', id);
         if (!ok && prev) {
             this.setState({ clientes: [...this.state.clientes, prev] });
+        }
+        return ok;
+    }
+
+    async addUnidadeCliente(unidade) {
+        const item = { ...unidade, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+        this.setState({ unidadesCliente: [...this.state.unidadesCliente, item] });
+        const ok = await this._syncCreate('unidadesCliente', item);
+        if (!ok) {
+            this.setState({ unidadesCliente: this.state.unidadesCliente.filter(u => u.id !== item.id) });
+            return null;
+        }
+        return item;
+    }
+
+    async updateUnidadeCliente(id, updates) {
+        const prev = this.state.unidadesCliente.find(u => u.id === id);
+        this.setState({ unidadesCliente: this.state.unidadesCliente.map(u => u.id === id ? { ...u, ...updates } : u) });
+        const ok = await this._syncUpdate('unidadesCliente', id, updates);
+        if (!ok && prev) {
+            this.setState({ unidadesCliente: this.state.unidadesCliente.map(u => u.id === id ? prev : u) });
+        }
+        return ok;
+    }
+
+    async deleteUnidadeCliente(id) {
+        const prev = this.state.unidadesCliente.find(u => u.id === id);
+        this.setState({ unidadesCliente: this.state.unidadesCliente.filter(u => u.id !== id) });
+        const ok = await this._syncDelete('unidadesCliente', id);
+        if (!ok && prev) {
+            this.setState({ unidadesCliente: [...this.state.unidadesCliente, prev] });
         }
         return ok;
     }
@@ -1437,6 +1472,35 @@ class Store {
         const ok = await this._syncDelete('crmTarefas', id);
         if (!ok && prev) {
             this.setState({ crmTarefas: [...(this.state.crmTarefas || []), prev] });
+        }
+        return ok;
+    }
+
+    // --- CRM Notas Methods ---
+
+    async addCrmNota(nota) {
+        const now = new Date().toISOString();
+        const item = {
+            ...nota,
+            id: nota.id || crypto.randomUUID(),
+            created_at: now,
+            updated_at: now
+        };
+        this.setState({ crmNotas: [...(this.state.crmNotas || []), item] });
+        const ok = await this._syncCreate('crmNotas', item);
+        if (!ok) {
+            this.setState({ crmNotas: (this.state.crmNotas || []).filter(n => n.id !== item.id) });
+            return null;
+        }
+        return item;
+    }
+
+    async deleteCrmNota(id) {
+        const prev = (this.state.crmNotas || []).find(n => n.id === id);
+        this.setState({ crmNotas: (this.state.crmNotas || []).filter(n => n.id !== id) });
+        const ok = await this._syncDelete('crmNotas', id);
+        if (!ok && prev) {
+            this.setState({ crmNotas: [...(this.state.crmNotas || []), prev] });
         }
         return ok;
     }

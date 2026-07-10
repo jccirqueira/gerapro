@@ -852,25 +852,30 @@ function handleSaveFile(data, res, empresaId) {
 function handleListPtcs(res, empresaId) {
     const baseDir = getEmpresaPtcDir(empresaId);
 
-    fs.readdir(baseDir, { withFileTypes: true }, (err, entries) => {
-        if (err) {
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: err.message }));
-            return;
-        }
+    function scanDir(dir, depth = 0) {
+        let results = [];
+        if (depth > 3) return results;
+        try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const dirent of entries) {
+                if (!dirent.isDirectory()) continue;
+                if (dirent.name.startsWith('PTC-') || /^\d{8,10}-/.test(dirent.name)) {
+                    results.push(dirent.name);
+                } else if (depth < 2 && /^\d/.test(dirent.name)) {
+                    results = results.concat(scanDir(path.join(dir, dirent.name), depth + 1));
+                }
+            }
+        } catch (e) {}
+        return results;
+    }
 
-        const ptcs = entries
-            .filter(dirent =>
-                dirent.isDirectory() &&
-                (dirent.name.startsWith('PTC-') || /^\d{8,10}-/.test(dirent.name))
-            )
-            .map(dirent => dirent.name);
-
-        ptcs.sort().reverse(); // Show newest first
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, ptcs: ptcs }));
-    });
+    try {
+        let ptcs = scanDir(baseDir);
+        ptcs.sort().reverse();
+        sendJson(res, 200, { success: true, ptcs });
+    } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+    }
 }
 
 function handleGetRevisions(ptcFolder, res, empresaId) {
@@ -1662,7 +1667,26 @@ function getEmpresaPtcDir(empresaId) {
 }
 
 function getFullPtcPath(empresaId, ptcFolder) {
-    return path.join(getEmpresaPtcDir(empresaId), ptcFolder);
+    const baseDir = getEmpresaPtcDir(empresaId);
+    const directPath = path.join(baseDir, ptcFolder);
+    if (fs.existsSync(directPath)) return directPath;
+    // Search recursively inside client/unidade subfolders (for AUTPRO structure)
+    try {
+        const entries = fs.readdirSync(baseDir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory() || !/^\d/.test(entry.name)) continue;
+            const subPath = path.join(baseDir, entry.name);
+            const subEntries = fs.readdirSync(subPath, { withFileTypes: true });
+            for (const subEntry of subEntries) {
+                if (!subEntry.isDirectory()) continue;
+                const candidate = path.join(subPath, subEntry.name, ptcFolder);
+                if (fs.existsSync(candidate)) return candidate;
+            }
+        }
+    } catch (e) {
+        // Ignore unreadable dirs
+    }
+    return directPath;
 }
 
 // Migrate root-level .docx files to templates/default/ on first run
@@ -1831,10 +1855,31 @@ function handleCreatePtc(data, res, empresaId) {
         return;
     }
 
-    const num = (ptcNumber || String(Date.now()).slice(-4)).replace(/[^a-zA-Z0-9]/g, '');
-    const titleSlug = ptcTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40);
-    const folderName = `${num}-${titleSlug}`;
-    const rootPath = path.join(getEmpresaPtcDir(empresaId), folderName);
+    const empresa = db.findEmpresaById(empresaId || 'default');
+    const isAUTPRO = empresa?.folder_name?.startsWith('AUT_');
+
+    let rootPath;
+    let folderName;
+    let effectiveNumber = ptcNumber;
+
+    if (isAUTPRO && data.autpro) {
+        const { codigoCliente, codigoUnidade, sequencial, clienteId, clienteRazaoSocial, unidadeNome } = data.autpro;
+
+        const clienteFolderName = `${codigoCliente} - ${clienteRazaoSocial}`;
+        const unidadeFolderName = `${codigoUnidade} - ${unidadeNome}`;
+        const seqPadded = String(data.autpro.consumedSequencial || sequencial).padStart(3, '0');
+        effectiveNumber = `${codigoCliente}${codigoUnidade}${seqPadded}`;
+
+        const titleSlug = ptcTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40);
+        folderName = `${effectiveNumber}-${titleSlug}`;
+        rootPath = path.join(getEmpresaPtcDir(empresaId), clienteFolderName, unidadeFolderName, folderName);
+    } else {
+        const num = (ptcNumber || String(Date.now()).slice(-4)).replace(/[^a-zA-Z0-9]/g, '');
+        effectiveNumber = num;
+        const titleSlug = ptcTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40);
+        folderName = `${num}-${titleSlug}`;
+        rootPath = path.join(getEmpresaPtcDir(empresaId), folderName);
+    }
 
     if (fs.existsSync(rootPath)) {
         sendJson(res, 409, { success: false, error: `Pasta ${folderName} já existe` });
@@ -1849,11 +1894,17 @@ function handleCreatePtc(data, res, empresaId) {
         subfolders.forEach(sub => fs.mkdirSync(path.join(rootPath, sub), { recursive: true }));
 
         fs.writeFileSync(path.join(rootPath, 'ptc_info.json'), JSON.stringify({
-            ptcNumber: num, title: ptcTitle, clientName,
+            ptcNumber: effectiveNumber, title: ptcTitle, clientName,
             contact: contact || '', email: email || '', phone: phone || '', role: role || '',
             type: type || '', businessType: businessType || 'Industrialização',
             vendedor: data.vendedor || '',
-            dates: dates || {}, createdAt: new Date().toISOString()
+            dates: dates || {}, createdAt: new Date().toISOString(),
+            autpro: isAUTPRO && data.autpro ? {
+                codigoCliente: data.autpro.codigoCliente,
+                codigoUnidade: data.autpro.codigoUnidade,
+                sequencial: parseInt(data.autpro.consumedSequencial || data.autpro.sequencial),
+                clienteId: data.autpro.clienteId
+            } : undefined
         }, null, 2));
 
         console.log(`[Server] PTC created: ${folderName}`);
@@ -1863,6 +1914,27 @@ function handleCreatePtc(data, res, empresaId) {
         sendJson(res, 500, { success: false, error: err.message });
     }
 }
+
+// === WEBHOOK DISPATCH ===
+
+async function dispatchWebhooks(entity, event, data, empresaId) {
+    try {
+        const webhooks = db.findAll('crmWebhooks', empresaId);
+        const active = webhooks.filter(w => w.ativo !== false && (!w.eventos || w.eventos.includes(event)));
+        for (const wh of active) {
+            const payload = JSON.stringify({ event, entity, data, timestamp: new Date().toISOString() });
+            fetch(wh.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Webhook-Event': event, 'X-Entity': entity },
+                body: payload
+            }).catch(err => console.error(`[Webhook] ${wh.url} failed:`, err.message));
+        }
+    } catch (e) {
+        console.error('[Webhook] dispatch error:', e.message);
+    }
+}
+
+const CRM_ENTITIES = ['crmLeads', 'crmInteracoes', 'crmTarefas', 'crmNotas'];
 
 // === STATIC FILE SERVING ===
 
@@ -2264,7 +2336,7 @@ const server = http.createServer(async (req, res) => {
 
         const entityMatch = pathname.match(/^\/api\/data\/(\w+)$/);
         const entityMatchWithId = pathname.match(/^\/api\/data\/(\w+)\/(.+)$/);
-        const validEntities = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos'];
+        const validEntities = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmEmailTemplates','crmStages','crmWebhooks','crmSequencias','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente'];
 
         if (entityMatch && req.method === 'POST') {
             const tokenUser = getTokenUser(req);
@@ -2275,6 +2347,10 @@ const server = http.createServer(async (req, res) => {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
                 const created = db.create(entity, body, empresaId);
+
+                if (CRM_ENTITIES.includes(entity)) {
+                    dispatchWebhooks(entity, 'created', created, empresaId);
+                }
 
                 // Auto-log for pipelineItems creation
                 if (entity === 'pipelineItems' && body.tipo && body.origemId) {
@@ -2379,6 +2455,10 @@ const server = http.createServer(async (req, res) => {
                     }
                 }
 
+                if (CRM_ENTITIES.includes(entity)) {
+                    dispatchWebhooks(entity, 'updated', { old: oldItem, new: item, changes: body }, tokenUser.empresa_id || 'default');
+                }
+
                 sendJson(res, 200, { success: true, item });
             }
             catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -2411,9 +2491,40 @@ const server = http.createServer(async (req, res) => {
                     });
                 }
 
+                if (CRM_ENTITIES.includes(entity)) {
+                    dispatchWebhooks(entity, 'deleted', item, tokenUser.empresa_id || 'default');
+                }
+
                 sendJson(res, 200, { success: true });
             }
             catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/webhooks/test' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const body = await readBody(req);
+                const testPayload = JSON.stringify({
+                    event: 'test',
+                    entity: body.entity || 'crmLeads',
+                    data: { message: 'Webhook test from GeraPro CRM', timestamp: new Date().toISOString() }
+                });
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 10000);
+                const response = await fetch(body.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Webhook-Event': 'test', 'X-Entity': body.entity || 'crmLeads' },
+                    body: testPayload,
+                    signal: controller.signal
+                });
+                clearTimeout(timeout);
+                const responseBody = await response.text();
+                sendJson(res, 200, { success: true, status: response.status, response: responseBody.slice(0, 2000) });
+            } catch (err) {
+                sendJson(res, 200, { success: false, error: err.message });
+            }
             return;
         }
 
@@ -2463,6 +2574,56 @@ const server = http.createServer(async (req, res) => {
         }
 
         // === PTC ===
+
+        if (pathname === '/api/unidades-cliente' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const url = new URL(req.url, `http://${req.headers.host}`);
+                const clienteId = url.searchParams.get('cliente_id');
+                if (!clienteId) { sendJson(res, 400, { success: false, error: 'cliente_id é obrigatório' }); return; }
+                const unidades = db.getUnidadesByCliente(clienteId, tokenUser.empresa_id || 'default');
+                sendJson(res, 200, { success: true, unidades });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/next-autpro-number' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const url = new URL(req.url, `http://${req.headers.host}`);
+                const clienteId = url.searchParams.get('cliente_id');
+                const codigoUnidade = url.searchParams.get('codigo_unidade');
+                if (!clienteId || !codigoUnidade) { sendJson(res, 400, { success: false, error: 'cliente_id e codigo_unidade são obrigatórios' }); return; }
+                const empId = tokenUser.empresa_id || 'default';
+                const seq = db.consumeNextAutproSequence(clienteId, codigoUnidade, empId);
+                if (!seq) { sendJson(res, 404, { success: false, error: 'Unidade não encontrada' }); return; }
+                const cliente = db.getDb().prepare('SELECT codigo_cliente FROM clientes WHERE id = ?').get(clienteId);
+                const codigoCliente = cliente?.codigo_cliente || '000';
+                const numero = `${codigoCliente}${codigoUnidade}${seq}`;
+                sendJson(res, 200, { success: true, numero, codigoCliente, codigoUnidade, sequencial: parseInt(seq) });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/next-autpro-number-preview' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const url = new URL(req.url, `http://${req.headers.host}`);
+                const clienteId = url.searchParams.get('cliente_id');
+                const codigoUnidade = url.searchParams.get('codigo_unidade');
+                if (!clienteId || !codigoUnidade) { sendJson(res, 400, { success: false, error: 'cliente_id e codigo_unidade são obrigatórios' }); return; }
+                const seq = db.peekNextAutproSequence(clienteId, codigoUnidade, tokenUser.empresa_id || 'default');
+                if (!seq) { sendJson(res, 404, { success: false, error: 'Unidade não encontrada' }); return; }
+                const cliente = db.getDb().prepare('SELECT codigo_cliente FROM clientes WHERE id = ?').get(clienteId);
+                const codigoCliente = cliente?.codigo_cliente || '000';
+                const numero = `${codigoCliente}${codigoUnidade}${seq}`;
+                sendJson(res, 200, { success: true, numero, codigoCliente, codigoUnidade, sequencial: parseInt(seq) });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
 
         if (pathname === '/api/next-proposal-number-preview' && req.method === 'GET') {
             const tokenUser = getTokenUser(req);
@@ -3256,6 +3417,51 @@ const server = http.createServer(async (req, res) => {
                 const content = fs.readFileSync(filePath);
                 res.setHeader('Content-Type', anexo.tipo_arquivo || 'application/octet-stream');
                 res.setHeader('Content-Disposition', `attachment; filename="${anexo.nome_arquivo}"`);
+                res.end(content);
+            } catch (err) { sendJson(res, 500, { error: err.message }); }
+            return;
+        }
+
+        // === CRM ANEXOS ===
+
+        if (pathname === '/api/crm/upload-anexo' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const body = await readBody(req);
+                const empresaId = tokenUser.empresa_id || 'default';
+
+                const anexosDir = path.join(__dirname, 'data', 'anexos_crm', empresaId);
+                if (!fs.existsSync(anexosDir)) fs.mkdirSync(anexosDir, { recursive: true });
+
+                const safeName = (body.nome_arquivo || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_');
+                const fileName = Date.now() + '_' + safeName;
+
+                if (body.fileData) {
+                    fs.writeFileSync(path.join(anexosDir, fileName), Buffer.from(body.fileData, 'base64'));
+                }
+
+                sendJson(res, 200, {
+                    success: true,
+                    item: { nome: safeName, caminho: fileName, tamanho: body.fileData ? Math.round(Buffer.from(body.fileData, 'base64').length / 1024) : 0, tipo: body.tipo_arquivo || '' }
+                });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname.startsWith('/api/crm/download-anexo/') && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const caminho = pathname.split('/').pop();
+                const empresaId = tokenUser.empresa_id || 'default';
+                const filePath = path.join(__dirname, 'data', 'anexos_crm', empresaId, caminho);
+                if (!fs.existsSync(filePath)) { sendJson(res, 404, { error: 'Arquivo não encontrado' }); return; }
+                const content = fs.readFileSync(filePath);
+                const ext = path.extname(caminho).toLowerCase();
+                const mimeTypes = { '.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.doc': 'application/msword', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.xls': 'application/vnd.ms-excel', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.zip': 'application/zip' };
+                res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+                res.setHeader('Content-Disposition', `inline; filename="${caminho.substring(caminho.indexOf('_') + 1)}"`);
                 res.end(content);
             } catch (err) { sendJson(res, 500, { error: err.message }); }
             return;

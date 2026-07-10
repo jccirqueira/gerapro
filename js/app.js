@@ -30,6 +30,8 @@ const App = {
         window.app.filterPtcList = this.filterPtcList.bind(this);
         window.app.closeSearchPtcModal = this.closeSearchPtcModal.bind(this);
         window.app.populatePtcContactFields = this.populatePtcContactFields.bind(this);
+        window.app.onPtcClientChange = this.onPtcClientChange.bind(this);
+        window.app.onPtcUnidadeChange = this.onPtcUnidadeChange.bind(this);
         window.app.onPtcContactChange = this.onPtcContactChange.bind(this);
         window.app.formatCurrency = this.formatCurrency.bind(this);
         window.app.formatCurrencyRaw = this.formatCurrencyRaw.bind(this);
@@ -1624,18 +1626,21 @@ const App = {
         const vendedores = store.getState().vendedores || [];
         const tbody = document.getElementById('conf-vendedores-tbody');
         if (!tbody) return;
-        tbody.innerHTML = vendedores.map(v => `
+        tbody.innerHTML = vendedores.map(v => {
+            const meta = parseFloat(v.meta_mensal) || 0;
+            return `
             <tr style="border-bottom:1px solid #f1f5f9;">
                 <td style="padding:8px 12px;">${this._escapeHtml(v.nome || '')}</td>
                 <td style="padding:8px 12px;">${this._escapeHtml(v.email || '')}</td>
                 <td style="padding:8px 12px;">${this._escapeHtml(v.telefone || '')}</td>
+                <td style="padding:8px 12px; text-align:right;">${meta > 0 ? 'R$ ' + meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
                 <td style="padding:8px 12px; text-align:center;">
                     <button class="btn btn-sm btn-ghost text-danger" onclick="app.deleteVendedor('${v.id}')" title="Remover">
                         <i class="ph ph-trash"></i>
                     </button>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
     },
 
     addVendedor() {
@@ -1643,9 +1648,10 @@ const App = {
         if (!nome) { this.showToast('Informe o nome do vendedor.', 'warning'); return; }
         const email = document.getElementById('conf-vendedor-email')?.value?.trim() || '';
         const telefone = document.getElementById('conf-vendedor-telefone')?.value?.trim() || '';
+        const meta_mensal = parseFloat(document.getElementById('conf-vendedor-meta')?.value) || 0;
         const vendedor = {
             id: crypto.randomUUID(),
-            nome, email, telefone,
+            nome, email, telefone, meta_mensal,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
@@ -1655,6 +1661,7 @@ const App = {
         document.getElementById('conf-vendedor-nome').value = '';
         document.getElementById('conf-vendedor-email').value = '';
         document.getElementById('conf-vendedor-telefone').value = '';
+        document.getElementById('conf-vendedor-meta').value = '';
         this.loadVendedoresForm();
         this.showToast('Vendedor adicionado!', 'success');
     },
@@ -2095,6 +2102,7 @@ const App = {
                             ${s.tracks_qualificacao ? '<span style="background:#f3e8ff;color:#7c3aed;padding:1px 6px;border-radius:4px">Registra Qualif.</span>' : ''}
                             ${s.tracks_conversao ? '<span style="background:#dbeafe;color:#2563eb;padding:1px 6px;border-radius:4px">Registra Conv.</span>' : ''}
                             ${s.is_loss ? '<span style="background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px">Perda</span>' : ''}
+                            ${s.probability !== undefined ? `<span style="background:#f0f9ff;color:#0369a1;padding:1px 6px;border-radius:4px">${s.probability}%</span>` : ''}
                         </div>
                     </div>
                     <div style="display:flex;gap:4px">
@@ -2176,7 +2184,8 @@ const App = {
                 tracks_qualificacao: 0,
                 tracks_conversao: 0,
                 is_loss: 0,
-                loss_reasons: []
+                loss_reasons: [],
+                probability: 0
             };
             this._stages.push(newStage);
             this.render();
@@ -2220,6 +2229,11 @@ const App = {
                                 <label style="font-size:11px;font-weight:600;color:#374151">Ícone (Phosphor)</label>
                                 <input type="text" id="stage-edit-icon" class="form-control" value="${this._esc(stage.icon || 'ph-dot-outline')}" style="font-size:12px;font-family:monospace">
                                 <span style="font-size:10px;color:#94a3b8">Ex: ph-dot-outline, ph-star, ph-check-circle</span>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;font-weight:600;color:#374151">Probabilidade (%)</label>
+                                <input type="number" id="stage-edit-probability" class="form-control" value="${stage.probability ?? 0}" min="0" max="100" style="font-size:12px">
+                                <span style="font-size:10px;color:#94a3b8">Usado no cálculo de forecast ponderado</span>
                             </div>
                         </div>
                         <div style="margin-bottom:16px">
@@ -2274,6 +2288,7 @@ const App = {
             const icon = document.getElementById('stage-edit-icon')?.value || stage.icon;
             const lossReasonsStr = document.getElementById('stage-edit-loss-reasons')?.value || '';
             const lossReasons = lossReasonsStr.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+            const probability = parseInt(document.getElementById('stage-edit-probability')?.value) || 0;
 
             const flags = {};
             document.querySelectorAll('[data-flag]').forEach(el => {
@@ -2285,6 +2300,7 @@ const App = {
                 stage_id: stageId,
                 color,
                 icon,
+                probability,
                 ...flags,
                 loss_reasons: lossReasons
             });
@@ -2293,7 +2309,7 @@ const App = {
             const statusEl = document.getElementById('crm-stages-status');
             if (statusEl) statusEl.textContent = 'Salvando...';
             await store.updateCrmStage(id, {
-                label, stage_id: stageId, color, icon, ...flags,
+                label, stage_id: stageId, color, icon, probability, ...flags,
                 loss_reasons: lossReasons
             });
             if (statusEl) statusEl.textContent = 'Salvo!';
@@ -2676,27 +2692,32 @@ const App = {
     // --- PTC Creation Logic ---
 
     async openPtcModal() {
+        const company = store.getState().company;
+        const isAUTPRO = company.folderName && company.folderName.startsWith('AUT_');
+
         const clientsInfo = store.getState().clientes.length > 0
-            ? store.getState().clientes.map(c => `<option value="${c.razaoSocial}">${c.razaoSocial}</option>`).join('')
+            ? store.getState().clientes.map(c => `<option value="${c.id}" data-razao="${this._escapeHtml(c.razaoSocial)}">${this._escapeHtml(c.razaoSocial)}</option>`).join('')
             : '<option value="">Nenhum cliente cadastrado</option>';
 
-        let ptcNum;
-        try {
-            const token = store.getState().auth?.token;
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = 'Bearer ' + token;
-            const res = await fetch('/api/next-proposal-number-preview', { headers });
-            const data = await res.json();
-            if (data.success && data.numero) ptcNum = data.numero;
-        } catch (e) {
-            console.warn('[PTC] Falha ao buscar prévia do número:', e);
-        }
-        if (!ptcNum) {
-            const d = new Date();
-            const hoje = String(d.getFullYear()).slice(-2) +
-                String(d.getMonth() + 1).padStart(2, '0') +
-                String(d.getDate()).padStart(2, '0');
-            ptcNum = hoje + '--';
+        let ptcNum = '';
+        if (!isAUTPRO) {
+            try {
+                const token = store.getState().auth?.token;
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const res = await fetch('/api/next-proposal-number-preview', { headers });
+                const data = await res.json();
+                if (data.success && data.numero) ptcNum = data.numero;
+            } catch (e) {
+                console.warn('[PTC] Falha ao buscar prévia do número:', e);
+            }
+            if (!ptcNum) {
+                const d = new Date();
+                const hoje = String(d.getFullYear()).slice(-2) +
+                    String(d.getMonth() + 1).padStart(2, '0') +
+                    String(d.getDate()).padStart(2, '0');
+                ptcNum = hoje + '--';
+            }
         }
 
         const html = `
@@ -2709,7 +2730,8 @@ const App = {
                     <div class="modal-body">
                         <div class="form-group">
                             <label class="form-label">Número da PTC</label>
-                            <input type="text" id="ptc-number" class="form-control" value="${ptcNum}" readonly style="background: #e2e8f0; font-weight: bold;">
+                            <input type="text" id="ptc-number" class="form-control" value="${ptcNum || (isAUTPRO ? 'Selecione cliente e unidade...' : '')}" readonly style="background: #e2e8f0; font-weight: bold;">
+                            <small id="ptc-number-hint" style="color: #64748b; ${isAUTPRO ? '' : 'display:none;'}">AUTPRO: Cliente + Unidade + Sequencial</small>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Título da PTC (Projeto)</label>
@@ -2717,9 +2739,15 @@ const App = {
                         </div>
                         <div class="form-group">
                             <label class="form-label">Cliente</label>
-                            <select id="ptc-client" class="form-control" onchange="app.populatePtcContactFields(this.value)">
+                            <select id="ptc-client" class="form-control" onchange="app.onPtcClientChange()">
                                 <option value="">Selecione...</option>
                                 ${clientsInfo}
+                            </select>
+                        </div>
+                        <div class="form-group" id="ptc-unidade-group" style="display: ${isAUTPRO ? 'block' : 'none'};">
+                            <label class="form-label">Unidade do Cliente</label>
+                            <select id="ptc-unidade" class="form-control" onchange="app.onPtcUnidadeChange()">
+                                <option value="">Selecione o cliente primeiro...</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -2755,7 +2783,6 @@ const App = {
                                 <option value="Elaboração de Projetos">Elaboração de Projetos</option>
                             </select>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">Tipo de Negócio</label>
                             <select id="ptc-business-type" class="form-control">
@@ -2764,7 +2791,6 @@ const App = {
                                 <option value="Prestação de Serviços">Prestação de Serviços</option>
                             </select>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">Tipo de Proposta</label>
                             <select id="ptc-tipo-proposta" class="form-control">
@@ -2772,7 +2798,6 @@ const App = {
                                 <option value="separado">Técnica + Comercial (2 documentos)</option>
                             </select>
                         </div>
-
                         <div class="form-group">
                             <label class="form-label">Vendedor</label>
                             <input type="text" id="ptc-vendedor" class="form-control" list="ptc-vendedor-list" placeholder="Selecione o vendedor">
@@ -2780,7 +2805,6 @@ const App = {
                                 ${(store.getState().vendedores || []).map(v => `<option value="${this._escapeHtml(v.nome)}">`).join('')}
                             </datalist>
                         </div>
-                        
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">Abertura</label>
@@ -2862,12 +2886,79 @@ const App = {
         }
     },
 
+    async onPtcClientChange() {
+        const elClient = document.getElementById('ptc-client');
+        const clientId = elClient?.value;
+        const client = store.getState().clientes.find(c => c.id === clientId);
+        const razaoSocial = client?.razaoSocial || '';
+
+        this.populatePtcContactFields(razaoSocial);
+
+        const company = store.getState().company;
+        const isAUTPRO = company.folderName && company.folderName.startsWith('AUT_');
+        if (!isAUTPRO) return;
+
+        const elUnidade = document.getElementById('ptc-unidade');
+        if (!elUnidade) return;
+
+        if (!clientId) {
+            elUnidade.innerHTML = '<option value="">Selecione o cliente primeiro...</option>';
+            document.getElementById('ptc-number').value = 'Selecione cliente e unidade...';
+            return;
+        }
+
+        try {
+            const token = store.getState().auth?.token;
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const res = await fetch(`/api/unidades-cliente?cliente_id=${clientId}`, { headers });
+            const data = await res.json();
+            if (data.success && data.unidades) {
+                if (data.unidades.length === 0) {
+                    elUnidade.innerHTML = '<option value="">Nenhuma unidade cadastrada para este cliente</option>';
+                } else {
+                    elUnidade.innerHTML = '<option value="">Selecione a unidade...</option>' +
+                        data.unidades.map(u => `<option value="${u.codigo_unidade}" data-nome="${this._escapeHtml(u.nome_unidade)}">${u.codigo_unidade} - ${this._escapeHtml(u.nome_unidade)}</option>`).join('');
+                }
+            }
+        } catch (e) {
+            console.warn('[PTC] Falha ao carregar unidades:', e);
+        }
+        document.getElementById('ptc-number').value = 'Selecione a unidade...';
+    },
+
+    async onPtcUnidadeChange() {
+        const company = store.getState().company;
+        const isAUTPRO = company.folderName && company.folderName.startsWith('AUT_');
+        if (!isAUTPRO) return;
+
+        const clientId = document.getElementById('ptc-client')?.value;
+        const codigoUnidade = document.getElementById('ptc-unidade')?.value;
+        if (!clientId || !codigoUnidade) {
+            document.getElementById('ptc-number').value = 'Selecione cliente e unidade...';
+            return;
+        }
+
+        try {
+            const token = store.getState().auth?.token;
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const res = await fetch(`/api/next-autpro-number-preview?cliente_id=${clientId}&codigo_unidade=${codigoUnidade}`, { headers });
+            const data = await res.json();
+            if (data.success && data.numero) {
+                document.getElementById('ptc-number').value = data.numero;
+            }
+        } catch (e) {
+            console.warn('[PTC] Falha ao gerar número AUTPRO:', e);
+        }
+    },
+
     onPtcContactChange(contactIndex) {
         if (contactIndex === '') return;
         const clientSelect = document.getElementById('ptc-client');
         if (!clientSelect) return;
-        const clientName = clientSelect.value;
-        const client = store.getState().clientes.find(c => c.razaoSocial === clientName);
+        const clientId = clientSelect.value;
+        const client = store.getState().clientes.find(c => c.id === clientId);
         if (!client) return;
 
         let contacts = [];
@@ -2914,7 +3005,6 @@ const App = {
 
     async savePtc() {
         try {
-            // Check elements existence
             const elNumber = document.getElementById('ptc-number');
             const elTitle = document.getElementById('ptc-title');
             const elClient = document.getElementById('ptc-client');
@@ -2926,10 +3016,15 @@ const App = {
                 return;
             }
 
-            const ptcNumber = await this.generatePtcNumber();
-            elNumber.value = ptcNumber;
+            const company = store.getState().company;
+            const isAUTPRO = company.folderName && company.folderName.startsWith('AUT_');
+
+            const clientId = elClient.value;
+            const client = store.getState().clientes.find(c => c.id === clientId);
+            const clientName = client?.razaoSocial || '';
+
+            let ptcNumber = elNumber.value;
             const ptcTitle = elTitle.value;
-            const clientName = elClient.value;
             const contact = elContact.value;
             const email = document.getElementById('ptc-email')?.value || '';
             const phone = document.getElementById('ptc-phone')?.value || '';
@@ -2939,7 +3034,6 @@ const App = {
             const tipoProposta = document.getElementById('ptc-tipo-proposta')?.value || 'tecnica_comercial';
             const vendedor = document.getElementById('ptc-vendedor')?.value || '';
 
-            // Date Fields
             const abertura = document.getElementById('ptc-date-abertura').value;
             const necesCliente = document.getElementById('ptc-date-cliente').value;
             const programadoPara = document.getElementById('ptc-date-programado').value;
@@ -2950,10 +3044,57 @@ const App = {
                 return;
             }
 
-            const payload = { ptcNumber, ptcTitle, clientName, contact, email, phone, role, type, businessType, vendedor, dates: { abertura, necesCliente, programadoPara, envioOrcamento } };
+            let payload;
 
-            // Call Backend to create folders
-            // 8082 Hardcoded to match server
+            if (isAUTPRO) {
+                const codigoCliente = client?.codigo_cliente || '';
+                const codigoUnidade = document.getElementById('ptc-unidade')?.value;
+                const unidadeSelect = document.getElementById('ptc-unidade');
+                const selectedOption = unidadeSelect?.options[unidadeSelect.selectedIndex];
+                const unidadeNome = selectedOption?.getAttribute('data-nome') || '';
+
+                if (!codigoUnidade) {
+                    this.showToast('Selecione a unidade do cliente.', 'error');
+                    return;
+                }
+
+                // Consume the sequence number
+                const token = store.getState().auth?.token;
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const seqRes = await fetch(`/api/next-autpro-number?cliente_id=${clientId}&codigo_unidade=${codigoUnidade}`, { headers });
+                const seqData = await seqRes.json();
+
+                if (!seqData.success) {
+                    this.showToast('Erro ao gerar número sequencial: ' + (seqData.error || ''), 'error');
+                    return;
+                }
+
+                ptcNumber = seqData.numero;
+                elNumber.value = ptcNumber;
+
+                payload = {
+                    ptcNumber,
+                    ptcTitle,
+                    clientName,
+                    contact, email, phone, role, type, businessType, vendedor,
+                    dates: { abertura, necesCliente, programadoPara, envioOrcamento },
+                    autpro: {
+                        codigoCliente,
+                        codigoUnidade,
+                        sequencial: seqData.sequencial,
+                        consumedSequencial: seqData.sequencial,
+                        clienteId: clientId,
+                        clienteRazaoSocial: clientName,
+                        unidadeNome
+                    }
+                };
+            } else {
+                ptcNumber = await this.generatePtcNumber();
+                elNumber.value = ptcNumber;
+                payload = { ptcNumber, ptcTitle, clientName, contact, email, phone, role, type, businessType, vendedor, dates: { abertura, necesCliente, programadoPara, envioOrcamento } };
+            }
+
             const _tkC2387 = store.getState().auth?.token;
             const response = await fetch('/api/create-ptc', {
                 method: 'POST',
@@ -2970,8 +3111,6 @@ const App = {
             const result = await response.json();
 
             if (result.success) {
-                // Extract folder name from path (last segment)
-                // Windows path might be double backslashes
                 const fullPath = result.path.replace(/\\/g, '/');
                 const folderName = fullPath.split('/').pop();
 

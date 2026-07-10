@@ -3,6 +3,8 @@ import { store } from './state.js';
 const CRM = {
     _currentView: 'dashboard',
     _selectedLeadId: null,
+    _calendarDate: new Date(),
+    _selectedCalendarDay: null,
     _filterStatus: 'todos',
     _filterVendedor: 'todos',
     _searchTerm: '',
@@ -27,6 +29,10 @@ const CRM = {
         return leadId ? all.filter(t => t.lead_id === leadId) : all;
     },
 
+    getNotas(leadId) {
+        return (store.getState().crmNotas || []).filter(n => n.lead_id === leadId);
+    },
+
     getVendedores() {
         return store.getState().vendedores || [];
     },
@@ -40,14 +46,14 @@ const CRM = {
         const stored = store.getState().crmStages;
         if (stored && stored.length > 0) return stored;
         return [
-            { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-            { id: 'tentando_contato', label: 'Tentando Contato', color: '#f59e0b', icon: 'ph-phone-call', position: 1, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-            { id: 'contato_realizado', label: 'Contato Realizado', color: '#3b82f6', icon: 'ph-chats', position: 2, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-            { id: 'qualificado', label: 'Qualificado', color: '#8b5cf6', icon: 'ph-star', position: 3, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 1, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-            { id: 'agendado_visita', label: 'Agendado', color: '#06b6d4', icon: 'ph-calendar-check', position: 4, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-            { id: 'visita_realizada', label: 'Visita Realizada', color: '#10b981', icon: 'ph-map-pin', position: 5, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-            { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: [] },
-            { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: ['nao_qualificado','sem_orcamento','nao_decidiu','concorrente','sem_contato','nao_responde','outro'] }
+            { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 5 },
+            { id: 'tentando_contato', label: 'Tentando Contato', color: '#f59e0b', icon: 'ph-phone-call', position: 1, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 10 },
+            { id: 'contato_realizado', label: 'Contato Realizado', color: '#3b82f6', icon: 'ph-chats', position: 2, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 20 },
+            { id: 'qualificado', label: 'Qualificado', color: '#8b5cf6', icon: 'ph-star', position: 3, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 1, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 40 },
+            { id: 'agendado_visita', label: 'Agendado', color: '#06b6d4', icon: 'ph-calendar-check', position: 4, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 60 },
+            { id: 'visita_realizada', label: 'Visita Realizada', color: '#10b981', icon: 'ph-map-pin', position: 5, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 70 },
+            { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: [], probability: 90 },
+            { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: ['nao_qualificado','sem_orcamento','nao_decidiu','concorrente','sem_contato','nao_responde','outro'], probability: 0 }
         ];
     },
 
@@ -156,6 +162,7 @@ const CRM = {
         this._overdueTimer = null;
         this._notifyOverdue(true);
         this._startOverdueTimer();
+        this._runAllSequencias().catch(() => {});
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             Notification.requestPermission();
         }
@@ -190,6 +197,7 @@ const CRM = {
                         <button class="crm-tab" data-view="kanban"><i class="ph ph-columns"></i> Kanban</button>
                         <button class="crm-tab" data-view="tabela"><i class="ph ph-table"></i> Lista</button>
                         <button class="crm-tab" data-view="tarefas"><i class="ph ph-check-square"></i> Tarefas</button>
+                        <button class="crm-tab" data-view="calendario"><i class="ph ph-calendar"></i> Calendário</button>
                         <button class="crm-tab" data-view="relatorios"><i class="ph ph-presentation-chart"></i> Relatórios</button>
                     </div>
                 </div>
@@ -205,6 +213,8 @@ const CRM = {
                         <input type="date" id="crm-filter-datestart" onchange="window.crm._setFilter('dateStart', this.value)" style="max-width:150px">
                         <input type="date" id="crm-filter-dateend" onchange="window.crm._setFilter('dateEnd', this.value)" style="max-width:150px">
                     </div>
+                    <button class="btn btn-sm btn-ghost" onclick="window.crm.abrirConfigSequencias()" title="Sequências" style="margin-left:4px;white-space:nowrap"><i class="ph ph-flow-arrow"></i> Sequências</button>
+                    <button class="btn btn-sm btn-ghost" onclick="window.crm.abrirConfigWebhooks()" title="Webhooks" style="margin-left:4px;white-space:nowrap"><i class="ph ph-plug"></i> Webhooks</button>
                 </div>
                 <div class="crm-content" id="crm-content"></div>
             </div>
@@ -235,6 +245,7 @@ const CRM = {
         else if (this._currentView === 'tabela') this._renderTabela();
         else if (this._currentView === 'kanban') this._renderKanban();
         else if (this._currentView === 'tarefas') this._renderTarefas();
+        else if (this._currentView === 'calendario') this._renderCalendario();
     },
 
     _filterLeads(leads) {
@@ -278,6 +289,7 @@ const CRM = {
         else if (this._currentView === 'kanban') this._renderKanban();
         else if (this._currentView === 'tabela') this._renderTabela();
         else if (this._currentView === 'tarefas') this._renderTarefas();
+        else if (this._currentView === 'calendario') this._renderCalendario();
         else if (this._currentView === 'relatorios') this._renderRelatorios();
     },
 
@@ -305,6 +317,11 @@ const CRM = {
             return st ? st.tracks_conversao : false;
         }).length;
         const valorEst = leads.reduce((s, l) => s + (parseFloat(l.estimativa_valor) || 0), 0);
+        const forecastPonderado = leads.reduce((s, l) => {
+            const st = this._getStage(l.status);
+            const prob = st ? (st.probability ?? 0) : 0;
+            return s + (parseFloat(l.estimativa_valor) || 0) * prob / 100;
+        }, 0);
         const hoje = new Date().toISOString().slice(0, 10);
         const tarefasHoje = this.getTarefas().filter(t => t.status !== 'concluida' && t.data_vencimento && t.data_vencimento.slice(0, 10) <= hoje).length;
         const leadsComFollowup = leads.filter(l => {
@@ -316,16 +333,19 @@ const CRM = {
 
         const porStatus = this.getLeadsPorStatus();
 
-        let statusCards = '';
-        this._getStages().forEach(s => {
+        const funnelBars = this._getStages().map(s => {
             const qtde = porStatus[s.id]?.length || 0;
-            statusCards += `
-                <div class="crm-stat-card" style="border-left: 4px solid ${s.color}">
-                    <div class="crm-stat-value">${qtde}</div>
-                    <div class="crm-stat-label">${s.label}</div>
+            const pct = total > 0 ? (qtde / total * 100) : 0;
+            return `
+                <div class="crm-funnel-bar">
+                    <div class="crm-funnel-row">
+                        <span class="crm-funnel-label">${s.label}</span>
+                        <span class="crm-funnel-count" style="color:${s.color}">${qtde}</span>
+                    </div>
+                    <div class="crm-bar-bg"><div class="crm-bar-fill" style="width:${pct}%;background:${s.color}"></div></div>
                 </div>
             `;
-        });
+        }).join('');
 
         const ultimosLeads = leads.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, 10);
 
@@ -343,7 +363,18 @@ const CRM = {
                                     <div class="crm-summary-card"><div class="crm-summary-value">${viraram}</div><div class="crm-summary-label">Viraram Proposta</div></div>
                                     <div class="crm-summary-card"><div class="crm-summary-value">${desqualificados}</div><div class="crm-summary-label">Desqualificados</div></div>
                                     <div class="crm-summary-card"><div class="crm-summary-value">${this.formatCurrency(valorEst)}</div><div class="crm-summary-label">Estimativa Total</div></div>
+                                    <div class="crm-summary-card"><div class="crm-summary-value">${this.formatCurrency(forecastPonderado)}</div><div class="crm-summary-label">Forecast Ponderado</div></div>
                                 </div>
+                                ${(() => {
+                                    const vends = this.getVendedores();
+                                    const metaTotal = vends.reduce((s, v) => s + (parseFloat(v.meta_mensal) || 0), 0);
+                                    if (metaTotal <= 0) return '';
+                                    const leadsAll = this._filterLeads(this.getLeads());
+                                    const valorTotal = leadsAll.reduce((s, l) => s + (parseFloat(l.estimativa_valor) || 0), 0);
+                                    const pct = Math.min(valorTotal / metaTotal * 100, 100);
+                                    const color = pct >= 100 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#ef4444';
+                                    return `<div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Meta Global: ${this.formatCurrency(metaTotal)}</span><span style="font-weight:600;color:${color}">${pct.toFixed(0)}%</span></div><div class="crm-bar-bg"><div class="crm-bar-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+                                })()}
                             </div>
                         </div>
                         <div class="crm-panel">
@@ -363,7 +394,7 @@ const CRM = {
                         <div class="crm-panel">
                             <div class="crm-panel-header"><i class="ph ph-funnel"></i> Funil</div>
                             <div class="crm-panel-body">
-                                <div class="crm-status-grid">${statusCards}</div>
+                                ${funnelBars}
                             </div>
                         </div>
                     </div>
@@ -435,13 +466,26 @@ const CRM = {
                 <div class="crm-lead-card-info">
                     ${lead.celular ? `<span><i class="ph ph-phone"></i> ${lead.celular}</span>` : ''}
                     ${lead.estimativa_valor > 0 ? `<span><i class="ph ph-currency-circle-dollar"></i> ${this.formatCurrency(lead.estimativa_valor)}</span>` : ''}
+                    ${lead.estimativa_valor > 0 && stage && (stage.probability ?? 0) > 0 ? `<span><i class="ph ph-chart-line"></i> ${this.formatCurrency(lead.estimativa_valor * (stage.probability ?? 0) / 100)}</span>` : ''}
                 </div>
                 <div class="crm-lead-card-footer">
                     <span class="crm-text-muted">${this.getVendedorNome(lead.vendedor_id)}</span>
                     ${isLate ? `<span class="crm-followup-late"><i class="ph ph-warning"></i></span>` : ''}
                 </div>
+                <div class="crm-lead-card-preview">
+                    ${this._getNextTaskPreview(lead.id)}
+                    ${hasFollowup ? `<span class="${isLate ? 'crm-followup-late' : ''}"><i class="ph ph-calendar"></i> ${new Date(lead.data_proximo_followup).toLocaleDateString()}</span>` : ''}
+                </div>
             </div>
         `;
+    },
+
+    _getNextTaskPreview(leadId) {
+        const tarefas = this.getTarefas(leadId).filter(t => t.status === 'pendente');
+        if (tarefas.length === 0) return '';
+        const next = tarefas.sort((a, b) => new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0))[0];
+        const date = next.data_vencimento ? new Date(next.data_vencimento).toLocaleDateString() : '';
+        return `<span><i class="ph ph-check-square"></i> ${this._esc(next.titulo)}${date ? ' (' + date + ')' : ''}</span>`;
     },
 
     _onDragStart(event, leadId) {
@@ -502,6 +546,7 @@ const CRM = {
                         <th onclick="window.crm._toggleSort('score')" style="cursor:pointer">Score${sortIcon('score')}</th>
                         <th onclick="window.crm._toggleSort('vendedor_id')" style="cursor:pointer">Vendedor${sortIcon('vendedor_id')}</th>
                         <th onclick="window.crm._toggleSort('estimativa_valor')" style="cursor:pointer">Valor Est.${sortIcon('estimativa_valor')}</th>
+                        <th onclick="window.crm._toggleSort('probability')" style="cursor:pointer">Prob.${sortIcon('probability')}</th>
                         <th onclick="window.crm._toggleSort('created_at')" style="cursor:pointer">Criação${sortIcon('created_at')}</th>
                         <th>Ações</th>
                     </tr>
@@ -514,6 +559,7 @@ const CRM = {
                             <td><span class="crm-score ${this.getScoreClass(l.score)}">${l.score ?? 0}</span></td>
                             <td>${this.getVendedorNome(l.vendedor_id)}</td>
                             <td>${this.formatCurrency(l.estimativa_valor)}</td>
+                            <td>${(() => { const st = this._getStage(l.status); const prob = st ? (st.probability ?? 0) : 0; return prob > 0 ? `<span style="font-weight:600">${prob}%</span><br><span class="crm-text-muted">${this.formatCurrency((parseFloat(l.estimativa_valor) || 0) * prob / 100)}</span>` : '—'; })()}</td>
                             <td class="crm-text-muted">${l.created_at ? new Date(l.created_at).toLocaleDateString() : '—'}</td>
                             <td>
                                 <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
@@ -531,6 +577,13 @@ const CRM = {
         const field = this._sortField;
         const dir = this._sortDir === 'asc' ? 1 : -1;
         return [...leads].sort((a, b) => {
+            if (field === 'probability') {
+                const stA = this._getStage(a.status);
+                const stB = this._getStage(b.status);
+                const probA = stA ? (stA.probability ?? 0) : 0;
+                const probB = stB ? (stB.probability ?? 0) : 0;
+                return (probA - probB) * dir;
+            }
             let va = a[field] ?? '';
             let vb = b[field] ?? '';
             if (field === 'estimativa_valor' || field === 'score') {
@@ -592,6 +645,537 @@ const CRM = {
                 this.updateBadge();
             },
 
+    _renderCalendario() {
+        const content = document.getElementById('crm-content');
+        if (!content) return;
+
+        const now = new Date();
+        const year = this._calendarDate.getFullYear();
+        const month = this._calendarDate.getMonth();
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+        const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const weekdayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+        const tarefas = this.getTarefas();
+        const leads = this.getLeads();
+
+        const todayStr = now.toISOString().slice(0, 10);
+        const selDay = this._selectedCalendarDay;
+
+        const itemsByDay = {};
+        const addItem = (dateStr, item, type) => {
+            if (!itemsByDay[dateStr]) itemsByDay[dateStr] = [];
+            itemsByDay[dateStr].push({ ...item, _type: type });
+        };
+
+        tarefas.forEach(t => {
+            if (t.data_vencimento) {
+                const d = t.data_vencimento.slice(0, 10);
+                addItem(d, t, 'tarefa');
+            }
+        });
+
+        leads.forEach(l => {
+            if (l.data_proximo_followup) {
+                const d = l.data_proximo_followup.slice(0, 10);
+                addItem(d, l, 'followup');
+            }
+        });
+
+        const cellHtml = [];
+        for (let i = 0; i < firstDay; i++) {
+            const d = daysInPrevMonth - firstDay + 1 + i;
+            cellHtml.push(`<div class="crm-cal-day crm-cal-day-other">${d}</div>`);
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const isToday = dateStr === todayStr;
+            const isSelected = selDay === dateStr;
+            const items = itemsByDay[dateStr] || [];
+            const tarefaCount = items.filter(i => i._type === 'tarefa').length;
+            const followupCount = items.filter(i => i._type === 'followup').length;
+            cellHtml.push(`
+                <div class="crm-cal-day ${isToday ? 'crm-cal-day-today' : ''} ${isSelected ? 'crm-cal-day-selected' : ''}" onclick="window.crm._selectCalendarDay('${dateStr}')">
+                    <span class="crm-cal-day-num">${d}</span>
+                    ${tarefaCount > 0 ? `<span class="crm-cal-badge crm-cal-badge-tarefa" title="${tarefaCount} tarefa(s)">${tarefaCount}</span>` : ''}
+                    ${followupCount > 0 ? `<span class="crm-cal-badge crm-cal-badge-followup" title="${followupCount} follow-up(s)">${followupCount}</span>` : ''}
+                </div>
+            `);
+        }
+
+        const selectedItems = selDay && itemsByDay[selDay] ? itemsByDay[selDay] : [];
+        const selDateLabel = selDay ? new Date(selDay + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+        content.innerHTML = `
+            <div style="display:flex;gap:12px;height:100%">
+                <div style="flex:2">
+                    <div class="crm-panel">
+                        <div class="crm-panel-header">
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <button class="btn btn-sm" onclick="window.crm._calendarNav(-1)" title="Mês anterior"><i class="ph ph-caret-left"></i></button>
+                                <strong style="font-size:15px">${monthNames[month]} ${year}</strong>
+                                <button class="btn btn-sm" onclick="window.crm._calendarNav(1)" title="Próximo mês"><i class="ph ph-caret-right"></i></button>
+                                <button class="btn btn-sm" onclick="window.crm._calendarToday()" title="Hoje"><i class="ph ph-clock-counter-clockwise"></i> Hoje</button>
+                            </div>
+                        </div>
+                        <div class="crm-panel-body" style="padding:8px">
+                            <div class="crm-cal-grid">
+                                ${weekdayNames.map(w => `<div class="crm-cal-weekday">${w}</div>`).join('')}
+                                ${cellHtml.join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="flex:1">
+                    <div class="crm-panel">
+                        <div class="crm-panel-header"><i class="ph ph-list"></i> ${selDay ? this._esc(selDateLabel) : 'Selecione um dia'}</div>
+                        <div class="crm-panel-body" style="max-height:60vh;overflow-y:auto">
+                            ${!selDay ? '<div class="crm-empty"><p>Clique em um dia para ver os eventos</p></div>' :
+                                selectedItems.length === 0 ? '<div class="crm-empty"><p>Nenhum evento neste dia</p></div>' :
+                                selectedItems.sort((a, b) => {
+                                    if (a._type !== b._type) return a._type === 'tarefa' ? -1 : 1;
+                                    return 0;
+                                }).map(item => {
+                                    if (item._type === 'tarefa') {
+                                        const lead = leads.find(l => l.id === item.lead_id);
+                                        const isLate = item.data_vencimento && item.data_vencimento.slice(0, 10) < todayStr && item.status !== 'concluida';
+                                        return `
+                                            <div class="crm-tarefa-card ${isLate ? 'crm-tarefa-late' : ''}">
+                                                <div class="crm-tarefa-card-header">
+                                                    <strong>${this._esc(item.titulo)}</strong>
+                                                    <span class="crm-tarefa-tipo ${item.tipo}">${item.tipo}</span>
+                                                </div>
+                                                <div class="crm-tarefa-card-body">
+                                                    ${item.descricao ? `<p>${this._esc(item.descricao)}</p>` : ''}
+                                                    <div class="crm-tarefa-card-meta">
+                                                        ${lead ? `<span><i class="ph ph-user"></i> ${this._esc(lead.nome)}</span>` : ''}
+                                                        ${item.status !== 'concluida' ? `<button class="btn btn-sm btn-success" onclick="window.crm._concluirTarefa('${item.id}')"><i class="ph ph-check"></i></button>` : `<span style="color:#16a34a;font-size:11px"><i class="ph ph-check-circle"></i> Concluída</span>`}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    } else {
+                                        const lead = leads.find(l => l.id === item.id);
+                                        return `
+                                            <div class="crm-interacao-card" style="cursor:pointer" onclick="window.crm.abrirModalLead('${item.id}')">
+                                                <div class="crm-interacao-header">
+                                                    <span class="crm-status-badge" style="background:${this.getStatusColor(item.status)};font-size:10px;padding:2px 6px">${this.getStatusLabel(item.status)}</span>
+                                                </div>
+                                                <div class="crm-interacao-body">
+                                                    <strong>${this._esc(item.nome)}${item.empresa ? ' — ' + this._esc(item.empresa) : ''}</strong>
+                                                </div>
+                                                <div class="crm-interacao-resultado"><i class="ph ph-bell-ringing"></i> Follow-up agendado</div>
+                                            </div>
+                                        `;
+                                    }
+                                }).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    _calendarNav(dir) {
+        const d = new Date(this._calendarDate);
+        d.setMonth(d.getMonth() + dir);
+        this._calendarDate = d;
+        this._selectedCalendarDay = null;
+        this._renderCalendario();
+    },
+
+    _calendarToday() {
+        this._calendarDate = new Date();
+        const todayStr = new Date().toISOString().slice(0, 10);
+        this._selectedCalendarDay = todayStr;
+        this._renderCalendario();
+    },
+
+    _selectCalendarDay(dateStr) {
+        this._selectedCalendarDay = this._selectedCalendarDay === dateStr ? null : dateStr;
+        this._renderCalendario();
+    },
+
+    abrirConfigWebhooks() {
+        const webhooks = store.getState().crmWebhooks || [];
+        const eventosDisponiveis = [
+            { id: 'crmLeads:created', label: 'Lead Criado' },
+            { id: 'crmLeads:updated', label: 'Lead Atualizado' },
+            { id: 'crmLeads:deleted', label: 'Lead Excluído' },
+            { id: 'crmInteracoes:created', label: 'Interação Registrada' },
+            { id: 'crmTarefas:created', label: 'Tarefa Criada' },
+            { id: 'crmTarefas:updated', label: 'Tarefa Atualizada' },
+            { id: 'crmNotas:created', label: 'Nota Adicionada' }
+        ];
+
+        const overlay = document.createElement('div');
+        overlay.className = 'crm-modal-overlay';
+        overlay.innerHTML = `
+            <div class="crm-modal" style="max-width:700px">
+                <div class="crm-modal-header">
+                    <h3><i class="ph ph-plug"></i> Webhooks Pipeline</h3>
+                    <button class="crm-modal-close" onclick="this.closest('.crm-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="crm-modal-body">
+                    <div style="margin-bottom:16px;font-size:12px;color:var(--color-text-muted)">
+                        Webhooks disparam requisições HTTP para URLs externas quando eventos do CRM ocorrem.
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <button class="btn btn-sm btn-primary" onclick="window.crm._addWebhookForm()"><i class="ph ph-plus"></i> Novo Webhook</button>
+                    </div>
+                    <div id="crm-webhooks-list">
+                        ${webhooks.length === 0 ? '<div class="crm-empty"><p>Nenhum webhook configurado</p></div>' :
+                            webhooks.map(wh => {
+                                const eventos = (() => { try { return JSON.parse(wh.eventos || '[]'); } catch { return []; } })();
+                                return `
+                                <div class="crm-interacao-card" style="margin-bottom:8px">
+                                    <div class="crm-interacao-header">
+                                        <strong>${this._esc(wh.nome)}</strong>
+                                        <div style="display:flex;gap:6px;align-items:center">
+                                            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer">
+                                                <input type="checkbox" ${wh.ativo !== false ? 'checked' : ''} onchange="window.crm._toggleWebhook('${wh.id}', this.checked)">
+                                                Ativo
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="crm-interacao-body">
+                                        <div style="font-size:11px;color:var(--color-text-muted);word-break:break-all">${this._esc(wh.url)}</div>
+                                        <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+                                            ${eventos.map(e => `<span style="font-size:10px;background:#e2e8f0;padding:1px 6px;border-radius:4px">${eventosDisponiveis.find(ed => ed.id === e)?.label || e}</span>`).join('')}
+                                        </div>
+                                    </div>
+                                    <div class="crm-interacao-footer">
+                                        <button class="btn btn-sm" onclick="window.crm._testWebhook('${wh.id}')"><i class="ph ph-lightning"></i> Testar</button>
+                                        <button class="btn btn-sm btn-danger" onclick="window.crm._deleteWebhook('${wh.id}')"><i class="ph ph-trash"></i></button>
+                                    </div>
+                                </div>
+                            `}).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    _addWebhookForm() {
+        const overlay = document.createElement('div');
+        overlay.className = 'crm-modal-overlay';
+        overlay.innerHTML = `
+            <div class="crm-modal" style="max-width:500px">
+                <div class="crm-modal-header">
+                    <h3>Novo Webhook</h3>
+                    <button class="crm-modal-close" onclick="this.closest('.crm-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="crm-modal-body">
+                    <form id="crm-webhook-form" onsubmit="event.preventDefault();window.crm._saveWebhook()">
+                        <div class="crm-form-grid">
+                            <div class="crm-field" style="grid-column:span 2">
+                                <label>Nome</label>
+                                <input type="text" id="wh-nome" class="form-control" required placeholder="Ex: Notificar Slack">
+                            </div>
+                            <div class="crm-field" style="grid-column:span 2">
+                                <label>URL</label>
+                                <input type="url" id="wh-url" class="form-control" required placeholder="https://hooks.slack.com/...">
+                            </div>
+                            <div class="crm-field" style="grid-column:span 2">
+                                <label>Eventos</label>
+                                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+                                    ${[
+                                        { id: 'crmLeads:created', label: 'Lead Criado' },
+                                        { id: 'crmLeads:updated', label: 'Lead Atualizado' },
+                                        { id: 'crmLeads:deleted', label: 'Lead Excluído' },
+                                        { id: 'crmInteracoes:created', label: 'Interação' },
+                                        { id: 'crmTarefas:created', label: 'Tarefa Criada' },
+                                        { id: 'crmTarefas:updated', label: 'Tarefa Atualizada' },
+                                        { id: 'crmNotas:created', label: 'Nota' }
+                                    ].map(e => `
+                                        <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">
+                                            <input type="checkbox" class="wh-evento" value="${e.id}" checked> ${e.label}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+                            <button type="button" class="btn btn-sm" onclick="this.closest('.crm-modal-overlay').remove()">Cancelar</button>
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="ph ph-check"></i> Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    async _saveWebhook() {
+        const nome = document.getElementById('wh-nome')?.value?.trim();
+        const url = document.getElementById('wh-url')?.value?.trim();
+        if (!nome || !url) { this.showToast('Preencha nome e URL.', 'warning'); return; }
+        const eventoEls = document.querySelectorAll('.wh-evento:checked');
+        const eventos = Array.from(eventoEls).map(el => el.value);
+        if (eventos.length === 0) { this.showToast('Selecione pelo menos um evento.', 'warning'); return; }
+        const item = {
+            id: crypto.randomUUID(),
+            nome, url,
+            eventos: JSON.stringify(eventos),
+            ativo: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const webhooks = [...(store.getState().crmWebhooks || []), item];
+        store.setState({ crmWebhooks: webhooks });
+        await store._syncCreate('crmWebhooks', item).catch(() => {});
+        const overlay = document.getElementById('crm-webhook-form')?.closest('.crm-modal-overlay');
+        if (overlay) overlay.remove();
+        this.abrirConfigWebhooks();
+        this.showToast('Webhook adicionado!', 'success');
+    },
+
+    async _toggleWebhook(id, ativo) {
+        const webhooks = store.getState().crmWebhooks || [];
+        const wh = webhooks.find(w => w.id === id);
+        if (!wh) return;
+        wh.ativo = ativo ? 1 : 0;
+        store.setState({ crmWebhooks: webhooks });
+        await store._syncUpdate('crmWebhooks', id, { ativo: wh.ativo }).catch(() => {});
+        this.abrirConfigWebhooks();
+    },
+
+    async _deleteWebhook(id) {
+        if (!confirm('Excluir este webhook?')) return;
+        const webhooks = (store.getState().crmWebhooks || []).filter(w => w.id !== id);
+        store.setState({ crmWebhooks: webhooks });
+        await store._syncDelete('crmWebhooks', id).catch(() => {});
+        this.abrirConfigWebhooks();
+    },
+
+    async _testWebhook(id) {
+        const wh = (store.getState().crmWebhooks || []).find(w => w.id === id);
+        if (!wh) return;
+        const token = store.getState().auth?.token;
+        if (!token) { this.showToast('Não autenticado.', 'warning'); return; }
+        try {
+            const res = await fetch('/api/webhooks/test', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: wh.url, entity: 'crmLeads' })
+            });
+            const data = await res.json();
+            if (data.success && data.status >= 200 && data.status < 300) {
+                this.showToast(`Teste OK! Status: ${data.status}`, 'success');
+            } else {
+                this.showToast(`Falha: ${data.status || data.error}`, 'error');
+            }
+        } catch (err) {
+            this.showToast(`Erro: ${err.message}`, 'error');
+        }
+    },
+
+    _getSequencias() {
+        return store.getState().crmSequencias || [];
+    },
+
+    async _applySequencias(leadId) {
+        const lead = this.getLeads().find(l => l.id === leadId);
+        if (!lead) return;
+        const sequencias = this._getSequencias().filter(s => s.ativo !== false);
+        const existingTasks = this.getTarefas(leadId);
+        for (const seq of sequencias) {
+            if (seq.trigger_event === 'stage_entered' && seq.trigger_value === lead.status) {
+                const alreadyHas = existingTasks.some(t => t.titulo === seq.task_titulo && t.status !== 'concluida' && t._seq_id === seq.id);
+                if (alreadyHas) continue;
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + (parseInt(seq.delay_days) || 0));
+                const tarefa = {
+                    id: crypto.randomUUID(),
+                    lead_id: leadId,
+                    titulo: seq.task_titulo,
+                    descricao: seq.task_descricao || '',
+                    tipo: 'sequencia',
+                    prioridade: seq.task_prioridade || 'media',
+                    status: 'pendente',
+                    data_vencimento: dueDate.toISOString().slice(0, 10),
+                    lead_nome: lead.nome,
+                    _seq_id: seq.id,
+                    created_at: new Date().toISOString()
+                };
+                await store.addCrmTarefa(tarefa);
+            }
+        }
+    },
+
+    async _runAllSequencias() {
+        const leads = this.getLeads();
+        for (const lead of leads) {
+            await this._applySequencias(lead.id);
+        }
+        console.log('[CRM] Sequências aplicadas para', leads.length, 'leads');
+    },
+
+    abrirConfigSequencias() {
+        const sequencias = this._getSequencias();
+        const stages = this._getStages();
+        const content = document.getElementById('crm-content');
+        if (!content) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'crm-modal-overlay';
+        overlay.innerHTML = `
+            <div class="crm-modal" style="max-width:700px">
+                <div class="crm-modal-header">
+                    <h3><i class="ph ph-flow-arrow"></i> Sequências de Atividades</h3>
+                    <button class="crm-modal-close" onclick="this.closest('.crm-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="crm-modal-body">
+                    <div style="margin-bottom:16px;font-size:12px;color:var(--color-text-muted)">
+                        Sequências criam tarefas automaticamente quando um lead atinge um estágio específico.
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <button class="btn btn-sm btn-primary" onclick="window.crm._addSequenciaForm()"><i class="ph ph-plus"></i> Nova Sequência</button>
+                    </div>
+                    <div id="crm-sequencias-list">
+                        ${sequencias.length === 0 ? '<div class="crm-empty"><p>Nenhuma sequência configurada</p></div>' :
+                            sequencias.map(seq => {
+                                const stageLabel = stages.find(s => s.id === seq.trigger_value)?.label || seq.trigger_value;
+                                return `
+                                <div class="crm-interacao-card" style="margin-bottom:8px">
+                                    <div class="crm-interacao-header">
+                                        <strong>${this._esc(seq.nome)}</strong>
+                                        <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer">
+                                            <input type="checkbox" ${seq.ativo !== false ? 'checked' : ''} onchange="window.crm._toggleSequencia('${seq.id}', this.checked)">
+                                            Ativo
+                                        </label>
+                                    </div>
+                                    <div class="crm-interacao-body" style="font-size:12px">
+                                        <span style="background:#e2e8f0;padding:1px 6px;border-radius:4px">${this._esc(stageLabel)}</span>
+                                        → ${this._esc(seq.task_titulo)}
+                                        ${parseInt(seq.delay_days) > 0 ? ` (${seq.delay_days} dia(s) após)` : ' (imediato)'}
+                                    </div>
+                                    <div class="crm-interacao-footer">
+                                        <button class="btn btn-sm btn-danger" onclick="window.crm._deleteSequencia('${seq.id}')"><i class="ph ph-trash"></i></button>
+                                    </div>
+                                </div>
+                            `}).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    _addSequenciaForm() {
+        const stages = this._getStages();
+        const overlay = document.createElement('div');
+        overlay.className = 'crm-modal-overlay';
+        overlay.innerHTML = `
+            <div class="crm-modal" style="max-width:500px">
+                <div class="crm-modal-header">
+                    <h3>Nova Sequência</h3>
+                    <button class="crm-modal-close" onclick="this.closest('.crm-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="crm-modal-body">
+                    <form id="crm-sequencia-form" onsubmit="event.preventDefault();window.crm._saveSequencia()">
+                        <div class="crm-form-grid">
+                            <div class="crm-field" style="grid-column:span 2">
+                                <label>Nome da Sequência</label>
+                                <input type="text" id="seq-nome" class="form-control" required placeholder="Ex: Follow-up pós-qualificação">
+                            </div>
+                            <div class="crm-field">
+                                <label>Quando entrar no estágio</label>
+                                <select id="seq-trigger-value" class="form-control" required>
+                                    <option value="">Selecione...</option>
+                                    ${stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="crm-field">
+                                <label>Atraso (dias)</label>
+                                <input type="number" id="seq-delay" class="form-control" value="0" min="0">
+                            </div>
+                            <div class="crm-field" style="grid-column:span 2">
+                                <label>Título da Tarefa</label>
+                                <input type="text" id="seq-titulo" class="form-control" required placeholder="Ex: Ligar para cliente">
+                            </div>
+                            <div class="crm-field" style="grid-column:span 2">
+                                <label>Descrição</label>
+                                <textarea id="seq-descricao" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="crm-field">
+                                <label>Prioridade</label>
+                                <select id="seq-prioridade" class="form-control">
+                                    <option value="baixa">Baixa</option>
+                                    <option value="media" selected>Média</option>
+                                    <option value="alta">Alta</option>
+                                    <option value="urgente">Urgente</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+                            <button type="button" class="btn btn-sm" onclick="this.closest('.crm-modal-overlay').remove()">Cancelar</button>
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="ph ph-check"></i> Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    async _saveSequencia() {
+        const nome = document.getElementById('seq-nome')?.value?.trim();
+        const trigger_value = document.getElementById('seq-trigger-value')?.value;
+        const delay_days = parseInt(document.getElementById('seq-delay')?.value) || 0;
+        const task_titulo = document.getElementById('seq-titulo')?.value?.trim();
+        const task_descricao = document.getElementById('seq-descricao')?.value?.trim() || '';
+        const task_prioridade = document.getElementById('seq-prioridade')?.value || 'media';
+        if (!nome || !trigger_value || !task_titulo) { this.showToast('Preencha nome, estágio e título da tarefa.', 'warning'); return; }
+        const item = {
+            id: crypto.randomUUID(),
+            nome,
+            trigger_event: 'stage_entered',
+            trigger_value,
+            delay_days,
+            task_titulo,
+            task_descricao,
+            task_prioridade,
+            ativo: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const sequencias = [...(this._getSequencias()), item];
+        store.setState({ crmSequencias: sequencias });
+        await store._syncCreate('crmSequencias', item).catch(() => {});
+        const overlay = document.getElementById('crm-sequencia-form')?.closest('.crm-modal-overlay');
+        if (overlay) overlay.remove();
+        this.abrirConfigSequencias();
+        this.showToast('Sequência criada!', 'success');
+    },
+
+    async _toggleSequencia(id, ativo) {
+        const sequencias = this._getSequencias();
+        const seq = sequencias.find(s => s.id === id);
+        if (!seq) return;
+        seq.ativo = ativo ? 1 : 0;
+        store.setState({ crmSequencias: sequencias });
+        await store._syncUpdate('crmSequencias', id, { ativo: seq.ativo }).catch(() => {});
+        this.abrirConfigSequencias();
+    },
+
+    async _deleteSequencia(id) {
+        if (!confirm('Excluir esta sequência?')) return;
+        const sequencias = this._getSequencias().filter(s => s.id !== id);
+        store.setState({ crmSequencias: sequencias });
+        await store._syncDelete('crmSequencias', id).catch(() => {});
+        this.abrirConfigSequencias();
+    },
+
+    showToast(msg, type, duration, action) {
+        if (typeof app !== 'undefined' && app.showToast) app.showToast(msg, type || 'info', duration, action);
+    },
+
     _renderTarefaCard(tarefa, hoje) {
         const isLate = tarefa.data_vencimento && tarefa.data_vencimento.slice(0, 10) < hoje && tarefa.status !== 'concluida';
         const lead = this.getLeads().find(l => l.id === tarefa.lead_id);
@@ -636,12 +1220,16 @@ const CRM = {
         const leads = this.getLeads();
         const total = leads.length;
         const porStatus = this.getLeadsPorStatus();
+        const vendedores = this.getVendedores();
         const porVendedor = {};
         leads.forEach(l => {
             const vid = l.vendedor_id || 'sem_vendedor';
-            if (!porVendedor[vid]) porVendedor[vid] = { total: 0, qualificados: 0, propostas: 0, leads: [] };
+            if (!porVendedor[vid]) porVendedor[vid] = { total: 0, qualificados: 0, propostas: 0, valorTotal: 0, meta: 0, leads: [] };
             porVendedor[vid].total++;
             porVendedor[vid].leads.push(l);
+            porVendedor[vid].valorTotal += parseFloat(l.estimativa_valor) || 0;
+            const vendedor = vendedores.find(v => v.id === vid);
+            if (vendedor) porVendedor[vid].meta = parseFloat(vendedor.meta_mensal) || 0;
             const st = this._getStage(l.status);
             if (st && st.tracks_conversao) porVendedor[vid].propostas++;
             if (st && !st.is_default && !st.is_terminal && !st.is_loss && !st.tracks_conversao) porVendedor[vid].qualificados++;
@@ -650,15 +1238,20 @@ const CRM = {
         const totalPerdidos = leads.filter(l => { const st = this._getStage(l.status); return st && st.is_loss; }).length;
         const taxaConversao = total > 0 ? (totalConvertidos / total * 100).toFixed(1) : '0.0';
 
-        const vendedorRows = Object.entries(porVendedor).map(([vid, data]) => `
+        const vendedorRows = Object.entries(porVendedor).map(([vid, data]) => {
+            const meta = data.meta || 0;
+            const atingido = meta > 0 ? Math.min(data.valorTotal / meta * 100, 100) : 0;
+            return `
             <tr>
                 <td>${this.getVendedorNome(vid)}</td>
                 <td>${data.total}</td>
                 <td>${data.qualificados}</td>
                 <td>${data.propostas}</td>
                 <td>${data.total > 0 ? (data.propostas / data.total * 100).toFixed(1) + '%' : '0%'}</td>
+                <td>${meta > 0 ? 'R$ ' + meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
+                <td>${meta > 0 ? `<div style="display:flex;align-items:center;gap:6px"><div class="crm-bar-bg" style="flex:1;max-width:80px"><div class="crm-bar-fill" style="width:${atingido}%;background:${atingido >= 100 ? '#16a34a' : atingido >= 50 ? '#f59e0b' : '#ef4444'}"></div></div><span style="font-size:11px;font-weight:600">${atingido.toFixed(0)}%</span></div>` : '—'}</td>
             </tr>
-        `).join('');
+        `}).join('');
 
         content.innerHTML = `
             <div class="crm-dashboard" style="max-width:900px">
@@ -675,8 +1268,8 @@ const CRM = {
                         </div>
                         <h3 style="font-size:14px;margin:0 0 8px">Desempenho por Vendedor</h3>
                         <table class="crm-table">
-                            <thead><tr><th>Vendedor</th><th>Total Leads</th><th>Qualificados</th><th>Propostas</th><th>Conversão</th></tr></thead>
-                            <tbody>${vendedorRows || '<tr><td colspan="5" class="crm-text-muted">Nenhum dado</td></tr>'}</tbody>
+                            <thead><tr><th>Vendedor</th><th>Total Leads</th><th>Qualificados</th><th>Propostas</th><th>Conversão</th><th>Meta (R$)</th><th>% Atingido</th></tr></thead>
+                            <tbody>${vendedorRows || '<tr><td colspan="7" class="crm-text-muted">Nenhum dado</td></tr>'}</tbody>
                         </table>
                     </div>
                 </div>
@@ -703,11 +1296,16 @@ const CRM = {
     },
 
     _getExportLeads() {
-        return this._filterLeads(this.getLeads()).map(l => ({
+        return this._filterLeads(this.getLeads()).map(l => {
+            const st = this._getStage(l.status);
+            const prob = st ? (st.probability ?? 0) : 0;
+            return {
             Nome: l.nome || '',
             Empresa: l.empresa || '',
             Status: this.getStatusLabel(l.status),
             Score: l.score ?? 0,
+            Probabilidade: prob + '%',
+            'Forecast': (parseFloat(l.estimativa_valor) || 0) * prob / 100,
             Vendedor: this.getVendedorNome(l.vendedor_id),
             'Valor Estimado': l.estimativa_valor || 0,
             Celular: l.celular || '',
@@ -720,7 +1318,8 @@ const CRM = {
             'Data Último Contato': l.data_ultimo_contato ? l.data_ultimo_contato.slice(0, 10) : '',
             'Data Qualificação': l.data_qualificacao ? l.data_qualificacao.slice(0, 10) : '',
             Observações: l.observacoes || ''
-        }));
+        };
+        });
     },
 
     _exportCSV() {
@@ -1013,6 +1612,7 @@ const CRM = {
                     <button class="crm-modal-tab" data-tab="interacoes" onclick="window.crm._switchModalTab(this, 'interacoes')"><i class="ph ph-chats"></i> Interações (${interacoes.length})</button>
                     <button class="crm-modal-tab" data-tab="tarefas" onclick="window.crm._switchModalTab(this, 'tarefas')"><i class="ph ph-check-square"></i> Tarefas (${tarefas.length})</button>
                     <button class="crm-modal-tab" data-tab="propostas" onclick="window.crm._switchModalTab(this, 'propostas')"><i class="ph ph-file"></i> Propostas (${pipelineItems.length})</button>
+                    <button class="crm-modal-tab" data-tab="notas" onclick="window.crm._switchModalTab(this, 'notas')"><i class="ph ph-note-pencil"></i> Notas (${this.getNotas(lead.id).length})</button>
                     <button class="crm-modal-tab" data-tab="score" onclick="window.crm._switchModalTab(this, 'score')"><i class="ph ph-star"></i> Score</button>
                     <button class="crm-modal-tab" data-tab="acoes" onclick="window.crm._switchModalTab(this, 'acoes')"><i class="ph ph-lightning"></i> Ações</button>
                     <button class="crm-modal-tab" data-tab="email" onclick="window.crm._switchModalTab(this, 'email')"><i class="ph ph-envelope"></i> E-mail</button>
@@ -1037,6 +1637,7 @@ const CRM = {
         else if (tabName === 'interacoes') body.innerHTML = this._renderModalTabInteracoes(lead);
         else if (tabName === 'tarefas') body.innerHTML = this._renderModalTabTarefas(lead);
         else if (tabName === 'propostas') body.innerHTML = this._renderModalTabPropostas(lead);
+        else if (tabName === 'notas') body.innerHTML = this._renderModalTabNotas(lead);
         else if (tabName === 'score') body.innerHTML = this._renderModalTabScore(lead);
         else if (tabName === 'acoes') body.innerHTML = this._renderModalTabAcoes(lead);
         else if (tabName === 'email') {
@@ -1158,6 +1759,7 @@ const CRM = {
                             <div class="crm-interacao-body">${this._esc(i.descricao)}</div>
                             ${i.resultado ? `<div class="crm-interacao-resultado"><strong>Resultado:</strong> ${this._esc(i.resultado)}</div>` : ''}
                             ${i.proximo_passo ? `<div class="crm-interacao-proximo"><strong>Próximo passo:</strong> ${this._esc(i.proximo_passo)}${i.proxima_data ? ` até ${new Date(i.proxima_data).toLocaleDateString()}` : ''}</div>` : ''}
+                            ${(() => { try { const a = typeof i.anexos === 'string' ? JSON.parse(i.anexos) : (i.anexos || []); return a.length > 0 ? `<div class="crm-interacao-anexos">${a.map(an => `<a href="/api/crm/download-anexo/${encodeURIComponent(an.caminho)}" target="_blank" class="crm-anexo-link" title="${this._esc(an.nome)} (${an.tamanho || 0} KB)"><i class="ph ph-paperclip"></i> ${this._esc(an.nome)}</a>`).join('')}</div>` : ''; } catch(e) { return ''; } })()}
                             <div class="crm-interacao-footer">
                                 ${i.realizado_por ? `<span>${this._esc(i.realizado_por)}</span>` : ''}
                                 <button class="btn btn-sm btn-danger" onclick="window.crm._excluirInteracao('${i.id}','${lead.id}')"><i class="ph ph-trash"></i></button>
@@ -1179,6 +1781,42 @@ const CRM = {
                 </div>
                 ${tarefas.length === 0 ? '<div class="crm-empty"><p>Nenhuma tarefa</p></div>' :
                     tarefas.sort((a, b) => new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0)).map(t => this._renderTarefaCard(t, hoje)).join('')}
+            </div>
+        `;
+    },
+
+    _renderModalTabNotas(lead) {
+        const notas = this.getNotas(lead.id);
+        return `
+            <div class="crm-modal-tab-content">
+                <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+                    <span class="crm-text-muted">${notas.length} nota(s)</span>
+                </div>
+                <div style="margin-bottom:12px">
+                    <textarea id="crm-nota-conteudo" rows="2" class="form-control" placeholder="Escreva uma nota..." style="width:100%;resize:vertical" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();window.crm._addNota('${lead.id}')}"></textarea>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+                        <span class="crm-text-muted" style="font-size:11px">Pressione Ctrl+Enter para salvar</span>
+                        <button class="btn btn-sm btn-primary" onclick="window.crm._addNota('${lead.id}')"><i class="ph ph-plus"></i> Adicionar Nota</button>
+                    </div>
+                </div>
+                <div id="crm-notas-lista">
+                    ${notas.length === 0 ? '<div class="crm-empty"><p>Nenhuma nota</p></div>' :
+                        notas.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).map(n => {
+                            const data = n.created_at ? new Date(n.created_at).toLocaleString() : '';
+                            const autor = n.autor ? this._esc(n.autor) : '';
+                            return `
+                            <div class="crm-interacao-card">
+                                <div class="crm-interacao-header">
+                                    ${autor ? `<span style="font-weight:600;font-size:12px">${autor}</span>` : '<span class="crm-text-muted" style="font-size:12px">Anônimo</span>'}
+                                    <span class="crm-text-muted">${data}</span>
+                                </div>
+                                <div class="crm-interacao-body" style="white-space:pre-wrap">${this._esc(n.conteudo)}</div>
+                                <div class="crm-interacao-footer">
+                                    <button class="btn btn-sm btn-danger" onclick="window.crm._excluirNota('${n.id}','${lead.id}')"><i class="ph ph-trash"></i></button>
+                                </div>
+                            </div>
+                        `}).join('')}
+                </div>
             </div>
         `;
     },
@@ -1333,6 +1971,7 @@ const CRM = {
         if (newStage.tracks_conversao) {
             await store.updateCrmLead(leadId, { data_conversao: new Date().toISOString() });
         }
+        this._applySequencias(leadId).catch(() => {});
         this.updateBadge();
         const body = document.getElementById('crm-lead-modal-body');
         if (body) body.innerHTML = this._renderModalTabDados(lead);
@@ -1933,6 +2572,11 @@ const CRM = {
                             <label>Data do Próximo Passo</label>
                             <input type="date" id="i-proxima-data">
                         </div>
+                        <div class="crm-field" style="grid-column:span 2">
+                            <label>Anexos</label>
+                            <input type="file" id="i-anexos" multiple onchange="window.crm._previewAnexos(this)">
+                            <div id="i-anexos-preview" style="font-size:11px;color:var(--color-text-muted);margin-top:4px"></div>
+                        </div>
                         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
                             <button type="button" class="btn" onclick="this.closest('.crm-modal-overlay').remove()">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Salvar</button>
@@ -1944,9 +2588,52 @@ const CRM = {
         document.body.appendChild(overlay);
     },
 
+    _previewAnexos(input) {
+        const list = document.getElementById('i-anexos-preview');
+        if (!list) return;
+        const files = input.files;
+        if (files.length === 0) { list.innerHTML = ''; return; }
+        list.innerHTML = Array.from(files).map(f => `<div style="padding:2px 0"><i class="ph ph-paperclip"></i> ${this._esc(f.name)} (${(f.size / 1024).toFixed(1)} KB)</div>`).join('');
+    },
+
+    async _uploadAnexo(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    const base64 = reader.result.split(',')[1];
+                    const token = store.getState().auth?.token;
+                    const res = await fetch(`http://${location.hostname}:8082/api/crm/upload-anexo`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ nome_arquivo: file.name, fileData: base64, tipo_arquivo: file.type })
+                    });
+                    const data = await res.json();
+                    if (data.success) resolve(data.item);
+                    else reject(new Error(data.error || 'Falha no upload'));
+                } catch (e) { reject(e); }
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    },
+
     async _salvarInteracao(leadId) {
         const descricao = document.getElementById('i-descricao')?.value;
         if (!descricao) { alert('Descrição é obrigatória'); return; }
+
+        const fileInput = document.getElementById('i-anexos');
+        const files = fileInput?.files || [];
+        const anexos = [];
+        for (let i = 0; i < files.length; i++) {
+            try {
+                const meta = await this._uploadAnexo(files[i]);
+                anexos.push(meta);
+            } catch (e) {
+                console.error('[CRM] Erro upload anexo:', e);
+            }
+        }
+
         const interacao = {
             lead_id: leadId,
             tipo: document.getElementById('i-tipo')?.value || 'ligacao',
@@ -1958,7 +2645,8 @@ const CRM = {
             proximo_passo: document.getElementById('i-proximo')?.value || '',
             proxima_data: document.getElementById('i-proxima-data')?.value || '',
             realizado_por: store.getState().ui?.userName || 'Usuário',
-            data_hora: new Date().toISOString()
+            data_hora: new Date().toISOString(),
+            anexos: JSON.stringify(anexos)
         };
         const created = await store.addCrmInteracao(interacao);
         if (created) {
@@ -1994,6 +2682,31 @@ const CRM = {
         const body = document.getElementById('crm-lead-modal-body');
         const lead = this.getLeads().find(l => l.id === leadId);
         if (body && lead) body.innerHTML = this._renderModalTabInteracoes(lead);
+    },
+
+    async _addNota(leadId) {
+        const textarea = document.getElementById('crm-nota-conteudo');
+        const conteudo = textarea?.value?.trim();
+        if (!conteudo) { this.showToast('Escreva o conteúdo da nota.', 'warning'); return; }
+        const userNome = store.getState().auth?.user?.nome || store.getState().auth?.user?.username || '—';
+        const nota = {
+            lead_id: leadId,
+            conteudo,
+            autor: userNome
+        };
+        await store.addCrmNota(nota);
+        textarea.value = '';
+        const body = document.getElementById('crm-lead-modal-body');
+        const lead = this.getLeads().find(l => l.id === leadId);
+        if (body && lead) body.innerHTML = this._renderModalTabNotas(lead);
+    },
+
+    async _excluirNota(notaId, leadId) {
+        if (!confirm('Excluir esta nota?')) return;
+        await store.deleteCrmNota(notaId);
+        const body = document.getElementById('crm-lead-modal-body');
+        const lead = this.getLeads().find(l => l.id === leadId);
+        if (body && lead) body.innerHTML = this._renderModalTabNotas(lead);
     },
 
     abrirModalNovaTarefa(leadId) {

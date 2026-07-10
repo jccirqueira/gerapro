@@ -76,8 +76,23 @@ function initSchema() {
             logo TEXT DEFAULT '',
             observacoes TEXT,
             contatos TEXT,
+            codigo_cliente TEXT DEFAULT '',
             createdAt TEXT,
             updatedAt TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS unidades_cliente (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            cliente_id TEXT NOT NULL,
+            codigo_unidade TEXT NOT NULL,
+            nome_unidade TEXT DEFAULT '',
+            cep TEXT, logradouro TEXT, numero TEXT, bairro TEXT, cidade TEXT, estado TEXT,
+            proximo_sequencial INTEGER DEFAULT 1,
+            createdAt TEXT,
+            updatedAt TEXT,
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+            UNIQUE(empresa_id, cliente_id, codigo_unidade)
         );
 
         CREATE TABLE IF NOT EXISTS fornecedores (
@@ -506,6 +521,42 @@ function initSchema() {
             created_at TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS crm_notas (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            lead_id TEXT NOT NULL,
+            conteudo TEXT NOT NULL,
+            autor TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS crm_webhooks (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            nome TEXT NOT NULL,
+            url TEXT NOT NULL,
+            eventos TEXT NOT NULL DEFAULT '[]',
+            ativo INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS crm_sequencias (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            nome TEXT NOT NULL,
+            trigger_event TEXT NOT NULL DEFAULT 'stage_entered',
+            trigger_value TEXT NOT NULL DEFAULT '',
+            delay_days INTEGER NOT NULL DEFAULT 0,
+            task_titulo TEXT NOT NULL DEFAULT 'Follow-up automático',
+            task_descricao TEXT DEFAULT '',
+            task_prioridade TEXT DEFAULT 'media',
+            ativo INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT,
+            updated_at TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS crm_email_templates (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -521,6 +572,7 @@ function initSchema() {
         CREATE INDEX IF NOT EXISTS idx_crm_leads_vendedor ON crm_leads(vendedor_id);
         CREATE INDEX IF NOT EXISTS idx_crm_leads_followup ON crm_leads(data_proximo_followup);
         CREATE INDEX IF NOT EXISTS idx_crm_interacoes_lead ON crm_interacoes(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_crm_notas_lead ON crm_notas(lead_id);
         CREATE INDEX IF NOT EXISTS idx_crm_tarefas_lead ON crm_tarefas(lead_id);
         CREATE INDEX IF NOT EXISTS idx_crm_tarefas_responsavel ON crm_tarefas(responsavel);
         CREATE INDEX IF NOT EXISTS idx_crm_tarefas_vencimento ON crm_tarefas(data_vencimento);
@@ -591,6 +643,18 @@ function initSchema() {
 
     // Migration: add login_theme column to settings (for login customization)
     try { db.exec("ALTER TABLE settings ADD COLUMN login_theme TEXT DEFAULT '{}'"); } catch (e) { /* column may already exist */ }
+
+    // Migration: add codigo_cliente column to clientes (for AUTPRO numbering)
+    try { db.exec("ALTER TABLE clientes ADD COLUMN codigo_cliente TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+
+    // Migration: add probability column to crm_stages (for weighted forecast)
+    try { db.exec("ALTER TABLE crm_stages ADD COLUMN probability INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
+
+    // Migration: add anexos column to crm_interacoes (for file attachments)
+    try { db.exec("ALTER TABLE crm_interacoes ADD COLUMN anexos TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
+
+    // Migration: add meta_mensal column to vendedores
+    try { db.exec("ALTER TABLE vendedores ADD COLUMN meta_mensal REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
 
     // Migration: add logo column to clientes table
     try { db.exec("ALTER TABLE clientes ADD COLUMN logo TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
@@ -841,6 +905,9 @@ const TABLE_MAP = {
     crmLeads: { pk: 'id', table: 'crm_leads' },
     crmInteracoes: { pk: 'id', table: 'crm_interacoes' },
     crmTarefas: { pk: 'id', table: 'crm_tarefas' },
+    crmNotas: { pk: 'id', table: 'crm_notas' },
+    crmWebhooks: { pk: 'id', table: 'crm_webhooks' },
+    crmSequencias: { pk: 'id', table: 'crm_sequencias' },
     crmEmailTemplates: { pk: 'id', table: 'crm_email_templates' },
     crmStages: { pk: 'id', table: 'crm_stages' },
     manufaturaProjetos: { pk: 'id', table: 'manufatura_projetos' },
@@ -850,7 +917,8 @@ const TABLE_MAP = {
     manufaturaHistorico: { pk: 'id', table: 'manufatura_historico' },
     manufaturaPerfisTeste: { pk: 'id', table: 'manufatura_perfis_teste' },
     manufaturaResultadosTeste: { pk: 'id', table: 'manufatura_resultados_teste' },
-    manufaturaAnexos: { pk: 'id', table: 'manufatura_anexos' }
+    manufaturaAnexos: { pk: 'id', table: 'manufatura_anexos' },
+    unidadesCliente: { pk: 'id', table: 'unidades_cliente' }
 };
 
 // --- System seed data (composicoes + regras, loaded on first run) ---
@@ -959,20 +1027,20 @@ function ensureSystemData() {
     const stageCount = db.prepare('SELECT COUNT(*) as cnt FROM crm_stages').get();
     if (stageCount.cnt === 0) {
         const DEFAULT_STAGES = [
-            { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]' },
-            { id: 'tentando_contato', label: 'Tentando Contato', color: '#f59e0b', icon: 'ph-phone-call', position: 1, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]' },
-            { id: 'contato_realizado', label: 'Contato Realizado', color: '#3b82f6', icon: 'ph-chats', position: 2, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]' },
-            { id: 'qualificado', label: 'Qualificado', color: '#8b5cf6', icon: 'ph-star', position: 3, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 1, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]' },
-            { id: 'agendado_visita', label: 'Agendado', color: '#06b6d4', icon: 'ph-calendar-check', position: 4, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]' },
-            { id: 'visita_realizada', label: 'Visita Realizada', color: '#10b981', icon: 'ph-map-pin', position: 5, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]' },
-            { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: '[]' },
-            { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: '["nao_qualificado","sem_orcamento","nao_decidiu","concorrente","sem_contato","nao_responde","outro"]' }
+            { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]', probability: 5 },
+            { id: 'tentando_contato', label: 'Tentando Contato', color: '#f59e0b', icon: 'ph-phone-call', position: 1, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]', probability: 10 },
+            { id: 'contato_realizado', label: 'Contato Realizado', color: '#3b82f6', icon: 'ph-chats', position: 2, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]', probability: 20 },
+            { id: 'qualificado', label: 'Qualificado', color: '#8b5cf6', icon: 'ph-star', position: 3, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 1, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]', probability: 40 },
+            { id: 'agendado_visita', label: 'Agendado', color: '#06b6d4', icon: 'ph-calendar-check', position: 4, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]', probability: 60 },
+            { id: 'visita_realizada', label: 'Visita Realizada', color: '#10b981', icon: 'ph-map-pin', position: 5, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]', probability: 70 },
+            { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: '[]', probability: 90 },
+            { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: '["nao_qualificado","sem_orcamento","nao_decidiu","concorrente","sem_contato","nao_responde","outro"]', probability: 0 }
         ];
         const insertStage = db.prepare(`INSERT OR IGNORE INTO crm_stages
-            (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, created_at, updated_at)
-            VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at)
+            VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         for (const s of DEFAULT_STAGES) {
-            insertStage.run(s.id, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, s.loss_reasons, now, now);
+            insertStage.run(s.id, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, s.loss_reasons, s.probability, now, now);
         }
     }
 }
@@ -1422,6 +1490,28 @@ function peekNextProposalNumber() {
     return hoje + String(seq).padStart(2, '0');
 }
 
+function getUnidadesByCliente(clienteId, empresaId) {
+    const stmt = db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND empresa_id = ? ORDER BY codigo_unidade');
+    return stmt.all(clienteId, empresaId);
+}
+
+function peekNextAutproSequence(clienteId, codigoUnidade, empresaId) {
+    const stmt = db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND codigo_unidade = ? AND empresa_id = ?');
+    const unidade = stmt.get(clienteId, codigoUnidade, empresaId);
+    if (!unidade) return null;
+    return String(unidade.proximo_sequencial).padStart(3, '0');
+}
+
+function consumeNextAutproSequence(clienteId, codigoUnidade, empresaId) {
+    const stmt = db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND codigo_unidade = ? AND empresa_id = ?');
+    const unidade = stmt.get(clienteId, codigoUnidade, empresaId);
+    if (!unidade) return null;
+    const seq = unidade.proximo_sequencial;
+    db.prepare('UPDATE unidades_cliente SET proximo_sequencial = ?, updatedAt = ? WHERE id = ?')
+        .run(seq + 1, new Date().toISOString(), unidade.id);
+    return String(seq).padStart(3, '0');
+}
+
 function updatePipelineRevision(id, data, empresaId = 'default') {
     const existing = db.prepare('SELECT * FROM pipeline_items WHERE id = ? AND empresa_id = ?').get(id, empresaId);
     if (existing?.status === 'fechado') return;
@@ -1591,7 +1681,8 @@ function getFullSync(empresaId = 'default') {
         manufaturaHistorico: findAll('manufaturaHistorico', empresaId),
         manufaturaPerfisTeste: findAll('manufaturaPerfisTeste', empresaId),
         manufaturaResultadosTeste: findAll('manufaturaResultadosTeste', empresaId),
-        manufaturaAnexos: findAll('manufaturaAnexos', empresaId)
+        manufaturaAnexos: findAll('manufaturaAnexos', empresaId),
+        unidadesCliente: findAll('unidadesCliente', empresaId)
     };
 }
 
@@ -2074,8 +2165,8 @@ function createCrmStage(empresaId, data) {
     const id = data.id || crypto.randomUUID();
     const maxPos = getDb().prepare('SELECT COALESCE(MAX(position), -1) as m FROM crm_stages WHERE empresa_id = ?').get(empresaId);
     const position = data.position ?? (maxPos.m + 1);
-    getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, empresaId, data.stage_id || id, data.label || '', data.color || '#6b7280', data.icon || 'ph-dot-outline', position, data.is_default ? 1 : 0, data.is_terminal ? 1 : 0, data.allows_proposal ? 1 : 0, data.tracks_qualificacao ? 1 : 0, data.tracks_conversao ? 1 : 0, data.is_loss ? 1 : 0, JSON.stringify(data.loss_reasons || []), now, now);
+    getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, empresaId, data.stage_id || id, data.label || '', data.color || '#6b7280', data.icon || 'ph-dot-outline', position, data.is_default ? 1 : 0, data.is_terminal ? 1 : 0, data.allows_proposal ? 1 : 0, data.tracks_qualificacao ? 1 : 0, data.tracks_conversao ? 1 : 0, data.is_loss ? 1 : 0, JSON.stringify(data.loss_reasons || []), data.probability ?? 0, now, now);
     if (data.is_default) {
         getDb().prepare('UPDATE crm_stages SET is_default = 0 WHERE empresa_id = ? AND id != ?').run(empresaId, id);
     }
@@ -2095,6 +2186,7 @@ function updateCrmStage(id, empresaId, data) {
         if (data[key] !== undefined) { fields.push(`${key}=?`); values.push(data[key] ? 1 : 0); }
     }
     if (data.loss_reasons !== undefined) { fields.push('loss_reasons=?'); values.push(JSON.stringify(data.loss_reasons)); }
+    if (data.probability !== undefined) { fields.push('probability=?'); values.push(data.probability); }
     if (fields.length > 0) {
         fields.push('updated_at=?'); values.push(now);
         values.push(id, empresaId);
@@ -2124,18 +2216,18 @@ function resetCrmStages(empresaId) {
     getDb().prepare('DELETE FROM crm_stages WHERE empresa_id = ?').run(empresaId);
     const now = new Date().toISOString();
     const DEFAULT_STAGES = [
-        { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-        { id: 'tentando_contato', label: 'Tentando Contato', color: '#f59e0b', icon: 'ph-phone-call', position: 1, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-        { id: 'contato_realizado', label: 'Contato Realizado', color: '#3b82f6', icon: 'ph-chats', position: 2, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-        { id: 'qualificado', label: 'Qualificado', color: '#8b5cf6', icon: 'ph-star', position: 3, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 1, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-        { id: 'agendado_visita', label: 'Agendado', color: '#06b6d4', icon: 'ph-calendar-check', position: 4, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-        { id: 'visita_realizada', label: 'Visita Realizada', color: '#10b981', icon: 'ph-map-pin', position: 5, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [] },
-        { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: [] },
-        { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: ['nao_qualificado','sem_orcamento','nao_decidiu','concorrente','sem_contato','nao_responde','outro'] }
+        { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 5 },
+        { id: 'tentando_contato', label: 'Tentando Contato', color: '#f59e0b', icon: 'ph-phone-call', position: 1, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 10 },
+        { id: 'contato_realizado', label: 'Contato Realizado', color: '#3b82f6', icon: 'ph-chats', position: 2, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 20 },
+        { id: 'qualificado', label: 'Qualificado', color: '#8b5cf6', icon: 'ph-star', position: 3, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 1, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 40 },
+        { id: 'agendado_visita', label: 'Agendado', color: '#06b6d4', icon: 'ph-calendar-check', position: 4, is_default: 0, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 60 },
+        { id: 'visita_realizada', label: 'Visita Realizada', color: '#10b981', icon: 'ph-map-pin', position: 5, is_default: 0, is_terminal: 0, allows_proposal: 1, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 70 },
+        { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: [], probability: 90 },
+        { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: ['nao_qualificado','sem_orcamento','nao_decidiu','concorrente','sem_contato','nao_responde','outro'], probability: 0 }
     ];
-    const insertStage = getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insertStage = getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const s of DEFAULT_STAGES) {
-        insertStage.run(s.id, empresaId, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, JSON.stringify(s.loss_reasons), now, now);
+        insertStage.run(s.id, empresaId, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, JSON.stringify(s.loss_reasons), s.probability, now, now);
     }
     return findAllCrmStages(empresaId);
 }
@@ -2234,5 +2326,8 @@ module.exports = {
     resetCrmStages,
     logCrmEmail,
     findCrmEmailLogByLead,
-    markEmailOpened
+    markEmailOpened,
+    getUnidadesByCliente,
+    peekNextAutproSequence,
+    consumeNextAutproSequence
 };
