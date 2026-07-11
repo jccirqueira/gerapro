@@ -345,12 +345,12 @@ class PrecificacaoModule {
         const isAutPro = state.company?.folderName?.startsWith('AUT_');
         container.innerHTML = this.getPricingFormHTML(this.activeTag, data, { matCost, laborCost, expenseCost }, regime, isSeuComponent, isCubMt, isAutPro);
         
-        // Pre-fill credit fields from all material sources if not manually overridden
-        if (regime !== 'Simples Nacional' && !data.icmsCredito && !data.pisCofinsCredito && !data.ipiCredito) {
+        // Pre-fill credit fields — cada crédito individualmente (não bloqueia se um já foi preenchido)
+        if (regime !== 'Simples Nacional') {
             const credits = this.calculateEquipmentCredits(eq);
-            if (credits.credIcms > 0) { data.icmsCredito = credits.credIcms; this.setVal('prec_icms_credito', app.formatCurrencyRaw(credits.credIcms)); }
-            if (credits.credIpi > 0) { data.ipiCredito = credits.credIpi; this.setVal('prec_ipi_credito', app.formatCurrencyRaw(credits.credIpi)); }
-            if (credits.credPisCof > 0) { data.pisCofinsCredito = credits.credPisCof; this.setVal('prec_pis_cofins_credito', app.formatCurrencyRaw(credits.credPisCof)); }
+            if (!data.icmsCredito && credits.credIcms > 0) { data.icmsCredito = credits.credIcms; this.setVal('prec_icms_credito', app.formatCurrencyRaw(credits.credIcms)); }
+            if (!data.ipiCredito && credits.credIpi > 0) { data.ipiCredito = credits.credIpi; this.setVal('prec_ipi_credito', app.formatCurrencyRaw(credits.credIpi)); }
+            if (!data.pisCofinsCredito && credits.credPisCof > 0) { data.pisCofinsCredito = credits.credPisCof; this.setVal('prec_pis_cofins_credito', app.formatCurrencyRaw(credits.credPisCof)); }
         }
 
         // Bind event listeners to new elements
