@@ -737,6 +737,8 @@ class PrecificacaoModule {
         let totalCost = 0, totalSalesNoIpi = 0, totalIpi = 0, totalProfit = 0;
         let totalDiretoSales = 0, totalProprioSales = 0;
         let tableRows = '';
+        const _tr = (cells) => `<tr>${cells}</tr>`;
+        const _td = (v, cls = '') => `<td style="text-align:right;${cls}">${v}</td>`;
 
         if (useSeuMode) {
             tableRows = seus.map(seu => {
@@ -755,26 +757,48 @@ class PrecificacaoModule {
                 totalIpi         += seuIpi;
                 totalProfit      += seuProfit;
                 const seuMargin = seuSales > 0 ? (seuProfit / seuSales) * 100 : 0;
-                return { tag: seu.tag, desc: `${comps.length} componente(s): ${comps.join(', ') || '—'}`, cost: seuCost, sales: seuSales, ipi: seuIpi, profit: seuProfit, margin: seuMargin };
-            });
+                return _tr(
+                    `<td class="font-bold">${seu.tag}</td>` +
+                    _td(app.formatCurrency(seuCost)) +
+                    _td(app.formatCurrency(seuSales), 'color:var(--color-primary);font-weight:600;') +
+                    _td(app.formatCurrency(seuProfit), `font-weight:700;color:${seuProfit >= 0 ? 'var(--color-success)' : 'var(--color-danger)'};`) +
+                    _td(`${seuMargin.toFixed(2)}%`, `font-weight:700;color:${seuMargin >= 0 ? 'var(--color-success)' : 'var(--color-danger)'};`)
+                );
+            }).join('');
         } else {
-            const normalRows = [];
+            const rows = [];
             for (const eq of equipments) {
                 const result = this.calculatedResults[eq.tag] || { finalPriceNoIpi: 0, ipiValue: 0, cost: 0, profit: 0, direto: false };
                 totalCost += result.cost || 0;
                 totalSalesNoIpi += result.finalPriceNoIpi || 0;
                 if (result.direto) {
                     totalDiretoSales += result.finalPriceNoIpi || 0;
-                    normalRows.push({ tag: eq.tag, desc: 'FATURAMENTO DIRETO', cost: result.cost || 0, sales: result.finalPriceNoIpi || 0, ipi: 0, profit: 0, margin: 0, direto: true });
+                    rows.push(_tr(
+                        `<td class="font-bold">${eq.tag}<br><span style="font-size:10px;color:#64748b;">FATURAMENTO DIRETO</span></td>` +
+                        _td(app.formatCurrency(result.cost || 0)) +
+                        _td(app.formatCurrency(result.finalPriceNoIpi || 0), 'color:var(--color-primary);font-weight:600;') +
+                        _td(app.formatCurrency(0)) +
+                        _td(app.formatCurrency(result.finalPriceNoIpi || 0)) +
+                        _td(app.formatCurrency(0), 'color:var(--color-success)') +
+                        _td('0,00%', 'color:var(--color-success)')
+                    ));
                 } else {
                     totalProprioSales += result.finalPriceNoIpi || 0;
                     totalIpi    += result.ipiValue || 0;
                     totalProfit += result.profit || 0;
                     const margin = result.finalPriceNoIpi > 0 ? (result.profit / result.finalPriceNoIpi) * 100 : 0;
-                    normalRows.push({ tag: eq.tag, desc: '', cost: result.cost, sales: result.finalPriceNoIpi || 0, ipi: result.ipiValue || 0, profit: result.profit || 0, margin });
+                    rows.push(_tr(
+                        `<td class="font-bold">${eq.tag}</td>` +
+                        _td(app.formatCurrency(result.cost)) +
+                        _td(app.formatCurrency(result.finalPriceNoIpi || 0), 'color:var(--color-primary);font-weight:600;') +
+                        _td(app.formatCurrency(result.ipiValue || 0)) +
+                        _td(app.formatCurrency((result.finalPriceNoIpi || 0) + (result.ipiValue || 0))) +
+                        _td(app.formatCurrency(result.profit || 0), `font-weight:700;color:${result.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)'};`) +
+                        _td(`${margin.toFixed(2)}%`, `font-weight:700;color:${margin >= 0 ? 'var(--color-success)' : 'var(--color-danger)'};`)
+                    ));
                 }
             }
-            tableRows = normalRows;
+            tableRows = rows.join('');
         }
 
         const infraResult = this.calculatedResults['__INFRA__'];
@@ -782,7 +806,25 @@ class PrecificacaoModule {
             totalCost += infraResult.cost || 0;
             totalSalesNoIpi += infraResult.finalPriceNoIpi || 0;
             totalProfit += infraResult.profit || 0;
-            tableRows.push({ tag: 'Infraestrutura', desc: '', cost: infraResult.cost || 0, sales: infraResult.finalPriceNoIpi || 0, ipi: infraResult.ipiValue || 0, profit: infraResult.profit || 0, margin: null, infra: true });
+            if (useSeuMode) {
+                tableRows += _tr(
+                    `<td style="font-weight:700;color:#0369a1;">Infraestrutura</td>` +
+                    _td(app.formatCurrency(infraResult.cost || 0)) +
+                    _td(app.formatCurrency(infraResult.finalPriceNoIpi || 0), 'color:var(--color-primary);font-weight:600;') +
+                    _td(app.formatCurrency(infraResult.profit || 0), `font-weight:700;color:${(infraResult.profit || 0) >= 0 ? 'var(--color-success)' : 'var(--color-danger)'};`) +
+                    _td('—')
+                );
+            } else {
+                tableRows += _tr(
+                    `<td style="font-weight:700;color:#0369a1;">Infraestrutura</td>` +
+                    _td(app.formatCurrency(infraResult.cost || 0)) +
+                    _td(app.formatCurrency(infraResult.finalPriceNoIpi || 0), 'color:var(--color-primary);font-weight:600;') +
+                    _td(app.formatCurrency(infraResult.ipiValue || 0)) +
+                    _td(app.formatCurrency((infraResult.finalPriceNoIpi || 0) + (infraResult.ipiValue || 0))) +
+                    _td(app.formatCurrency(infraResult.profit || 0), `font-weight:700;color:${(infraResult.profit || 0) >= 0 ? 'var(--color-success)' : 'var(--color-danger)'};`) +
+                    _td('—')
+                );
+            }
         }
 
         const totalMargin = totalSalesNoIpi > 0 ? (totalProfit / totalSalesNoIpi) * 100 : 0;
