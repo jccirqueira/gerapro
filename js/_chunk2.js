@@ -403,6 +403,7 @@ const PropostaTecnicaModule = {
             ],
 
             scopeItems: [],
+            materialOverrides: {},
 
             revisions: [{ no: '00', desc: 'Emissão Inicial', elab: 'M.S', verif: 'G.A', aprov: 'R.D', data: new Date().toLocaleDateString() }],
 

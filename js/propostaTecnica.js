@@ -506,6 +506,7 @@ const PropostaTecnicaModule = {
             cidade: '',
             uf: '',
             vendorList: initialVendorList,
+            materialOverrides: {},
 
             revisions: [{ no: '00', desc: 'Emissão Inicial', elab: '', verif: '', aprov: '', data: new Date().toLocaleDateString() }],
             engenheiroResponsavel: '',

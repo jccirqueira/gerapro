@@ -382,23 +382,37 @@ class PrecificacaoModule {
     }
 
     calculateEquipmentMaterialCost(eq) {
+        const state = store.getState();
+        const tipicos = state.tipicos || [];
+        const materiais = state.materiais || [];
+        const overrides = state.activeTechnicalProposal?.materialOverrides || {};
         let total = 0;
-        const tipicos = store.getState().tipicos || [];
+
+        const getCusto = (item) => {
+            const ov = item.materialId ? overrides[item.materialId]?.custo : undefined;
+            if (ov != null) return ov;
+            const mat = item.materialId ? materiais.find(m => m.id === item.materialId) : null;
+            if (mat?.custo != null) return mat.custo;
+            return item.custo ?? 0;
+        };
+
         (eq.loads || []).forEach(load => {
             const typical = tipicos.find(t => t.id === load.typicalId);
             if (typical && typical.items) {
                 typical.items.forEach(item => {
-                    total += (item.qtd || 0) * (item.custo || 0);
+                    total += (item.qtd || 0) * getCusto(item);
                 });
             }
         });
         (eq.materials || []).forEach(item => {
-            total += (item.qtd || 0) * (item.custo || 0);
+            total += (item.qtd || 0) * getCusto(item);
         });
         const autoMat = eq.automationMaterials || (() => {
             if (eq.ioList && eq.ioList.racks && eq.ioList.racks.some(r => (r.slots || []).length > 0)) {
                 const bom = deriveMaterials(eq.ioList);
                 return (bom.items || []).map(item => ({
+                    materialId: item.materialId || '',
+                    descricao: item.descricao,
                     custo: item.custoUnitario || 0,
                     qtd: item.qtd || 0,
                     icms: item.icms || 0,
@@ -410,41 +424,58 @@ class PrecificacaoModule {
             return [];
         })();
         autoMat.forEach(item => {
-            total += (item.qtd || 0) * (item.custo || 0);
+            total += (item.qtd || 0) * getCusto(item);
         });
         return total;
     }
 
     calculateEquipmentCredits(eq) {
-        const tipicos = store.getState().tipicos || [];
+        const state = store.getState();
+        const tipicos = state.tipicos || [];
+        const materiais = state.materiais || [];
+        const overrides = state.activeTechnicalProposal?.materialOverrides || {};
         let totalIcms = 0, totalIpi = 0, totalPisCof = 0;
 
-        const cred = (item, field, dft) => {
-            const v = item[field] !== undefined && item[field] !== null ? item[field] : dft;
-            return (item.qtd || 0) * (item.custo || 0) * (Number(v) || 0) / 100;
+        const calcCred = (item, field, dft) => {
+            const ov = item.materialId ? overrides[item.materialId]?.custo : undefined;
+            let custo;
+            if (ov != null) {
+                custo = ov;
+            } else {
+                const mat = item.materialId ? materiais.find(m => m.id === item.materialId) : null;
+                custo = mat?.custo != null ? mat.custo : (item.custo ?? 0);
+            }
+            let taxa;
+            if (item.materialId) {
+                const mat = materiais.find(m => m.id === item.materialId);
+                taxa = mat?.[field] != null ? Number(mat[field]) : (item[field] != null ? Number(item[field]) : dft);
+            } else {
+                taxa = item[field] != null ? Number(item[field]) : dft;
+            }
+            return (item.qtd || 0) * custo * taxa / 100;
         };
 
         (eq.loads || []).forEach(load => {
             const typical = tipicos.find(t => t.id === load.typicalId);
             if (typical && typical.items) {
                 typical.items.forEach(item => {
-                    totalIcms += cred(item, 'icms', 18);
-                    totalIpi += cred(item, 'ipi', 0);
-                    totalPisCof += cred(item, 'pis', 1.65) + cred(item, 'cofins', 7.60);
+                    totalIcms += calcCred(item, 'icms', 18);
+                    totalIpi += calcCred(item, 'ipi', 0);
+                    totalPisCof += calcCred(item, 'pis', 1.65) + calcCred(item, 'cofins', 7.60);
                 });
             }
         });
 
         (eq.materials || []).forEach(item => {
-            totalIcms += cred(item, 'icms', 18);
-            totalIpi += cred(item, 'ipi', 0);
-            totalPisCof += cred(item, 'pis', 1.65) + cred(item, 'cofins', 7.60);
+            totalIcms += calcCred(item, 'icms', 18);
+            totalIpi += calcCred(item, 'ipi', 0);
+            totalPisCof += calcCred(item, 'pis', 1.65) + calcCred(item, 'cofins', 7.60);
         });
 
         (eq.automationMaterials || []).forEach(item => {
-            totalIcms += cred(item, 'icms', 18);
-            totalIpi += cred(item, 'ipi', 0);
-            totalPisCof += cred(item, 'pis', 1.65) + cred(item, 'cofins', 7.60);
+            totalIcms += calcCred(item, 'icms', 18);
+            totalIpi += calcCred(item, 'ipi', 0);
+            totalPisCof += calcCred(item, 'pis', 1.65) + calcCred(item, 'cofins', 7.60);
         });
 
         return { credIcms: totalIcms, credIpi: totalIpi, credPisCof: totalPisCof };
@@ -520,8 +551,12 @@ class PrecificacaoModule {
                             
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
                                 <div class="form-group">
-                                    <label class="form-label">Total Materiais (PT) R$</label>
-                                    <input type="text" id="prec_material" class="form-control" value="${app.formatCurrency(costs.matCost)}" readonly style="background: var(--color-bg-alt); font-weight: bold;">
+                                    <label class="form-label">Total Materiais (PT) R$
+                                        <span id="btn-override-materiais" style="cursor:pointer;color:#0369a1;margin-left:6px;font-size:14px;" title="Editar custo dos materiais">✏️</span>
+                                    </label>
+                                    <div style="display:flex;align-items:center;gap:4px;">
+                                        <input type="text" id="prec_material" class="form-control" value="${app.formatCurrency(costs.matCost)}" readonly style="background: var(--color-bg-alt); font-weight: bold; flex:1;">
+                                    </div>
                                 </div>
                                 <div class="form-group" id="group-consumiveis" style="display: ${data.businessType === 'Prestação de Serviços' ? 'none' : 'block'};">
                                     <label class="form-label">Total Consumíveis (%) <small>(sobre material)</small></label>
@@ -1164,6 +1199,178 @@ class PrecificacaoModule {
             });
             this.updateFatSelectStyle(data.faturamento);
         }
+
+        // Override materiais
+        const btnOverride = document.getElementById('btn-override-materiais');
+        if (btnOverride) {
+            btnOverride.addEventListener('click', () => this.openMaterialOverrideModal());
+        }
+    }
+
+    openMaterialOverrideModal() {
+        const state = store.getState();
+        const eq = state.activeTechnicalProposal?.equipments.find(e => e.tag === this.activeTag);
+        if (!eq) return;
+
+        const materiais = state.materiais || [];
+        const overrides = state.activeTechnicalProposal?.materialOverrides || {};
+        const tipicos = state.tipicos || [];
+
+        const items = [];
+
+        (eq.loads || []).forEach(load => {
+            const typical = tipicos.find(t => t.id === load.typicalId);
+            if (typical && typical.items) {
+                typical.items.forEach(item => {
+                    const mat = materiais.find(m => m.id === item.materialId);
+                    items.push({
+                        materialId: item.materialId,
+                        descricao: mat?.descricao || item.descricao || '(material sem descrição)',
+                        qtd: item.qtd || 0,
+                        custoOriginal: mat?.custo ?? item.custo ?? 0,
+                        override: overrides[item.materialId]?.custo
+                    });
+                });
+            }
+        });
+
+        (eq.materials || []).forEach(item => {
+            const mat = materiais.find(m => m.id === item.materialId);
+            items.push({
+                materialId: item.materialId,
+                descricao: mat?.descricao || item.descricao || '(material)',
+                qtd: item.qtd || 0,
+                custoOriginal: mat?.custo ?? item.custo ?? 0,
+                override: item.materialId ? overrides[item.materialId]?.custo : undefined
+            });
+        });
+
+        (eq.automationMaterials || []).forEach(item => {
+            const mat = item.materialId ? materiais.find(m => m.id === item.materialId) : null;
+            items.push({
+                materialId: item.materialId,
+                descricao: mat?.descricao || item.descricao || '(automação)',
+                qtd: item.qtd || 0,
+                custoOriginal: mat?.custo ?? item.custo ?? 0,
+                override: item.materialId ? overrides[item.materialId]?.custo : undefined
+            });
+        });
+
+        if (items.length === 0) {
+            app.toast('Aviso', 'Nenhum material encontrado para este equipamento.', 'info');
+            return;
+        }
+
+        const modalId = 'modal-override-materiais';
+        document.getElementById(modalId)?.remove();
+
+        const modal = document.createElement('div');
+        modal.id = modalId;
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+        const rows = items.map((item, i) => {
+            const ov = item.override != null ? app.formatCurrencyRaw(item.override) : '';
+            return `
+                <tr>
+                    <td style="padding:6px 8px;font-size:13px;">${item.descricao}</td>
+                    <td style="padding:6px 8px;text-align:center;">${item.qtd}</td>
+                    <td style="padding:6px 8px;text-align:right;">${app.formatCurrency(item.custoOriginal)}</td>
+                    <td style="padding:6px 8px;">
+                        <input type="text" id="override-val-${i}" class="form-control" value="${ov}" data-material-id="${item.materialId}" style="width:120px;text-align:right;" placeholder="${app.formatCurrencyRaw(item.custoOriginal)}">
+                    </td>
+                    <td style="padding:6px 8px;text-align:right;font-size:13px;" id="override-total-${i}">${app.formatCurrency((item.override ?? item.custoOriginal) * item.qtd)}</td>
+                </tr>`;
+        }).join('');
+
+        modal.innerHTML = `
+            <div style="background:#fff;border-radius:8px;width:800px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,0.2);">
+                <div style="padding:16px 20px;border-bottom:1px solid var(--color-border);display:flex;justify-content:space-between;align-items:center;">
+                    <h3 style="margin:0;font-size:16px;">Override de Custos — Materiais</h3>
+                    <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+                </div>
+                <div style="padding:12px 20px;font-size:13px;color:#64748b;">
+                    <i>Preencha o custo negociado para esta proposta. Deixe em branco para usar o custo do cadastro.</i>
+                </div>
+                <div style="overflow-y:auto;flex:1;padding:0 20px 12px;">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="border-bottom:2px solid var(--color-border);">
+                                <th style="text-align:left;padding:8px;font-size:13px;">Descrição</th>
+                                <th style="text-align:center;padding:8px;font-size:13px;">Qtd</th>
+                                <th style="text-align:right;padding:8px;font-size:13px;">Custo Cadastro</th>
+                                <th style="text-align:left;padding:8px;font-size:13px;">Override R$</th>
+                                <th style="text-align:right;padding:8px;font-size:13px;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                <div style="padding:12px 20px;border-top:1px solid var(--color-border);display:flex;justify-content:flex-end;gap:8px;">
+                    <button class="btn" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
+                    <button id="btn-save-override" class="btn btn-primary">Salvar e Recalcular</button>
+                </div>
+            </div>`;
+
+        document.body.appendChild(modal);
+
+        // Format currency inputs
+        modal.querySelectorAll('[id^="override-val-"]').forEach(input => {
+            input.addEventListener('blur', (e) => {
+                const val = app.parseCurrency(e.target.value);
+                e.target.value = val > 0 ? app.formatCurrencyRaw(val) : '';
+                const idx = parseInt(e.target.id.replace('override-val-', ''));
+                const item = items[idx];
+                const overrideVal = val > 0 ? val : null;
+                const totalEl = document.getElementById(`override-total-${idx}`);
+                if (totalEl) {
+                    totalEl.textContent = app.formatCurrency((overrideVal ?? item.custoOriginal) * item.qtd);
+                }
+            });
+            input.addEventListener('focus', (e) => {
+                e.target.value = e.target.value.replace(/\./g, '');
+            });
+        });
+
+        document.getElementById('btn-save-override').addEventListener('click', () => {
+            const newOverrides = { ...overrides };
+            modal.querySelectorAll('[id^="override-val-"]').forEach(input => {
+                const mid = input.dataset.materialId;
+                if (!mid) return;
+                const val = app.parseCurrency(input.value);
+                if (val > 0) {
+                    newOverrides[mid] = { ...(newOverrides[mid] || {}), custo: val };
+                } else {
+                    if (newOverrides[mid]) {
+                        delete newOverrides[mid].custo;
+                        if (Object.keys(newOverrides[mid]).length === 0) delete newOverrides[mid];
+                    }
+                }
+            });
+
+            const proposal = { ...store.getState().activeTechnicalProposal, materialOverrides: newOverrides };
+            store.setState({ activeTechnicalProposal: proposal });
+            modal.remove();
+
+            // Recalcular custo material e créditos com overrides e atualizar os inputs
+            const eq2 = store.getState().activeTechnicalProposal?.equipments.find(e => e.tag === this.activeTag);
+            if (eq2) {
+                const newMatCost = this.calculateEquipmentMaterialCost(eq2);
+                const matInput = document.getElementById('prec_material');
+                if (matInput) matInput.value = app.formatCurrency(newMatCost);
+
+                const regime = store.getState().company?.regimeTributario || 'Lucro Real';
+                if (regime !== 'Simples Nacional') {
+                    const credits = this.calculateEquipmentCredits(eq2);
+                    if (credits.credIcms > 0) { this.setVal('prec_icms_credito', app.formatCurrencyRaw(credits.credIcms)); }
+                    if (credits.credIpi > 0) { this.setVal('prec_ipi_credito', app.formatCurrencyRaw(credits.credIpi)); }
+                    if (credits.credPisCof > 0) { this.setVal('prec_pis_cofins_credito', app.formatCurrencyRaw(credits.credPisCof)); }
+                }
+            }
+
+            this.calculate();
+            app.toast('Sucesso', 'Overrides salvos.', 'success');
+        });
     }
 
     updateFatSelectStyle(faturamento) {

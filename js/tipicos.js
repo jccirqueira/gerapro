@@ -1077,11 +1077,6 @@ const TipicosModule = {
         } else {
             this.currentBuilderState.items.push({
                 materialId: material.id,
-                descricao: material.descricao,
-                fabricante: material.fabricante,
-                codigoFabricante: material.codigoFabricante, // Cod. Fab.
-                modelo: material.modelo || '',
-                custo: material.custo,
                 qtd: qtd
             });
         }

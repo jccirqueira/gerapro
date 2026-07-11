@@ -49,8 +49,8 @@ export const loadDemoData = () => {
             drives: '',
             custoTotal: 0,
             items: [
-                { materialId: 'mat-djm-10', descricao: 'Disjuntor Motor MPW18 6.3-10A', fabricante: 'WEG', codigoFabricante: '12429285', custo: 155.00, qtd: 1 },
-                { materialId: 'mat-ct-18', descricao: 'Contator CWB18 18A 1NA+1NF 220V 60Hz', fabricante: 'WEG', codigoFabricante: '12242501', custo: 115.00, qtd: 1 }
+                { materialId: 'mat-djm-10', descricao: 'Disjuntor Motor MPW18 6.3-10A', fabricante: 'WEG', codigoFabricante: '12429285', custo: 155.00, qtd: 1, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 },
+                { materialId: 'mat-ct-18', descricao: 'Contator CWB18 18A 1NA+1NF 220V 60Hz', fabricante: 'WEG', codigoFabricante: '12242501', custo: 115.00, qtd: 1, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 }
             ]
         },
         {
@@ -65,9 +65,9 @@ export const loadDemoData = () => {
             drives: 'WEG',
             custoTotal: 0,
             items: [
-                { materialId: 'mat-dj-32', descricao: 'Disjuntor Miniatura MDW Tripolar 32A', fabricante: 'WEG', codigoFabricante: '10076442', custo: 58.50, qtd: 1 },
-                { materialId: 'mat-inv-5', descricao: 'Inversor CFW500 5CV 380V', fabricante: 'WEG', codigoFabricante: '11223344', custo: 2450.00, qtd: 1 },
-                { materialId: 'mat-com-pnet', descricao: 'Módulo Comunicação Profinet', fabricante: 'WEG', codigoFabricante: '14556677', custo: 450.00, qtd: 1 }
+                { materialId: 'mat-dj-32', descricao: 'Disjuntor Miniatura MDW Tripolar 32A', fabricante: 'WEG', codigoFabricante: '10076442', custo: 58.50, qtd: 1, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 },
+                { materialId: 'mat-inv-5', descricao: 'Inversor CFW500 5CV 380V', fabricante: 'WEG', codigoFabricante: '11223344', custo: 2450.00, qtd: 1, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 },
+                { materialId: 'mat-com-pnet', descricao: 'Módulo Comunicação Profinet', fabricante: 'WEG', codigoFabricante: '14556677', custo: 450.00, qtd: 1, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 }
             ]
         },
         {
@@ -82,8 +82,8 @@ export const loadDemoData = () => {
             drives: 'WEG',
             custoTotal: 0,
             items: [
-                { materialId: 'mat-dj-32', descricao: 'Disjuntor Miniatura MDW Tripolar 32A', fabricante: 'WEG', codigoFabricante: '10076442', custo: 58.50, qtd: 1 },
-                { materialId: 'mat-ss-10', descricao: 'Soft-Starter SSW05 10A 5CV', fabricante: 'WEG', codigoFabricante: '10041234', custo: 1250.00, qtd: 1 }
+                { materialId: 'mat-dj-32', descricao: 'Disjuntor Miniatura MDW Tripolar 32A', fabricante: 'WEG', codigoFabricante: '10076442', custo: 58.50, qtd: 1, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 },
+                { materialId: 'mat-ss-10', descricao: 'Soft-Starter SSW05 10A 5CV', fabricante: 'WEG', codigoFabricante: '10041234', custo: 1250.00, qtd: 1, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 }
             ]
         },
         {
@@ -98,9 +98,9 @@ export const loadDemoData = () => {
             drives: '',
             custoTotal: 0,
             items: [
-                { materialId: 'mat-btn-gr', descricao: 'Botão Impulso Verde 1NA', fabricante: 'WEG', codigoFabricante: '12882294', custo: 18.50, qtd: 2 },
-                { materialId: 'mat-btn-red', descricao: 'Botão Impulso Vermelho 1NF', fabricante: 'WEG', codigoFabricante: '12882295', custo: 18.50, qtd: 2 },
-                { materialId: 'mat-lp-white', descricao: 'Sinaleiro LED Branco 220V', fabricante: 'WEG', codigoFabricante: '11002233', custo: 12.90, qtd: 4 }
+                { materialId: 'mat-btn-gr', descricao: 'Botão Impulso Verde 1NA', fabricante: 'WEG', codigoFabricante: '12882294', custo: 18.50, qtd: 2, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 },
+                { materialId: 'mat-btn-red', descricao: 'Botão Impulso Vermelho 1NF', fabricante: 'WEG', codigoFabricante: '12882295', custo: 18.50, qtd: 2, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 },
+                { materialId: 'mat-lp-white', descricao: 'Sinaleiro LED Branco 220V', fabricante: 'WEG', codigoFabricante: '11002233', custo: 12.90, qtd: 4, icms: 18, ipi: 10, pis: 1.65, cofins: 7.60 }
             ]
         }
     ];
