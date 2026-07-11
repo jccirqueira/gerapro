@@ -1411,7 +1411,7 @@ class PrecificacaoModule {
             }
 
             this.calculate();
-            app.toast('Sucesso', 'Overrides salvos.', 'success');
+            app.toast('Overrides salvos.', 'success');
         });
     }
 
@@ -1754,11 +1754,11 @@ class PrecificacaoModule {
             });
             const result = await res.json();
             if (result.success) {
-                app.toast('Sucesso', 'Configurações de precificação salvas.', 'success');
+                app.toast('Configurações de precificação salvas.', 'success');
             }
         } catch (e) {
             console.error(e);
-            app.toast('Erro', 'Falha ao salvar precificação.', 'error');
+            app.toast('Falha ao salvar precificação.', 'error');
         }
     }
 
