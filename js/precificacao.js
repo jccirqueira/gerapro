@@ -676,7 +676,7 @@ class PrecificacaoModule {
                                 <span class="font-bold" id="res_custos_fixos">R$ 0,00</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                                <span class="text-muted">(−) Comissão (s/ líquido):</span>
+                                <span class="text-muted">(−) Comissão (s/ ${isAutPro ? 'Bruto' : 'líquido'}):</span>
                                 <span class="font-bold" id="res_comissao">R$ 0,00</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--color-border); align-items: center;">
@@ -1397,30 +1397,31 @@ class PrecificacaoModule {
             totalImpostosPercent = getVal('prec_icms') + getVal('prec_pis_cofins') + (businessType === 'Prestação de Serviços' ? getVal('prec_iss') : 0);
         }
 
-        // 3. Preço Ideal (Markup)
+        // 3. IPI (precisa ser lido antes do markup para AutPro)
+        const ipiIsento = document.getElementById('prec_ipi_isento')?.checked;
+        const ipiPercent = ipiIsento ? 0 : getVal('prec_ipi');
+
+        // 4. Preço Ideal (Markup)
         const margemIdeal = getVal('prec_margem_ideal');
         const custosFixos = getVal('prec_custos_fixos');
         const comissao = getVal('prec_comissao');
 
         let percComissao, valorComissao;
         if (isAutPro) {
-            // AutPro: 0,5% fixo sobre o valor bruto (precoFinalNoIpi), sem ajuste de impostos
-            percComissao = 0.5;
-            valorComissao = 0; // será recalculado após precoFinalNoIpi
+            percComissao = 0.5 * (1 + ipiPercent / 100);
+            valorComissao = 0;
         } else {
             percComissao = comissao * (1 - totalImpostosPercent / 100);
-            valorComissao = 0; // será recalc após precoFinalNoIpi
+            valorComissao = 0;
         }
         const fatorMarkup = 1 - ((totalImpostosPercent + custosFixos + percComissao + margemIdeal) / 100);
         let precoIdeal = fatorMarkup > 0 ? custoTotal / fatorMarkup : custoTotal;
 
-        // 4. Preço Final (Com Desconto)
+        // 5. Preço Final (Com Desconto)
         const desconto = getVal('prec_desconto');
         const precoFinalNoIpi = precoIdeal * (1 - (desconto / 100));
 
-        // 5. IPI
-        const ipiIsento = document.getElementById('prec_ipi_isento')?.checked;
-        const ipiPercent = ipiIsento ? 0 : getVal('prec_ipi');
+        // 6.1. Valor do IPI
         const valorIpi = precoFinalNoIpi * (ipiPercent / 100);
         const precoFinalWithIpi = precoFinalNoIpi + valorIpi;
 
@@ -1428,7 +1429,7 @@ class PrecificacaoModule {
         const valorImpostos = precoFinalNoIpi * (totalImpostosPercent / 100);
         const valorCustosFixos = precoFinalNoIpi * (custosFixos / 100);
         if (isAutPro) {
-            valorComissao = precoFinalNoIpi * (0.5 / 100);
+            valorComissao = (precoFinalNoIpi + valorIpi) * (0.5 / 100);
         } else {
             const baseComissao = precoFinalNoIpi - valorImpostos;
             valorComissao = baseComissao * (comissao / 100);
@@ -1582,10 +1583,13 @@ class PrecificacaoModule {
             const custosFixos = data.custosFixos || 0;
             const comissao = data.comissao || 0;
 
+            const ipiIsento = data.ipiIsento || false;
+            const ipiPercent = ipiIsento ? 0 : (data.ipi || 0);
+
             let percComissao, valorComissao;
             if (isAutPro) {
-                percComissao = 0.5;
-                valorComissao = 0; // recalc após precoFinalNoIpi
+                percComissao = 0.5 * (1 + ipiPercent / 100);
+                valorComissao = 0;
             } else {
                 percComissao = comissao * (1 - totalImpostosPercent / 100);
                 valorComissao = 0;
@@ -1596,14 +1600,12 @@ class PrecificacaoModule {
             const desconto = data.desconto || 0;
             const precoFinalNoIpi = precoIdeal * (1 - (desconto / 100));
 
-            const ipiIsento = data.ipiIsento || false;
-            const ipiPercent = ipiIsento ? 0 : (data.ipi || 0);
             const valorIpi = precoFinalNoIpi * (ipiPercent / 100);
 
             const valorImpostos = precoFinalNoIpi * (totalImpostosPercent / 100);
             const valorCustosFixos = precoFinalNoIpi * (custosFixos / 100);
             if (isAutPro) {
-                valorComissao = precoFinalNoIpi * (0.5 / 100);
+                valorComissao = (precoFinalNoIpi + valorIpi) * (0.5 / 100);
             } else {
                 const baseComissao = precoFinalNoIpi - valorImpostos;
                 valorComissao = baseComissao * (comissao / 100);
