@@ -1,0 +1,78 @@
+<project version="0.100.0" title="Teste API">
+    <properties>
+        <property name="saveddate" show="1">07/07/2026</property>
+        <property name="saveddate-eu" show="1">07/07/2026</property>
+        <property name="saveddate-us" show="1">2026-07-07</property>
+        <property name="savedfilename" show="1">Teste API</property>
+        <property name="savedfilepath" show="1">C:\Users\jcc\Documents\Workspace_A\GeraPro\teste_via_api.qet</property>
+        <property name="savedtime" show="1">05:41:09</property>
+    </properties>
+    <newdiagrams>
+        <border cols="15" colsize="50" rows="6" displaycols="true" displayrows="true" rowsize="80"/>
+        <inset date="null" title="" auto_page_num="" displayAt="bottom" filename="" author="" plant="" locmach="" indexrev="" folio="%id/%total" version=""/>
+        <conductors num="_" conductor_color="" type="multi" displaytext="1" onetextperfolio="0" vertirotatetext="270" color2="#000000" horizrotatetext="0" bicolor="false" condsize="1" numsize="7" tension_protocol="" bus="" dash-size="2" conductor_section="" vertical-alignment="AlignRight" function="" horizontal-alignment="AlignBottom" text_color="#000000" cable="" formula=""/>
+        <report label="%f-%l%c"/>
+        <xrefs>
+            <xref type="protection" displayhas="cross" offset="0" slave_label="(%f-%l%c)" showpowerctc="true" delayprefix="" switchprefix="" powerprefix="" snapto="label" xrefpos="" master_label="%f-%l%c"/>
+            <xref type="coil" displayhas="cross" offset="40" slave_label="(%f-%l%c)" showpowerctc="true" delayprefix="" switchprefix="" powerprefix="" snapto="label" xrefpos="AlignTop" master_label="%f-%l%c"/>
+            <xref type="commutator" displayhas="cross" offset="0" slave_label="(%f-%l%c)" showpowerctc="true" delayprefix="" switchprefix="" powerprefix="" snapto="label" xrefpos="" master_label="%f-%l%c"/>
+        </xrefs>
+        <conductors_autonums freeze_new_conductors="false" current_autonum=""/>
+        <folio_autonums/>
+        <element_autonums freeze_new_elements="false" current_autonum=""/>
+    </newdiagrams>
+    <diagram title="Teste API" displayrows="true" version="0.100.0" cols="15" folio="%id/%total" displaycols="true" height="480" colsize="50" order="1" rows="6" author="GeraPro" filename="" date="2026-07-07" rowsize="80" freezeNewElement="false" freezeNewConductor="false">
+        <defaultconductor num="_" vertirotatetext="0" displaytext="1" type="multi" horizrotatetext="0" numsize="9" onetextperfolio="0"/>
+        <elements>
+            <element x="0" y="0" type="embed://import/gerapro/box_60x80.elmt" uuid="{52314e0b-0bb1-4e2d-8729-67ea8644020a}" orientation="0" freezeLabel="false" prefix="">
+                <terminals>
+                    <terminal x="0" y="-10" nameHidden="0" number="1" id="0" name="1" orientation="0"/>
+                    <terminal x="0" y="10" nameHidden="0" number="2" id="1" name="2" orientation="2"/>
+                </terminals>
+                <inputs/>
+                <dynamic_texts>
+                    <dynamic_elmt_text frame="false" Halignment="AlignLeft" x="-28" y="-5" rotation="0" font="Liberation Sans,7,-1,5,50,0,0,0,0,0,Regular" text_width="-1" uuid="{26dbeb51-4fc6-49e7-8cbf-8c59581175c8}" keep_visual_rotation="false" text_from="ElementInfo" Valignment="AlignTop">
+                        <text>R1</text>
+                        <info_name>label</info_name>
+                    </dynamic_elmt_text>
+                </dynamic_texts>
+            </element>
+        </elements>
+    </diagram>
+    <collection>
+        <category name="import">
+            <names>
+                <name lang="en">Imported elements</name>
+            </names>
+            <category name="gerapro">
+                <names>
+                    <name lang="en">GeraPro</name>
+                </names>
+                <element name="box_60x80.elmt">
+                    <definition type="element" link_type="master" hotspot_x="30" hotspot_y="0" width="60" height="80" version="0.100.0">
+                        <uuid uuid="{6b70bf73-c422-40a3-92c9-fa4a583490e3}"/>
+                        <names>
+                            <name lang="en">Box 60x80</name>
+                        </names>
+                        <kindInformations>
+                            <kindInformation name="type">other</kindInformation>
+                        </kindInformations>
+                        <informations>Author: GeraPro</informations>
+                        <description>
+                            <line x1="-30" y1="0" x2="30" y2="0" end1="none" end2="none" style="line-style:normal;line-weight:normal;filling:none;color:black"/>
+                            <line x1="30" y1="0" x2="30" y2="80" end1="none" end2="none" style="line-style:normal;line-weight:normal;filling:none;color:black"/>
+                            <line x1="30" y1="80" x2="-30" y2="80" end1="none" end2="none" style="line-style:normal;line-weight:normal;filling:none;color:black"/>
+                            <line x1="-30" y1="80" x2="-30" y2="0" end1="none" end2="none" style="line-style:normal;line-weight:normal;filling:none;color:black"/>
+                            <terminal type="Generic" x="0" y="0" name="TOP" uuid="{2dab1910-7e6f-4e2a-848b-479dcd0d029e}" orientation="n"/>
+                            <terminal type="Generic" x="0" y="80" name="BOTTOM" uuid="{7599fab3-ae56-4c1d-8982-b3b6927e77fe}" orientation="s"/>
+                            <dynamic_text Halignment="AlignCenter" frame="false" x="0" y="40" rotation="0" font="Liberation Sans,10,-1,5,50,0,0,0,0,0,Regular" text_width="-1" uuid="{44a670dc-b6b5-494a-94b4-7480d5a29e02}" keep_visual_rotation="false" Valignment="AlignCenter" text_from="ElementInfo">
+                                <text/>
+                                <info_name>label</info_name>
+                            </dynamic_text>
+                        </description>
+                    </definition>
+                </element>
+            </category>
+        </category>
+    </collection>
+</project>

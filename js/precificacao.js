@@ -342,7 +342,8 @@ class PrecificacaoModule {
         const laborCost = this.calculateEquipmentLaborCost(eq);
         const expenseCost = this.calculateEquipmentExpenseCost(eq);
 
-        container.innerHTML = this.getPricingFormHTML(this.activeTag, data, { matCost, laborCost, expenseCost }, regime, isSeuComponent, isCubMt);
+        const isAutPro = state.company?.folderName?.startsWith('AUT_');
+        container.innerHTML = this.getPricingFormHTML(this.activeTag, data, { matCost, laborCost, expenseCost }, regime, isSeuComponent, isCubMt, isAutPro);
         
         // Pre-fill credit fields from all material sources if not manually overridden
         if (regime !== 'Simples Nacional' && !data.icmsCredito && !data.pisCofinsCredito && !data.ipiCredito) {
@@ -491,7 +492,7 @@ class PrecificacaoModule {
         return { cost, finalPrice };
     }
 
-    getPricingFormHTML(tag, data, costs, regime, isSeuComponent = false, isCubMt = false) {
+    getPricingFormHTML(tag, data, costs, regime, isSeuComponent = false, isCubMt = false, isAutPro = false) {
         return `
             <div class="card" style="padding: 24px; border: none; box-shadow: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -613,10 +614,24 @@ class PrecificacaoModule {
                                     <label class="form-label">Custos Fixos / Admin (%)</label>
                                     <input type="number" id="prec_custos_fixos" class="form-control" value="${data.custosFixos || 8}" step="0.01">
                                 </div>
+                                ${isAutPro ? `
+                                <div class="form-group">
+                                    <div style="display:flex;align-items:center;gap:8px;background:#f0fdf4;padding:8px 12px;border-radius:6px;border:1px solid #bbf7d0;">
+                                        <i class="ph ph-check-circle" style="color:#16a34a;font-size:16px;flex-shrink:0;"></i>
+                                        <div>
+                                            <div style="font-size:11px;color:#475569;font-weight:600;">Comissão Fixa AutPro</div>
+                                            <div style="font-weight:700;color:#16a34a;">0,5% s/ Valor Bruto</div>
+                                            <div style="font-size:10px;color:#ca8a04;">Limitada a R$ 30.000,00 por proposta</div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="prec_comissao" value="0.5">
+                                </div>
+                                ` : `
                                 <div class="form-group">
                                     <label class="form-label">Comissão Vendas (%)</label>
                                     <input type="number" id="prec_comissao" class="form-control" value="${data.comissao || 5}" step="0.01">
                                 </div>
+                                `}
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 12px; border-top: 1px dashed var(--color-border);">
@@ -741,7 +756,23 @@ class PrecificacaoModule {
             return r.direto === true;
         });
 
-        return { equipments, seus, useSeuMode, totalCost, totalSalesNoIpi, totalIpi, totalProfit, totalDiretoSales, totalProprioSales, tableRows, totalMargin, hasDireto, infraResult, projectName: state.activeTechnicalProposal?.nomeProjeto || '' };
+        // AutPro: aplicar cap de R$ 30k na comissão
+        const isAutPro = state.company?.folderName?.startsWith('AUT_');
+        let autproComissaoBruta = 0, autproComissaoEfetiva = 0, autproEconomiaCap = 0;
+        if (isAutPro) {
+            // Soma comissão de todos os itens (exceto faturamento direto)
+            for (const r of Object.values(this.calculatedResults)) {
+                if (!r.direto && r.comissao !== undefined) {
+                    autproComissaoBruta += r.comissao;
+                }
+            }
+            autproComissaoEfetiva = Math.min(autproComissaoBruta, 30000);
+            autproEconomiaCap = Math.max(0, autproComissaoBruta - 30000);
+            // Ajusta o lucro total: adiciona a economia do cap de volta
+            totalProfit += autproEconomiaCap;
+        }
+
+        return { equipments, seus, useSeuMode, totalCost, totalSalesNoIpi, totalIpi, totalProfit, totalDiretoSales, totalProprioSales, tableRows, totalMargin, hasDireto, infraResult, projectName: state.activeTechnicalProposal?.nomeProjeto || '', isAutPro, autproComissaoBruta, autproComissaoEfetiva, autproEconomiaCap };
     }
 
     renderSummaryView(container) {
@@ -759,7 +790,7 @@ class PrecificacaoModule {
         }
 
         const d = this._calcSummaryData();
-        const { useSeuMode, hasDireto, totalCost, totalSalesNoIpi, totalIpi, totalProfit, totalDiretoSales, totalProprioSales, totalMargin } = d;
+        const { useSeuMode, hasDireto, totalCost, totalSalesNoIpi, totalIpi, totalProfit, totalDiretoSales, totalProprioSales, totalMargin, isAutPro, autproComissaoBruta, autproComissaoEfetiva, autproEconomiaCap } = d;
 
         container.innerHTML = `
             <div class="card" style="padding: 24px; border: none; box-shadow: none;">
@@ -839,6 +870,21 @@ class PrecificacaoModule {
                 </div>
                 `}
 
+                ${isAutPro ? `
+                <div style="display: flex; gap: 16px; margin-bottom: 20px; padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; align-items: center;">
+                    <i class="ph ph-percent" style="font-size: 24px; color: #16a34a;"></i>
+                    <div style="flex: 1;">
+                        <span class="text-xs text-muted text-uppercase font-bold">Comissão AutPro (0,5% s/ Valor Bruto)</span>
+                        <div style="display: flex; gap: 24px; margin-top: 4px; flex-wrap: wrap;">
+                            <span style="font-size: 13px; color: #475569;">Bruta: <strong>${app.formatCurrency(autproComissaoBruta)}</strong></span>
+                            <span style="font-size: 13px; color: #475569;">Cap: <strong>R$ 30.000,00</strong></span>
+                            <span style="font-size: 13px; font-weight: 700; color: #16a34a;">Efetiva: ${app.formatCurrency(autproComissaoEfetiva)}</span>
+                            ${autproEconomiaCap > 0 ? `<span style="font-size: 13px; color: #ca8a04;">Economia (adicionada ao lucro): <strong>${app.formatCurrency(autproEconomiaCap)}</strong></span>` : ''}
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+
                 <div class="table-container">
                     <table>
                         <thead>
@@ -874,7 +920,7 @@ class PrecificacaoModule {
 
     printResumoConsolidado() {
         const d = this._calcSummaryData();
-        const { equipments, useSeuMode, hasDireto, totalCost, totalSalesNoIpi, totalIpi, totalProfit, totalDiretoSales, totalProprioSales, totalMargin, tableRows } = d;
+        const { equipments, useSeuMode, hasDireto, totalCost, totalSalesNoIpi, totalIpi, totalProfit, totalDiretoSales, totalProprioSales, totalMargin, tableRows, isAutPro, autproComissaoBruta, autproComissaoEfetiva, autproEconomiaCap } = d;
 
         const html = `
 <!DOCTYPE html>
@@ -932,6 +978,15 @@ class PrecificacaoModule {
         <div class="kpi-box"><div class="kpi-label">Margem Média Real</div><div class="kpi-value">${totalMargin.toFixed(2)}%</div></div>
     </div>
     `}
+    ${isAutPro ? `
+    <div style="margin-bottom:16px;padding:8px 12px;border:1px solid #bbf7d0;border-radius:4px;background:#f0fdf4;font-size:11px;">
+        <strong>Comiss&atilde;o AutPro (0,5% s/ Valor Bruto):</strong>
+        Bruta: ${app.formatCurrency(autproComissaoBruta)} |
+        Cap: R$ 30.000,00 |
+        <strong>Efetiva: ${app.formatCurrency(autproComissaoEfetiva)}</strong>
+        ${autproEconomiaCap > 0 ? `| Economia (no lucro): ${app.formatCurrency(autproEconomiaCap)}` : ''}
+    </div>
+    ` : ''}
     <table>
         <thead>
             <tr>
@@ -1281,6 +1336,7 @@ class PrecificacaoModule {
 
         const state = store.getState();
         const regime = state.company?.regimeTributario || 'Lucro Real';
+        const isAutPro = state.company?.folderName?.startsWith('AUT_');
         
         const getVal = (id, isCurrency = false) => {
             const el = document.getElementById(id);
@@ -1309,6 +1365,8 @@ class PrecificacaoModule {
                 finalPriceNoIpi: custoTotal,
                 ipiValue: 0,
                 profit: 0,
+                comissao: 0,
+                faturamento: 'Direto',
                 direto: true
             };
             return;
@@ -1344,7 +1402,15 @@ class PrecificacaoModule {
         const custosFixos = getVal('prec_custos_fixos');
         const comissao = getVal('prec_comissao');
 
-        const percComissao = comissao * (1 - totalImpostosPercent / 100);
+        let percComissao, valorComissao;
+        if (isAutPro) {
+            // AutPro: 0,5% fixo sobre o valor bruto (precoFinalNoIpi), sem ajuste de impostos
+            percComissao = 0.5;
+            valorComissao = 0; // será recalculado após precoFinalNoIpi
+        } else {
+            percComissao = comissao * (1 - totalImpostosPercent / 100);
+            valorComissao = 0; // será recalc após precoFinalNoIpi
+        }
         const fatorMarkup = 1 - ((totalImpostosPercent + custosFixos + percComissao + margemIdeal) / 100);
         let precoIdeal = fatorMarkup > 0 ? custoTotal / fatorMarkup : custoTotal;
 
@@ -1361,8 +1427,12 @@ class PrecificacaoModule {
         // 6. Lucro Líquido
         const valorImpostos = precoFinalNoIpi * (totalImpostosPercent / 100);
         const valorCustosFixos = precoFinalNoIpi * (custosFixos / 100);
-        const baseComissao = precoFinalNoIpi - valorImpostos;
-        const valorComissao = baseComissao * (comissao / 100);
+        if (isAutPro) {
+            valorComissao = precoFinalNoIpi * (0.5 / 100);
+        } else {
+            const baseComissao = precoFinalNoIpi - valorImpostos;
+            valorComissao = baseComissao * (comissao / 100);
+        }
         const lucroLiquido = precoFinalNoIpi - custoTotal - valorImpostos - valorCustosFixos - valorComissao;
         const margemReal = precoFinalNoIpi > 0 ? (lucroLiquido / precoFinalNoIpi) * 100 : 0;
 
@@ -1384,7 +1454,10 @@ class PrecificacaoModule {
             cost: custoTotal,
             finalPriceNoIpi: precoFinalNoIpi,
             ipiValue: valorIpi,
-            profit: lucroLiquido
+            profit: lucroLiquido,
+            comissao: valorComissao,
+            faturamento: document.getElementById('prec-faturamento-select')?.value || 'Próprio',
+            direto: faturamento === 'Direto'
         };
     }
 
@@ -1443,6 +1516,7 @@ class PrecificacaoModule {
         const state = store.getState();
         const equipments = state.activeTechnicalProposal?.equipments || [];
         const regime = state.company?.regimeTributario || 'Lucro Real';
+        const isAutPro = state.company?.folderName?.startsWith('AUT_');
         console.log('[Precificacao] calculateAll - equipments:', equipments.length, 'pricingMap keys:', Object.keys(this.pricingMap));
 
         for (const eq of equipments) {
@@ -1490,6 +1564,8 @@ class PrecificacaoModule {
                     finalPriceNoIpi: custoTotal,
                     ipiValue: 0,
                     profit: 0,
+                    comissao: 0,
+                    faturamento: 'Direto',
                     direto: true
                 };
                 continue;
@@ -1505,7 +1581,15 @@ class PrecificacaoModule {
             const margemIdeal = data.margemIdeal || 0;
             const custosFixos = data.custosFixos || 0;
             const comissao = data.comissao || 0;
-            const percComissao = comissao * (1 - totalImpostosPercent / 100);
+
+            let percComissao, valorComissao;
+            if (isAutPro) {
+                percComissao = 0.5;
+                valorComissao = 0; // recalc após precoFinalNoIpi
+            } else {
+                percComissao = comissao * (1 - totalImpostosPercent / 100);
+                valorComissao = 0;
+            }
             const fatorMarkup = 1 - ((totalImpostosPercent + custosFixos + percComissao + margemIdeal) / 100);
             let precoIdeal = fatorMarkup > 0 ? custoTotal / fatorMarkup : custoTotal;
 
@@ -1518,15 +1602,22 @@ class PrecificacaoModule {
 
             const valorImpostos = precoFinalNoIpi * (totalImpostosPercent / 100);
             const valorCustosFixos = precoFinalNoIpi * (custosFixos / 100);
-            const baseComissao = precoFinalNoIpi - valorImpostos;
-            const valorComissao = baseComissao * (comissao / 100);
+            if (isAutPro) {
+                valorComissao = precoFinalNoIpi * (0.5 / 100);
+            } else {
+                const baseComissao = precoFinalNoIpi - valorImpostos;
+                valorComissao = baseComissao * (comissao / 100);
+            }
             const lucroLiquido = precoFinalNoIpi - custoTotal - valorImpostos - valorCustosFixos - valorComissao;
 
             this.calculatedResults[tag] = {
                 cost: custoTotal,
                 finalPriceNoIpi: precoFinalNoIpi,
                 ipiValue: valorIpi,
-                profit: lucroLiquido
+                profit: lucroLiquido,
+                comissao: valorComissao,
+                faturamento: data.faturamento,
+                direto: false
             };
         }
 

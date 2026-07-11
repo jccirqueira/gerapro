@@ -1,0 +1,303 @@
+================================================================================
+ ADAPTAÇÃO PARA QET 0.100 — COLLECTION EMBUTIDA E SIMBOLOGIA
+================================================================================
+ Data: 07/07/2026
+ Autor: GeraPro (desenvolvimento assistido por IA)
+ Arquivos: js/geradorQet.js, js/propostaTecnica.js
+ Versão: 2.0.0
+ Status: IMPLEMENTADO E TESTADO (geração OK, pendente validação visual no QET)
+================================================================================
+
+
+SUMÁRIO
+--------------------------------------------------------------------------------
+ 1. Contexto
+ 2. Problemas Identificados
+ 3. Mudanças Realizadas
+ 4. Estrutura do Collection (Elemento Embutido)
+ 5. Fluxo de Renderização no QET 0.100
+ 6. Arquivos Modificados
+ 7. Observações Técnicas
+ 8. Roadmap
+
+
+================================================================================
+1. CONTEXTO
+================================================================================
+
+ O GeraPro gera arquivos .qet (XML) para abertura no QElectroTech (QET).
+
+ A versão 0.100 do QET introduziu mudanças significativas no formato de
+ arquivo .qet:
+   - Exige version="0.100.0" no <project>
+   - Requer seção <collection> com elementos embutidos (embedded)
+   - Caminhos de símbolo mudaram de embed://import/industrie/*.elmt
+     para embed://import/10_electric/*/*.elmt (coleção padrão)
+   - Não carrega mais símbolos externos automaticamente; tudo deve
+     estar no <collection> do próprio .qet
+
+ O módulo geradorQet.js (v1.0.0) gerava arquivos compatíveis com QET 0.4~0.80,
+ que se tornaram inválidos/brancos no QET 0.100.
+
+
+================================================================================
+2. PROBLEMAS IDENTIFICADOS
+================================================================================
+
+ 2.1. Versão incompatível
+
+   QET_VERSION = '0.4'  →  QET 0.100 ignorava o arquivo
+   QET_VERSION = '0.80' →  QET 0.100 mostrava warnings de compatibilidade
+   Solução: QET_VERSION = '0.100.0'
+
+ 2.2. Símbolos externos inexistentes
+
+   Antes:  embed://import/industrie/disjoncteur.elmt
+           embed://import/industrie/contacteur.elmt
+           embed://import/industrie/boite.elmt
+           ...
+
+   Problema: QET 0.100 não encontrava esses paths na coleção padrão
+             (a coleção padrão usa import/10_electric/...)
+
+   Solução: Embedar um elemento próprio dentro do .qet via <collection>
+            e usar um único path: embed://import/gerapro/box_60x80.elmt
+
+ 2.3. Seções ausentes no <newdiagrams>
+
+   QET 0.100 exige:
+     <folio_autonums/>
+     <element_autonums freeze_new_elements="false" current_autonum=""/>
+
+   Antes esses elementos estavam ausentes.
+
+ 2.4. Exibição de texto nos componentes
+
+   Tentativa 1: <dynamic_texts text_from="ElementInfo"> — não exibia
+                porque ElementInfo não é preenchida em arquivos gerados
+                programaticamente.
+
+   Tentativa 2 (atual): <inputs><input x="0" y="40" text="NOME"/></inputs>
+                Mecanismo legado do QET que funciona em todas as versões.
+
+ 2.5. Posição vertical dos componentes
+
+   Antes: compY += altura + 20  → componentes espaçados irregularmente
+   Agora: compY += 8            → row-based (8 * 10 = 80 = altura do
+                                   elemento box_60x80)
+   qetRows: dinâmico = Math.max(6, ceil(nComponentes / 2) + 1)
+
+ 2.6. Símbolo para categoria vazia
+
+   Muitos materiais têm m.categoria = '' (vazio). Agora busca também
+   em m.descricao como fallback na mapping function (antes de
+   simplificar para usar sempre o elemento embutido).
+
+
+================================================================================
+3. MUDANÇAS REALIZADAS
+================================================================================
+
+ 3.1. js/geradorQet.js
+
+   LINHA      | ANTES                    | DEPOIS
+   -----------|--------------------------|-------------------------------
+   5          | QET_VERSION = '0.80'     | QET_VERSION = '0.100.0'
+   33-87      | (não existia)            | buildBoxElementDef() — gera
+              |                          |   definição do elemento caixa
+              |                          |   60x80 com 2 terminais e
+              |                          |   dynamic_text central
+   89-104     | (não existia)            | buildCollection() — gera
+              |                          |   seção <collection> com
+              |                          |   categoria import/gerapro e
+              |                          |   elemento box_60x80.elmt
+   106-236    | buildDiagram()           | buildDiagram() refatorado:
+              |                          |   • inputs em vez de dynamic_texts
+              |                          |   • removeu geração de UUIDs
+              |                          |     desnecessários para inputs
+              |                          |   • rowHeight = 80
+              |                          |   • finalRows dinâmico
+   277-280    | (não existia)            | Cálculo de qetRows + chamada
+              |                          | buildCollection()
+   282-325    | (não existia)            | xrefs no formato QET 0.100
+              |                          | (3 tipos: protection, coil,
+              |                          |  commutator)
+   341-397    | newdiagrams simplificado | newdiagrams completo com:
+              |                          |   • border, inset, conductors
+              |                          |   • report, xrefs
+              |                          |   • conductors_autonums
+              |                          |   • folio_autonums
+              |                          |   • element_autonums
+
+ 3.2. js/propostaTecnica.js
+
+   LINHA      | ANTES                    | DEPOIS
+   -----------|--------------------------|-------------------------------
+   17112      | cat.includes('contator') | const simboloQet =
+              | ? 'embed://...' : ...     | 'embed://import/gerapro/
+              | (11 linhas de ternários)  | box_60x80.elmt'
+              |                          |
+              | (mapeamento complexo     | (único símbolo para todos
+              |  com 11 categorias)      |  os tipos de componente)
+
+
+================================================================================
+4. ESTRUTURA DO COLLECTION (ELEMENTO EMBUTIDO)
+================================================================================
+
+ O elemento box_60x80.elmt é um retângulo simples com 2 terminais e
+ texto centralizado, definido dentro do próprio .qet:
+
+   <collection>
+     <category name="import">
+       <names><name lang="en">Imported elements</name></names>
+       <category name="gerapro">
+         <names><name lang="en">GeraPro</name></names>
+         <element name="box_60x80.elmt">
+           <definition type="element" link_type="master"
+                       hotspot_x="30" hotspot_y="0"
+                       width="60" height="80"
+                       version="0.100.0">
+             <uuid uuid="{...}"/>
+             <names><name lang="en">Box 60x80</name></names>
+             <kindInformations>
+               <kindInformation name="type">other</kindInformation>
+             </kindInformations>
+             <informations>Author: GeraPro</informations>
+             <description>
+               <!-- 4 linhas formando o retângulo -->
+               <line x1="-30" y1="0" x2="30" y2="0" .../>
+               <line x1="30" y1="0" x2="30" y2="80" .../>
+               <line x1="30" y1="80" x2="-30" y2="80" .../>
+               <line x1="-30" y1="80" x2="-30" y2="0" .../>
+               <!-- Terminal superior -->
+               <terminal type="Generic" x="0" y="0" name="TOP"
+                         uuid="{...}" orientation="n"/>
+               <!-- Terminal inferior -->
+               <terminal type="Generic" x="0" y="80" name="BOTTOM"
+                         uuid="{...}" orientation="s"/>
+               <!-- Texto dinâmico no centro -->
+               <dynamic_text Halignment="AlignCenter" frame="false"
+                             x="0" y="40" rotation="0"
+                             font="Liberation Sans,10,..."
+                             uuid="{...}"
+                             Valignment="AlignCenter"
+                             text_from="ElementInfo">
+                 <text/>
+                 <info_name>label</info_name>
+               </dynamic_text>
+             </description>
+           </definition>
+         </element>
+       </category>
+     </category>
+   </collection>
+
+ Path do elemento: embed://import/gerapro/box_60x80.elmt
+
+ No diagrama, o texto do componente é passado via <inputs>:
+   <inputs>
+     <input x="0" y="40" text="Disjuntor motor com disparador"/>
+   </inputs>
+
+
+================================================================================
+5. FLUXO DE RENDERIZAÇÃO NO QET 0.100
+================================================================================
+
+  1. Usuário clica "Exportar QET" no GeraPro
+  2. Frontend (propostaTecnica.js) coleta materiais do equipamento ativo
+     Extrai IDs de cabinetAssignments (fallback: todos materiais)
+     Mapeia cada material para:
+       - simboloQet = 'embed://import/gerapro/box_60x80.elmt' (fixo)
+       - tag = descrição do material
+       - posicaoY = contador * 8 (linhas de 80 décimos de mm)
+       - terminais = 2 (superior/inferior)
+     Envia POST para /api/export-qet com { componentes, bornes, titleblock }
+  3. Backend (server_new.js → handleExportQET) recebe os dados
+     Gera arquivo temporário com gerarProjetoQet()
+     Retorna como download (res.download)
+  4. Usuário abre .qet no QET 0.100
+  5. QET lê <project version="0.100.0">
+     Encontra <collection> com box_60x80.elmt
+     Renderiza cada <element> usando o elemento embutido
+     Exibe texto via <inputs><input text="...">
+
+
+================================================================================
+6. ARQUIVOS MODIFICADOS
+================================================================================
+
+  js/geradorQet.js       (476 linhas) — Rewrite completo para QET 0.100
+  js/propostaTecnica.js   (simplificação na linha 17112)
+
+
+================================================================================
+7. OBSERVAÇÕES TÉCNICAS
+================================================================================
+
+ 7.1. Hotspot do elemento
+
+   hotspot_x = 30, hotspot_y = 0
+   O retângulo desenha de (-30, 0) a (30, 80), ou seja:
+   - Largura: 60 (centrado no hotspot x)
+   - Altura: 80 (do hotspot y para baixo)
+   - O ponto de referência fica no centro-superior do elemento
+
+ 7.2. Terminais do elemento vs terminais do diagrama
+
+   O elemento tem 2 terminais na definição (TOP em y=0, BOTTOM em y=80).
+   O diagrama pode ter terminais adicionais ou em posições diferentes
+   (calculados a partir da altura do material: altura/2/10 * 10).
+
+   Quando o QET abre o arquivo, os terminais do diagrama são sincronizados
+   com os terminais da definição do elemento (se os nomes coincidirem).
+
+ 7.3. Inputs vs Dynamic Texts
+
+   <inputs> é o mecanismo legado do QET para exibir texto em elementos.
+   <dynamic_texts> é o mecanismo atual, que usa ElementInfo.
+
+   Em arquivos gerados programaticamente (sem interação do usuário),
+   <inputs> é mais confiável porque:
+   - O texto é definido inline no atributo text
+   - Não depende de estado interno do QET (label property)
+   - Funciona em todas as versões do QET (0.4 ~ 0.100)
+
+ 7.4. Posição do texto
+
+   O texto via input é posicionado em (0, 40) — centro do retângulo.
+   O input usa coordenadas relativas ao elemento, na mesma escala
+   das coordenadas do desenho (décimos de mm).
+
+
+================================================================================
+8. ROADMAP
+================================================================================
+
+ Versão 2.0 (COMPLETO - 07/07/2026)
+   ✔ Geração de .qet compatível com QET 0.100
+   ✔ Elemento caixa embutido no <collection>
+   ✔ Versão 0.100.0 no project + diagram
+   ✔ Seções folio_autonums e element_autonums
+   ✔ Inputs para exibição de tags
+   ✔ Símbolo único para todos os componentes
+
+ Versão 2.1 (PLANEJADO)
+   ☐ Validar visualmente no QET 0.100 se os textos aparecem
+   ☐ Testar com múltiplos equipamentos e bornes
+   ☐ Ajustar orientação dos terminais (0=N, 2=S) para conectar
+     corretamente com condutores
+   ☐ Adicionar fallback para QET 0.80 (manter compatibilidade
+     retroativa detectando versão do QET)
+
+ Versão 2.2 (PLANEJADO)
+   ☐ Múltiplos tipos de elemento embutido (contator, disjuntor,
+     relé, fusível, motor) com formas diferenciadas
+   ☐ Posicionamento automático baseado na altura real dos componentes
+   ☐ Suporte a múltiplos diagramas (força, comando, bornes)
+   ☐ Tabela de bornes gerada como elemento de texto
+
+================================================================================
+ FIM DO DOCUMENTO
+================================================================================

@@ -1,0 +1,530 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    RELATÓRIO DE IMPLANTAÇÃO — NOVA NUMERAÇÃO DE PROPOSTAS AUTPRO                ║
+║                                                                                  ║
+║    Data: 08 de Julho de 2026                                                    ║
+║    Sistema: GeraPro                                                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+================================================================================
+ÍNDICE
+================================================================================
+
+  1.  Objetivo da Mudança
+  2.  Arquivos Modificados
+  3.  Detalhamento das Alterações no Backend (db.js)
+  4.  Detalhamento das Alterações no Servidor (server_new.js)
+  5.  Detalhamento das Alterações na Store (state.js)
+  6.  Detalhamento das Alterações no Frontend Clientes (clientes.js)
+  7.  Detalhamento das Alterações no Frontend App (app.js)
+  8.  Como Funciona o Sequenciamento
+  9.  Estrutura de Pastas no Servidor
+  10. Formato Final dos Códigos
+  11. Perguntas Frequentes (FAQ)
+  12. Riscos e Pontos de Atenção
+
+
+================================================================================
+1. OBJETIVO DA MUDANÇA
+================================================================================
+
+Antes: O sistema numerava as propostas com a data do dia + sequencial diário.
+        Formato: YYMMDDNN  (ex: 26070801)
+        Pasta: GERAPRO/AUT_2e10603f/26070801-TITULO/
+
+Agora (somente AUTPRO): O número da proposta carrega significado:
+        Código: 00801017 onde:
+           008 = código do cliente (manual)
+           01  = código da unidade (manual)
+           017 = sequencial automático por unidade (3 dígitos)
+
+        Pasta: GERAPRO/AUT_2e10603f/008 - BP BIOENERGY/01 - MOEMA/017 - TITULO/
+
+Objetivos:
+    - Identificar visualmente o cliente e unidade pelo número
+    - Organizar pastas em hierarquia lógica
+    - Eliminar números sem significado
+    - Automatizar o sequencial por unidade
+
+
+================================================================================
+2. ARQUIVOS MODIFICADOS
+================================================================================
+
+2.1. js/db.js        — Backend SQLite (schema, funções CRUD, sequenciamento)
+2.2. server_new.js   — Servidor HTTP (rotas, criação de PTC, listagem)
+2.3. js/state.js     — Store reativa do frontend (estado + CRUD)
+2.4. js/clientes.js  — Módulo de cadastro de clientes
+2.5. js/app.js       — Controlador principal (modal PTC, salvamento)
+2.6. docs/explicacao-codificacao-propostas.txt   — Documentação para usuários
+2.7. docs/explicacao-codificacao-propostas.html  — Documentação para usuários
+2.8. 08-07/implantacao-nova-numeracao-autpro.txt  — Este arquivo
+
+
+================================================================================
+3. DETALHAMENTO — js/db.js (Backend SQLite)
+================================================================================
+
+3.1. NOVA TABELA: unidades_cliente
+    ─────────────────────────────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS unidades_cliente (
+        id TEXT PRIMARY KEY,
+        empresa_id TEXT NOT NULL DEFAULT 'default',
+        cliente_id TEXT NOT NULL,
+        codigo_unidade TEXT NOT NULL,
+        nome_unidade TEXT DEFAULT '',
+        cep TEXT, logradouro TEXT, numero TEXT, bairro TEXT, cidade TEXT, estado TEXT,
+        proximo_sequencial INTEGER DEFAULT 1,
+        createdAt TEXT, updatedAt TEXT,
+        FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+        UNIQUE(empresa_id, cliente_id, codigo_unidade)
+    );
+
+3.2. COLUNA ADICIONADA (clientes)
+
+    ALTER TABLE clientes ADD COLUMN codigo_cliente TEXT DEFAULT '';
+    (com try-catch para migração segura)
+
+3.3. TABLE_MAP — Entrada para CRUD genérico
+
+    unidadesCliente: { pk: 'id', table: 'unidades_cliente' }
+
+3.4. NOVAS FUNÇÕES
+
+    function getUnidadesByCliente(clienteId, empresaId):
+        SELECT * FROM unidades_cliente WHERE cliente_id = ? AND empresa_id = ?
+        Retorna array de unidades de um cliente.
+
+    function peekNextAutproSequence(clienteId, codigoUnidade, empresaId):
+        SELECT proximo_sequencial FROM unidades_cliente
+        WHERE cliente_id = ? AND codigo_unidade = ? AND empresa_id = ?
+        Retorna o próximo número (sem consumir) como string de 3 dígitos.
+        Retorna null se a unidade não existir.
+
+    function consumeNextAutproSequence(clienteId, codigoUnidade, empresaId):
+        SELECT proximo_sequencial → seq
+        UPDATE unidades_cliente SET proximo_sequencial = seq + 1
+        Retorna o número consumido como string de 3 dígitos.
+        Retorna null se a unidade não existir.
+
+3.5. getFullSync — Adicionado retorno de unidadesCliente
+
+    unidadesCliente: findAll('unidadesCliente', empresaId)
+
+3.6. module.exports — Adicionado export das 3 novas funções
+
+    getUnidadesByCliente, peekNextAutproSequence, consumeNextAutproSequence
+
+
+================================================================================
+4. DETALHAMENTO — server_new.js (Servidor HTTP)
+================================================================================
+
+4.1. LISTA DE ENTIDADES VÁLIDAS (CRUD genérico)
+
+    Adicionado 'unidadesCliente' ao array validEntities.
+
+4.2. NOVAS ROTAS
+
+    4.2.1. GET /api/unidades-cliente?cliente_id=X
+        Autenticação: Bearer JWT (empresa_id extraída do token)
+        Parâmetros:
+            - cliente_id (obrigatório)
+        Ação: Chama db.getUnidadesByCliente(clienteId, empresaId)
+        Retorno: { success: true, unidades: [...] }
+
+    4.2.2. GET /api/next-autpro-number?cliente_id=X&codigo_unidade=Y
+        Autenticação: Bearer JWT
+        Parâmetros:
+            - cliente_id (obrigatório)
+            - codigo_unidade (obrigatório)
+        Ação:
+            1. Chama db.consumeNextAutproSequence(clienteId, codigoUnidade, empresaId)
+               → INCREMENTA o contador e retorna o sequencial
+            2. Busca codigo_cliente do cliente (SQL direto: SELECT codigo_cliente FROM clientes)
+            3. Monta o número: ${codigoCliente}${codigoUnidade}${seq}
+        Retorno: { success: true, numero: "00801001", codigoCliente: "008", codigoUnidade: "01", sequencial: 1 }
+        Status 404 se unidade não encontrada.
+
+    4.2.3. GET /api/next-autpro-number-preview?cliente_id=X&codigo_unidade=Y
+        Igual à anterior, mas chama peekNextAutproSequence (NÃO incrementa).
+
+4.3. MODIFICAÇÃO — handleCreatePtc(data, res, empresaId)
+
+    AGORA:
+        1. Verifica se a empresa é AUTPRO via empresa?.folder_name?.startsWith('AUT_')
+        2. Se AUTPRO + data.autpro presente:
+            a. Extrai de data.autpro: codigoCliente, codigoUnidade, sequencial (consumido),
+               clienteId, clienteRazaoSocial, unidadeNome
+            b. Constrói:
+                clienteFolderName = `${codigoCliente} - ${clienteRazaoSocial}`
+                unidadeFolderName = `${codigoUnidade} - ${unidadeNome}`
+                effectiveNumber   = `${codigoCliente}${codigoUnidade}${seqPadded}`
+                folderName        = `${effectiveNumber}-${titleSlug}`
+                rootPath          = path.join(getEmpresaPtcDir(empresaId), clienteFolderName,
+                                             unidadeFolderName, folderName)
+            c. Salva metadados autpro em ptc_info.json
+        3. Se NÃO for AUTPRO, mantém o comportamento antigo.
+
+4.4. MODIFICAÇÃO — handleListPtcs(res, empresaId)
+
+    AGORA usa busca recursiva (até profundidade 3):
+        - Procura pastas na raiz que casam com /^\d{8,10}-/ ou 'PTC-'
+        - Dentro dessas, procura subpastas de mesmo padrão (clientes > unidades)
+        - Retorna apenas o nome da pasta PTC (último segmento), não o caminho relativo
+
+4.5. MODIFICAÇÃO — getFullPtcPath(empresaId, ptcFolder)
+
+    AGORA:
+        1. Tenta path.join(baseDir, ptcFolder) diretamente
+        2. Se não existir, busca recursivamente dentro de subdiretórios
+           (cliente > unidade) para encontrar a pasta PTC
+        3. Retorna o caminho completo encontrado
+
+
+================================================================================
+5. DETALHAMENTO — js/state.js (Store Reativa)
+================================================================================
+
+5.1. ESTADO INICIAL
+
+    Adicionado: unidadesCliente: []
+
+5.2. MÉTODOS CRUD
+
+    addUnidadeCliente(unidade):
+        - Gera UUID e createdAt
+        - Atualiza estado (cache otimista)
+        - Chama _syncCreate('unidadesCliente', item)
+        - Reverte em caso de falha
+        - Retorna o item criado ou null
+
+    updateUnidadeCliente(id, updates):
+        - Atualiza estado (cache otimista)
+        - Chama _syncUpdate('unidadesCliente', id, updates)
+        - Reverte em caso de falha
+        - Retorna boolean
+
+    deleteUnidadeCliente(id):
+        - Remove do estado (cache otimista)
+        - Chama _syncDelete('unidadesCliente', id)
+        - Reverte em caso de falha
+        - Retorna boolean
+
+5.3. LOAD (sync)
+
+    Adicionado 'unidadesCliente' na lista de keys carregadas do
+    endpoint /api/data/sync/full.
+
+
+================================================================================
+6. DETALHAMENTO — js/clientes.js (Módulo de Clientes)
+================================================================================
+
+6.1. BINDINGS EXPORTADOS (init)
+
+    Adicionado:
+        addUnidadeRow: this.addUnidadeRow.bind(this)
+        removeUnidadeRow: this.removeUnidadeRow.bind(this)
+
+6.2. CAMPO "Código do Cliente" (aba Dados Gerais)
+
+    Input com name="codigo_cliente", maxlength=10.
+    Texto de ajuda: "Usado na numeração AUTPRO (ex: 00801XXX)"
+
+6.3. NOVA ABA "Unidades"
+
+    Botão na tab-bar:
+        <button id="btn-tab-unidades" class="tab-btn"
+                onclick="app.clientes.switchTab('unidades')">Unidades</button>
+
+    Conteúdo da aba:
+        - Botão "+ Adicionar Unidade"
+        - Container #unidades-container com .unidade-row para cada unidade
+        - Cada .unidade-row contém:
+            . Código (width 100px, .unidade-codigo)
+            . Nome da Unidade (flex: 1, .unidade-nome)
+            . CEP, Logradouro, Número, Bairro, Cidade, UF (inputs individuais)
+            . Hidden .unidade-id
+            . Botão de remover (chama app.clientes.removeUnidadeRow)
+        - Já renderiza unidades existentes via getUnidadesByCliente(data.id)
+        - Info box: "As unidades são salvas automaticamente ao salvar o cliente."
+
+6.4. MÉTODO addUnidadeRow(clienteId)
+
+    - Cria uma nova .unidade-row com todos os campos vazios
+    - Insere no final do #unidades-container
+
+6.5. MÉTODO removeUnidadeRow(btn)
+
+    - Se a unidade já tem ID (já foi salva antes), chama store.deleteUnidadeCliente(id)
+    - Remove o .unidade-row do DOM
+
+6.6. MÉTODO getUnidadesByCliente(clienteId)
+
+    - Filtra store.getState().unidadesCliente por cliente_id
+
+6.7. MODIFICAÇÃO — save()
+
+    Após salvar o cliente (create ou update):
+        1. Obtém clienteId (do update ou do created.id)
+        2. Obtém existingUnidades = getUnidadesByCliente(clienteId)
+        3. Itera sobre todos os .unidade-row no DOM
+        4. Para cada unidade:
+            - Extrai dados dos inputs (codigo_unidade, nome_unidade, etc.)
+            - Se tem ID e existe no existingUnidades → updateUnidadeCliente
+            - Se não tem ID → addUnidadeCliente
+        5. Remove unidades que existiam mas não estão mais no DOM
+           (compara existingUnidades vs currentUnidadeIds)
+
+
+================================================================================
+7. DETALHAMENTO — js/app.js (Controlador Principal)
+================================================================================
+
+7.1. BINDINGS EXPORTADOS (init)
+
+    Adicionado:
+        window.app.onPtcClientChange   = this.onPtcClientChange.bind(this)
+        window.app.onPtcUnidadeChange  = this.onPtcUnidadeChange.bind(this)
+
+7.2. MODIFICAÇÃO — openPtcModal()
+
+    - Detecta isAUTPRO via company.folderName?.startsWith('AUT_')
+    - Se AUTPRO:
+        - ptcNum começa vazio (em vez de buscar /api/next-proposal-number-preview)
+        - Hint "AUTPRO: Cliente + Unidade + Sequencial" fica visível
+        - Select de unidade (#ptc-unidade-group) fica visível
+        - Select de cliente agora usa value="id" com data-razao (em vez de value="nome")
+    - Se não AUTPRO:
+        - Fluxo antigo: busca preview do número YYMMDDNN
+        - Select de unidade oculto
+
+7.3. NOVA FUNÇÃO — onPtcClientChange()
+
+    - Obtém clientId do select
+    - Chama populatePtcContactFields(razaoSocial)
+    - Se AUTPRO:
+        * Se clienteId vazio → reseta campos
+        * Se clienteId presente → busca unidades via API:
+            GET /api/unidades-cliente?cliente_id=${clientId}
+        * Popula o select #ptc-unidade com as unidades
+        * Se 0 unidades: exibe "Nenhuma unidade cadastrada"
+    - Reseta #ptc-number para "Selecione a unidade..."
+
+7.4. NOVA FUNÇÃO — onPtcUnidadeChange()
+
+    - Se AUTPRO + clienteId + codigoUnidade:
+        * Busca preview do número:
+            GET /api/next-autpro-number-preview?cliente_id=X&codigo_unidade=Y
+        * Atualiza #ptc-number com o número retornado (ex: 00801001)
+    - Se incompleto → reseta #ptc-number
+
+7.5. MODIFICAÇÃO — savePtc()
+
+    Fluxo AUTPRO:
+        1. Obtém clientId, clientName, codigoCliente do cliente selecionado
+        2. Obtém codigoUnidade e unidadeNome do select #ptc-unidade
+        3. Valida se unidade foi selecionada
+        4. CHAMADA CRÍTICA: Consome o sequencial:
+            GET /api/next-autpro-number?cliente_id=X&codigo_unidade=Y
+        5. Atualiza ptcNumber com o número retornado
+        6. Constrói payload.autpro com todos os metadados:
+            { codigoCliente, codigoUnidade, sequencial, consumedSequencial,
+              clienteId, clienteRazaoSocial, unidadeNome }
+        7. Envia POST /api/create-ptc com os dados (server monta a estrutura)
+
+    Fluxo antigo (não-AUTPRO):
+        - Chama generatePtcNumber() (antigo YYMMDDNN)
+        - Envia POST /api/create-ptc sem dados autpro
+
+7.6. CORREÇÃO — onPtcContactChange()
+
+    - Agora busca cliente por ID (clientSelect.value) em vez de razaoSocial,
+      compatível com a mudança do select de clientes para usar ID.
+
+
+================================================================================
+8. COMO FUNCIONA O SEQUENCIAL
+================================================================================
+
+- Cada unidade_cliente tem um campo proximo_sequencial (INTEGER, default 1)
+- Quando a PTC é criada, o frontend chama /api/next-autpro-number
+  → que chama consumeNextAutproSequence()
+  → que lê o valor atual e atualiza para valor + 1
+  → retorna o valor ANTIGO (que foi "consumido")
+- O preview (/api/next-autpro-number-preview) lê sem modificar
+- O sequencial é sempre formatado como 3 dígitos (padStart(3, '0'))
+
+IMPORTANTE:
+    - Se o usuário abrir o modal mas não salvar, o preview mostra o número
+      mas NÃO consome. Só consome no clique em "Salvar e Criar Pastas".
+    - Se o save falhar após consumir (ex: erro de rede), o número fica "perdido".
+      Isso é aceitável pois são números sequenciais de proposta, não financeiros.
+      Em caso de falha, o admin pode reajustar manualmente o proximo_sequencial
+      no banco de dados.
+
+
+================================================================================
+9. ESTRUTURA DE PASTAS NO SERVIDOR
+================================================================================
+
+ANTES:
+    GeraPro/AUT_2e10603f/26070801-MEU-PROJETO/
+    GeraPro/AUT_2e10603f/26070802-OUTRO-PROJETO/
+
+AGORA (AUTPRO):
+    GeraPro/
+    └── AUT_2e10603f/
+        └── 008 - BP BIOENERGY/                  ← pasta do cliente
+            └── 01 - MOEMA/                      ← pasta da unidade
+                ├── 017 - INSTALACAO-E-CONFIG-SERVIDOR/   ← pasta da proposta
+                │   ├── Documentação Cliente/
+                │   ├── Documentação Minha_Empresa/
+                │   ├── Documentação Fornecedores/
+                │   ├── Log das Revisões/
+                │   └── Outros/
+                ├── 018 - OUTRO-PROJETO/
+                └── ...
+
+    E também, lado a lado:
+    GeraPro/AUT_2e10603f/26070801-PROJETO-ANTIGO/  ← intacta
+
+A pasta do cliente só é criada quando a primeira proposta para aquele
+cliente é salva. Nunca é criada vazia.
+
+
+================================================================================
+10. FORMATO FINAL DOS CÓDIGOS
+================================================================================
+
+Número base: 00801017
+    ├── 008   = codigo_cliente (cadastrado pelo usuário no cliente)
+    ├── 01    = codigo_unidade  (cadastrado pelo usuário na aba Unidades)
+    └── 017   = sequencial (automático, 3 dígitos, 001-999)
+
+Códigos gerados:
+    PT-00801017  ← Proposta Técnica
+    PC-00801017  ← Proposta Comercial
+
+Nome da pasta no servidor:
+    00801017-INSTALACAO-E-CONFIGURACAO-SERVIDOR
+
+Path completo:
+    GeraPro/AUT_2e10603f/008 - BP BIOENERGY/01 - MOEMA/00801017-INSTALACAO-E-CONFIGURACAO-SERVIDOR/
+
+
+================================================================================
+11. PERGUNTAS FREQUENTES (FAQ)
+================================================================================
+
+Q: A mudança afeta outras empresas?
+R: Não. Somente a empresa cujo folder_name começa com 'AUT_' (AUTPRO).
+
+Q: O que acontece com as propostas antigas?
+R: Permanecem intactas na raiz da pasta da empresa (formato YYMMDDNN).
+
+Q: Preciso migrar dados?
+R: Não. A migração é apenas de schema (coluna codigo_cliente + tabela unidades_cliente).
+   Dados existentes não são alterados.
+
+Q: O código do cliente precisa ser único?
+R: Não há validação automática de unicidade, mas é recomendado que seja único
+   dentro da empresa AUTPRO para evitar confusão.
+
+Q: E se eu errar o código do cliente depois de já ter propostas?
+R: O código fica gravado no ptc_info.json dentro da pasta. Se mudar o código
+   no cadastro, novas propostas usarão o novo código. As pastas antigas não
+   são renomeadas automaticamente.
+
+Q: Posso ter unidades com o mesmo código?
+R: Não. A constraint UNIQUE(empresa_id, cliente_id, codigo_unidade) impede
+   códigos duplicados para o mesmo cliente.
+
+Q: O que acontece se o sequencial chegar em 999?
+R: Atualmente o sistema não trata rollover. São 999 propostas por unidade.
+   Se necessário no futuro, pode-se adicionar validação ou estender para 4 dígitos.
+
+Q: O usuário consegue ver o sequencial atual de cada unidade?
+R: Não diretamente na interface. O próximo número é exibido no preview do
+   modal de criação de PTC. O sequencial atual está armazenado no banco
+   (unidades_cliente.proximo_sequencial) e pode ser consultado via API.
+
+Q: Como faço o cadastro de unidades em lote?
+R: Atualmente não há importação em lote para unidades. É necessário cadastrar
+   manualmente cada unidade no cliente. Pode ser adicionado no futuro via
+   importação CSV.
+
+Q: Posso cadastrar o endereço de cada unidade?
+R: Sim, a aba Unidades tem campos completos de endereço (CEP, logradouro, etc.)
+   que são salvos no banco de dados.
+
+
+================================================================================
+12. RISCOS E PONTOS DE ATENÇÃO
+================================================================================
+
+12.1. RISCO: Inconsistência entre currentPtc.folder antigo e novo
+
+    currentPtc.folder agora retorna APENAS o nome da pasta (último segmento),
+    ex: "00801017-INSTALACAO-E-CONFIG-SERVIDOR".
+    O servidor (getFullPtcPath) busca recursivamente em subdiretórios para
+    encontrar a pasta pelo nome.
+
+    IMPACTO: Performance marginalmente menor na busca de diretórios.
+    MITIGAÇÃO: A busca recursiva é rasa (máx 2 níveis) e ocorre via
+    fs.existsSync, que é rápido.
+
+12.2. RISCO: Duplicidade de pipelineItems
+
+    O origId armazenado nos pipelineItems é o nome da pasta (ex: "00801017-TITULO").
+    Como agora é um nome diferente do antigo (YYMMDDNN-TITULO), não há conflito
+    de matching.
+
+    MITIGAÇÃO: A função _ensurePipelineItemForPtc compara por igualdade estrita,
+    então cada proposta terá seu próprio pipeline correto.
+
+12.3. RISCO: Número "perdido" se save falhar
+
+    Se o frontend consumir o sequencial (GET /api/next-autpro-number) e depois
+    o POST /api/create-ptc falhar, o número foi consumido mas não usado.
+
+    MITIGAÇÃO: Baixo impacto prático. Em caso de contingência, ajustar manualmente
+    o proximo_sequencial no banco. Pode-se futuramente implementar rollback.
+
+12.4. RISCO: Pasta de cliente criada com caracteres especiais
+
+    O nome da pasta é montado como "${codigoCliente} - ${clienteRazaoSocial}".
+    Se a razaoSocial tiver caracteres inválidos para sistema de arquivos,
+    a criação da pasta pode falhar.
+
+    MITIGAÇÃO: O titleSlug já é sanitizado. O nome do cliente e unidade não
+    são sanitizados — considerar aplicar slug também no nome das pastas
+    pai se houver problemas.
+
+12.5. RISCO: Compatibilidade com getFullPtcPath para propostas antigas
+
+    Propostas antigas (na raiz) são encontradas pelo path.join direto.
+    Propostas novas (hierárquicas) são encontradas pela busca recursiva.
+    Isso funciona, mas pode haver ambiguidade se duas pastas com o mesmo
+    nome existirem em locais diferentes (improvável).
+
+12.6. RISCO: Dependência de sincronização
+
+    As unidades são carregadas via API (/api/unidades-cliente) dinamicamente
+    no modal PTC, e não via state síncrono. Isso garante dados atualizados
+    mesmo que outro usuário tenha cadastrado uma unidade recentemente.
+
+12.7. RISCO: Concorrência
+
+    Se dois usuários abrirem o modal de PTC para a mesma unidade ao mesmo tempo,
+    ambos verão o mesmo preview (ex: 017), mas o primeiro que salvar consumirá
+    o 017, e o segundo consumirá o 018. O preview do segundo ficará desatualizado,
+    mas o save usará o número correto porque a chamada de consumo (consumeNextAutproSequence)
+    é atômica e ocorre dentro do save.
+
+================================================================================
+FIM DO RELATÓRIO
+================================================================================
