@@ -374,6 +374,13 @@ body {
 
 .btn-xs { font-size: 11px; padding: 0 6px; height: 24px; }
 
+.btn-add {
+    background-color: var(--green-500);
+    color: #fff;
+}
+.btn-add:hover { background-color: var(--green-600); }
+.btn-add:active { background-color: var(--green-700); }
+
 /* Overrides for specific buttons (kept for compatibility) */
 #btn-buscar-ptc:hover { background-color: rgb(0, 0, 255) !important; border-color: rgb(0, 0, 255) !important; }
 #btn-iniciar-ptc:hover { background-color: rgb(13, 224, 200) !important; border-color: rgb(13, 224, 200) !important; }
@@ -796,6 +803,199 @@ select.form-control {
     .ajuda-search-input { width: 160px; }
 }
 
+/* ===== Ajuda System — Enhanced ===== */
+@keyframes ajuda-overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ajuda-modal-enter {
+  from { opacity: 0; transform: translateY(20px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.ajuda-overlay {
+  animation: ajuda-overlay-enter .2s ease-out;
+}
+.ajuda-modal {
+  animation: ajuda-modal-enter .25s ease-out;
+}
+.ajuda-content {
+  transition: opacity .15s ease;
+}
+.ajuda-content.fade-out {
+  opacity: 0;
+}
+.ajuda-content.fade-in {
+  opacity: 1;
+}
+.ajuda-item:hover {
+  background: var(--blue-100) !important;
+}
+.ajuda-search-loading {
+  position: absolute;
+  right: 8px; top: 50%; transform: translateY(-50%);
+  width: 14px; height: 14px;
+  border: 2px solid var(--neutral-300);
+  border-top-color: var(--blue-500);
+  border-radius: 50%;
+  animation: ajuda-spin .6s linear infinite;
+  pointer-events: none;
+}
+@keyframes ajuda-spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+.ajuda-search-result-count {
+  display: inline-block;
+  background: var(--blue-100);
+  color: var(--blue-700);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 6px;
+  border-radius: 8px;
+  margin-left: auto;
+}
+.ajuda-progress {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+.ajuda-section-anchor {
+  scroll-margin-top: 16px;
+}
+.ajuda-back-to-top {
+  position: fixed;
+  bottom: 80px;
+  right: calc(5vw + 16px);
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-divider);
+  color: var(--color-text-secondary);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1002;
+  box-shadow: var(--shadow-md);
+  transition: opacity .2s;
+}
+.ajuda-back-to-top.visible {
+  display: flex;
+}
+.ajuda-back-to-top:hover {
+  background: var(--neutral-100);
+  color: var(--color-text-primary);
+}
+.ajuda-sidebar-section {
+  padding-left: 28px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  transition: color .15s;
+}
+.ajuda-sidebar-section:hover {
+  color: var(--color-text-primary);
+}
+.ajuda-sidebar-section.active {
+  color: var(--green-700);
+  font-weight: 600;
+}
+.ajuda-sidebar-section .ajuda-highlight {
+  font-size: 12px;
+}
+.ajuda-search-preview {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 2px 0 4px 28px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.ajuda-search-preview em {
+  font-style: normal;
+  background: var(--yellow-200);
+  padding: 0 1px;
+  border-radius: 2px;
+}
+/* Help trigger */
+.help-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--neutral-200);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  margin-left: 4px;
+  vertical-align: middle;
+  line-height: 1;
+}
+.help-trigger:hover {
+  background: var(--blue-500);
+  color: #fff;
+}
+/* Responsive: drawer sidebar */
+@media (max-width: 768px) {
+  .ajuda-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100%;
+    z-index: 1003;
+    transition: left .25s ease;
+    border-right: 1px solid var(--color-divider);
+    box-shadow: 2px 0 12px rgba(0,0,0,.15);
+  }
+  .ajuda-sidebar.open {
+    left: 0;
+  }
+  .ajuda-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 1002;
+  }
+  .ajuda-sidebar-backdrop.visible {
+    display: block;
+  }
+  .ajuda-sidebar-toggle {
+    display: flex !important;
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--neutral-100);
+    border: 1px solid var(--color-divider);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1004;
+    color: var(--color-text-secondary);
+    font-size: 16px;
+  }
+  .ajuda-sidebar-toggle:hover {
+    background: var(--neutral-200);
+  }
+  .ajuda-header {
+    padding-left: 52px;
+  }
+}
+
 /* Pagination styles */
 .page-btn {
     display: inline-flex; align-items: center; justify-content: center;
@@ -958,4 +1158,9 @@ select.form-control {
 
 /* ── Animations ── */
 @keyframes crmModalIn { from { opacity:0; transform:translateY(-10px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }
+
+/* ===== BOM Drag Handle ===== */
+.bom-drag-handle { cursor: grab; }
+.bom-drag-handle:active { cursor: grabbing; }
+tr.opacity-30 { opacity: 0.3; }
 

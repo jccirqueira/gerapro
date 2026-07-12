@@ -553,6 +553,7 @@ class PrecificacaoModule {
                                 <div class="form-group">
                                     <label class="form-label">Total Materiais (PT) R$
                                         <span id="btn-override-materiais" style="cursor:pointer;color:#0369a1;margin-left:6px;font-size:14px;" title="Editar custo dos materiais">✏️</span>
+                                        <span class="help-trigger" data-help="precificacao/override-custos">?</span>
                                     </label>
                                     <div style="display:flex;align-items:center;gap:4px;">
                                         <input type="text" id="prec_material" class="form-control" value="${app.formatCurrency(costs.matCost)}" readonly style="background: var(--color-bg-alt); font-weight: bold; flex:1;">

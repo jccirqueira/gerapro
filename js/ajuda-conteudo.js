@@ -106,6 +106,21 @@
         titulo: 'Contatos e Observações',
         screenshot: 'prints/clientes/contatos.png',
         texto: 'Na aba Contatos, é possível cadastrar múltiplos contatos por cliente, cada um com:\n\n- Nome do contato\n- Cargo\n- E-mail\n- Telefone/Celular\n\nO primeiro contato cadastrado é usado como padrão para preenchimento automático nos campos "A/C" (Aos Cuidados) nas Propostas.\n\nO campo de Observações Técnicas/Comerciais permite registrar informações adicionais relevantes sobre o cliente.'
+      },
+      {
+        id: 'codigo-cliente',
+        titulo: 'Código do Cliente',
+        texto: 'O campo "Código do Cliente" é um identificador alfanumérico adicional para facilitar a integração com sistemas externos (ERP, contabilidade, etc.).\n\n- Pode conter letras, números e caracteres especiais\n- Não é obrigatório\n- Deve ser único por cliente\n- Aparece nas listagens e relatórios para referência cruzada'
+      },
+      {
+        id: 'unidades',
+        titulo: 'Múltiplas Unidades do Cliente',
+        texto: 'Um cliente pode ter múltiplas unidades (filiais, plantas, obras) cadastradas. Cada unidade possui:\n\n- Nome/Razão da unidade\n- Endereço completo\n- Contato local\n- Dados fiscais específicos (se aplicável)\n\nNa Proposta Técnica, é possível selecionar qual unidade do cliente está sendo atendida, facilitando o endereçamento dos documentos e o cálculo de ICMS por localidade.'
+      },
+      {
+        id: 'vinculo-autpro',
+        titulo: 'Vínculo com AutPro',
+        texto: 'Clientes podem ser vinculados ao módulo **AutPro** para propostas automatizadas. Quando o vínculo está ativo:\n\n- O cliente aparece como opção no fluxo do AutPro\n- As condições comerciais padrão do cliente são aplicadas automaticamente\n- O cálculo de comissão segue a regra AutPro (0,5% sobre bruto com IPI)\n\nO vínculo é configurado através de um campo toggle no cadastro do cliente.'
       }
     ]
   },
@@ -559,6 +574,37 @@
           'O diálogo de impressão do navegador será exibido automaticamente.',
           'Configure as opções de impressão e clique em "Imprimir".'
         ]
+      },
+      {
+        id: 'override-custos',
+        titulo: 'Override de Custo de Materiais',
+        texto: 'O sistema permite definir um custo de material diferente do cadastro para uma proposta específica, sem alterar o banco de dados mestre.\n\nFunciona através do botão ✏️ (lápis) ao lado de "Total Materiais" no formulário de precificação. Um modal é aberto listando todos os itens com seus custos atuais, permitindo editar o valor de override.\n\nAo salvar:\n- O override é armazenado em `propostaAtiva.materialOverrides[materialId].custo`\n- Os créditos (ICMS, IPI, PIS/COFINS) são recalculados automaticamente\n- O preço final é atualizado em tempo real',
+        passos: [
+          'Na Precificação, localize o campo "Total Materiais".',
+          'Clique no botão ✏️ ao lado do valor.',
+          'No modal, localize o material desejado na lista.',
+          'Edite o campo "Custo" com o valor negociado.',
+          'Clique em "Salvar Overrides". Os créditos e preços serão recalculados.'
+        ],
+        campos: [
+          { nome: 'Custo Original', descricao: 'Custo do material conforme cadastro (somente leitura).' },
+          { nome: 'Custo (Override)', descricao: 'Valor negociado para esta proposta específica.' }
+        ]
+      },
+      {
+        id: 'calculo-ao-vivo',
+        titulo: 'Cálculo ao Vivo de Impostos',
+        texto: 'Diferentemente do modelo anterior (que copiava os valores de IPI, ICMS, PIS e COFINS dos materiais no momento da criação do típico), o sistema agora consulta os dados fiscais diretamente do cadastro de materiais em tempo real.\n\nVantagens:\n- Alterações nos impostos do material no cadastro refletem automaticamente em todas as propostas\n- Elimina inconsistências de dados copiados desatualizados\n- O cálculo sempre usa a alíquota vigente no momento da precificação'
+      },
+      {
+        id: 'tipicos-ponteiro',
+        titulo: 'Típicos como Ponteiros',
+        texto: 'Os típicos de partida agora armazenam apenas `{ materialId, qtd }` — ou seja, funcionam como ponteiros para os materiais no banco de dados, em vez de copiar todos os campos (custo, ICMS, IPI, PIS, COFINS, etc.).\n\nIsso significa que:\n- A lista de materiais de um típico é sempre resolvida ao vivo\n- Qualquer atualização no cadastro do material se reflete automaticamente\n- Não há risco de dados fiscais/contábeis ficarem dessincronizados'
+      },
+      {
+        id: 'autpro-comissao',
+        titulo: 'AutPro — Comissão sobre Bruto (com IPI)',
+        texto: 'Para propostas do tipo **AutPro**, a comissão de vendas segue uma regra especial:\n\n- Percentual fixo de **0,5%** sobre o valor total **incluindo IPI**\n- Cálculo: `(precoFinalSemIPI + valorIPI) × 0,5%`\n- A taxa efetiva no markup é ajustada para: `0,5 × (1 + aliquotaIPI / 100)`\n- **Cap de R$ 30.000,00** por equipamento\n\nNa interface, o label muda dinamicamente:\n- AutPro: `(−) Comissão (s/ Bruto)` — inclui IPI na base\n- Demais: `(−) Comissão (s/ líquido)` — sem IPI na base'
       }
     ]
   },
@@ -626,6 +672,39 @@
         titulo: 'Importar Preços',
         screenshot: 'prints/materiais/importar-precos.png',
         texto: 'Permite importar preços em lote via planilha (.xlsx, .xls, .csv).\n\nO sistema detecta automaticamente as colunas da planilha por palavras-chave (Código, Preço, etc.). É possível mapear manualmente as colunas de código e preço antes de confirmar a importação.'
+      },
+      {
+        id: 'grupo-siemens',
+        titulo: 'Grupo Siemens',
+        texto: 'O campo "Grupo Siemens" classifica o material dentro da taxonomia Siemens de componentes elétricos. Essa classificação auxilia na:\n\n- Organização de listas de materiais por grupo funcional\n- Geração de relatórios agrupados por categoria Siemens\n- Integração com sistemas legados que usam essa classificação'
+      },
+      {
+        id: 'modelo',
+        titulo: 'Modelo do Material',
+        texto: 'O campo "Modelo" armazena o modelo ou número de parte do fabricante (ex: 3RV2011-1JA10, XT1B160, etc.).\n\nEsse campo é usado para:\n- Busca rápida por modelo no seletor de materiais\n- Identificação precisa na BOM dos típicos\n- Exportação para documentos técnicos'
+      },
+      {
+        id: 'dimensoes',
+        titulo: 'Dimensões do Material (L×A×P)',
+        texto: 'Os campos de dimensão (Largura, Altura, Profundidade em mm) permitem registrar o tamanho físico do material. Esses dados são utilizados:\n\n- No cálculo de layout dos painéis (distribuição física)\n- Na estimativa de espaço ocupado no invólucro\n- No dimensionamento de canaletas e dutos\n\nNão são campos obrigatórios, mas seu preenchimento melhora a precisão dos cálculos mecânicos.'
+      },
+      {
+        id: 'importador-interativo',
+        titulo: 'Importador Interativo de Materiais',
+        texto: 'O novo importador de materiais oferece uma experiência interativa com:\n\n- Upload de arquivos .xlsx, .xls, .csv\n- Preview dos dados em tabela antes da importação\n- Mapeamento inteligente de colunas por palavras-chave\n- Ajuste manual do mapeamento quando necessário\n- Validação de dados antes de importar\n- Relatório de importação (sucessos e erros)',
+        passos: [
+          'Acesse Materiais > Importar.',
+          'Clique em "Selecionar Arquivo" ou arraste o arquivo para a área de upload.',
+          'Visualize o preview dos dados na tabela.',
+          'Confira o mapeamento automático das colunas.',
+          'Ajuste manualmente se alguma coluna não foi identificada.',
+          'Clique em "Processar Importação" para concluir.'
+        ]
+      },
+      {
+        id: 'uf-fornecedor',
+        titulo: 'UF do Fornecedor',
+        texto: 'O campo "UF do Fornecedor" registra o estado de origem do fornecedor do material. Esse dado é relevante para:\n\n- Cálculo de ICMS interestadual\n- Diferenciação de alíquotas por origem\n- Relatórios fiscais e logísticos\n\nO campo é preenchido automaticamente quando um fornecedor é selecionado, usando a UF do endereço cadastrado do fornecedor.'
       }
     ]
   },
@@ -842,23 +921,55 @@
   importacao: {
     titulo: 'Importar Dados',
     icone: 'ph-upload-simple',
-    descricao: 'Importação de dados em massa via planilhas Excel e CSV.',
+    descricao: 'Importação interativa de materiais via planilhas Excel e CSV com mapeamento inteligente de colunas.',
     secoes: [
       {
         id: 'visao-geral',
         titulo: 'Visão Geral',
         screenshot: 'prints/importacao/visao-geral.png',
-        texto: 'O módulo de Importação permite carregar dados em massa de planilhas Excel (.xlsx, .xls) e arquivos CSV para dentro do sistema.\n\nO sistema detecta automaticamente as colunas da planilha por palavras-chave, facilitando o mapeamento: Descrição, Custo/Preço, Código, Fabricante, Unidade, Categoria, NCM, Área.'
+        texto: 'O módulo de Importação permite carregar materiais em massa de planilhas Excel (.xlsx, .xls) e arquivos CSV para o banco de dados do sistema.\n\nO sistema utiliza um **mapeamento inteligente**: detecta automaticamente as colunas da planilha por palavras-chave (descrição, custo/preço, código, fabricante, unidade, categoria, NCM, área, etc.) e permite ajuste manual antes de confirmar.'
       },
       {
-        id: 'uso',
-        titulo: 'Como Importar',
-        screenshot: 'prints/importacao/uso.png',
+        id: 'fluxo-interativo',
+        titulo: 'Fluxo Interativo de Importação',
+        screenshot: 'prints/importacao/fluxo-interativo.png',
+        texto: 'O importador interativo guia o usuário por etapas:\n\n**1. Upload:** Arraste o arquivo ou clique para selecionar. Suporta .xlsx, .xls e .csv.\n\n**2. Preview:** O sistema exibe uma prévia dos dados em tabela, com as primeiras linhas do arquivo.\n\n**3. Mapeamento:** Cada coluna do arquivo é associada a um campo do sistema. O mapeamento automático cobre: código interno, código do fabricante, descrição, fabricante (nome), categoria, NCM, unidade, custo, IPI, ICMS, PIS, COFINS, modelo, grupo Siemens, largura, altura, profundidade, UF do fornecedor.\n\n**4. Revisão:** Confira os dados antes de importar. Itens com erros são destacados.\n\n**5. Confirmação:** Clique em "Confirmar Importação". O relatório final mostra quantos itens foram importados com sucesso e quais tiveram erro (com motivo).',
         passos: [
-          'Clique em "Selecionar Arquivo" e escolha uma planilha .xlsx, .xls ou .csv.',
-          'Visualize a prévia dos dados na tabela de preview.',
-          'Confira o mapeamento automático das colunas.',
-          'Clique em "Processar Importação" para concluir.'
+          'Acesse Materiais > Importar (ou o módulo Importar Dados no menu).',
+          'Clique em "Selecionar Arquivo" ou arraste o arquivo para a área de upload.',
+          'Aguarde o preview dos dados ser carregado.',
+          'Verifique o mapeamento automático das colunas.',
+          'Se necessário, clique no dropdown de uma coluna para re-mapear manualmente.',
+          'Clique em "Processar Importação" para iniciar a validação.',
+          'Revise o relatório final e clique em "Concluir".'
+        ]
+      },
+      {
+        id: 'colunas',
+        titulo: 'Colunas Reconhecidas',
+        screenshot: 'prints/importacao/colunas.png',
+        campos: [
+          { nome: 'Código Interno', descricao: 'Código de identificação interno do material.' },
+          { nome: 'Código do Fabricante', descricao: 'Referência do fabricante para o material.' },
+          { nome: 'Descrição Técnica', descricao: 'Descrição detalhada do material.' },
+          { nome: 'Fabricante', descricao: 'Nome do fabricante. Deve existir no cadastro de fornecedores.' },
+          { nome: 'Categoria', descricao: 'Classificação do material (Disjuntor, Contator, Cabo, etc.).' },
+          { nome: 'Unidade', descricao: 'un, m, kg, cj.' },
+          { nome: 'Custo (R$)', descricao: 'Preço de custo unitário.' },
+          { nome: 'NCM', descricao: 'Código NCM para classificação fiscal.' },
+          { nome: 'IPI (%)', descricao: 'Alíquota de IPI.' },
+          { nome: 'ICMS (%)', descricao: 'Alíquota de ICMS.' },
+          { nome: 'PIS (%)', descricao: 'Alíquota de PIS.' },
+          { nome: 'COFINS (%)', descricao: 'Alíquota de COFINS.' },
+          { nome: 'Modelo', descricao: 'Modelo ou número de parte do fabricante.' },
+          { nome: 'Grupo Siemens', descricao: 'Classificação Siemens do material.' },
+          { nome: 'Largura / Altura / Profundidade (mm)', descricao: 'Dimensões físicas do material.' },
+          { nome: 'UF do Fornecedor', descricao: 'Estado de origem do fornecedor.' },
+          { nome: 'Área', descricao: 'Área de aplicação (ex: GERACAO E DISTR. ENERGIA).' },
+          { nome: 'Tensão (V)', descricao: 'Tensão nominal do material.' },
+          { nome: 'Corrente (A)', descricao: 'Corrente nominal do material.' },
+          { nome: 'Peso (kg)', descricao: 'Peso unitário do material.' },
+          { nome: 'Lead Time (dias)', descricao: 'Prazo de entrega do fornecedor.' }
         ]
       }
     ]
@@ -994,6 +1105,290 @@
         titulo: 'Segurança e Backup',
         screenshot: 'prints/configuracoes/seguranca.png',
         texto: 'Ferramentas de segurança e manutenção dos dados:\n\n- Baixar Backup JSON: Exporta todos os dados do sistema para um arquivo JSON.\n- Restaurar Backup: Importa um backup JSON previamente exportado. Atenção: substitui todos os dados atuais.\n- Resetar Fábrica: Apaga completamente todos os dados do sistema (requer confirmação).\n- Carregar Dados de Exemplo: Popula o banco com dados de demonstração.'
+      }
+    ]
+  },
+
+  crm: {
+    titulo: 'CRM',
+    icone: 'ph-squares-four',
+    descricao: 'Gestão de leads, pipeline visual, interações, tarefas, calendário, e-mail, score, webhooks e sequências de ações.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral do CRM',
+        screenshot: 'prints/crm/visao-geral.png',
+        texto: 'O módulo de CRM (Customer Relationship Management) centraliza a gestão do relacionamento com clientes e leads. Oferece:\n\n- Dashboard com KPIs: leads abertos, valor em pipeline, taxa de conversão e ticket médio\n- Kanban visual com 6 estágios (Aguardando Início, Em Elaboração, Proposta Enviada, Negociação, Fechado, Perdido)\n- Gestão de interações (ligação, e-mail, reunião, WhatsApp)\n- Sistema de tarefas com calendário\n- Score de leads baseado em engajamento\n- E-mail integrado com templates\n- Webhooks para automação externa\n- Sequências de ações programadas'
+      },
+      {
+        id: 'dashboard',
+        titulo: 'Dashboard do CRM',
+        screenshot: 'prints/crm/dashboard.png',
+        texto: 'Ao acessar o CRM, o dashboard exibe:\n\n- Cards de resumo: Leads Abertos, Valor em Pipeline, Taxa de Conversão, Ticket Médio\n- Gráfico de funil (pipeline) com distribuição por estágio\n- Atividades recentes: últimas interações e tarefas\n- Indicador de calor nos cards do Kanban (verde ≤3 dias, âmbar ≤7 dias, vermelho >7 dias sem contato)'
+      },
+      {
+        id: 'kanban',
+        titulo: 'Kanban — Pipeline Visual',
+        screenshot: 'prints/crm/kanban.png',
+        texto: 'O Kanban organiza os leads em 6 colunas (estágios):\n\n1. Aguardando Início: leads recém-criados ou PTC iniciada\n2. Em Elaboração: proposta sendo preparada\n3. Proposta Enviada: proposta enviada ao cliente\n4. Negociação: em tratativas com o cliente\n5. Fechado: negócio ganho\n6. Perdido: negócio não concretizado\n\nCada card exibe: cliente, projeto, valor, data e indicador de calor. Arraste cards entre colunas para mudar o estágio. Clique no ícone da coluna para recolhê-la.',
+        passos: [
+          'Visualize todos os leads distribuídos nas 6 colunas.',
+          'Arraste um card para outra coluna para mudar o estágio.',
+          'Clique no ícone da coluna para recolhê-la.',
+          'Clique em um card para abrir o modal de detalhes.',
+          'Use "Novo Lead" para adicionar uma oportunidade manualmente.'
+        ]
+      },
+      {
+        id: 'cadastro-lead',
+        titulo: 'Cadastro de Lead',
+        screenshot: 'prints/crm/cadastro-lead.png',
+        texto: 'Para criar um novo lead manualmente:\n\n- Clique em "+ Novo Lead" no canto superior direito\n- Preencha: Cliente (obrigatório), Projeto, Valor Estimado, Observações\n- O lead aparecerá na coluna "Aguardando Início"\n\nLeads também podem surgir automaticamente de:\n- Propostas Comerciais salvas vinculadas a uma PTC\n- Orçamentos com status definido',
+        campos: [
+          { nome: 'Cliente', descricao: 'Nome do cliente ou empresa. Campo obrigatório.' },
+          { nome: 'Projeto', descricao: 'Descrição ou nome do projeto.' },
+          { nome: 'Valor Estimado', descricao: 'Valor estimado da oportunidade em R$.' },
+          { nome: 'Observações', descricao: 'Informações adicionais sobre o lead.' }
+        ]
+      },
+      {
+        id: 'edicao-lead',
+        titulo: 'Edição de Lead',
+        screenshot: 'prints/crm/edicao-lead.png',
+        passos: [
+          'Clique no card do lead para abrir o modal de detalhes.',
+          'Clique em "Editar" no canto superior direito do modal.',
+          'Atualize cliente, projeto, valor, observações, data do último contato e próximo follow-up.',
+          'Clique em "Salvar" para confirmar.'
+        ]
+      },
+      {
+        id: 'estagios',
+        titulo: 'Estágios do Pipeline',
+        screenshot: 'prints/crm/estagios.png',
+        texto: 'O CRM possui 6 estágios padrão que refletem o funil de vendas:\n\n- Aguardando Início: lead recém-criado\n- Em Elaboração: proposta em preparação\n- Proposta Enviada: proposta formal enviada\n- Negociação: tratativas comerciais ativas\n- Fechado: negócio concluído com sucesso\n- Perdido: negócio não concretizado\n\nOs estágios podem ser customizados via Configurações de Estágios.',
+        campos: [
+          { nome: 'Aguardando Início', descricao: 'Leads novos ou PTCs recém-criadas.' },
+          { nome: 'Em Elaboração', descricao: 'Proposta técnica/comercial em desenvolvimento.' },
+          { nome: 'Proposta Enviada', descricao: 'Documento formal enviado ao cliente.' },
+          { nome: 'Negociação', descricao: 'Retorno do cliente com tratativas ativas.' },
+          { nome: 'Fechado', descricao: 'Negócio ganho.' },
+          { nome: 'Perdido', descricao: 'Negócio perdido.' }
+        ]
+      },
+      {
+        id: 'interacoes',
+        titulo: 'Interações',
+        screenshot: 'prints/crm/interacoes.png',
+        texto: 'O registro de interações mantém o histórico completo de contatos com cada lead. Para registrar:\n\n1. Abra o card do lead\n2. Role até "Registrar Interação"\n3. Selecione o tipo: Ligação, E-mail, Reunião, WhatsApp ou Outro\n4. Informe data e descrição do contato\n5. Opcional: defina um próximo follow-up (data e hora)\n6. Clique em "Registrar"\n\nO histórico exibe ícones por tipo, ordenado do mais recente para o mais antigo.',
+        campos: [
+          { nome: 'Tipo', descricao: 'Ligação, E-mail, Reunião, WhatsApp ou Outro.' },
+          { nome: 'Data', descricao: 'Data em que ocorreu a interação.' },
+          { nome: 'Descrição', descricao: 'Resumo do que foi tratado. Campo obrigatório.' },
+          { nome: 'Próx. Follow-up (Data/Hora)', descricao: 'Data e hora do próximo acompanhamento agendado.' }
+        ]
+      },
+      {
+        id: 'tarefas',
+        titulo: 'Tarefas',
+        screenshot: 'prints/crm/tarefas.png',
+        texto: 'O módulo de tarefas permite:\n\n- Adicionar tarefas com descrição, data de vencimento, prioridade (Baixa/Média/Alta) e status (Pendente/Em Andamento/Concluída)\n- Vincular tarefas a leads do pipeline\n- Filtrar tarefas por status e lead\n- Visualizar em lista ou calendário\n- Ações: concluir, editar, excluir',
+        passos: [
+          'No CRM, clique em "+ Nova Tarefa".',
+          'Preencha descrição, data de vencimento, prioridade e lead relacionado.',
+          'A tarefa aparecerá na lista e no calendário.',
+          'Use os filtros para visualizar por status ou lead.',
+          'Clique no checkbox para marcar como concluída.'
+        ]
+      },
+      {
+        id: 'calendario',
+        titulo: 'Calendário',
+        screenshot: 'prints/crm/calendario.png',
+        texto: 'O calendário do CRM exibe as tarefas e follow-ups agendados em uma visualização mensal. Cada tarefa aparece como um card colorido no dia correspondente:\n\n- Azul: tarefa pendente\n- Verde: tarefa concluída\n- Laranja: follow-up agendado\n\nClique em uma data para adicionar uma nova tarefa diretamente. Navegue entre os meses usando os botões < >.',
+        passos: [
+          'No CRM, clique na aba "Calendário".',
+          'Visualize as tarefas do mês atual.',
+          'Use < > para navegar entre meses.',
+          'Clique em uma data para criar nova tarefa.',
+          'Passe o mouse sobre um card para ver detalhes.'
+        ]
+      },
+      {
+        id: 'email',
+        titulo: 'E-mail',
+        screenshot: 'prints/crm/email.png',
+        texto: 'O CRM possui integração com e-mail para:\n\n- Envio de e-mails diretamente do sistema\n- Templates de e-mail pré-configurados\n- Histórico de e-mails enviados por lead\n- Anexos\n\nConfigure o servidor SMTP em Configurações > E-mail para habilitar o envio.',
+        passos: [
+          'No CRM, clique em "E-mail" para abrir o composer.',
+          'Selecione um template ou escreva manualmente.',
+          'Escolha o lead/contato destinatário.',
+          'Anexe arquivos se necessário.',
+          'Clique em "Enviar".'
+        ]
+      },
+      {
+        id: 'score',
+        titulo: 'Score de Leads',
+        screenshot: 'prints/crm/score.png',
+        texto: 'O Score de Leads é um valor numérico (0-100) que indica o nível de engajamento do lead:\n\n- Score alto (70+): lead engajado, interações recentes, pronto para proposta\n- Score médio (30-70): lead com contato esporádico, requer follow-up\n- Score baixo (0-30): lead inativo ou recém-criado\n\nO score é calculado automaticamente com base na frequência de interações, tempo desde o último contato e estágio no pipeline.',
+        campos: [
+          { nome: 'Score', descricao: 'Valor 0-100 calculado automaticamente.' },
+          { nome: 'Nível', descricao: 'Alto (70+), Médio (30-70) ou Baixo (0-30).' }
+        ]
+      },
+      {
+        id: 'config-estagios',
+        titulo: 'Configuração de Estágios',
+        screenshot: 'prints/crm/config-estagios.png',
+        texto: 'Permite customizar os estágios do pipeline:\n\n- Adicionar novos estágios\n- Renomear estágios existentes\n- Reordenar arrastando\n- Excluir estágios personalizados\n\nOs 6 estágios padrão não podem ser excluídos, apenas renomeados.',
+        passos: [
+          'Acesse Configurações > Estágios do CRM.',
+          'Clique em "+ Novo Estágio" para adicionar.',
+          'Arraste os estágios para reordenar.',
+          'Clique no nome para renomear.',
+          'Clique no X para excluir (apenas estágios personalizados).'
+        ]
+      },
+      {
+        id: 'webhooks',
+        titulo: 'Webhooks',
+        screenshot: 'prints/crm/webhooks.png',
+        texto: 'Webhooks permitem integrar o CRM com sistemas externos. Quando um lead muda de estágio, uma requisição HTTP é enviada para a URL configurada com os dados do lead em formato JSON.\n\nExemplo de uso: notificar um chatbot, atualizar um CRM externo, disparar automações.',
+        passos: [
+          'Acesse o módulo de Webhooks no CRM.',
+          'Clique em "Novo Webhook".',
+          'Informe: nome, URL de destino e estágio que dispara o webhook.',
+          'Salve. O webhook será disparado sempre que um lead atingir o estágio configurado.'
+        ],
+        campos: [
+          { nome: 'Nome', descricao: 'Identificação do webhook.' },
+          { nome: 'URL', descricao: 'URL de destino que receberá o POST com os dados do lead.' },
+          { nome: 'Estágio', descricao: 'Estágio do pipeline que dispara o webhook.' }
+        ]
+      },
+      {
+        id: 'sequencias',
+        titulo: 'Sequências de Ações',
+        screenshot: 'prints/crm/sequencias.png',
+        texto: 'Sequências de ações permitem automatizar tarefas repetitivas. Exemplo: ao mover um lead para "Proposta Enviada", disparar automaticamente:\n\n1. Enviar e-mail de acompanhamento\n2. Criar tarefa de follow-up para 7 dias\n3. Notificar o vendedor via Telegram\n\nCada sequência é composta por ações encadeadas com condições de disparo.',
+        passos: [
+          'Acesse "Sequências" no CRM.',
+          'Clique em "Nova Sequência".',
+          'Defina o gatilho (estágio ou evento).',
+          'Adicione as ações da sequência.',
+          'Ative a sequência. Ela passará a executar automaticamente.'
+        ]
+      }
+    ]
+  },
+
+  manufatura: {
+    titulo: 'Manufatura',
+    icone: 'ph-factory',
+    descricao: 'Gestão de ordens de produção, apontamento de horas, andamento físico, materiais alocados e cronograma.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral da Manufatura',
+        texto: 'O módulo de Manufatura gerencia a produção dos painéis elétricos, desde a abertura da ordem de produção até o apontamento de horas e acompanhamento do andamento físico.\n\nFuncionalidades principais:\n- Ordens de Produção (OP) vinculadas a PTCs\n- Apontamento de horas por funcionário e atividade\n- Andamento físico com percentuais por equipamento\n- Alocação de materiais às ordens\n- Cronograma visual da produção'
+      },
+      {
+        id: 'ordem-producao',
+        titulo: 'Ordens de Produção',
+        texto: 'As Ordens de Produção (OP) organizam a fabricação dos painéis. Cada OP está vinculada a uma PTC e contém:\n\n- Número da OP (automático)\n- PTC de origem\n- Equipamentos a serem produzidos\n- Datas de abertura, início e conclusão\n- Status: Aberta, Em Produção, Concluída, Cancelada\n- Responsável pela execução\n\nAs OPs são criadas manualmente ou geradas automaticamente a partir da aprovação de uma proposta.',
+        campos: [
+          { nome: 'Nº OP', descricao: 'Número sequencial automático da ordem de produção.' },
+          { nome: 'PTC', descricao: 'Proposta Técnica e Comercial vinculada.' },
+          { nome: 'Equipamentos', descricao: 'Lista de TAGs dos painéis a produzir.' },
+          { nome: 'Status', descricao: 'Aberta, Em Produção, Concluída ou Cancelada.' },
+          { nome: 'Responsável', descricao: 'Profissional responsável pela execução da OP.' }
+        ]
+      },
+      {
+        id: 'apontamento',
+        titulo: 'Apontamento de Horas',
+        texto: 'O apontamento de horas registra o tempo gasto por cada funcionário em cada atividade da produção.\n\n- Selecione a OP e o equipamento\n- Escolha o funcionário e a atividade (composição)\n- Registre as horas trabalhadas (início/fim ou quantidade)\n- Visualize o total de horas apontadas por OP, equipamento e funcionário\n\nOs dados de apontamento alimentam o cálculo de custos de mão de obra.',
+        passos: [
+          'Acesse o módulo Manufatura > Apontamento.',
+          'Selecione a OP e o equipamento.',
+          'Escolha o funcionário e a atividade.',
+          'Informe as horas trabalhadas.',
+          'Salve o apontamento.'
+        ],
+        campos: [
+          { nome: 'Funcionário', descricao: 'Nome do profissional que executou a atividade.' },
+          { nome: 'Atividade', descricao: 'Composição de mão de obra executada.' },
+          { nome: 'Horas', descricao: 'Quantidade de horas trabalhadas.' },
+          { nome: 'Data', descricao: 'Data do apontamento.' }
+        ]
+      },
+      {
+        id: 'andamento-fisico',
+        titulo: 'Andamento Físico',
+        texto: 'O andamento físico mostra o progresso da produção em percentuais:\n\n- Por OP: percentual geral de conclusão\n- Por equipamento: andamento individual de cada painel\n- Por atividade: progresso de cada composição\n\nOs percentuais são calculados com base nas horas apontadas vs. horas estimadas.',
+        passos: [
+          'No módulo Manufatura, clique em "Andamento Físico".',
+          'Selecione a OP desejada.',
+          'Visualize o progresso por equipamento e por atividade.',
+          'Use os indicadores para identificar gargalos na produção.'
+        ]
+      },
+      {
+        id: 'materiais-alocados',
+        titulo: 'Materiais Alocados',
+        texto: 'A aba de Materiais Alocados permite gerenciar a reserva e consumo de materiais para cada OP:\n\n- Visualizar a lista de materiais necessários (da BOM da proposta)\n- Registrar saída de materiais do estoque\n- Acompanhar materiais pendentes e já consumidos\n- Identificar divergências entre o previsto e o realizado',
+        passos: [
+          'Acesse Manufatura > Materiais Alocados.',
+          'Selecione a OP para ver os materiais previstos.',
+          'Registre a saída dos materiais conforme forem sendo utilizados.',
+          'Confira o relatório de consumo vs. previsto.'
+        ]
+      },
+      {
+        id: 'cronograma',
+        titulo: 'Cronograma',
+        texto: 'O cronograma exibe uma linha do tempo visual da produção:\n\n- Barras horizontais representando cada OP\n- Datas de início e fim previstas\n- Status atual (cor verde = concluído, azul = em andamento, cinza = pendente)\n- Possibilidade de arrastar para ajustar prazos\n- Filtro por período e status',
+        passos: [
+          'No módulo Manufatura, clique em "Cronograma".',
+          'Visualize as OPs no gráfico de Gantt.',
+          'Arraste as barras para ajustar datas (se necessário).',
+          'Use os filtros para focar em um período ou status específico.'
+        ]
+      }
+    ]
+  },
+
+  'relatorio-manufatura': {
+    titulo: 'Relatório de Manufatura',
+    icone: 'ph-chart-bar',
+    descricao: 'Relatórios de produção com filtros avançados e exportação de dados de manufatura.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral',
+        texto: 'O Relatório de Manufatura consolida os dados de produção para análise gerencial. Inclui:\n\n- Total de OPs por período\n- Horas apontadas por funcionário e atividade\n- Materiais consumidos vs. previstos\n- Andamento físico consolidado\n- Custos de mão de obra por OP'
+      },
+      {
+        id: 'filtros',
+        titulo: 'Filtros',
+        texto: 'Os filtros disponíveis permitem refinar a visualização:\n\n- Período (data inicial e final)\n- Status da OP (Aberta, Em Produção, Concluída, Cancelada)\n- PTC específica\n- Funcionário\n- Equipamento/TAG',
+        passos: [
+          'Acesse Relatório de Manufatura.',
+          'Aplique os filtros desejados no topo da tela.',
+          'Os dados são atualizados automaticamente.'
+        ]
+      },
+      {
+        id: 'exportacao',
+        titulo: 'Exportação',
+        texto: 'O relatório pode ser exportado nos formatos:\n\n- CSV: formato de texto compatível com Excel\n- XLS: planilha nativa do Excel (.xlsx)\n\nUse o botão "Exportar" no canto superior direito para selecionar o formato.',
+        passos: [
+          'Aplique os filtros desejados.',
+          'Clique em "Exportar".',
+          'Escolha o formato (CSV ou XLS).',
+          'O arquivo será gerado e baixado automaticamente.'
+        ]
       }
     ]
   },
@@ -1319,8 +1714,8 @@
 window.AJUDA_CATEGORIAS = [
   { label: 'Principal', modules: ['dashboard'] },
   { label: 'Cadastros', modules: ['clientes', 'fornecedores'] },
-  { label: 'Comercial', modules: ['proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'precificacao', 'orcamentos', 'importacaoET'] },
-  { label: 'Engenharia', modules: ['materiais', 'paineis', 'tipicos', 'cubiculos', 'cargas', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'calculos-eletricos', 'calculos-mecanicos', 'lm'] },
-  { label: 'Relatórios', modules: ['relatorio-propostas', 'relatorio-cadastros', 'relatorio-tipicos'] },
+  { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'precificacao', 'orcamentos', 'importacaoET'] },
+  { label: 'Engenharia', modules: ['materiais', 'paineis', 'tipicos', 'cubiculos', 'cargas', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'calculos-eletricos', 'calculos-mecanicos', 'lm', 'manufatura'] },
+  { label: 'Relatórios', modules: ['relatorio-propostas', 'relatorio-cadastros', 'relatorio-tipicos', 'relatorio-manufatura'] },
   { label: 'Configurações', modules: ['importacao', 'configuracoes'] }
 ];

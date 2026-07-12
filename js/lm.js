@@ -72,10 +72,12 @@ const LMModule = {
 
         return sortedCargas.map(carga => {
             const typical = tipicos.find(t => t.id === carga.typicalId);
+            // Make a mutable copy so reorder does not touch original until saved
+            const origItems = typical ? typical.items : [];
             return {
                 carga: carga,
                 typical: typical,
-                items: typical ? typical.items : []
+                items: origItems ? [...origItems] : []
             };
         });
     },
@@ -94,7 +96,7 @@ const LMModule = {
             return;
         }
 
-        const html = groupedData.map(group => {
+        const html = groupedData.map((group, gIdx) => {
             const { carga, typical, items } = group;
 
             if (!typical) return `
@@ -106,11 +108,14 @@ const LMModule = {
 
             let subtotalGroup = 0;
 
-            const rows = items.map(item => {
+            const rows = items.map((item, iIdx) => {
                 const total = item.qtd * item.custo;
                 subtotalGroup += total;
                 return `
-                    <tr>
+                    <tr data-index="${iIdx}">
+                        <td style="text-align:center;cursor:grab;width:32px;" class="bom-drag-handle">
+                            <i class="ph ph-grip-vertical" style="font-size:14px;opacity:0.4;"></i>
+                        </td>
                         <td style="text-align: center; width: 60px;">${item.qtd}</td>
                         <td>${item.descricao || '-'}</td>
                         <td style="width: 120px;">${item.modelo || '-'}</td>
@@ -138,6 +143,7 @@ const LMModule = {
                     <table class="table table-striped" style="margin: 0;">
                         <thead>
                             <tr>
+                                <th style="text-align:center;width:32px;"></th>
                                 <th style="text-align: center;">Qtd</th>
                                 <th>Descrição</th>
                                 <th>Modelo</th>
@@ -147,7 +153,7 @@ const LMModule = {
                                 <th style="text-align: right;">Total</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody data-group-index="${gIdx}">
                             ${rows}
                         </tbody>
                     </table>
@@ -156,6 +162,46 @@ const LMModule = {
         }).join('');
 
         container.innerHTML = html;
+
+        this._initSortableLM();
+    },
+
+    _initSortableLM() {
+        if (!window.Sortable) return;
+        document.querySelectorAll('#lm-list-body tbody[data-group-index]').forEach(tbody => {
+            if (tbody.__sortable) tbody.__sortable.destroy();
+            tbody.__sortable = Sortable.create(tbody, {
+                handle: '.bom-drag-handle',
+                animation: 150,
+                ghostClass: 'opacity-30',
+                onEnd: (evt) => {
+                    if (evt.oldIndex === evt.newIndex) return;
+                    const gIdx = parseInt(tbody.dataset.groupIndex);
+                    const group = this.currentGroupedData[gIdx];
+                    if (!group || !group.typical) return;
+                    const items = group.items;
+                    const [moved] = items.splice(evt.oldIndex, 1);
+                    items.splice(evt.newIndex, 0, moved);
+                    this._saveTipicoOrder(group.typical, items);
+                    this.render();
+                }
+            });
+        });
+    },
+
+    _saveTipicoOrder(typical, newItems) {
+        const state = store.getState();
+        const idx = state.tipicos.findIndex(t => t.id === typical.id);
+        if (idx === -1) return;
+        state.tipicos[idx].items = newItems;
+        store.setState({ tipicos: state.tipicos });
+        // Persist to localStorage or server
+        const dbSave = window.db || window.store;
+        if (typeof store.save === 'function') {
+            store.save();
+        } else if (typeof dbSave?.tipicos?.update === 'function') {
+            dbSave.tipicos.update(state.tipicos[idx]);
+        }
     },
 
     async exportXLS() {

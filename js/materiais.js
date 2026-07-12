@@ -180,6 +180,7 @@ const MateriaisModule = {
                     <div>
                         <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
                             <i class="ph ph-package"></i> Catálogo de Materiais
+                            <span class="help-trigger" data-help="materiais/visao-geral">?</span>
                         </h2>
                         <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">Banco de Dados Global de Componentes e Insumos</div>
                     </div>

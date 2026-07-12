@@ -182,11 +182,12 @@ const CRM = {
                     <div>
                         <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;">
                             <i class="ph ph-funnel"></i> CRM
+                            <span class="help-trigger" data-help="crm/visao-geral">?</span>
                         </h2>
                         <div style="font-size:12px;opacity:0.9;margin-top:2px;">Gerencie seus leads e oportunidades aqui.</div>
                     </div>
                     <div style="display:flex;gap:10px;">
-                        <button class="btn btn-sm btn-ghost" onclick="window.crm.abrirModalNovoLead()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                        <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalNovoLead()">
                             <i class="ph ph-plus"></i> Novo Lead
                         </button>
                     </div>
@@ -534,7 +535,7 @@ const CRM = {
         content.innerHTML = `
             <div style="display:flex;gap:8px;margin-bottom:8px;justify-content:flex-end">
                 <button class="btn btn-sm" onclick="window.crm._baixarModeloCsv()" title="Baixar modelo CSV para importação"><i class="ph ph-download-simple"></i> Modelo</button>
-                <button class="btn btn-sm" onclick="window.crm.abrirModalImportarLeads()" title="Importar leads de CSV ou XLSX"><i class="ph ph-upload-simple"></i> Importar</button>
+                <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalImportarLeads()" title="Importar leads de CSV ou XLSX"><i class="ph ph-upload-simple"></i> Importar</button>
                 <button class="btn btn-sm" onclick="window.crm._exportCSV()"><i class="ph ph-file-csv"></i> CSV</button>
                 <button class="btn btn-sm" onclick="window.crm._exportXLSX()"><i class="ph ph-table"></i> XLSX</button>
             </div>
@@ -825,7 +826,7 @@ const CRM = {
                         Webhooks disparam requisições HTTP para URLs externas quando eventos do CRM ocorrem.
                     </div>
                     <div style="margin-bottom:12px">
-                        <button class="btn btn-sm btn-primary" onclick="window.crm._addWebhookForm()"><i class="ph ph-plus"></i> Novo Webhook</button>
+                        <button class="btn btn-sm btn-add" onclick="window.crm._addWebhookForm()"><i class="ph ph-plus"></i> Novo Webhook</button>
                     </div>
                     <div id="crm-webhooks-list">
                         ${webhooks.length === 0 ? '<div class="crm-empty"><p>Nenhum webhook configurado</p></div>' :
@@ -1746,7 +1747,7 @@ const CRM = {
             <div class="crm-modal-tab-content">
                 <div style="display:flex;justify-content:space-between;margin-bottom:12px">
                     <span class="crm-text-muted">${interacoes.length} interação(ões)</span>
-                    <button class="btn btn-sm" onclick="window.crm.abrirModalInteracao('${lead.id}')"><i class="ph ph-plus"></i> Nova Interação</button>
+                    <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalInteracao('${lead.id}')"><i class="ph ph-plus"></i> Nova Interação</button>
                 </div>
                 ${interacoes.length === 0 ? '<div class="crm-empty"><p>Nenhuma interação registrada</p></div>' :
                     interacoes.sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0)).map(i => `
@@ -1777,7 +1778,7 @@ const CRM = {
             <div class="crm-modal-tab-content">
                 <div style="display:flex;justify-content:space-between;margin-bottom:12px">
                     <span class="crm-text-muted">${tarefas.length} tarefa(s)</span>
-                    <button class="btn btn-sm" onclick="window.crm.abrirModalNovaTarefa('${lead.id}')"><i class="ph ph-plus"></i> Nova Tarefa</button>
+                    <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalNovaTarefa('${lead.id}')"><i class="ph ph-plus"></i> Nova Tarefa</button>
                 </div>
                 ${tarefas.length === 0 ? '<div class="crm-empty"><p>Nenhuma tarefa</p></div>' :
                     tarefas.sort((a, b) => new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0)).map(t => this._renderTarefaCard(t, hoje)).join('')}
@@ -1923,15 +1924,15 @@ const CRM = {
                 <div style="margin-bottom:16px">
                     <h4 style="font-size:13px;margin:0 0 8px">Registrar</h4>
                     <div style="display:flex;gap:8px">
-                        <button class="btn btn-sm" onclick="window.crm.abrirModalInteracao('${lead.id}')" ${podeAvancar ? '' : 'disabled'}><i class="ph ph-chats"></i> Interação</button>
-                        <button class="btn btn-sm" onclick="window.crm.abrirModalNovaTarefa('${lead.id}')" ${podeAvancar ? '' : 'disabled'}><i class="ph ph-check-square"></i> Tarefa</button>
+                        <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalInteracao('${lead.id}')" ${podeAvancar ? '' : 'disabled'}><i class="ph ph-chats"></i> Interação</button>
+                        <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalNovaTarefa('${lead.id}')" ${podeAvancar ? '' : 'disabled'}><i class="ph ph-check-square"></i> Tarefa</button>
                     </div>
                 </div>
                 ${podeSolicitar ? `
                     <div style="margin-bottom:16px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px">
                         <h4 style="font-size:13px;margin:0 0 8px;color:#16a34a"><i class="ph ph-file-arrow-up"></i> Solicitar Proposta</h4>
                         <p style="font-size:12px;margin:0 0 8px;color:#374151">Quando o lead estiver pronto, solicite a criação de uma proposta. O engenheiro responsável avaliará e criará na Gestão de Propostas.</p>
-                        <button class="btn btn-primary" onclick="window.crm._solicitarProposta('${lead.id}')"><i class="ph ph-paper-plane-tilt"></i> Solicitar Proposta</button>
+                        <button class="btn btn-add" onclick="window.crm._solicitarProposta('${lead.id}')"><i class="ph ph-paper-plane-tilt"></i> Solicitar Proposta</button>
                     </div>
                 ` : ''}
                 ${!leadStage?.is_loss && !leadStage?.is_terminal ? `
@@ -2371,7 +2372,7 @@ const CRM = {
                 </div>
                 <div class="crm-modal-body">
                     <div style="margin-bottom:16px;display:flex;gap:8px">
-                        <button class="btn btn-primary btn-sm" onclick="window.crm.abrirModalTemplateNovo()">
+                        <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalTemplateNovo()">
                             <i class="ph ph-plus"></i> Novo Template
                         </button>
                     </div>

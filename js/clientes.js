@@ -46,6 +46,7 @@ const ClientesModule = {
                     <div>
                         <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
                             <i class="ph ph-users"></i> Gerenciamento de Clientes
+                            <span class="help-trigger" data-help="clientes/visao-geral">?</span>
                         </h2>
                         <div style="font-size: 12px; opacity: 0.9; margin-top: 2px;">Cadastro Central de Empresas, Contatos e Localizações</div>
                     </div>

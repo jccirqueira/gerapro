@@ -1100,7 +1100,10 @@ const TipicosModule = {
             const subtotal = item.custo * item.qtd;
             total += subtotal;
             return `
-                <tr>
+                <tr data-index="${index}">
+                    <td style="text-align:center;cursor:grab;" class="bom-drag-handle">
+                        <i class="ph ph-grip-vertical" style="font-size:14px;opacity:0.4;"></i>
+                    </td>
                     <td style="text-align: center;"><input type="number" class="form-control" style="padding: 2px; height: 24px; text-align: center;" value="${item.qtd}" onchange="app.tipicos.updateQtd(${index}, this.value)"></td>
                     <td style="padding-left: 10px;">
                         <div style="font-size: 13px;">${item.descricao || '-'}</div>
@@ -1128,6 +1131,26 @@ const TipicosModule = {
             this.currentBuilderState.items[index].qtd = parseInt(val) || 1;
             this.renderBuilderItems();
         };
+
+        this._initSortableBOM();
+    },
+
+    _initSortableBOM() {
+        const tbody = document.getElementById('builder-items-body');
+        if (!tbody || !window.Sortable) return;
+        if (tbody.__sortable) tbody.__sortable.destroy();
+        tbody.__sortable = Sortable.create(tbody, {
+            handle: '.bom-drag-handle',
+            animation: 150,
+            ghostClass: 'opacity-30',
+            onEnd: (evt) => {
+                if (evt.oldIndex === evt.newIndex) return;
+                const items = this.currentBuilderState.items;
+                const [moved] = items.splice(evt.oldIndex, 1);
+                items.splice(evt.newIndex, 0, moved);
+                this.renderBuilderItems();
+            }
+        });
     },
 
     recalculateCosts() {
