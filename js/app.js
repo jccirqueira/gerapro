@@ -916,6 +916,7 @@ const App = {
         }
         if (viewName === 'crm' && window.crm) {
             if (window.crm._notifyOverdue) window.crm._notifyOverdue(true);
+            if (window.crm._refreshVendedorSelects) window.crm._refreshVendedorSelects();
         }
         if (viewName === 'paineis' && window.paineisModule) {
             window.paineisModule.render();
@@ -1663,6 +1664,7 @@ const App = {
         document.getElementById('conf-vendedor-telefone').value = '';
         document.getElementById('conf-vendedor-meta').value = '';
         this.loadVendedoresForm();
+        if (window.crm?._refreshVendedorSelects) window.crm._refreshVendedorSelects();
         this.showToast('Vendedor adicionado!', 'success');
     },
 
@@ -1671,6 +1673,7 @@ const App = {
         store.setState({ vendedores });
         store._syncDelete('vendedores', id).catch(() => {});
         this.loadVendedoresForm();
+        if (window.crm?._refreshVendedorSelects) window.crm._refreshVendedorSelects();
         this.showToast('Vendedor removido.', 'info');
     },
 

@@ -42,6 +42,18 @@ const CRM = {
         return v ? v.nome || v.razao_social || id : '—';
     },
 
+    _refreshVendedorSelects() {
+        const filterSelect = document.getElementById('crm-filter-vendedor');
+        if (!filterSelect) return;
+        const vendedores = this.getVendedores();
+        const currentValue = filterSelect.value;
+        filterSelect.innerHTML = '<option value="todos">Todos Vendedores</option>' +
+            vendedores.map(v => `<option value="${v.id}">${v.nome || v.razao_social}</option>`).join('');
+        if (filterSelect.querySelector(`option[value="${currentValue}"]`)) {
+            filterSelect.value = currentValue;
+        }
+    },
+
     _getStages() {
         const stored = store.getState().crmStages;
         if (stored && stored.length > 0) return stored;
@@ -166,6 +178,7 @@ const CRM = {
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             Notification.requestPermission();
         }
+        store.subscribe(() => this._refreshVendedorSelects());
     },
 
     render() {

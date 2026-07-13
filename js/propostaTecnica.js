@@ -12387,25 +12387,25 @@ const PropostaTecnicaModule = {
 
                         <tr style="background: var(--color-accent); border-bottom: 2px solid #e2e8f0; color: #fff; text-transform: uppercase;">
 
-                            <th style="padding: 10px; text-align: center; width: 30px;"><i class="ph ph-grip-vertical" style="opacity: 0.5;"></i></th>
+                            <th style="padding: 10px; text-align: center; width: 30px; color:#fff;"><i class="ph ph-grip-vertical" style="opacity: 0.5;"></i></th>
 
-                            <th style="padding: 10px; text-align: left; width: 60px;">TAG</th>
+                            <th style="padding: 10px; text-align: left; width: 60px; color:#fff;">TAG</th>
 
-                            <th style="padding: 10px; text-align: left; width: 320px;">DESCRIÇÃO</th>
+                            <th style="padding: 10px; text-align: left; width: 320px; color:#fff;">DESCRIÇÃO</th>
 
-                            <th style="padding: 10px; text-align: center; width: 80px;">${eq && eq.type === 'CUB-MT' ? 'TENSÃO NOMINAL (KV)' : 'POTÊNCIA (CV)'}</th>
+                            <th style="padding: 10px; text-align: center; width: 80px; color:#fff;">${eq && eq.type === 'CUB-MT' ? 'TENSÃO NOMINAL (KV)' : 'POTÊNCIA (CV)'}</th>
 
-                            <th style="padding: 10px; text-align: center; width: 80px;">${eq && eq.type === 'CUB-MT' ? 'CORRENTE NOMINAL (A)' : 'TENSÃO (V)'}</th>
+                            <th style="padding: 10px; text-align: center; width: 80px; color:#fff;">${eq && eq.type === 'CUB-MT' ? 'CORRENTE NOMINAL (A)' : 'TENSÃO (V)'}</th>
 
-                            <th style="padding: 10px; text-align: center; width: 80px;">${eq && eq.type === 'CUB-MT' ? 'ICC(KA)(1S)' : 'COR. APROX (A)'}</th>
+                            <th style="padding: 10px; text-align: center; width: 80px; color:#fff;">${eq && eq.type === 'CUB-MT' ? 'ICC(KA)(1S)' : 'COR. APROX (A)'}</th>
 
-                            <th style="padding: 10px; text-align: center; width: 140px;">${eq && eq.type === 'CUB-MT' ? 'INSTALAÇÃO' : 'REGIME DE TRABALHO'}</th>
+                            <th style="padding: 10px; text-align: center; width: 140px; color:#fff;">${eq && eq.type === 'CUB-MT' ? 'INSTALAÇÃO' : 'REGIME DE TRABALHO'}</th>
 
-                            <th style="padding: 10px; text-align: center; width: 60px;">TIPO</th>
+                            <th style="padding: 10px; text-align: center; width: 60px; color:#fff;">TIPO</th>
 
-                            <th style="padding: 10px; text-align: left;">${eq && eq.type === 'CUB-MT' ? 'TÍPICO DE CUBÍCULO (COMPOSIÇÃO)' : 'TÍPICO DE PARTIDA (COMPOSIÇÃO)'}</th>
+                            <th style="padding: 10px; text-align: left; color:#fff;">${eq && eq.type === 'CUB-MT' ? 'TÍPICO DE CUBÍCULO (COMPOSIÇÃO)' : 'TÍPICO DE PARTIDA (COMPOSIÇÃO)'}</th>
 
-                            <th style="padding: 10px; width: 85px;"></th>
+                            <th style="padding: 10px; width: 85px; color:#fff;"></th>
 
                         </tr>
 
@@ -14491,6 +14491,9 @@ const PropostaTecnicaModule = {
     renderLoadsLM(eq) {
 
         const tipicos = store.getState().tipicos || [];
+        const company = store.getState().company || {};
+        const isAutPro = company.folderName?.startsWith('AUT_');
+        const lmHeaderBg = isAutPro ? 'rgb(3, 92, 169)' : '#22c55e';
 
         const loads = eq.loads || [];
 
@@ -14616,25 +14619,25 @@ const PropostaTecnicaModule = {
 
                                 <thead>
 
-                                    <tr style="background: #22c55e; border-bottom: 1px solid #f1f5f9; color: #fff; text-transform: uppercase;">
+                                    <tr style="background: ${lmHeaderBg}; border-bottom: 1px solid #f1f5f9; color: #fff; text-transform: uppercase;">
 
-                                        <th style="padding: 8px; text-align: center; width: 40px;">QTD</th>
+                                        <th style="padding: 8px; text-align: center; width: 40px; color:#fff;">QTD</th>
 
-                                        <th style="padding: 8px; text-align: left;">DESCRIÇÃO</th>
+                                        <th style="padding: 8px; text-align: left; color:#fff;">DESCRIÇÃO</th>
 
-                                        <th style="padding: 8px; text-align: left; width: 120px;">MODELO</th>
+                                        <th style="padding: 8px; text-align: left; width: 120px; color:#fff;">MODELO</th>
 
-                                        <th style="padding: 8px; text-align: left; width: 120px;">CÓD. FAB.</th>
+                                        <th style="padding: 8px; text-align: left; width: 120px; color:#fff;">CÓD. FAB.</th>
 
-                                        <th style="padding: 8px; text-align: left; width: 100px;">FABRICANTE</th>
+                                        <th style="padding: 8px; text-align: left; width: 100px; color:#fff;">FABRICANTE</th>
 
-                                        <th style="padding: 8px; text-align: center; width: 50px;">ICMS</th>
+                                        <th style="padding: 8px; text-align: center; width: 50px; color:#fff;">ICMS</th>
 
-                                        <th style="padding: 8px; text-align: center; width: 50px;">IPI</th>
+                                        <th style="padding: 8px; text-align: center; width: 50px; color:#fff;">IPI</th>
 
-                                        <th style="padding: 8px; text-align: right; width: 80px;">UNIT.</th>
+                                        <th style="padding: 8px; text-align: right; width: 80px; color:#fff;">UNIT.</th>
 
-                                        <th style="padding: 8px; text-align: right; width: 80px;">TOTAL</th>
+                                        <th style="padding: 8px; text-align: right; width: 80px; color:#fff;">TOTAL</th>
 
                                     </tr>
 
