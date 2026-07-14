@@ -405,7 +405,27 @@ const AUTPRO_SCOPE_ITEMS = [
     { id: 'autpro_53', desc: 'VARIAÇÃO DE PREÇOS DO COBRE' },
     { id: 'autpro_54', desc: 'JORNADA DE TRABALHO' },
     { id: 'autpro_55', desc: 'VALIDADE DA PROPOSTA' },
-    { id: 'autpro_56', desc: 'CONFIDENCIALIDADE' }
+    { id: 'autpro_56', desc: 'CONFIDENCIALIDADE' },
+    { id: 'autpro_57', desc: 'APROVAÇÃO DOS PROJETOS' },
+    { id: 'autpro_58', desc: 'PROJETOS E OBRAS CIVIS' },
+    { id: 'autpro_59', desc: 'ACESSOS EXTERNOS' },
+    { id: 'autpro_60', desc: 'CANTEIRO DE OBRA' },
+    { id: 'autpro_61', desc: 'TRATATIVAS COM A CONCESSIONÁRIA' },
+    { id: 'autpro_62', desc: 'SISTEMA DE MÉDIA TENSÃO' },
+    { id: 'autpro_63', desc: 'ESTUDOS ELÉTRICOS' },
+    { id: 'autpro_64', desc: 'ALTA TENSÃO E LINHA DE TRANSMISSÃO E DISTRIBUIÇÃO' },
+    { id: 'autpro_65', desc: 'SISTEMA DE DETECÇÃO E COMBATE A INCÊNDIO' },
+    { id: 'autpro_66', desc: 'RECUPERAÇÃO / COMPENSAÇÃO AMBIENTAL' },
+    { id: 'autpro_67', desc: 'LICENCIAMENTO AMBIENTAL' },
+    { id: 'autpro_68', desc: 'PROPOSTA BUDGET' },
+    { id: 'autpro_69', desc: 'MOBILIZAÇÃO DE EQUIPES' },
+    { id: 'autpro_70', desc: 'ESCOPO MACRO DE FORNECIMENTO' },
+    { id: 'autpro_71', desc: 'DOCUMENTAÇÃO DE ENGENHARIA' },
+    { id: 'autpro_72', desc: 'PROJETO DE PAINÉIS' },
+    { id: 'autpro_73', desc: 'PROJETO EXECUTIVO DE INSTALAÇÕES' },
+    { id: 'autpro_74', desc: 'DATABOOK' },
+    { id: 'autpro_75', desc: 'ART (ANOTAÇÃO DE RESPONSABILIDADE TÉCNICA)' },
+    { id: 'autpro_76', desc: 'FORNECIMENTO DE EQUIPAMENTOS' }
 ];
 
 const PropostaTecnicaModule = {
@@ -2515,7 +2535,7 @@ const PropostaTecnicaModule = {
                                 const ptcFolder = String(window.app.currentPtc?.folder || '');
                                 const newMatch = ptcFolder.match(/^(\d{8,10})/);
                                 const oldMatch = ptcFolder.match(/PTC-\d{4}-\d+/i);
-                                const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : 'PTC-0000-0000');
+                                const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : (window.app.currentPtcInfo?.ptcNumber || 'PTC-0000-0000'));
                                 return `${basePtc}-PT${data.customCodigoSuffix || '_Rev00'}`;
                             })()}" readonly style="background-color: #f1f5f9; font-weight: 500;">
 
@@ -15656,7 +15676,7 @@ const PropostaTecnicaModule = {
         const ptcFolder = String(window.app.currentPtc?.folder || '');
         const newMatch = ptcFolder.match(/^(\d{8,10})/);
         const oldMatch = ptcFolder.match(/PTC-\d{4}-\d+/i);
-        const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : '');
+        const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : (window.app.currentPtcInfo?.ptcNumber || ''));
         const _existingPT = (store.getState().propostasTecnicas || []).find(p => p.ptc_folder === ptcFolder || p.ptcFolder === ptcFolder);
         const _stableId = _existingPT ? _existingPT.id : ('PT-' + (basePtc || Date.now().toString(36).toUpperCase()));
         const _stableCodigo = _existingPT?.codigo || (basePtc ? `${basePtc}-PT_Rev00` : _stableId);
@@ -17466,9 +17486,10 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
             // Preparar dados do template
             const clientObj = (store.getState().clientes || []).find(c => c.razaoSocial === data.cliente);
+            const _isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
             const _ptcFolderPT = String(window.app.currentPtc?.folder || '');
             const _ptcMatchPT = _ptcFolderPT.match(/^(\d{8,10})/);
-            const _ptcNumberPT = _ptcMatchPT ? _ptcMatchPT[1] : (data.codigo || '00000000');
+            const _ptcNumberPT = _ptcMatchPT ? _ptcMatchPT[1] : (window.app.currentPtcInfo?.ptcNumber || data.codigo || '00000000');
             const _revPTVal = data.revisions?.length > 0 ? data.revisions[data.revisions.length - 1].no : '00';
             const _revStrPT = _revPTVal && _revPTVal !== '0' ? String(_revPTVal).replace(/[^0-9]/g, '') : '00';
 
@@ -17515,7 +17536,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 revisao: data.revisions?.length > 0 ? data.revisions[data.revisions.length - 1].no : '00',
 
                 codigo: data.codigo || '',
-                ptc_number: `${_ptcNumberPT || '00000000'}-PT-Rev${_revStrPT}`,
+                ptc_number: _isAUTPRO ? `PT-${_ptcNumberPT || '00000000'}-Rev${_revStrPT}` : `${_ptcNumberPT || '00000000'}-PT-Rev${_revStrPT}`,
 
                 revisoes: (data.revisions || []).map(r => ({
 
@@ -18024,10 +18045,10 @@ ${dataRows}
 
             const ptcFolder = String(window.app.currentPtc?.folder || '');
             const ptcMatch = ptcFolder.match(/^(\d{8,10})/);
-            const ptcNumber = ptcMatch ? ptcMatch[1] : (data.codigo || '00000000');
+            const ptcNumber = ptcMatch ? ptcMatch[1] : (window.app.currentPtcInfo?.ptcNumber || data.codigo || '00000000');
             const rev = window.app.currentPtc?.revision;
             const revStr = rev && rev !== '0' ? rev.replace(/[^0-9]/g, '') : '00';
-            const fileName = `${ptcNumber}-PT-Rev${revStr}.docx`;
+            const fileName = _isAUTPRO ? `PT-${ptcNumber}-Rev${revStr}.docx` : `${ptcNumber}-PT-Rev${revStr}.docx`;
 
             const url = window.URL.createObjectURL(outBlob);
 

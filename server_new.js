@@ -859,7 +859,7 @@ function handleListPtcs(res, empresaId) {
             const entries = fs.readdirSync(dir, { withFileTypes: true });
             for (const dirent of entries) {
                 if (!dirent.isDirectory()) continue;
-                if (dirent.name.startsWith('PTC-') || /^\d{8,10}-/.test(dirent.name)) {
+                if (dirent.name.startsWith('PTC-') || /^\d{3,10}-/.test(dirent.name)) {
                     results.push(dirent.name);
                 } else if (depth < 2 && /^\d/.test(dirent.name)) {
                     results = results.concat(scanDir(path.join(dir, dirent.name), depth + 1));
@@ -1871,7 +1871,7 @@ function handleCreatePtc(data, res, empresaId) {
         effectiveNumber = `${codigoCliente}${codigoUnidade}${seqPadded}`;
 
         const titleSlug = ptcTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40);
-        folderName = `${effectiveNumber}-${titleSlug}`;
+        folderName = `${seqPadded}-${titleSlug}`;
         rootPath = path.join(getEmpresaPtcDir(empresaId), clienteFolderName, unidadeFolderName, folderName);
     } else {
         const num = (ptcNumber || String(Date.now()).slice(-4)).replace(/[^a-zA-Z0-9]/g, '');

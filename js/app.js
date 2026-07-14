@@ -3577,10 +3577,14 @@ const App = {
                 let base = folder;
                 const newMatch = folder.match(/^(\d{8,10})/);
                 if (newMatch) base = newMatch[1];
+                else if (window.app.currentPtcInfo?.ptcNumber) base = window.app.currentPtcInfo.ptcNumber;
                 const revNum = window.app.currentPtc.revisionNum;
                 const revStr = (revNum !== undefined && revNum !== null)
                     ? `_Rev${String(revNum).padStart(2, '0')}` : '';
-                textEl.textContent = tipo ? `${base}-${tipo}${revStr}` : `${base}${revStr}`;
+                const _badgeIsAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
+                textEl.textContent = tipo
+                    ? (_badgeIsAUTPRO ? `${tipo}-${base}${revStr}` : `${base}-${tipo}${revStr}`)
+                    : `${base}${revStr}`;
                 badge.style.display = 'inline-flex';
             } else {
                 badge.style.display = 'none';

@@ -555,7 +555,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                                 const ptcFolder = String(window.app.currentPtc?.folder || '');
                                 const newMatch = ptcFolder.match(/^(\d{8,10})/);
                                 const oldMatch = ptcFolder.match(/PTC-\d{4}-\d+/i);
-                                const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : 'PTC-0000-0000');
+                                const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : (window.app.currentPtcInfo?.ptcNumber || 'PTC-0000-0000'));
                                 return `${basePtc}-PC${data.customCodigoSuffix || '_Rev00'}`;
                             })()}" readonly style="background-color: #f1f5f9; font-weight: 500;">
 
@@ -1696,14 +1696,15 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             }
         }
 
+        const _isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
         const _ptcFolderPC = String(window.app.currentPtc?.folder || '');
         const _ptcMatchPC = _ptcFolderPC.match(/^(\d{8,10})/);
-        const _ptcNumberPC = _ptcMatchPC ? _ptcMatchPC[1] : '00000000';
+        const _ptcNumberPC = _ptcMatchPC ? _ptcMatchPC[1] : (window.app.currentPtcInfo?.ptcNumber || '00000000');
         const _revPCVal = window.app.currentPtc?.revision || '00';
         const _revStrPC = _revPCVal && _revPCVal !== '0' ? String(_revPCVal).replace(/[^0-9]/g, '') : '00';
 
         const templateData = {
-            ptc_number: `${_ptcNumberPC}-PC-Rev${_revStrPC}`,
+            ptc_number: _isAUTPRO ? `PC-${_ptcNumberPC}-Rev${_revStrPC}` : `${_ptcNumberPC}-PC-Rev${_revStrPC}`,
             cliente: cliente,
             razao_social: clientData?.razaoSocial || '',
             nome_fantasia: clientData?.nomeFantasia || '',
@@ -1929,10 +1930,10 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
             const ptcFolder = String(window.app.currentPtc?.folder || '');
             const ptcMatch = ptcFolder.match(/^(\d{8,10})/);
-            const ptcNumber = ptcMatch ? ptcMatch[1] : '00000000';
+            const ptcNumber = ptcMatch ? ptcMatch[1] : (window.app.currentPtcInfo?.ptcNumber || '00000000');
             const rev = window.app.currentPtc?.revision;
             const revStr = rev && rev !== '0' ? rev.replace(/[^0-9]/g, '') : '00';
-            const filename = `${ptcNumber}-PC-Rev${revStr}.docx`;
+            const filename = _isAUTPRO ? `PC-${ptcNumber}-Rev${revStr}.docx` : `${ptcNumber}-PC-Rev${revStr}.docx`;
 
             if (!skipDownload) {
                 const url = window.URL.createObjectURL(out);
@@ -2152,7 +2153,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const ptcFolder = String(window.app.currentPtc?.folder || '');
         const newMatch = ptcFolder.match(/^(\d{8,10})/);
         const oldMatch = ptcFolder.match(/PTC-\d{4}-\d+/i);
-        const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : '');
+        const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : (window.app.currentPtcInfo?.ptcNumber || ''));
         const newData = {
             cliente: ptc?.client || '',
             projeto: ptc?.title || '',

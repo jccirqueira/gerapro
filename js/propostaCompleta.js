@@ -526,14 +526,15 @@ const PropostaCompletaModule = {
             const clientObj = (state.clientes || []).find(c => c.razaoSocial === cliente);
 
             // Build templateData from technical proposal
+            const _isAUTPRO = state.company?.folderName?.startsWith('AUT_');
             const _ptcFolderPComp = String(window.app.currentPtc?.folder || '');
             const _ptcMatchPComp = _ptcFolderPComp.match(/^(\d{8,10})/);
-            const _ptcNumberPComp = _ptcMatchPComp ? _ptcMatchPComp[1] : '00000000';
+            const _ptcNumberPComp = _ptcMatchPComp ? _ptcMatchPComp[1] : (window.app.currentPtcInfo?.ptcNumber || '00000000');
             const _revPCompVal = window.app.currentPtc?.revision || '00';
             const _revStrPComp = _revPCompVal && _revPCompVal !== '0' ? String(_revPCompVal).replace(/[^0-9]/g, '') : '00';
 
             const templateData = {
-                ptc_number: `${_ptcNumberPComp}-PTC-Rev${_revStrPComp}`,
+                ptc_number: _isAUTPRO ? `PTC-${_ptcNumberPComp}-Rev${_revStrPComp}` : `${_ptcNumberPComp}-PTC-Rev${_revStrPComp}`,
                 cliente: cliente || '',
                 razao_social: clientObj?.razaoSocial || '',
                 nome_fantasia: clientObj?.nomeFantasia || '',
@@ -810,10 +811,10 @@ const PropostaCompletaModule = {
 
             const ptcFolder = String(window.app.currentPtc?.folder || '');
             const ptcMatch = ptcFolder.match(/^(\d{8,10})/);
-            const ptcNumber = ptcMatch ? ptcMatch[1] : '00000000';
+            const ptcNumber = ptcMatch ? ptcMatch[1] : (window.app.currentPtcInfo?.ptcNumber || '00000000');
             const rev = window.app.currentPtc?.revision;
             const revStr = rev && rev !== '0' ? rev.replace(/[^0-9]/g, '') : '00';
-            const filename = `${ptcNumber}-PTC-Rev${revStr}.docx`;
+            const filename = _isAUTPRO ? `PTC-${ptcNumber}-Rev${revStr}.docx` : `${ptcNumber}-PTC-Rev${revStr}.docx`;
 
             const url = URL.createObjectURL(outBlob);
             const a = document.createElement('a');
