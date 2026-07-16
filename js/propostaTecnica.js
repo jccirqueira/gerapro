@@ -425,8 +425,160 @@ const AUTPRO_SCOPE_ITEMS = [
     { id: 'autpro_73', desc: 'PROJETO EXECUTIVO DE INSTALAÇÕES' },
     { id: 'autpro_74', desc: 'DATABOOK' },
     { id: 'autpro_75', desc: 'ART (ANOTAÇÃO DE RESPONSABILIDADE TÉCNICA)' },
-    { id: 'autpro_76', desc: 'FORNECIMENTO DE EQUIPAMENTOS' }
+    { id: 'autpro_76', desc: 'FORNECIMENTO DE EQUIPAMENTOS' },
+    { id: 'autpro_77', desc: 'CRONOGRAMA DO PROJETO E PLANEJAMENTO DA OBRA' },
+    { id: 'autpro_78', desc: 'OMISSÕES OU INFORMAÇÕES NÃO CEDIDAS PELA CONTRATANTE' },
+    { id: 'autpro_79', desc: 'ESTUDO DE CURTO-CIRCUITO' },
+    { id: 'autpro_80', desc: 'ESTUDO DE SELETIVIDADE E COORDENAÇÃO DA PROTEÇÃO' },
+    { id: 'autpro_81', desc: 'ESTUDO DE ARC FLASH' },
+    { id: 'autpro_82', desc: 'ESTUDO DE FLUXO DE CARGA' },
+    { id: 'autpro_83', desc: 'ESTUDO DE PARTIDA DE MOTORES' },
+    { id: 'autpro_84', desc: 'ESTUDO DE QUALIDADE DE ENERGIA E HARMÔNICOS' },
+    { id: 'autpro_85', desc: 'ESTUDO DE MALHA DE ATERRAMENTO' },
+    { id: 'autpro_86', desc: 'PADRÕES' },
+    { id: 'autpro_87', desc: 'LISTAS DE - PARA' },
+    { id: 'autpro_88', desc: 'LISTAS DE IO´S' },
+    { id: 'autpro_89', desc: 'ARQUITETURA DE REDE' },
+    { id: 'autpro_90', desc: 'PLANTA DE ENCAMINHAMENTO DE INFRAESTRUTURA DE MÉDIA E BAIXA TENSÃO' },
+    { id: 'autpro_91', desc: 'PLANTA DE ENCAMINHAMENTO DE INFRAESTRUTURA DE AUTOMAÇÃO, REDES E INSTRUMENTAÇÃO' },
+    { id: 'autpro_92', desc: 'CADERNO DE DETALHES TÍPICOS' },
+    { id: 'autpro_93', desc: 'MEMORIAS DE CÁLCULOS' },
+    { id: 'autpro_94', desc: 'PROJETO DE ILUMINAÇÃO' },
+    { id: 'autpro_95', desc: 'SISTEMA DE ATERRAMENTO' },
+    { id: 'autpro_96', desc: 'PDA E SPDA' },
+    { id: 'autpro_97', desc: 'ESTUDOS ELÉTRICOS' },
+    { id: 'autpro_98', desc: 'CRITÉRIOS DE ACEITAÇÃO' },
+    { id: 'autpro_99', desc: 'ESCOPO MACRO DE FORNECIMENTO' },
+    { id: 'autpro_100', desc: 'CAPA' },
+    { id: 'autpro_101', desc: 'ÍNDICE' },
+    { id: 'autpro_102', desc: 'DADOS TÉCNICOS' },
+    { id: 'autpro_103', desc: 'SIMBOLOGIA' },
+    { id: 'autpro_104', desc: 'LAYOUT MECÂNICO DOS PAINÉIS' },
+    { id: 'autpro_105', desc: 'DIAGRAMA UNIFILAR (SE NECESSÁRIO)' },
+    { id: 'autpro_106', desc: 'DIAGRAMA TRIFILAR' },
+    { id: 'autpro_107', desc: 'DETALHAMENTO DAS RÉGUAS DE BORNES' },
+    { id: 'autpro_108', desc: 'LISTA DE MATERIAL' },
+    { id: 'autpro_109', desc: 'ARQUITETURA DE REDE DO PAINEL (SE NECESSÁRIO)' },
+    { id: 'autpro_110', desc: 'INFORMAÇÕES PARA FABRICAÇÃO' },
+    { id: 'autpro_111', desc: 'INFORMAÇÕES PARA INSTALAÇÃO' },
+    { id: 'autpro_112', desc: 'AS BUILT' }
 ];
+
+const PREMISSAS_IDS = [
+    'autpro_77', 'autpro_78',
+    'autpro_57', 'autpro_58', 'autpro_59', 'autpro_60', 'autpro_61',
+    'autpro_62', 'autpro_63', 'autpro_64', 'autpro_65', 'autpro_66',
+    'autpro_67', 'autpro_68', 'autpro_69'
+];
+
+const PREMISSAS_LABELS = {
+    autpro_77: 'CRONOGRAMA DO PROJETO E PLANEJAMENTO DA OBRA',
+    autpro_78: 'OMISSÕES OU INFORMAÇÕES NÃO CEDIDAS PELA CONTRATANTE',
+    autpro_57: 'APROVAÇÃO DOS PROJETOS',
+    autpro_58: 'PROJETOS E OBRAS CIVIS',
+    autpro_59: 'ACESSOS EXTERNOS',
+    autpro_60: 'CANTEIRO DE OBRA',
+    autpro_61: 'TRATATIVAS COM A CONCESSIONÁRIA',
+    autpro_62: 'SISTEMA DE MÉDIA TENSÃO',
+    autpro_63: 'ESTUDOS ELÉTRICOS',
+    autpro_64: 'ALTA TENSÃO E LINHA DE TRANSMISSÃO E DISTRIBUIÇÃO',
+    autpro_65: 'SISTEMA DE DETECÇÃO E COMBATE A INCÊNDIO',
+    autpro_66: 'RECUPERAÇÃO / COMPENSAÇÃO AMBIENTAL',
+    autpro_67: 'LICENCIAMENTO AMBIENTAL',
+    autpro_68: 'PROPOSTA BUDGET',
+    autpro_69: 'MOBILIZAÇÃO DE EQUIPES'
+};
+
+const PREMISSAS_NUMBERS = {
+    autpro_77: '5.1', autpro_78: '5.2',
+    autpro_57: '5.3', autpro_58: '5.4', autpro_59: '5.5', autpro_60: '5.6', autpro_61: '5.7',
+    autpro_62: '5.8', autpro_63: '5.9', autpro_64: '5.10', autpro_65: '5.11', autpro_66: '5.12',
+    autpro_67: '5.13', autpro_68: '5.14', autpro_69: '5.15'
+};
+
+const DOCUMENTACAO_IDS = [
+    'autpro_71', 'autpro_97', 'autpro_72', 'autpro_73', 'autpro_86', 'autpro_74', 'autpro_75',
+    'autpro_79', 'autpro_80', 'autpro_81', 'autpro_82', 'autpro_83', 'autpro_84', 'autpro_85',
+    'autpro_87', 'autpro_88', 'autpro_89', 'autpro_90', 'autpro_91', 'autpro_92', 'autpro_93',
+    'autpro_94', 'autpro_95', 'autpro_96',
+    'autpro_100', 'autpro_101', 'autpro_102', 'autpro_103', 'autpro_104', 'autpro_105',
+    'autpro_106', 'autpro_107', 'autpro_108', 'autpro_109', 'autpro_110', 'autpro_111', 'autpro_112'
+];
+
+const DOCUMENTACAO_LABELS = {
+    autpro_71: '7. DOCUMENTAÇÃO DE ENGENHARIA',
+    autpro_97: '7.1. ESTUDOS ELÉTRICOS',
+    autpro_79: 'Estudo de Curto-Circuito',
+    autpro_80: 'Estudo de Seletividade e Coordenação da Proteção',
+    autpro_81: 'Estudo de Arc Flash',
+    autpro_82: 'Estudo de Fluxo de Carga',
+    autpro_83: 'Estudo de Partida de Motores',
+    autpro_84: 'Estudo de Qualidade de Energia e Harmônicos',
+    autpro_85: 'Estudo de Malha de Aterramento',
+    autpro_72: '7.2. PROJETO DE PAINÉIS',
+    autpro_100: 'Capa',
+    autpro_101: 'Índice',
+    autpro_102: 'Dados Técnicos',
+    autpro_103: 'Simbologia',
+    autpro_104: 'Layout Mecânico dos Painéis',
+    autpro_105: 'Diagrama Unifilar (se necessário)',
+    autpro_106: 'Diagrama Trifilar',
+    autpro_107: 'Detalhamento das Réguas de Bornes',
+    autpro_108: 'Lista de Material',
+    autpro_109: 'Arquitetura de Rede do Painel (se necessário)',
+    autpro_110: 'Informações para Fabricação',
+    autpro_111: 'Informações para Instalação',
+    autpro_112: 'As Built',
+    autpro_73: '7.3. PROJETO EXECUTIVO DE INSTALAÇÕES',
+    autpro_87: 'Listas DE - PARA',
+    autpro_88: 'Listas de IO´s',
+    autpro_89: 'Arquitetura de Rede',
+    autpro_90: 'Planta de encaminhamento de infraestrutura de média e baixa tensão',
+    autpro_91: 'Planta de encaminhamento de infraestrutura de automação, redes e instrumentação',
+    autpro_92: 'Caderno de Detalhes Típicos',
+    autpro_93: 'Memorias de Cálculos',
+    autpro_94: 'Projeto de Iluminação',
+    autpro_95: 'Sistema de aterramento',
+    autpro_96: 'PDA e SPDA',
+    autpro_86: '7.4. PADRÕES',
+    autpro_74: '7.5. DATABOOK',
+    autpro_75: '7.6. ART (ANOTAÇÃO DE RESPONSABILIDADE TÉCNICA)'
+};
+
+const DOCUMENTACAO_ORDER = ['autpro_97', 'autpro_72', 'autpro_73', 'autpro_86', 'autpro_74', 'autpro_75'];
+
+const DOCUMENTACAO_SUB_MASTERS = {
+    autpro_97: ['autpro_79', 'autpro_80', 'autpro_81', 'autpro_82', 'autpro_83', 'autpro_84', 'autpro_85'],
+    autpro_72: ['autpro_100', 'autpro_101', 'autpro_102', 'autpro_103', 'autpro_104', 'autpro_105', 'autpro_106', 'autpro_107', 'autpro_108', 'autpro_109', 'autpro_110', 'autpro_111', 'autpro_112'],
+    autpro_73: ['autpro_87', 'autpro_88', 'autpro_89', 'autpro_90', 'autpro_91', 'autpro_92', 'autpro_93', 'autpro_94', 'autpro_95', 'autpro_96']
+};
+
+const FORNECIMENTO_IDS = [
+    'autpro_99',
+    'autpro_01', 'autpro_02', 'autpro_03', 'autpro_04', 'autpro_05', 'autpro_06', 'autpro_07',
+    'autpro_08',
+    'autpro_09', 'autpro_10', 'autpro_11', 'autpro_12', 'autpro_13', 'autpro_14', 'autpro_15', 'autpro_16',
+    'autpro_17',
+    'autpro_18', 'autpro_19'
+];
+
+const FORNECIMENTO_ORDER = ['autpro_99', 'autpro_08', 'autpro_17'];
+
+const FORNECIMENTO_SUB_MASTERS = {
+    autpro_99: ['autpro_01', 'autpro_02', 'autpro_03', 'autpro_04', 'autpro_05', 'autpro_06', 'autpro_07'],
+    autpro_08: ['autpro_09', 'autpro_10', 'autpro_11', 'autpro_12', 'autpro_13', 'autpro_14', 'autpro_15', 'autpro_16'],
+    autpro_17: ['autpro_18', 'autpro_19']
+};
+
+const FORNECIMENTO_STATIC_SUB_ITEMS = {
+    autpro_19: [
+        'Módulos básicos DIO',
+        'MiniDio p/ Trilho DIN – 6FO',
+        'Cordões Duplex - MM (62.5) ST-SPC/ST-SPC 1.5m',
+        'Extensões Opticas Conectorizadas - 02F MM (62.5) ST-SPC',
+        'Tubete 60x3,5mm'
+    ]
+};
 
 const PropostaTecnicaModule = {
 
@@ -514,6 +666,8 @@ const PropostaTecnicaModule = {
             ptc_folder: window.app.currentPtc?.folder || '',
 
             cliente: window.app.currentPtc?.client || '',
+
+            unidade_cliente: window.app.currentPtc?.unidade_cliente || window.app.currentPtcInfo?.autpro?.codigoUnidade || '',
 
             projeto: window.app.currentPtc?.title || '',
 
@@ -2485,6 +2639,7 @@ const PropostaTecnicaModule = {
     renderTabGeral(data) {
         const aiGeral = new Set(data._aiChanges?.geral || []);
         const isAi = (f) => aiGeral.has(f);
+        const isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
 
         return `
 
@@ -2521,9 +2676,25 @@ const PropostaTecnicaModule = {
 
                 </div>
 
+                ${isAUTPRO ? `
+                <div class="form-group" style="margin-top: 16px;">
 
+                    <label class="form-label">Unidade do Cliente</label>
 
-                <div class="grid-form" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; margin-top: 20px;">
+                    <select name="unidade_cliente" id="pt_unidade_cliente" class="form-control" onchange="app.propostaTecnica.handleUnidadeChange(this.value)">
+
+                        <option value="">Selecione uma unidade...</option>
+
+                    </select>
+
+                    <div style="margin-top: 5px; font-size: 12px; color: #94a3b8;">
+                        Unidade cadastrada no cliente &mdash; selecione o cliente primeiro se a lista estiver vazia
+                    </div>
+
+                </div>
+                ` : ''}
+
+                <div class="grid-form" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; margin-top: ${isAUTPRO ? '16px' : '20px'};">
 
                     <div class="form-group">
 
@@ -2536,7 +2707,7 @@ const PropostaTecnicaModule = {
                                 const newMatch = ptcFolder.match(/^(\d{8,10})/);
                                 const oldMatch = ptcFolder.match(/PTC-\d{4}-\d+/i);
                                 const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : (window.app.currentPtcInfo?.ptcNumber || 'PTC-0000-0000'));
-                                return `${basePtc}-PT${data.customCodigoSuffix || '_Rev00'}`;
+                                return `${basePtc}-PT${data.customCodigoSuffix || '_R00'}`;
                             })()}" readonly style="background-color: #f1f5f9; font-weight: 500;">
 
                             <button type="button" class="btn btn-secondary" title="Editar Código" onclick="const el = document.getElementById('pt-prop-codigo'); el.removeAttribute('readonly'); el.style.backgroundColor = 'white'; el.focus();">
@@ -2561,7 +2732,7 @@ const PropostaTecnicaModule = {
 
 
 
-                <div class="grid-form" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px;">
+                <div class="grid-form" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; margin-top: 20px;">
 
                     <div class="form-group">
 
@@ -2591,9 +2762,17 @@ const PropostaTecnicaModule = {
 
                     <div class="form-group">
 
-                        <label class="form-label">Telefone</label>
+                        <label class="form-label">Telefone Fixo</label>
 
                         <input type="text" name="telefone" id="pt_telefone" class="form-control" value="${data.telefone || ''}" placeholder="(00) 00000-0000" readonly style="background: #f1f5f9; cursor: not-allowed;">
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label class="form-label">Celular</label>
+
+                        <input type="text" name="celular" id="pt_celular" class="form-control" value="${data.celular || ''}" placeholder="(00) 00000-0000" readonly style="background: #f1f5f9; cursor: not-allowed;">
 
                     </div>
 
@@ -2909,8 +3088,70 @@ const PropostaTecnicaModule = {
             }));
         }
 
+        // Merge missing items into existing proposals
+        AUTPRO_SCOPE_ITEMS.forEach(ref => {
+            if (!data.autproScope.find(i => i.id === ref.id)) {
+                data.autproScope.push({ id: ref.id, desc: ref.desc, incluso: false });
+            }
+        });
+
         const items = data.autproScope;
+        const allCount = items.length;
         const checkedCount = items.filter(it => it.incluso).length;
+
+        const premissasItems = items.filter(it => PREMISSAS_IDS.includes(it.id));
+        const premissasChecked = premissasItems.filter(it => it.incluso).length;
+
+        const docItems = items.filter(it => DOCUMENTACAO_IDS.includes(it.id));
+        const docChecked = docItems.filter(it => it.incluso).length;
+
+        const otherItems = items.filter(it => !PREMISSAS_IDS.includes(it.id) && !DOCUMENTACAO_IDS.includes(it.id));
+
+        function renderSubItems(parentId) {
+            const subIds = DOCUMENTACAO_SUB_MASTERS[parentId] || [];
+            return subIds.map(subId => {
+                const sub = items.find(i => i.id === subId);
+                if (!sub) return '';
+                return `
+                    <label class="autpro-row" data-autpro-id="${sub.id}"
+                           style="display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 44px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; transition: all 0.15s; margin-left: 0px;">
+                        <input type="checkbox" ${sub.incluso ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; flex-shrink: 0;">
+                        <span style="font-size: 13px; color: #334155; line-height: 1.3;">${DOCUMENTACAO_LABELS[sub.id] || sub.desc}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function renderSubMaster(sectionId) {
+            const label = DOCUMENTACAO_LABELS[sectionId] || '';
+            const subIds = DOCUMENTACAO_SUB_MASTERS[sectionId] || [];
+            const subChecked = subIds.filter(id => items.find(i => i.id === id)?.incluso).length;
+            return `
+                <div style="margin-bottom: 4px;">
+                    <label class="autpro-row documentacao-sub-master" data-autpro-id="${sectionId}"
+                           style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        <input type="checkbox" ${items.find(i => i.id === sectionId)?.incluso ? 'checked' : ''}
+                               onchange="app.propostaTecnica.toggleDocumentacaoSub('${sectionId}', this.checked)"
+                               style="width: 16px; height: 16px; accent-color: #3b82f6; flex-shrink: 0;">
+                        <span style="font-size: 13px; color: #1e293b; flex: 1;">${label}</span>
+                        <span style="font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 8px; border-radius: 10px;">${subChecked}/${subIds.length}</span>
+                    </label>
+                    ${renderSubItems(sectionId)}
+                </div>
+            `;
+        }
+
+        function renderSimpleDocItem(sectionId) {
+            const item = items.find(i => i.id === sectionId);
+            if (!item) return '';
+            return `
+                <label class="autpro-row" data-autpro-id="${item.id}"
+                       style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; transition: all 0.15s;">
+                    <input type="checkbox" ${item.incluso ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; flex-shrink: 0;">
+                    <span style="font-size: 13px; color: #334155; line-height: 1.3;">${DOCUMENTACAO_LABELS[item.id] || item.desc}</span>
+                </label>
+            `;
+        }
 
         return `
             <div style="padding: 40px; max-width: 1200px; margin: 0 auto; animation: fadeIn 0.3s ease;">
@@ -2921,24 +3162,107 @@ const PropostaTecnicaModule = {
                         <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
                             Itens do escopo de fornecimento AUTPRO &mdash; marque os itens aplicáveis
                             <span style="margin-left: 12px; background: #eff6ff; color: #1e3a8a; padding: 2px 10px; border-radius: 10px; font-weight: 600;">
-                                ${checkedCount}/${items.length} selecionados
+                                ${checkedCount}/${allCount} selecionados
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 4px;">
-                    ${items.map(item => `
+                <!-- Seção 5: PREMISSAS DA PROPOSTA -->
+                <div class="premissas-container" style="margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; background: #fafafa;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                        <h5 style="margin: 0; font-size: 14px; color: #1e3a8a; font-weight: 700; flex: 1;">5. PREMISSAS DA PROPOSTA</h5>
+                        <span style="font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 10px; border-radius: 10px;">${premissasChecked}/${premissasItems.length}</span>
+                        <label style="font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #475569;">
+                            <input type="checkbox" ${premissasChecked === premissasItems.length ? 'checked' : ''}
+                                   onchange="app.propostaTecnica.togglePremissas(this.checked)" style="width: 14px; height: 14px;">
+                            Marcar/Desmarcar Todos
+                        </label>
+                    </div>
+                    ${premissasItems.map(item => `
                         <label class="autpro-row" data-autpro-id="${item.id}"
-                               style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; transition: all 0.15s;">
+                               style="display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; transition: all 0.15s; margin-bottom: 3px;">
                             <input type="checkbox" ${item.incluso ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; flex-shrink: 0;">
-                            <span style="font-size: 13px; color: #334155; line-height: 1.3;">${item.desc}</span>
+                            <span style="font-size: 13px; color: #334155; line-height: 1.3;">${PREMISSAS_LABELS[item.id] || item.desc}</span>
                         </label>
                     `).join('')}
                 </div>
 
+                <!-- Seção 7: DOCUMENTAÇÃO DE ENGENHARIA -->
+                <div class="documentacao-container" style="margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; background: #fafafa;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                        <h5 style="margin: 0; font-size: 14px; color: #1e3a8a; font-weight: 700; flex: 1;">7. DOCUMENTAÇÃO DE ENGENHARIA</h5>
+                        <span style="font-size: 11px; background: #e2e8f0; color: #475569; padding: 2px 10px; border-radius: 10px;">${docChecked}/${docItems.filter(i => i.id !== 'autpro_71').length}</span>
+                        <label style="font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #475569;">
+                            <input type="checkbox" ${docItems.filter(i => i.id !== 'autpro_71').every(i => i.incluso) ? 'checked' : ''}
+                                   onchange="app.propostaTecnica.toggleDocumentacao(this.checked)" style="width: 14px; height: 14px;">
+                            Marcar/Desmarcar Todos
+                        </label>
+                    </div>
+                    ${DOCUMENTACAO_ORDER.map(id => {
+                        if (DOCUMENTACAO_SUB_MASTERS[id]) {
+                            return renderSubMaster(id);
+                        }
+                        return renderSimpleDocItem(id);
+                    }).join('')}
+                </div>
+
+                <!-- Outros Itens -->
+                <div style="margin-bottom: 24px;">
+                    <h5 style="margin: 0 0 12px 0; font-size: 14px; color: #475569; font-weight: 700;">Outros Itens</h5>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 4px;">
+                        ${otherItems.map(item => `
+                            <label class="autpro-row" data-autpro-id="${item.id}"
+                                   style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; transition: all 0.15s;">
+                                <input type="checkbox" ${item.incluso ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #3b82f6; flex-shrink: 0;">
+                                <span style="font-size: 13px; color: #334155; line-height: 1.3;">${item.desc}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+
             </div>
         `;
+    },
+
+    togglePremissas(checked) {
+        const data = store.getState().activeTechnicalProposal;
+        if (!data || !data.autproScope) return;
+        data.autproScope.forEach(item => {
+            if (PREMISSAS_IDS.includes(item.id)) {
+                item.incluso = !!checked;
+            }
+        });
+        store.setState({ activeTechnicalProposal: data });
+        this.renderModal(data);
+    },
+
+    toggleDocumentacao(checked) {
+        const data = store.getState().activeTechnicalProposal;
+        if (!data || !data.autproScope) return;
+        data.autproScope.forEach(item => {
+            if (DOCUMENTACAO_IDS.includes(item.id)) {
+                item.incluso = !!checked;
+            }
+        });
+        store.setState({ activeTechnicalProposal: data });
+        this.renderModal(data);
+    },
+
+    toggleDocumentacaoSub(masterId, checked) {
+        const data = store.getState().activeTechnicalProposal;
+        if (!data || !data.autproScope) return;
+        const subIds = DOCUMENTACAO_SUB_MASTERS[masterId] || [];
+        data.autproScope.forEach(item => {
+            if (subIds.includes(item.id)) {
+                item.incluso = !!checked;
+            }
+        });
+        // Also toggle the master itself
+        const master = data.autproScope.find(i => i.id === masterId);
+        if (master) master.incluso = !!checked;
+        store.setState({ activeTechnicalProposal: data });
+        this.renderModal(data);
     },
 
     syncScopeFromProposal() {
@@ -11547,6 +11871,8 @@ const PropostaTecnicaModule = {
 
                 data.cliente = formData.get('cliente') || data.cliente;
 
+                data.unidade_cliente = formData.get('unidade_cliente') || data.unidade_cliente;
+
                 data.codigo = formData.get('codigo') || data.codigo;
 
                 data.data_emissao = formData.get('data_emissao') || data.data_emissao;
@@ -11556,6 +11882,8 @@ const PropostaTecnicaModule = {
                 data.email = formData.get('email') || data.email;
 
                 data.telefone = formData.get('telefone') || data.telefone;
+
+                data.celular = formData.get('celular') || data.celular;
 
                 data.projeto = formData.get('projeto') || data.projeto;
 
@@ -12150,9 +12478,73 @@ const PropostaTecnicaModule = {
             clInput.value = client.logo;
         }
 
+        // 6. Preencher Unidade do Cliente (AUTPRO) + contatos da unidade
+        const unidadeSel = document.getElementById('pt_unidade_cliente');
+        if (unidadeSel) {
+            if (client) {
+                const rawUnidades = (store.getState().unidadesCliente || []).filter(u => u.cliente_id === client.id);
+                const unidades = rawUnidades.map(u => ({
+                    ...u,
+                    contatos: typeof u.contatos === 'string' ? JSON.parse(u.contatos) : (u.contatos || [])
+                }));
+                unidadeSel.innerHTML = '<option value="">Selecione uma unidade...</option>' +
+                    unidades.map(u => `<option value="${u.codigo_unidade}">${u.codigo_unidade} - ${this._escapeHtml(u.nome_unidade || '')}</option>`).join('');
+
+                const savedUnidade = ptProposalData?.unidade_cliente || window.app.currentPtc?.unidade_cliente || window.app.currentPtcInfo?.autpro?.codigoUnidade || '';
+                if (savedUnidade && unidades.some(u => u.codigo_unidade === savedUnidade)) {
+                    unidadeSel.value = savedUnidade;
+                    if (ptProposalData) {
+                        ptProposalData.unidade_cliente = savedUnidade;
+                        store.setState({ activeTechnicalProposal: ptProposalData });
+                    }
+                    this.handleUnidadeChange(savedUnidade);
+                }
+            } else {
+                unidadeSel.innerHTML = '<option value="">Selecione um cliente primeiro...</option>';
+            }
+        }
+
     },
 
+    handleUnidadeChange(codigoUnidade) {
+        if (!codigoUnidade) return;
+        const clientName = document.getElementById('pt_cliente')?.value;
+        if (!clientName) return;
 
+        const slug = (s) => (s || '').toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
+        const client = store.getState().clientes.find(c => slug(c.razaoSocial) === slug(clientName));
+        if (!client) return;
+
+        const raw = (store.getState().unidadesCliente || []).find(u => u.cliente_id === client.id && u.codigo_unidade === codigoUnidade);
+        if (!raw) return;
+        const unidade = { ...raw, contatos: typeof raw.contatos === 'string' ? JSON.parse(raw.contatos) : (raw.contatos || []) };
+        const contacts = unidade.contatos || [];
+
+        const data = store.getState().activeTechnicalProposal;
+        if (data) {
+            data.unidade_cliente = codigoUnidade;
+            store.setState({ activeTechnicalProposal: data });
+        }
+
+        const aosCuidados = document.getElementById('pt_aos_cuidados');
+        if (aosCuidados) {
+            if (contacts.length > 0) {
+                aosCuidados.innerHTML = contacts.map((c, i) =>
+                    `<option value="${this._escapeHtml(c.nome)}" ${i === 0 ? 'selected' : ''}>${this._escapeHtml(c.nome || '')}</option>`
+                ).join('');
+            } else {
+                aosCuidados.innerHTML = '<option value="">Nenhum contato na unidade</option>';
+            }
+        }
+
+        const primeiro = contacts[0] || null;
+        const emailInput = document.getElementById('pt_email');
+        const telInput = document.getElementById('pt_telefone');
+        const celInput = document.getElementById('pt_celular');
+        if (emailInput) emailInput.value = (primeiro && primeiro.email) || '';
+        if (telInput) telInput.value = (primeiro && primeiro.telefone) || '';
+        if (celInput) celInput.value = (primeiro && primeiro.celular) || '';
+    },
 
     updateContactDropdown(clientName) {
 
@@ -12167,9 +12559,35 @@ const PropostaTecnicaModule = {
     handleContactSelection(contactName) {
 
         const clientName = document.getElementById('pt_cliente').value;
+        const isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
 
+        // Para AUTPRO, buscar contatos da unidade selecionada
+        if (isAUTPRO) {
+            const codigoUnidade = document.getElementById('pt_unidade_cliente')?.value;
+            if (codigoUnidade) {
+                const slug = (s) => (s || '').toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
+                const client = store.getState().clientes.find(c => slug(c.razaoSocial) === slug(clientName));
+                if (client) {
+                    const raw = (store.getState().unidadesCliente || []).find(u => u.cliente_id === client.id && u.codigo_unidade === codigoUnidade);
+                    if (raw) {
+                        const unidade = { ...raw, contatos: typeof raw.contatos === 'string' ? JSON.parse(raw.contatos) : (raw.contatos || []) };
+                        const contact = (unidade.contatos || []).find(c => c.nome === contactName);
+                        if (contact) {
+                            const emailInput = document.getElementById('pt_email');
+                            const telInput = document.getElementById('pt_telefone');
+                            const celInput = document.getElementById('pt_celular');
+                            if (emailInput) emailInput.value = contact.email || '';
+                            if (telInput) telInput.value = contact.telefone || '';
+                            if (celInput) celInput.value = contact.celular || '';
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Fallback: buscar contatos do cliente
         const clients = store.getState().clientes || [];
-
         const client = clients.find(c => c.razaoSocial === clientName);
 
         const contacts = [];
@@ -15679,7 +16097,7 @@ const PropostaTecnicaModule = {
         const basePtc = newMatch ? newMatch[1] : (oldMatch ? oldMatch[0].toUpperCase() : (window.app.currentPtcInfo?.ptcNumber || ''));
         const _existingPT = (store.getState().propostasTecnicas || []).find(p => p.ptc_folder === ptcFolder || p.ptcFolder === ptcFolder);
         const _stableId = _existingPT ? _existingPT.id : ('PT-' + (basePtc || Date.now().toString(36).toUpperCase()));
-        const _stableCodigo = _existingPT?.codigo || (basePtc ? `${basePtc}-PT_Rev00` : _stableId);
+        const _stableCodigo = _existingPT?.codigo || (basePtc ? `${basePtc}-PT_R00` : _stableId);
         const newData = {
             id: _stableId,
             codigo: _stableCodigo,
@@ -17493,6 +17911,27 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             const _revPTVal = data.revisions?.length > 0 ? data.revisions[data.revisions.length - 1].no : '00';
             const _revStrPT = _revPTVal && _revPTVal !== '0' ? String(_revPTVal).replace(/[^0-9]/g, '') : '00';
 
+            const formatarDescricao = (desc) => {
+                const siglas = ['MT', 'BT', 'SPDA', 'PDA', 'CFTV', 'ART', 'TAC', 'DIO', 'COVID', 'IO', 'IO´S'];
+                return desc.split(' ').map(p => {
+                    if (p.includes('/')) {
+                        return p.split('/').map(part => {
+                            if (siglas.includes(part)) return part;
+                            return part.charAt(0) + part.slice(1).toLowerCase();
+                        }).join('/');
+                    }
+                    const limpa = p.replace(/[^A-Z0-9]/g, '');
+                    if (siglas.includes(limpa)) return p;
+                    const limpa2 = p.replace(/[^A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ0-9´]/g, '');
+                    if (siglas.includes(limpa2)) return p;
+                    const firstLetter = p.search(/[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÇ]/);
+                    if (firstLetter > 0) {
+                        return p.slice(0, firstLetter) + p[firstLetter] + p.slice(firstLetter + 1).toLowerCase();
+                    }
+                    return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+                }).join(' ');
+            };
+
             const templateData = {
 
                 projeto: data.projeto || '',
@@ -17517,7 +17956,57 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 contato_email: (clientObj?.contatos?.[0]?.email) || clientObj?.email || '',
                 contato_telefone: (clientObj?.contatos?.[0]?.telefone) || clientObj?.telefone || '',
 
+                cidade_cliente: clientObj?.cidade || '',
+
+                nome_empresa: clientObj?.razaoSocial || clientObj?.nomeFantasia || data.cliente || '',
+
+                cidade_uf: [clientObj?.cidade, clientObj?.estado].filter(Boolean).join('/') || '',
+
+                unidade_nome: (() => {
+                    if (!data.unidade_cliente || !clientObj?.id) return '';
+                    const raw = (store.getState().unidadesCliente || []).find(u => u.cliente_id === clientObj.id && u.codigo_unidade === data.unidade_cliente);
+                    return raw?.nome_unidade || '';
+                })(),
+
+                unidade_codigo: (() => {
+                    if (!data.unidade_cliente || !clientObj?.id) return '';
+                    return data.unidade_cliente;
+                })(),
+
+                contato_unidade_nome: (() => {
+                    if (!data.unidade_cliente || !clientObj?.id) return '';
+                    const raw = (store.getState().unidadesCliente || []).find(u => u.cliente_id === clientObj.id && u.codigo_unidade === data.unidade_cliente);
+                    if (!raw) return '';
+                    const contatos = typeof raw.contatos === 'string' ? JSON.parse(raw.contatos) : (raw.contatos || []);
+                    return contatos[0]?.nome || '';
+                })(),
+
+                contato_unidade_email: (() => {
+                    if (!data.unidade_cliente || !clientObj?.id) return '';
+                    const raw = (store.getState().unidadesCliente || []).find(u => u.cliente_id === clientObj.id && u.codigo_unidade === data.unidade_cliente);
+                    if (!raw) return '';
+                    const contatos = typeof raw.contatos === 'string' ? JSON.parse(raw.contatos) : (raw.contatos || []);
+                    return contatos[0]?.email || '';
+                })(),
+
+                contato_unidade_telefone: (() => {
+                    if (!data.unidade_cliente || !clientObj?.id) return '';
+                    const raw = (store.getState().unidadesCliente || []).find(u => u.cliente_id === clientObj.id && u.codigo_unidade === data.unidade_cliente);
+                    if (!raw) return '';
+                    const contatos = typeof raw.contatos === 'string' ? JSON.parse(raw.contatos) : (raw.contatos || []);
+                    return contatos[0]?.telefone || '';
+                })(),
+
+                contato_unidade_celular: (() => {
+                    if (!data.unidade_cliente || !clientObj?.id) return '';
+                    const raw = (store.getState().unidadesCliente || []).find(u => u.cliente_id === clientObj.id && u.codigo_unidade === data.unidade_cliente);
+                    if (!raw) return '';
+                    const contatos = typeof raw.contatos === 'string' ? JSON.parse(raw.contatos) : (raw.contatos || []);
+                    return contatos[0]?.celular || '';
+                })(),
+
                 objeto: data.objeto || '',
+                objeto_do_fornecimento: data.objeto || '',
                 cidade: data.cidade || '',
                 uf: data.uf || '',
 
@@ -17531,12 +18020,14 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
                 telefone: data.telefone || '',
 
+                celular: data.celular || '',
+
                 data_emissao: new Date().toLocaleDateString('pt-BR'),
 
                 revisao: data.revisions?.length > 0 ? data.revisions[data.revisions.length - 1].no : '00',
 
                 codigo: data.codigo || '',
-                ptc_number: _isAUTPRO ? `PT-${_ptcNumberPT || '00000000'}-Rev${_revStrPT}` : `${_ptcNumberPT || '00000000'}-PT-Rev${_revStrPT}`,
+                ptc_number: _isAUTPRO ? `PT-${_ptcNumberPT || '00000000'}-R${_revStrPT}` : `${_ptcNumberPT || '00000000'}-PT-R${_revStrPT}`,
 
                 revisoes: (data.revisions || []).map(r => ({
 
@@ -17812,17 +18303,120 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
                 })),
 
-                // Escopo AUTPRO (condicionais individuais)
+                // ─── AUTPRO: Escopo (Seções 5, 7, 9) ───
 
                 tem_autpro_escopo: (data.autproScope || []).some(item => item.incluso),
 
                 ...Object.fromEntries((data.autproScope || []).map(item => [
-
                     item.id + '_incluso',
-
                     !!item.incluso
-
                 ])),
+
+                premissas_incluso: (data.autproScope || [])
+                    .filter(item => PREMISSAS_IDS.includes(item.id))
+                    .some(item => item.incluso),
+
+                premissas_itens: (() => {
+                    const scope = data.autproScope || [];
+                    return scope
+                        .filter(item => PREMISSAS_IDS.includes(item.id) && item.incluso)
+                        .sort((a, b) => PREMISSAS_IDS.indexOf(a.id) - PREMISSAS_IDS.indexOf(b.id))
+                        .map((item, idx) => ({
+                            numero: idx + 1,
+                            descricao: formatarDescricao(item.desc)
+                        }));
+                })(),
+
+                documentacao_incluso: (data.autproScope || [])
+                    .filter(item => DOCUMENTACAO_IDS.includes(item.id))
+                    .some(item => item.incluso),
+
+                secao71_itens: (() => {
+                    const subIds = DOCUMENTACAO_SUB_MASTERS.autpro_97 || [];
+                    return (data.autproScope || [])
+                        .filter(item => subIds.includes(item.id) && item.incluso)
+                        .map((item, idx) => ({ numero: idx + 1, descricao: formatarDescricao(item.desc) }));
+                })(),
+
+                secao72_itens: (() => {
+                    const subIds = DOCUMENTACAO_SUB_MASTERS.autpro_72 || [];
+                    return (data.autproScope || [])
+                        .filter(item => subIds.includes(item.id) && item.incluso)
+                        .map((item, idx) => ({ numero: idx + 1, descricao: formatarDescricao(item.desc) }));
+                })(),
+
+                secao73_itens: (() => {
+                    const subIds = DOCUMENTACAO_SUB_MASTERS.autpro_73 || [];
+                    return (data.autproScope || [])
+                        .filter(item => subIds.includes(item.id) && item.incluso)
+                        .map((item, idx) => ({ numero: idx + 1, descricao: formatarDescricao(item.desc) }));
+                })(),
+
+                fornecimento_incluso: (data.autproScope || [])
+                    .filter(item => FORNECIMENTO_IDS.includes(item.id))
+                    .some(item => item.incluso),
+
+                fornecimento_numero_secao: (() => {
+                    const scope = data.autproScope || [];
+                    const s5 = scope.filter(i => PREMISSAS_IDS.includes(i.id)).some(i => i.incluso);
+                    const s7 = scope.filter(i => DOCUMENTACAO_IDS.includes(i.id)).some(i => i.incluso);
+                    const s9 = scope.filter(i => FORNECIMENTO_IDS.includes(i.id)).some(i => i.incluso);
+                    let count = 0;
+                    if (s5) count++;
+                    if (s7) count++;
+                    return s9 ? count + 1 : 0;
+                })(),
+
+                fornecimento_grupos: (() => {
+                    const scope = data.autproScope || [];
+                    return FORNECIMENTO_ORDER
+                        .map(id => scope.find(i => i.id === id))
+                        .filter(grupo => grupo?.incluso)
+                        .map((grupo, gIdx) => {
+                            const subIds = FORNECIMENTO_SUB_MASTERS[grupo.id] || [];
+                            const itens = subIds
+                                .map(subId => scope.find(i => i.id === subId))
+                                .filter(sub => sub?.incluso)
+                                .map((sub, sIdx) => ({
+                                    numero: sIdx + 1,
+                                    descricao: formatarDescricao(sub.desc)
+                                }));
+                            const static_itens = [];
+                            subIds.forEach(subId => {
+                                const sub = scope.find(i => i.id === subId);
+                                if (sub?.incluso && FORNECIMENTO_STATIC_SUB_ITEMS[subId]) {
+                                    FORNECIMENTO_STATIC_SUB_ITEMS[subId].forEach(t => static_itens.push(t));
+                                }
+                            });
+                            return {
+                                numero: gIdx + 1,
+                                titulo: formatarDescricao(grupo.desc),
+                                itens,
+                                static_itens
+                            };
+                        });
+                })(),
+
+                secao91_itens: (() => {
+                    const subIds = FORNECIMENTO_SUB_MASTERS.autpro_99 || [];
+                    return (data.autproScope || [])
+                        .filter(item => subIds.includes(item.id) && item.incluso)
+                        .map((item, idx) => ({ numero: idx + 1, descricao: formatarDescricao(item.desc) }));
+                })(),
+
+                secao92_itens: (() => {
+                    const subIds = FORNECIMENTO_SUB_MASTERS.autpro_08 || [];
+                    return (data.autproScope || [])
+                        .filter(item => subIds.includes(item.id) && item.incluso)
+                        .map((item, idx) => ({ numero: idx + 1, descricao: formatarDescricao(item.desc) }));
+                })(),
+
+                secao93_itens: (() => {
+                    const subIds = FORNECIMENTO_SUB_MASTERS.autpro_17 || [];
+                    return (data.autproScope || [])
+                        .filter(item => subIds.includes(item.id) && item.incluso)
+                        .map((item, idx) => ({ numero: idx + 1, descricao: formatarDescricao(item.desc) }));
+                })(),
 
                 vendor_list: (data.vendorList || []).map((v, idx) => {
                     const opt = v.opt || '';
@@ -17894,7 +18488,40 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
             };
 
-
+            // AUTPRO: fornecimento grupo/item numbering
+            if (data.autproScope) {
+                const gruposInclusos = FORNECIMENTO_ORDER.filter(id =>
+                    data.autproScope.find(i => i.id === id)?.incluso
+                );
+                FORNECIMENTO_ORDER.forEach(id => {
+                    const num = id.replace('autpro_', '');
+                    templateData['fornecimento_grupo_' + num + '_numero'] = gruposInclusos.includes(id)
+                        ? gruposInclusos.indexOf(id) + 1 : 0;
+                });
+                FORNECIMENTO_ORDER.forEach(grupoId => {
+                    const subIds = FORNECIMENTO_SUB_MASTERS[grupoId] || [];
+                    const itensInclusos = subIds.filter(subId =>
+                        data.autproScope.find(i => i.id === subId)?.incluso
+                    );
+                    subIds.forEach(subId => {
+                        const num = subId.replace('autpro_', '');
+                        templateData['fornecimento_item_' + num + '_numero'] = itensInclusos.includes(subId)
+                            ? itensInclusos.indexOf(subId) + 1 : 0;
+                    });
+                });
+            } else {
+                FORNECIMENTO_ORDER.forEach(id => {
+                    const num = id.replace('autpro_', '');
+                    templateData['fornecimento_grupo_' + num + '_numero'] = 0;
+                });
+                FORNECIMENTO_ORDER.forEach(grupoId => {
+                    const subIds = FORNECIMENTO_SUB_MASTERS[grupoId] || [];
+                    subIds.forEach(subId => {
+                        const num = subId.replace('autpro_', '');
+                        templateData['fornecimento_item_' + num + '_numero'] = 0;
+                    });
+                });
+            }
 
             // Adicionar campos globais em maiúsculo (Strings e Arrays)
 
@@ -18048,7 +18675,7 @@ ${dataRows}
             const ptcNumber = ptcMatch ? ptcMatch[1] : (window.app.currentPtcInfo?.ptcNumber || data.codigo || '00000000');
             const rev = window.app.currentPtc?.revision;
             const revStr = rev && rev !== '0' ? rev.replace(/[^0-9]/g, '') : '00';
-            const fileName = _isAUTPRO ? `PT-${ptcNumber}-Rev${revStr}.docx` : `${ptcNumber}-PT-Rev${revStr}.docx`;
+            const fileName = _isAUTPRO ? `PT-${ptcNumber}-R${revStr}.docx` : `${ptcNumber}-PT-R${revStr}.docx`;
 
             const url = window.URL.createObjectURL(outBlob);
 

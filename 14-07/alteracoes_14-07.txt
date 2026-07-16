@@ -1,0 +1,462 @@
+================================================================================
+  GERAPRO - REGISTRO DE ALTERAÇÕES - 14/07/2026
+================================================================================
+
+SUMÁRIO
+  1. Objetivo geral
+  2. Detecção AUTPRO
+  3. Nomenclatura de pastas
+  4. Nomenclatura de documentos (PT/PC/PTC)
+  5. Contatos por unidade
+  6. Seção 5 - PREMISSAS DA PROPOSTA (Escopo AUTPRO)
+  7. Seção 7 - DOCUMENTAÇÃO DE ENGENHARIA (Escopo AUTPRO)
+  8. Constantes e IDs
+  9. Template Word (TEMPLATE_TEC.docx)
+  10. Arquivos modificados
+  11. Instruções de deploy
+
+
+================================================================================
+1. OBJETIVO GERAL
+================================================================================
+
+Implementar comportamentos específicos para empresas do tipo AUTPRO no sistema
+GeraPro. AUTPRO é detectada através do padrão de nome: folderName começando com
+"AUT_".
+
+
+================================================================================
+2. DETECÇÃO AUTPRO
+================================================================================
+
+Em todos os arquivos JS, a detecção é feita por:
+
+    company?.folderName?.startsWith('AUT_')
+
+ou por variável compartilhada _isAUTPRO definida em propostaTecnica.js,
+propostaComercial.js e propostaCompleta.js.
+
+O badge em app.js (linha 3580+) exibe "AUTPRO" com fundo azul quando ativo.
+
+
+================================================================================
+3. NOMENCLATURA DE PASTAS
+================================================================================
+
+ARQUIVO: server_new.js
+
+  3.1 Geração do nome da pasta (linha ~1874)
+      Antes: 00101001-Moenda-02
+      Depois: 001-Moenda-02
+
+      Lógica: seqPadded = String(seq).padStart(3, '0')
+      Ambos AUTPRO e não-AUTPRO usam 3 dígitos.
+
+  3.2 Regex de listagem (linha ~862)
+      Antes: /^\d{6,10}-/
+      Depois: /^\d{3,10}-/
+      Motivo: aceitar pastas com 3 dígitos no prefixo.
+
+
+================================================================================
+4. NOMENCLATURA DE DOCUMENTOS (PT/PC/PTC)
+================================================================================
+
+ARQUIVO: propostaTecnica.js, propostaComercial.js, propostaCompleta.js, app.js
+
+  4.1 PT (propostaTecnica.js)
+
+      Template ptc_number (linha ~17539):
+        AUTPRO: PT-{number}-Rev{rev}   (ex: PT-00101001-Rev00)
+        Não-AUTPRO: {number}-PT-Rev{rev}
+
+      Download filename (linha ~17492, ~18048, ~18051):
+        AUTPRO: PT-{number}-Rev{rev}.docx
+        Não-AUTPRO: {number}-PT-Rev{rev}.docx
+
+  4.2 PC (propostaComercial.js)
+
+      Template (linha ~1707, ~1702):
+        AUTPRO: PC-{number}-Rev{rev}
+        Não-AUTPRO: {number}-PC-Rev{rev}
+
+      Download filename (linha ~1933, ~1936):
+        AUTPRO: PC-{number}-Rev{rev}.docx
+
+  4.3 PTC (propostaCompleta.js)
+
+      Template (linha ~537, ~532):
+        AUTPRO: PTC-{number}-Rev{rev}
+        Não-AUTPRO: {number}-PTC-Rev{rev}
+
+      Download filename (linha ~814, ~817):
+        AUTPRO: PTC-{number}-Rev{rev}.docx
+
+  4.4 Badge (app.js ~linha 3580-3586)
+      AUTPRO: PT-00101001-Rev00
+
+  4.5 Formulários PT/PC/PTC
+      Os codigos default e os métodos _createFromPtc usam
+      window.app.currentPtcInfo?.ptcNumber como fallback para evitar
+      campos vazios.
+
+
+================================================================================
+5. CONTATOS POR UNIDADE
+================================================================================
+
+ARQUIVOS: db.js, clientes.js
+
+  5.1 Estrutura (db.js ~linha 884)
+      Migration: ALTER TABLE unidades_cliente ADD COLUMN contatos TEXT DEFAULT '[]'
+      O campo contatos armazena um JSON array de objetos:
+        [{ "nome": "...", "telefone": "...", "email": "..." }]
+
+  5.2 Comportamento (clientes.js)
+      - Para AUTPRO: a aba "Contatos" do cliente é OCULTA
+      - Cada unidade (unidades_cliente) exibe seus próprios contatos abaixo do
+        grid de equipamentos/softwares
+      - Para não-AUTPRO: funciona como antes (contatos por cliente)
+
+  5.3 Função addUnitContactRow
+      Adiciona linha de contato no DOM para a unidade.
+
+  5.4 Salvamento
+      O save da unidade serializa o array contatos como JSON string.
+
+  5.5 getUnidadesByCliente
+      Faz parse do JSON de contatos ao retornar unidades.
+      Se falhar, retorna array vazio.
+
+
+================================================================================
+6. SEÇÃO 5 - PREMISSAS DA PROPOSTA (Escopo AUTPRO)
+================================================================================
+
+ARQUIVO: propostaTecnica.js
+
+  6.1 Novos itens (linha ~429-430)
+      autpro_77: CRONOGRAMA DO PROJETO E PLANEJAMENTO DA OBRA
+      autpro_78: OMISSÕES OU INFORMAÇÕES NÃO CEDIDAS PELA CONTRATANTE
+
+  6.2 PREMISSAS_IDS (linha ~433-438)
+      Lista com 15 IDs: autpro_77, autpro_78, autpro_57..autpro_69
+
+  6.3 PREMISSAS_LABELS (linha ~440-456)
+      Mapa de labels numerados:
+        autpro_77: '5.1. CRONOGRAMA DO PROJETO E PLANEJAMENTO DA OBRA'
+        autpro_78: '5.2. OMISSÕES OU INFORMAÇÕES NÃO CEDIDAS PELA CONTRATANTE'
+        autpro_57: '5.3. APROVAÇÃO DOS PROJETOS'
+        autpro_58: '5.4. PROJETOS E OBRAS CIVIS'
+        autpro_59: '5.5. ACESSOS EXTERNOS'
+        autpro_60: '5.6. CANTEIRO DE OBRA'
+        autpro_61: '5.7. TRATATIVAS COM A CONCESSIONÁRIA'
+        autpro_62: '5.8. SISTEMA DE MÉDIA TENSÃO'
+        autpro_63: '5.9. ESTUDOS ELÉTRICOS'
+        autpro_64: '5.10. ALTA TENSÃO E LINHA DE TRANSMISSÃO E DISTRIBUIÇÃO'
+        autpro_65: '5.11. SISTEMA DE DETECÇÃO E COMBATE A INCÊNDIO'
+        autpro_66: '5.12. RECUPERAÇÃO / COMPENSAÇÃO AMBIENTAL'
+        autpro_67: '5.13. LICENCIAMENTO AMBIENTAL'
+        autpro_68: '5.14. PROPOSTA BUDGET'
+        autpro_69: '5.15. MOBILIZAÇÃO DE EQUIPES'
+
+  6.4 renderTabEscopoAUTPRO (linha ~2930+)
+      - Se autproScope vazio, inicializa com AUTPRO_SCOPE_ITEMS
+      - Filtra PREMISSAS_IDS do grid genérico (otherItems)
+      - Renderiza seção agrupada "5. PREMISSAS DA PROPOSTA":
+        - Master checkbox com onchange="togglePremissas(this.checked)"
+        - Cada sub-item com label numerado (5.1 a 5.15)
+        - Contador: X/15
+
+  6.5 togglePremissas(checked) (linha ~2996+)
+      Alterna todos checkboxes dentro de .premissas-container
+
+  6.6 templateData (propostaTecnica.js ~linha 17875-17887)
+      premissas_incluso: true se QUALQUER item em PREMISSAS_IDS estiver incluso
+      Também gera autpro_XX_incluso para cada item individual
+
+  6.7 templateData (propostaCompleta.js ~linha 636-644)
+      Mesma lógica: premissas_incluso via .some()
+
+
+================================================================================
+7. SEÇÃO 7 - DOCUMENTAÇÃO DE ENGENHARIA (Escopo AUTPRO)
+================================================================================
+
+ARQUIVO: propostaTecnica.js
+
+  7.1 Novos itens (linha ~432-457)
+      Sub-itens 7.1:
+        autpro_79: ESTUDO DE CURTO-CIRCUITO
+        autpro_80: ESTUDO DE SELETIVIDADE E COORDENAÇÃO DA PROTEÇÃO
+        autpro_81: ESTUDO DE ARC FLASH
+        autpro_82: ESTUDO DE FLUXO DE CARGA
+        autpro_83: ESTUDO DE PARTIDA DE MOTORES
+        autpro_84: ESTUDO DE QUALIDADE DE ENERGIA E HARMÔNICOS
+        autpro_85: ESTUDO DE MALHA DE ATERRAMENTO
+
+      Item 7.4:
+        autpro_86: PADRÕES
+
+      Sub-itens 7.3:
+        autpro_87: LISTAS DE - PARA
+        autpro_88: LISTAS DE IO´S
+        autpro_89: ARQUITETURA DE REDE
+        autpro_90: PLANTA DE ENCAMINHAMENTO DE INFRAESTRUTURA DE MÉDIA E BAIXA TENSÃO
+        autpro_91: PLANTA DE ENCAMINHAMENTO DE INFRAESTRUTURA DE AUTOMAÇÃO, REDES E INSTRUMENTAÇÃO
+        autpro_92: CADERNO DE DETALHES TÍPICOS
+        autpro_93: MEMORIAS DE CÁLCULOS
+        autpro_94: PROJETO DE ILUMINAÇÃO
+        autpro_95: SISTEMA DE ATERRAMENTO
+        autpro_96: PDA E SPDA
+
+      Duplicata para 7.1 (autpro_63 permanece em PREMISSAS):
+        autpro_97: ESTUDOS ELÉTRICOS
+
+  7.2 DOCUMENTACAO_IDS (linha ~485-490)
+      Lista com 24 IDs. NÃO inclui autpro_71 na contagem (ele é o header
+      master renderizado separadamente, sem checkbox no DOM).
+      Inclui: autpro_71, autpro_97, autpro_72, autpro_73, autpro_86,
+      autpro_74, autpro_75, autpro_79-85, autpro_87-96.
+
+  7.3 DOCUMENTACAO_LABELS (linha ~492-517)
+      Mapa de labels:
+        autpro_71: '7. DOCUMENTAÇÃO DE ENGENHARIA'
+        autpro_97: '7.1. ESTUDOS ELÉTRICOS'
+        autpro_79: 'Estudo de Curto-Circuito'
+        autpro_80: 'Estudo de Seletividade e Coordenação da Proteção'
+        autpro_81: 'Estudo de Arc Flash'
+        autpro_82: 'Estudo de Fluxo de Carga'
+        autpro_83: 'Estudo de Partida de Motores'
+        autpro_84: 'Estudo de Qualidade de Energia e Harmônicos'
+        autpro_85: 'Estudo de Malha de Aterramento'
+        autpro_72: '7.2. PROJETO DE PAINÉIS'
+        autpro_73: '7.3. PROJETO EXECUTIVO DE INSTALAÇÕES'
+        autpro_87: 'Listas DE - PARA'
+        autpro_88: 'Listas de IO´s'
+        autpro_89: 'Arquitetura de Rede'
+        autpro_90: 'Planta de encaminhamento de infraestrutura de média e baixa tensão'
+        autpro_91: 'Planta de encaminhamento de infraestrutura de automação, redes e instrumentação'
+        autpro_92: 'Caderno de Detalhes Típicos'
+        autpro_93: 'Memorias de Cálculos'
+        autpro_94: 'Projeto de Iluminação'
+        autpro_95: 'Sistema de aterramento'
+        autpro_96: 'PDA e SPDA'
+        autpro_86: '7.4. PADRÕES'
+        autpro_74: '7.5. DATABOOK'
+        autpro_75: '7.6. ART (ANOTAÇÃO DE RESPONSABILIDADE TÉCNICA)'
+
+  7.4 DOCUMENTACAO_ORDER (linha ~519-526)
+      Ordem de renderização (apenas itens principais, sub-itens são
+      renderizados dentro dos sub-masters):
+        autpro_97 (7.1)
+        autpro_72 (7.2)
+        autpro_73 (7.3)
+        autpro_86 (7.4)
+        autpro_74 (7.5)
+        autpro_75 (7.6)
+
+  7.5 DOCUMENTACAO_SUB_MASTERS (linha ~531-534)
+      Map de sub-masters para seus sub-itens:
+        autpro_97: ['autpro_79'..'autpro_85']
+        autpro_73: ['autpro_87'..'autpro_96']
+
+  7.6 Renderização no renderTabEscopoAUTPRO (linha ~3070-3120+)
+      Estrutura 3 níveis de indentação:
+        1. Master "7. DOCUMENTAÇÃO DE ENGENHARIA" (autpro-documentacao-master)
+           - Master checkbox alterna todos via toggleDocumentacao()
+           - Contador: X/23 (exclui autpro_71 do total)
+
+        2. Sub-masters 7.1 e 7.3 (documentacao-sub-master)
+           - Sub-master checkbox alterna sub-itens via toggleDocumentacaoSub()
+           - Tem data-autpro-id e classe autpro-row + documentacao-sub-master
+           - Contador individual: X/N sub-itens
+
+        3. Sub-itens (indentados 44px, classe autpro-row com data-autpro-id)
+
+        Itens sem sub-itens (7.2, 7.4, 7.5, 7.6):
+          - Renderizados como autpro-row normal
+
+  7.7 toggleDocumentacao(checked) (linha ~3140-3143)
+      Alterna TODOS checkboxes .autpro-row e .documentacao-sub-master
+      dentro de .documentacao-container
+
+  7.8 toggleDocumentacaoSub(masterId, checked) (linha ~3146-3157)
+      Alterna apenas sub-itens do masterId informado (autpro_97 ou autpro_73)
+      Lê sub-IDs de DOCUMENTACAO_SUB_MASTERS
+
+  7.9 Filtro otherItems (linha ~3021)
+      Antes: itens.filter(it => !PREMISSAS_IDS.includes(it.id))
+      Depois: itens.filter(it => !PREMISSAS_IDS.includes(it.id) && !DOCUMENTACAO_IDS.includes(it.id))
+
+  7.10 templateData (propostaTecnica.js ~linha 18038-18041)
+       documentacao_incluso: true se QUALQUER item em DOCUMENTACAO_IDS
+       estiver incluso (via .some())
+
+  7.11 templateData (propostaCompleta.js ~linha 651-652, 660)
+       DOCUMENTACAO_IDS inline com os mesmos 24 IDs
+       documentacao_incluso via .some()
+       No else: templateData.documentacao_incluso = false
+
+
+================================================================================
+8. CONSTANTES E IDs
+================================================================================
+
+  8.1 Lista completa de AUTPRO_SCOPE_ITEMS (após alterações)
+      autpro_01 a autpro_56  - Itens genéricos de escopo
+      autpro_57 a autpro_69  - Seção 5 (sub-itens 5.3 a 5.15)
+      autpro_70              - ESCOPO MACRO DE FORNECIMENTO (genérico)
+      autpro_71              - DOCUMENTAÇÃO DE ENGENHARIA (header seção 7)
+      autpro_72              - 7.2 PROJETO DE PAINÉIS
+      autpro_73              - 7.3 PROJETO EXECUTIVO DE INSTALAÇÕES
+      autpro_74              - 7.5 DATABOOK
+      autpro_75              - 7.6 ART
+      autpro_76              - FORNECIMENTO DE EQUIPAMENTOS (genérico)
+      autpro_77              - 5.1 CRONOGRAMA DO PROJETO...
+      autpro_78              - 5.2 OMISSÕES...
+      autpro_79 a autpro_85  - Sub-itens 7.1
+      autpro_86              - 7.4 PADRÕES
+      autpro_87 a autpro_96  - Sub-itens 7.3
+      autpro_97              - 7.1 ESTUDOS ELÉTRICOS (duplicata)
+
+  8.2 PREMISSAS_IDS (15 IDs)
+      autpro_77, autpro_78, autpro_57..autpro_69
+
+  8.3 DOCUMENTACAO_IDS (24 IDs)
+      autpro_71, autpro_97, autpro_72, autpro_73, autpro_86,
+      autpro_74, autpro_75, autpro_79..autpro_85, autpro_87..autpro_96
+
+  8.4 DOCUMENTACAO_ORDER (6 IDs)
+      autpro_97, autpro_72, autpro_73, autpro_86, autpro_74, autpro_75
+
+  8.5 DOCUMENTACAO_SUB_MASTERS
+      autpro_97 → [autpro_79..autpro_85] (7 sub-itens)
+      autpro_73 → [autpro_87..autpro_96] (10 sub-itens)
+
+
+================================================================================
+9. TEMPLATE WORD (TEMPLATE_TEC.docx)
+================================================================================
+
+  Arquivo: templates/AUT_2e10603f/TEMPLATE_TEC.docx
+
+  Necessário editar manualmente no Microsoft Word com "Mostrar/Ocultar ¶"
+  ativado. As tags docxtemplater devem ser inseridas nos parágrafos.
+
+  9.1 Seção 5 - PREMISSAS DA PROPOSTA
+
+      {#premissas_incluso}
+      5. PREMISSAS DA PROPOSTA
+
+      {#autpro_77_incluso}5.1. CRONOGRAMA DO PROJETO E PLANEJAMENTO DA OBRA{/autpro_77_incluso}
+      {#autpro_78_incluso}5.2. OMISSÕES OU INFORMAÇÕES NÃO CEDIDAS PELA CONTRATANTE{/autpro_78_incluso}
+      {#autpro_57_incluso}5.3. APROVAÇÃO DOS PROJETOS{/autpro_57_incluso}
+      {#autpro_58_incluso}5.4. PROJETOS E OBRAS CIVIS{/autpro_58_incluso}
+      {#autpro_59_incluso}5.5. ACESSOS EXTERNOS{/autpro_59_incluso}
+      {#autpro_60_incluso}5.6. CANTEIRO DE OBRA{/autpro_60_incluso}
+      {#autpro_61_incluso}5.7. TRATATIVAS COM A CONCESSIONÁRIA{/autpro_61_incluso}
+      {#autpro_62_incluso}5.8. SISTEMA DE MÉDIA TENSÃO{/autpro_62_incluso}
+      {#autpro_63_incluso}5.9. ESTUDOS ELÉTRICOS{/autpro_63_incluso}
+      {#autpro_64_incluso}5.10. ALTA TENSÃO E LINHA DE TRANSMISSÃO E DISTRIBUIÇÃO{/autpro_64_incluso}
+      {#autpro_65_incluso}5.11. SISTEMA DE DETECÇÃO E COMBATE A INCÊNDIO{/autpro_65_incluso}
+      {#autpro_66_incluso}5.12. RECUPERAÇÃO / COMPENSAÇÃO AMBIENTAL{/autpro_66_incluso}
+      {#autpro_67_incluso}5.13. LICENCIAMENTO AMBIENTAL{/autpro_67_incluso}
+      {#autpro_68_incluso}5.14. PROPOSTA BUDGET{/autpro_68_incluso}
+      {#autpro_69_incluso}5.15. MOBILIZAÇÃO DE EQUIPES{/autpro_69_incluso}
+      {/premissas_incluso}
+
+  9.2 Seção 7 - DOCUMENTAÇÃO DE ENGENHARIA
+
+      {#documentacao_incluso}
+      7. DOCUMENTAÇÃO DE ENGENHARIA
+
+      {#autpro_97_incluso}
+      7.1. ESTUDOS ELÉTRICOS
+      {#autpro_79_incluso}Estudo de Curto-Circuito{/autpro_79_incluso}
+      {#autpro_80_incluso}Estudo de Seletividade e Coordenação da Proteção{/autpro_80_incluso}
+      {#autpro_81_incluso}Estudo de Arc Flash{/autpro_81_incluso}
+      {#autpro_82_incluso}Estudo de Fluxo de Carga{/autpro_82_incluso}
+      {#autpro_83_incluso}Estudo de Partida de Motores{/autpro_83_incluso}
+      {#autpro_84_incluso}Estudo de Qualidade de Energia e Harmônicos{/autpro_84_incluso}
+      {#autpro_85_incluso}Estudo de Malha de Aterramento{/autpro_85_incluso}
+      {/autpro_97_incluso}
+
+      {#autpro_72_incluso}7.2. PROJETO DE PAINÉIS{/autpro_72_incluso}
+
+      {#autpro_73_incluso}
+      7.3. PROJETO EXECUTIVO DE INSTALAÇÕES
+      {#autpro_87_incluso}Listas DE - PARA{/autpro_87_incluso}
+      {#autpro_88_incluso}Listas de IO´s{/autpro_88_incluso}
+      {#autpro_89_incluso}Arquitetura de Rede{/autpro_89_incluso}
+      {#autpro_90_incluso}Planta de encaminhamento de infraestrutura de média e baixa tensão{/autpro_90_incluso}
+      {#autpro_91_incluso}Planta de encaminhamento de infraestrutura de automação, redes e instrumentação{/autpro_91_incluso}
+      {#autpro_92_incluso}Caderno de Detalhes Típicos{/autpro_92_incluso}
+      {#autpro_93_incluso}Memorias de Cálculos{/autpro_93_incluso}
+      {#autpro_94_incluso}Projeto de Iluminação{/autpro_94_incluso}
+      {#autpro_95_incluso}Sistema de aterramento{/autpro_95_incluso}
+      {#autpro_96_incluso}PDA e SPDA{/autpro_96_incluso}
+      {/autpro_73_incluso}
+
+      {#autpro_86_incluso}7.4. PADRÕES{/autpro_86_incluso}
+      {#autpro_74_incluso}7.5. DATABOOK{/autpro_74_incluso}
+      {#autpro_75_incluso}7.6. ART (ANOTAÇÃO DE RESPONSABILIDADE TÉCNICA){/autpro_75_incluso}
+      {/documentacao_incluso}
+
+
+================================================================================
+10. ARQUIVOS MODIFICADOS
+================================================================================
+
+  server_new.js
+    - Folder naming: seqPadded 3 dígitos + slug
+    - Regex listagem: /^\d{3,10}-/
+
+  js/app.js
+    - Badge AUTPRO format: PT-00101001-Rev00
+
+  js/db.js
+    - Migration: unidades_cliente.contatos TEXT DEFAULT '[]'
+
+  js/clientes.js
+    - Contatos por unidade (AUTPRO)
+
+  js/propostaTecnica.js
+    - PT naming AUTPRO format
+    - AUTPRO_SCOPE_ITEMS +19 itens (autpro_79 a autpro_97)
+    - PREMISSAS_IDS, PREMISSAS_LABELS
+    - DOCUMENTACAO_IDS, DOCUMENTACAO_LABELS, DOCUMENTACAO_ORDER,
+      DOCUMENTACAO_SUB_MASTERS
+    - renderTabEscopoAUTPRO: seções 5 e 7
+    - togglePremissas(), toggleDocumentacao(), toggleDocumentacaoSub()
+    - templateData: tem_autpro_escopo, premissas_incluso,
+      documentacao_incluso, autpro_XX_incluso
+
+  js/propostaComercial.js
+    - PC naming AUTPRO format
+
+  js/propostaCompleta.js
+    - PTC naming AUTPRO format
+    - templateData: premissas_incluso, documentacao_incluso,
+      autpro_XX_incluso
+
+  templates/AUT_2e10603f/TEMPLATE_TEC.docx
+    - PENDENTE: edição manual no Word com tags docxtemplater
+
+
+================================================================================
+11. INSTRUÇÕES DE DEPLOY
+================================================================================
+
+  1. git add .
+  2. git commit -m "descrição das alterações"
+  3. git push origin main
+  4. Acessar VPS via SSH
+  5. cd /caminho/do/projeto
+  6. git pull origin main
+  7. pm2 restart all (ou systemctl restart node-app)
+  8. Limpar cache do browser (Ctrl+F5) ao testar
+
+================================================================================
+  FIM DO REGISTRO - 14/07/2026
+================================================================================

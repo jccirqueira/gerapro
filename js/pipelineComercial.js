@@ -271,7 +271,7 @@ const PipelineComercialModule = {
         const tipoColors = { tecnica: '#3b82f6', comercial: '#22c55e', tecnica_comercial: '#8b5cf6' };
         const tipoBadge = `<span style="background:${tipoColors[tipo]}15;color:${tipoColors[tipo]};padding:1px 6px;border-radius:4px;font-size:9px;font-weight:700;">${tipoLabels[tipo] || tipo}</span>`;
         const base = item.origemId ? (window.app.formatProposalCode ? window.app.formatProposalCode(item.origemId) : item.origemId) : '';
-        const revStr = item.revisao !== undefined && item.revisao !== null ? `_Rev${String(item.revisao).padStart(2, '0')}` : '';
+        const revStr = item.revisao !== undefined && item.revisao !== null ? `_R${String(item.revisao).padStart(2, '0')}` : '';
         const codigo = base ? `${base}_${tipoLabels[tipo] || tipo}${revStr}` : '';
         const showIniciarPco = false;
         const podeSubirRev = item.status !== 'fechado' && item.status !== 'perdido' && item.status !== 'elaboracao' && store.getUserLevel() !== 'vendedor';
@@ -440,7 +440,7 @@ const PipelineComercialModule = {
         const tipoLabel = { tecnica: 'Proposta Técnica', comercial: 'Proposta Comercial', tecnica_comercial: 'Proposta Completa' }[tipo] || 'Proposta';
         const tipoAbr = { tecnica: 'PT', comercial: 'PC', tecnica_comercial: 'PTC' }[tipo] || '';
         const base = window.app.formatProposalCode ? window.app.formatProposalCode(item.origemId) : (item.origemId || '');
-        const revStr = item.revisao !== undefined && item.revisao !== null ? `_Rev${String(item.revisao).padStart(2, '0')}` : '';
+        const revStr = item.revisao !== undefined && item.revisao !== null ? `_R${String(item.revisao).padStart(2, '0')}` : '';
         const codigo = base ? `${base}_${tipoAbr}${revStr}` : (item.origemId || '');
         const novaRev = (item.revisao || 0) + 1;
         const jaConsolidada = item.consolidada;
@@ -1039,7 +1039,7 @@ const PipelineComercialModule = {
         const tipoLabels = { tecnica: 'PT', comercial: 'PC', tecnica_comercial: 'PTC' };
         const tipoAbr = tipoLabels[item.tipo] || '';
         const base = item.origemId ? (window.app.formatProposalCode ? window.app.formatProposalCode(item.origemId) : item.origemId) : '';
-        const revStr = item.revisao !== undefined && item.revisao !== null ? `_Rev${String(item.revisao).padStart(2, '0')}` : '';
+        const revStr = item.revisao !== undefined && item.revisao !== null ? `_R${String(item.revisao).padStart(2, '0')}` : '';
         const codigoProposta = base ? `${base}_${tipoAbr}${revStr}` : (item.origemId || '');
 
         const overlay = document.createElement('div');
@@ -1477,7 +1477,7 @@ const PipelineComercialModule = {
                 const tipo = item.tipo || 'tecnica_comercial';
                 const tipoLabel = tipoLabels[tipo] || tipo;
                 const base = item.origemId ? (window.app.formatProposalCode ? window.app.formatProposalCode(item.origemId) : item.origemId) : '';
-                const revStr = item.revisao !== undefined && item.revisao !== null ? `_Rev${String(item.revisao).padStart(2, '0')}` : '';
+                const revStr = item.revisao !== undefined && item.revisao !== null ? `_R${String(item.revisao).padStart(2, '0')}` : '';
                 const codigo = base ? `${base}_${tipoLabel}${revStr}` : '';
                 const date = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '';
                 const ultContato = item.ultimoContato ? new Date(item.ultimoContato).toLocaleDateString() : '';

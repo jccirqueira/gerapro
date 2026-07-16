@@ -1,0 +1,148 @@
+RESUMO DAS ALTERA��ES - 15/07/2026
+======================================
+
+Arquivos modificados:
+  - js/propostaTecnica.js
+  - js/propostaCompleta.js
+
+---------------------------------------------------------------
+1. FUN��O formatarDescricao (capitaliza��o)
+---------------------------------------------------------------
+Arquivos: propostaTecnica.js (linha ~464), propostaCompleta.js (linha ~633)
+
+Adicionada fun��o que converte descri��es em CAIXA ALTA para formato
+Capitalizado (primeira letra de cada palavra mai�scula), mantendo siglas
+espec�ficas em mai�sculo.
+
+Siglas preservadas em MAI�SCULO:
+  MT, BT, SPDA, PDA, CFTV, ART, TAC, DIO, COVID, IO, IO�S
+
+Regras:
+  - Palavras com / s�o divididas e cada parte � formatada separadamente
+    ex: ATERRAMENTO/SPDA -> Aterramento/SPDA
+  - Par�nteses e pontua��o inicial s�o preservados
+    ex: (MT) -> (MT), (ANOTA��O -> (Anota��o
+
+Aplicada nos seguintes mapeamentos de exporta��o Word:
+  - premissas_itens[].descricao
+  - secao71_itens[].descricao
+  - secao72_itens[].descricao
+  - secao73_itens[].descricao
+  - secao91_itens[].descricao
+  - secao92_itens[].descricao
+  - secao93_itens[].descricao
+  - fornecimento_grupos[].titulo
+  - fornecimento_grupos[].itens[].descricao
+
+---------------------------------------------------------------
+2. GRUPO 7.2 - PROJETO DE PAIN�IS (13 novos sub-itens)
+---------------------------------------------------------------
+IDs criados: autpro_100 a autpro_112
+
+autpro_100  CAPA
+autpro_101  �NDICE
+autpro_102  DADOS T�CNICOS
+autpro_103  SIMBOLOGIA
+autpro_104  LAYOUT MEC�NICO DOS PAIN�IS
+autpro_105  DIAGRAMA UNIFILAR (SE NECESS�RIO)
+autpro_106  DIAGRAMA TRIFILAR
+autpro_107  DETALHAMENTO DAS R�GUAS DE BORNES
+autpro_108  LISTA DE MATERIAL
+autpro_109  ARQUITETURA DE REDE DO PAINEL (SE NECESS�RIO)
+autpro_110  INFORMA��ES PARA FABRICA��O
+autpro_111  INFORMA��ES PARA INSTALA��O
+autpro_112  AS BUILT
+
+Onde foram adicionados:
+  a) AUTPRO_SCOPE_ITEMS (propostaTecnica.js)
+     - Array de 99 itens -> agora 112 itens
+
+  b) DOCUMENTACAO_LABELS (propostaTecnica.js)
+     - Labels para exibi��o na UI (mantidas em CAIXA ALTA)
+
+  c) DOCUMENTACAO_IDS (ambos os arquivos)
+     - Adicionados autpro_100-112 para toggleDocumentacao e filtros
+
+  d) DOCUMENTACAO_SUB_MASTERS (propostaTecnica.js)
+     autpro_72: [autpro_100..autpro_112]
+
+  e) DOCUMENTACAO_SUB_MASTERS_LOCAL (propostaCompleta.js)
+     autpro_72: [autpro_100..autpro_112]
+
+  f) Exporta��o Word (ambos os arquivos)
+     secao72_itens: array filtrado por DOCUMENTACAO_SUB_MASTERS.autpro_72
+
+  g) Else block (propostaCompleta.js)
+     templateData.secao72_itens = []
+
+  h) renderTabEscopoAUTPRO (propostaTecnica.js)
+     Adicionado merge de itens faltantes para garantir que propostas
+     existentes (salvas antes dos novos IDs) recebam autpro_100-112.
+
+Chave para template Word:
+  {#secao72_itens}
+  ✓ {numero}. {descricao}
+  {/secao72_itens}
+
+---------------------------------------------------------------
+3. REMO��O DOS N�MEROS NAS LABELS DA SE��O 5 (UI)
+---------------------------------------------------------------
+Arquivo: propostaTecnica.js - PREMISSAS_LABELS
+
+Antes:
+  autpro_77: '5.1. CRONOGRAMA DO PROJETO E PLANEJAMENTO DA OBRA'
+
+Depois:
+  autpro_77: 'CRONOGRAMA DO PROJETO E PLANEJAMENTO DA OBRA'
+
+Removidos os prefixos "5.1. ", "5.2. ", ... "5.15. " de todas as 15 labels.
+
+---------------------------------------------------------------
+4. FUNCIONAMENTO DO paragraphLoop NO WORD
+---------------------------------------------------------------
+Para loops de array funcionarem corretamente (sem linhas vazias), o
+template Word deve ter a abertura e fechamento em PAR�GRAFOS SEPARADOS:
+
+  {#secao71_itens}     <- par�grafo 1 (apenas a tag de abertura)
+  ✓ {numero}. {descricao}  <- par�grafo 2 (conte�do repetido)
+  {/secao71_itens}     <- par�grafo 3 (apenas a tag de fechamento)
+
+Usar Enter ap�s cada linha (par�grafo novo, N�O Shift+Enter).
+
+---------------------------------------------------------------
+5. DECIS�ES DO USU�RIO
+---------------------------------------------------------------
+a) Se��o 5 (PREMISSAS): Manter conditionais individuais no Word
+   ({#autpro_77_incluso}...{/autpro_77_incluso}), N�O usar array loop.
+
+b) Demais se��es (7.1, 7.2, 7.3, 9.1, 9.2, 9.3): Usar array loop
+   ({#secaoXX_itens}...{/secaoXX_itens}).
+
+c) Formato da descri��o no Word: Capitalizado (primeira letra de cada
+   palavra mai�scula).
+
+---------------------------------------------------------------
+6. CHAVES DISPON�VEIS PARA O TEMPLATE WORD
+---------------------------------------------------------------
+Se��o 5 (PREMISSAS) - Conditionais individuais:
+  {autpro_77_incluso} a {autpro_69_incluso}
+  {premissas_incluso}
+
+Se��o 7 - Arrays:
+  {#secao71_itens}{numero}. {descricao}{/secao71_itens}
+  {#secao72_itens}{numero}. {descricao}{/secao72_itens}
+  {#secao73_itens}{numero}. {descricao}{/secao73_itens}
+
+Se��o 9 - Arrays:
+  {#secao91_itens}{numero}. {descricao}{/secao91_itens}
+  {#secao92_itens}{numero}. {descricao}{/secao92_itens}
+  {#secao93_itens}{numero}. {descricao}{/secao93_itens}
+  {fornecimento_numero_secao}
+  {#fornecimento_grupos}{numero}. {titulo}{/fornecimento_grupos}
+
+Itens avulsos (se��es 7.4, 7.5, 7.6):
+  {autpro_86_incluso}, {autpro_74_incluso}, {autpro_75_incluso}
+
+Itens gen�ricos (outros):
+  {autpro_20_incluso} a {autpro_56_incluso}, {autpro_70_incluso},
+  {autpro_76_incluso}, {autpro_98_incluso}

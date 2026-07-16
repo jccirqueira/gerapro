@@ -16,6 +16,7 @@ const ClientesModule = {
             filterClients: this.filterClients.bind(this),
             addContactRow: this.addContactRow.bind(this),
             addUnidadeRow: this.addUnidadeRow.bind(this),
+            addUnitContactRow: this.addUnitContactRow.bind(this),
             removeUnidadeRow: this.removeUnidadeRow.bind(this),
             handleLogoUpload: this.handleLogoUpload.bind(this),
             removeClientLogo: this.removeClientLogo.bind(this),
@@ -158,7 +159,12 @@ const ClientesModule = {
     },
 
     getUnidadesByCliente(clienteId) {
-        return (store.getState().unidadesCliente || []).filter(u => u.cliente_id === clienteId);
+        return (store.getState().unidadesCliente || [])
+            .filter(u => u.cliente_id === clienteId)
+            .map(u => ({
+                ...u,
+                contatos: typeof u.contatos === 'string' ? JSON.parse(u.contatos) : (u.contatos || [])
+            }));
     },
 
     closeModal() {
@@ -180,6 +186,7 @@ const ClientesModule = {
     renderModal(client = null) {
         const isEdit = !!client;
         const data = client || {};
+        const isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
 
         const html = `
             <div id="form-cliente-container" class="fade-in" style="background: white; min-height: 100%; display: flex; flex-direction: column;">
@@ -201,7 +208,7 @@ const ClientesModule = {
                     <div style="padding: 0 var(--spacing-md); border-bottom: 1px solid var(--color-border); background: #f8fafc;">
                         <button id="btn-tab-geral" class="tab-btn active" onclick="app.clientes.switchTab('geral')">Dados Gerais</button>
                         <button id="btn-tab-endereco" class="tab-btn" onclick="app.clientes.switchTab('endereco')">Endereço & Fiscal</button>
-                        <button id="btn-tab-contato" class="tab-btn" onclick="app.clientes.switchTab('contato')">Contatos</button>
+                        ${!isAUTPRO ? '<button id="btn-tab-contato" class="tab-btn" onclick="app.clientes.switchTab(\'contato\')">Contatos</button>' : ''}
                         <button id="btn-tab-logo" class="tab-btn" onclick="app.clientes.switchTab('logo')">Logo</button>
                         <button id="btn-tab-unidades" class="tab-btn" onclick="app.clientes.switchTab('unidades')">Unidades</button>
                     </div>
@@ -374,6 +381,40 @@ const ClientesModule = {
                                                     <input type="text" class="form-control unidade-estado" value="${u.estado || ''}" placeholder="UF" maxlength="2">
                                                 </div>
                                             </div>
+                                            ${isAUTPRO ? `
+                                            <div class="unit-contacts-section" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                    <label class="form-label" style="font-size: 11px; margin-bottom: 0;"><i class="ph ph-users"></i> Contatos da Unidade</label>
+                                                    <button type="button" class="btn btn-sm btn-ghost" onclick="app.clientes.addUnitContactRow(this)" style="font-size: 11px; padding: 2px 8px;">+ Adicionar Contato</button>
+                                                </div>
+                                                <div class="unit-contacts-container">
+                                                    ${(u.contatos || []).map((c, ci) => `
+                                                        <div class="unit-contact-row" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 4px; margin-bottom: 6px; position: relative;">
+                                                            <button type="button" onclick="this.closest('.unit-contact-row').remove()" class="btn-icon" style="position: absolute; top: 4px; right: 4px; color: red; font-size: 11px; padding: 2px;" title="Remover Contato"><i class="ph ph-trash"></i></button>
+                                                            <div class="row" style="display: flex; gap: 8px; padding-right: 20px;">
+                                                                <div class="form-group" style="flex: 1;">
+                                                                    <input type="text" class="form-control unit-contact-name" value="${c.nome || ''}" placeholder="Nome do Contato" style="font-size: 12px; padding: 4px 8px;">
+                                                                </div>
+                                                                <div class="form-group" style="flex: 1;">
+                                                                    <input type="text" class="form-control unit-contact-role" value="${c.cargo || ''}" placeholder="Cargo" style="font-size: 12px; padding: 4px 8px;">
+                                                                </div>
+                                                            </div>
+                                                            <div class="row" style="display: flex; gap: 8px;">
+                                                                <div class="form-group" style="flex: 1;">
+                                                                    <input type="email" class="form-control unit-contact-email" value="${c.email || ''}" placeholder="E-mail" style="font-size: 12px; padding: 4px 8px;">
+                                                                </div>
+                                                                <div class="form-group" style="flex: 1;">
+                                                                    <input type="text" class="form-control unit-contact-phone" value="${c.telefone || ''}" placeholder="Telefone Fixo" style="font-size: 12px; padding: 4px 8px;">
+                                                                </div>
+                                                                <div class="form-group" style="flex: 1;">
+                                                                    <input type="text" class="form-control unit-contact-cellphone" value="${c.celular || ''}" placeholder="Celular" style="font-size: 12px; padding: 4px 8px;">
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    `).join('')}
+                                                </div>
+                                            </div>
+                                            ` : ''}
                                             <input type="hidden" class="unidade-id" value="${u.id}">
                                         </div>
                                     `).join('')}
@@ -383,6 +424,7 @@ const ClientesModule = {
                                 </div>
                             </div>
 
+                            ${!isAUTPRO ? `
                             <div id="tab-contato" class="tab-content" style="display: none;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                     <label class="form-label" style="margin-bottom: 0;">Lista de Contatos</label>
@@ -422,6 +464,7 @@ const ClientesModule = {
                                     <textarea name="observacoes" class="form-control" rows="3">${data.observacoes || ''}</textarea>
                                 </div>
                             </div>
+                            ` : ''}
                         </form>
                     </div>
                 </div>
@@ -450,36 +493,40 @@ const ClientesModule = {
             }
         });
 
-        // Parse Contacts array
-        obj.contatos = [];
-        const contactRows = document.querySelectorAll('.contact-row');
-        contactRows.forEach(row => {
-            const nomeInput = row.querySelector('.contact-name-input');
-            const cargoInput = row.querySelector('.contact-role-input');
-            const emailInput = row.querySelector('.contact-email-input');
-            const phoneInput = row.querySelector('.contact-phone-input');
+        const isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
+
+        // Parse Contacts array (client-level, only for non-AUTPRO)
+        if (!isAUTPRO) {
+            obj.contatos = [];
+            const contactRows = document.querySelectorAll('.contact-row');
+            contactRows.forEach(row => {
+                const nomeInput = row.querySelector('.contact-name-input');
+                const cargoInput = row.querySelector('.contact-role-input');
+                const emailInput = row.querySelector('.contact-email-input');
+                const phoneInput = row.querySelector('.contact-phone-input');
+                
+                if (nomeInput && (nomeInput.value.trim() || emailInput.value.trim() || phoneInput.value.trim())) {
+                    obj.contatos.push({
+                        nome: nomeInput.value.trim(),
+                        cargo: cargoInput.value.trim(),
+                        email: emailInput.value.trim(),
+                        telefone: phoneInput.value.trim()
+                    });
+                }
+            });
             
-            if (nomeInput && (nomeInput.value.trim() || emailInput.value.trim() || phoneInput.value.trim())) {
-                obj.contatos.push({
-                    nome: nomeInput.value.trim(),
-                    cargo: cargoInput.value.trim(),
-                    email: emailInput.value.trim(),
-                    telefone: phoneInput.value.trim()
-                });
+            // Fallback for list display (keep legacy support for old renderList views)
+            if (obj.contatos.length > 0) {
+                obj.contatoNome = obj.contatos[0].nome;
+                obj.contatoCargo = obj.contatos[0].cargo;
+                obj.email = obj.contatos[0].email;
+                obj.telefone = obj.contatos[0].telefone;
+            } else {
+                obj.contatoNome = '';
+                obj.contatoCargo = '';
+                obj.email = '';
+                obj.telefone = '';
             }
-        });
-        
-        // Fallback for list display (keep legacy support for old renderList views)
-        if (obj.contatos.length > 0) {
-            obj.contatoNome = obj.contatos[0].nome;
-            obj.contatoCargo = obj.contatos[0].cargo;
-            obj.email = obj.contatos[0].email;
-            obj.telefone = obj.contatos[0].telefone;
-        } else {
-            obj.contatoNome = '';
-            obj.contatoCargo = '';
-            obj.email = '';
-            obj.telefone = '';
         }
 
         if (!obj.razaoSocial) {
@@ -515,6 +562,20 @@ const ClientesModule = {
                 const nome = row.querySelector('.unidade-nome')?.value?.trim();
                 if (!codigo) continue;
 
+                // Parse unit contacts (AUTPRO)
+                const unitContacts = [];
+                const unitContactRows = row.querySelectorAll('.unit-contact-row');
+                unitContactRows.forEach(cr => {
+                    const ucNome = cr.querySelector('.unit-contact-name')?.value?.trim();
+                    const ucCargo = cr.querySelector('.unit-contact-role')?.value?.trim();
+                    const ucEmail = cr.querySelector('.unit-contact-email')?.value?.trim();
+                    const ucTelefone = cr.querySelector('.unit-contact-phone')?.value?.trim();
+                    const ucCelular = cr.querySelector('.unit-contact-cellphone')?.value?.trim();
+                    if (ucNome || ucEmail || ucTelefone || ucCelular) {
+                        unitContacts.push({ nome: ucNome, cargo: ucCargo, email: ucEmail, telefone: ucTelefone, celular: ucCelular });
+                    }
+                });
+
                 const unidadeData = {
                     empresa_id: store.getState().auth?.user?.empresa_id || 'default',
                     cliente_id: clienteId,
@@ -525,7 +586,8 @@ const ClientesModule = {
                     numero: row.querySelector('.unidade-numero')?.value || '',
                     bairro: row.querySelector('.unidade-bairro')?.value || '',
                     cidade: row.querySelector('.unidade-cidade')?.value || '',
-                    estado: row.querySelector('.unidade-estado')?.value || ''
+                    estado: row.querySelector('.unidade-estado')?.value || '',
+                    contatos: unitContacts
                 };
 
                 if (id && existingUnidades.some(u => u.id === id)) {
@@ -639,7 +701,7 @@ const ClientesModule = {
     addUnidadeRow(clienteId) {
         const container = document.getElementById('unidades-container');
         if (!container) return;
-        const idx = new Date().getTime();
+        const isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
         const html = `
             <div class="unidade-row" style="background: #fff; border: 1px solid var(--color-border); padding: 10px; border-radius: 6px; position: relative; animation: fadeIn 0.3s ease;">
                 <button type="button" onclick="this.closest('.unidade-row').remove()" class="btn-icon" style="position: absolute; top: 10px; right: 10px; color: red;" title="Remover Unidade"><i class="ph ph-trash"></i></button>
@@ -681,7 +743,48 @@ const ClientesModule = {
                         <input type="text" class="form-control unidade-estado" placeholder="UF" maxlength="2">
                     </div>
                 </div>
+                ${isAUTPRO ? `
+                <div class="unit-contacts-section" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label class="form-label" style="font-size: 11px; margin-bottom: 0;"><i class="ph ph-users"></i> Contatos da Unidade</label>
+                        <button type="button" class="btn btn-sm btn-ghost" onclick="app.clientes.addUnitContactRow(this)" style="font-size: 11px; padding: 2px 8px;">+ Adicionar Contato</button>
+                    </div>
+                    <div class="unit-contacts-container"></div>
+                </div>
+                ` : ''}
                 <input type="hidden" class="unidade-id" value="">
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    },
+
+    addUnitContactRow(btn) {
+        const section = btn.closest('.unit-contacts-section');
+        if (!section) return;
+        const container = section.querySelector('.unit-contacts-container');
+        if (!container) return;
+        const html = `
+            <div class="unit-contact-row" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 4px; margin-bottom: 6px; position: relative; animation: fadeIn 0.2s ease;">
+                <button type="button" onclick="this.closest('.unit-contact-row').remove()" class="btn-icon" style="position: absolute; top: 4px; right: 4px; color: red; font-size: 11px; padding: 2px;" title="Remover Contato"><i class="ph ph-trash"></i></button>
+                <div class="row" style="display: flex; gap: 8px; padding-right: 20px;">
+                    <div class="form-group" style="flex: 1;">
+                        <input type="text" class="form-control unit-contact-name" value="" placeholder="Nome do Contato" style="font-size: 12px; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <input type="text" class="form-control unit-contact-role" value="" placeholder="Cargo" style="font-size: 12px; padding: 4px 8px;">
+                    </div>
+                </div>
+                <div class="row" style="display: flex; gap: 8px;">
+                    <div class="form-group" style="flex: 1;">
+                        <input type="email" class="form-control unit-contact-email" value="" placeholder="E-mail" style="font-size: 12px; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <input type="text" class="form-control unit-contact-phone" value="" placeholder="Telefone Fixo" style="font-size: 12px; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <input type="text" class="form-control unit-contact-cellphone" value="" placeholder="Celular" style="font-size: 12px; padding: 4px 8px;">
+                    </div>
+                </div>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', html);

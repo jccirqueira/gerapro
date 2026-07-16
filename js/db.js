@@ -880,6 +880,8 @@ function initSchema() {
     try { db.exec("ALTER TABLE cubiculos ADD COLUMN nbi TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE cubiculos ADD COLUMN instalacao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE cubiculos ADD COLUMN releProtecao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+
+    try { db.exec("ALTER TABLE unidades_cliente ADD COLUMN contatos TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
 }
 
 // --- Generic CRUD helpers ---

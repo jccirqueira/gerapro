@@ -823,12 +823,13 @@ function handleSaveProposal(data, res, empresaId) {
 }
 
 function handleSaveFile(data, res, empresaId) {
-    const { ptcFolder, filename, content, isBase64, revisionFolder } = data;
+    const { ptcFolder, filename, content, isBase64, revisionFolder, subfolder } = data;
     if (!ptcFolder || !filename || !content) {
         sendJson(res, 400, { success: false, error: 'Missing required fields (ptcFolder, filename, content)' });
         return;
     }
-    let docsDir = path.join(getFullPtcPath(empresaId, ptcFolder), 'Documentação Minha_Empresa');
+    const targetSubfolder = subfolder || 'Documentação Minha_Empresa';
+    let docsDir = path.join(getFullPtcPath(empresaId, ptcFolder), targetSubfolder);
     if (revisionFolder && revisionFolder !== '0' && revisionFolder !== 0) {
         docsDir = path.join(docsDir, revisionFolder);
     }
@@ -1902,6 +1903,7 @@ function handleCreatePtc(data, res, empresaId) {
             autpro: isAUTPRO && data.autpro ? {
                 codigoCliente: data.autpro.codigoCliente,
                 codigoUnidade: data.autpro.codigoUnidade,
+                unidadeNome: data.autpro.unidadeNome || '',
                 sequencial: parseInt(data.autpro.consumedSequencial || data.autpro.sequencial),
                 clienteId: data.autpro.clienteId
             } : undefined

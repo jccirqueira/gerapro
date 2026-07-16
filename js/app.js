@@ -298,7 +298,7 @@ const App = {
         pipelineItems.forEach(pi => {
             const tipoAbr = { tecnica: 'PT', comercial: 'PC', tecnica_comercial: 'PTC' }[pi.tipo] || '';
             const base = pi.origemId ? (window.app.formatProposalCode?.(pi.origemId) || pi.origemId) : pi.id;
-            const revStr = pi.revisao != null ? `_Rev${String(pi.revisao).padStart(2, '0')}` : '';
+            const revStr = pi.revisao != null ? `_R${String(pi.revisao).padStart(2, '0')}` : '';
             recentActivity.push({
                 numero: `${base}${tipoAbr ? `_${tipoAbr}` : ''}${revStr}`,
                 cliente: pi.cliente || '—',
@@ -2826,6 +2826,20 @@ const App = {
                                 <input type="date" id="ptc-date-orcamento" class="form-control">
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">Documentos do Cliente (opcional)</label>
+                            <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#f8fafc;transition:all 0.2s;"
+                                 onclick="document.getElementById('ptc-files-input').click()"
+                                 onmouseover="this.style.borderColor='#3b82f6';this.style.background='#eff6ff'"
+                                 onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#f8fafc'">
+                                <i class="ph ph-upload" style="font-size:28px;color:#94a3b8;"></i>
+                                <p style="color:#475569;margin:8px 0 4px;font-weight:500;">Clique para selecionar arquivos do cliente</p>
+                                <p style="color:#94a3b8;font-size:12px;margin:0;">PDF, DOCX, XLSX, DWG, imagens...</p>
+                                <input type="file" id="ptc-files-input" multiple hidden
+                                       onchange="app.onPtcFilesSelected(event)">
+                            </div>
+                            <div id="ptc-files-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+                        </div>
                         <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
                             <button class="btn btn-cancel" onclick="document.getElementById('modal-ptc').remove()">Cancelar</button>
                             <button class="btn btn-primary" onclick="app.savePtc()">Salvar e Criar Pastas</button>
@@ -2987,6 +3001,65 @@ const App = {
         }
     },
 
+    onPtcFilesSelected(event) {
+        const files = Array.from(event.target.files);
+        if (!this._ptcFiles) this._ptcFiles = [];
+        this._ptcFiles = this._ptcFiles.concat(files);
+
+        const listEl = document.getElementById('ptc-files-list');
+        if (!listEl) return;
+        listEl.innerHTML = this._ptcFiles.map((f, i) =>
+            `<span style="display:inline-flex;align-items:center;gap:4px;background:#e2e8f0;padding:4px 10px;border-radius:20px;font-size:12px;">
+                <i class="ph ph-file"></i> ${f.name}
+                <i class="ph ph-x" style="cursor:pointer;color:#ef4444;font-size:14px;"
+                   onclick="app._ptcFiles.splice(${i},1);this.closest('span').remove()"></i>
+            </span>`
+        ).join('');
+        event.target.value = '';
+    },
+
+    async uploadClientDocs(event) {
+        const ptcFolder = document.getElementById('search-ptc-select')?.value;
+        if (!ptcFolder) return;
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+        const statusEl = document.getElementById('search-ptc-upload-status');
+        if (statusEl) statusEl.textContent = 'Enviando...';
+        const _tk = store.getState().auth?.token;
+        const _headers = { 'Content-Type': 'application/json' };
+        if (_tk) _headers['Authorization'] = 'Bearer ' + _tk;
+        let uploaded = 0;
+        for (const file of files) {
+            try {
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+                await fetch('/api/save-file', {
+                    method: 'POST',
+                    headers: _headers,
+                    body: JSON.stringify({
+                        ptcFolder,
+                        filename: file.name,
+                        content: base64,
+                        isBase64: true,
+                        subfolder: 'Documentação Cliente'
+                    })
+                });
+                uploaded++;
+            } catch (e) {
+                console.error('Erro ao enviar ' + file.name, e);
+            }
+        }
+        if (statusEl) {
+            statusEl.textContent = `${uploaded} de ${files.length} arquivo(s) enviado(s) para Documentação Cliente.`;
+            statusEl.style.color = uploaded > 0 ? '#16a34a' : '#ef4444';
+        }
+        event.target.value = '';
+    },
+
     async generatePtcNumber() {
         try {
             const token = store.getState().auth?.token;
@@ -3130,6 +3203,41 @@ const App = {
                 this._ensurePipelineItemForPtc(folderName, clientName, ptcTitle, 0, vendedor, tipoProposta);
 
                 alert(`Sucesso! Pasta criada em:\n${result.path}\n\nPTC "${folderName}" selecionada para trabalho.`);
+
+                // Upload de documentos do cliente
+                if (this._ptcFiles && this._ptcFiles.length > 0) {
+                    const _tk2388 = store.getState().auth?.token;
+                    const _headers2388 = { 'Content-Type': 'application/json' };
+                    if (_tk2388) _headers2388['Authorization'] = 'Bearer ' + _tk2388;
+                    let uploaded = 0;
+                    for (const file of this._ptcFiles) {
+                        try {
+                            const base64 = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result.split(',')[1]);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(file);
+                            });
+                            await fetch('/api/save-file', {
+                                method: 'POST',
+                                headers: _headers2388,
+                                body: JSON.stringify({
+                                    ptcFolder: folderName,
+                                    filename: file.name,
+                                    content: base64,
+                                    isBase64: true,
+                                    subfolder: 'Documentação Cliente'
+                                })
+                            });
+                            uploaded++;
+                        } catch (e) {
+                            console.error('Erro ao enviar ' + file.name, e);
+                        }
+                    }
+                    this.showToast(`${uploaded} de ${this._ptcFiles.length} arquivo(s) enviado(s) para Documentação Cliente.`, 'success');
+                    delete this._ptcFiles;
+                }
+
                 this.showToast('Estrutura de pastas criada com sucesso!', 'success');
                 if (document.getElementById('modal-ptc')) {
                     document.getElementById('modal-ptc').remove();
@@ -3240,6 +3348,22 @@ const App = {
                                     </table>
                                 </div>
                             </div>
+                            <div id="upload-cliente-container" style="margin-top: 20px; display: none;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <h4 style="font-size: 14px; font-weight: 700; color: var(--color-primary);">Documentos do Cliente</h4>
+                                </div>
+                                <div style="border:2px dashed #cbd5e1;border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:#f8fafc;transition:all 0.2s;"
+                                     onclick="document.getElementById('search-ptc-files-input').click()"
+                                     onmouseover="this.style.borderColor='#3b82f6';this.style.background='#eff6ff'"
+                                     onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#f8fafc'">
+                                    <i class="ph ph-upload" style="font-size:22px;color:#94a3b8;"></i>
+                                    <p style="color:#475569;margin:6px 0 2px;font-weight:500;">Adicionar arquivos enviados pelo cliente</p>
+                                    <p style="color:#94a3b8;font-size:11px;margin:0;">PDF, DOCX, XLSX, DWG, imagens...</p>
+                                    <input type="file" id="search-ptc-files-input" multiple hidden
+                                           onchange="app.uploadClientDocs(event)">
+                                </div>
+                                <div id="search-ptc-upload-status" style="margin-top:8px;font-size:13px;color:#64748b;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3321,6 +3445,8 @@ const App = {
     async loadPtcRevisions(ptcFolder) {
         if (!ptcFolder) {
             document.getElementById('revisions-container').style.display = 'none';
+            const uc = document.getElementById('upload-cliente-container');
+            if (uc) uc.style.display = 'none';
             return;
         }
 
@@ -3374,6 +3500,8 @@ const App = {
             }
 
             document.getElementById('revisions-container').style.display = 'block';
+            const uc = document.getElementById('upload-cliente-container');
+            if (uc) uc.style.display = 'block';
 
         } catch (err) {
             console.error('Error fetching revisions:', err);
@@ -3396,6 +3524,7 @@ const App = {
             const currentPtc = {
                 folder: ptcFolder,
                 client: data.cliente || '',
+                unidade_cliente: data.unidade_cliente || window.app.currentPtcInfo?.autpro?.codigoUnidade || window.app.currentPtc?.unidade_cliente || '',
                 title: data.projeto || '',
                 revision: revisionFolder,
                 revisionNum: revNum,
@@ -3460,7 +3589,7 @@ const App = {
                     cliente: extractedClient,
                     projeto: extractedTitle,
                     vendedor: extractedVendedor,
-                    customCodigoSuffix: `_Rev${paddedRev}`
+                    customCodigoSuffix: `_R${paddedRev}`
                 };
             } else {
                 // Ensure vendedor is set on existing proposals from ptc_info
@@ -3553,7 +3682,7 @@ const App = {
         }
         if (!base) return origemId;
         if (revision !== undefined && revision !== null && revision !== '') {
-            const revStr = `_Rev${String(revision).replace(/[^0-9]/g, '').padStart(2, '0')}`;
+            const revStr = `_R${String(revision).replace(/[^0-9]/g, '').padStart(2, '0')}`;
             return `${base}${revStr}`;
         }
         return base;
@@ -3580,7 +3709,7 @@ const App = {
                 else if (window.app.currentPtcInfo?.ptcNumber) base = window.app.currentPtcInfo.ptcNumber;
                 const revNum = window.app.currentPtc.revisionNum;
                 const revStr = (revNum !== undefined && revNum !== null)
-                    ? `_Rev${String(revNum).padStart(2, '0')}` : '';
+                    ? `_R${String(revNum).padStart(2, '0')}` : '';
                 const _badgeIsAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
                 textEl.textContent = tipo
                     ? (_badgeIsAUTPRO ? `${tipo}-${base}${revStr}` : `${base}-${tipo}${revStr}`)
