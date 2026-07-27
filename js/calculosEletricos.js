@@ -42,12 +42,17 @@ const CalculosEletricosModule = {
         const tableRows = loads.map(load => {
             totalCV += load.modelNum;
             totalCurrent += load.currentNum;
+            const _fmtBr = s => s.includes('.') && !s.includes(',') ? s.replace('.', ',') : s;
+            const rawModel = load.modelStr.trim();
+            const rawCurrent = load.currentStr.trim();
+            const displayModel = _fmtBr(rawModel) + (/CV|kW|Kvar$/i.test(rawModel) ? '' : 'CV');
+            const displayCurrent = _fmtBr(rawCurrent) + (rawCurrent.toUpperCase().endsWith('A') ? '' : 'A');
             return `
                 <tr>
                     <td>${load.tag}</td>
                     <td>${load.desc}</td>
-                    <td style="text-align: center;">${load.modelStr}</td>
-                    <td style="text-align: center;">${load.currentStr}</td>
+                    <td style="text-align: center;">${displayModel}</td>
+                    <td style="text-align: center;">${displayCurrent}</td>
                 </tr>
             `;
         }).join('');
@@ -90,7 +95,7 @@ const CalculosEletricosModule = {
                         </div>
                         <div>
                             <div class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600;">Potência Total (CV)</div>
-                            <div style="font-size: 24px; font-weight: 700; color: #701a75; margin-top: 4px;">${totalCV.toFixed(2)} CV</div>
+                            <div style="font-size: 24px; font-weight: 700; color: #701a75; margin-top: 4px;">${this._formatNumber(totalCV)} CV</div>
                         </div>
                     </div>
                     <div class="card" style="padding: 20px; background: #eff6ff; border-color: #bfdbfe; display: flex; align-items: center; gap: 16px;">
@@ -99,7 +104,7 @@ const CalculosEletricosModule = {
                         </div>
                         <div>
                             <div class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600;">Corrente Total (A)</div>
-                            <div style="font-size: 28px; font-weight: 700; color: #1e3a8a; margin-top: 4px;">${totalCurrent.toFixed(2)} A</div>
+                            <div style="font-size: 28px; font-weight: 700; color: #1e3a8a; margin-top: 4px;">${this._formatNumber(totalCurrent)} A</div>
                         </div>
                     </div>
                     <div class="card" style="padding: 20px; background: #ecfdf5; border-color: #a7f3d0; display: flex; align-items: center; gap: 16px;">
@@ -109,10 +114,10 @@ const CalculosEletricosModule = {
                         <div>
                             <div class="text-xs text-muted" style="text-transform: uppercase; font-weight: 600;">Corrente Nominal</div>
                             <div style="font-size: 22px; font-weight: 700; color: #065f46; margin-top: 4px;">${(() => {
-                                if (totalCurrent <= 0) return '0 A';
+                                if (totalCurrent <= 0) return '0,00 A';
                                 const faixas = [100,160,200,250,300,400,500,630,800,1000,1250,1600,2000,2500,3200,4000,5000,6300];
                                 const n = faixas.find(f => f >= totalCurrent);
-                                return n ? `${n} A` : 'Sob Consulta';
+                                return n ? `${this._formatNumber(n)} A` : 'Sob Consulta';
                             })()}</div>
                         </div>
                     </div>
@@ -146,8 +151,8 @@ const CalculosEletricosModule = {
                         <tfoot>
                             <tr style="font-weight: bold; background: #f1f5f9;">
                                 <td colspan="2" style="text-align: right;">TOTAL:</td>
-                                <td style="text-align: center;">${totalCV.toFixed(2)} CV</td>
-                                <td style="text-align: center;">${totalCurrent.toFixed(2)} A</td>
+                                <td style="text-align: center;">${this._formatNumber(totalCV)} CV</td>
+                                <td style="text-align: center;">${this._formatNumber(totalCurrent)} A</td>
                             </tr>
                         </tfoot>` : ''}
                     </table>
@@ -205,6 +210,57 @@ const CalculosEletricosModule = {
         return `Disjuntor Caixa Moldada ${amparagem} - ${icc}`;
     },
 
+    _formatNumber(value) {
+        return Number(value).toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    },
+
+    _parseLoadEntry(load) {
+        const tag = load.tag || '-';
+        const desc = load.desc || '-';
+        const modelStr = load.model || '0';
+        const currentStr = load.no || '0';
+        const panel = load.panelTag || 'Geral';
+
+        let cleanModelStr = String(modelStr).replace(/\s+/g, '').replace('CV', '').replace('kW', '').replace('Kvar', '');
+        let modelMatch = cleanModelStr.match(/[\d.,]+/);
+        let modelNum = 0;
+        if (modelMatch) {
+            let matchStr = modelMatch[0];
+            if (matchStr.includes(',') && matchStr.includes('.')) {
+                matchStr = matchStr.replace(/\./g, '').replace(',', '.');
+            } else if (matchStr.includes(',')) {
+                matchStr = matchStr.replace(',', '.');
+            }
+            modelNum = parseFloat(matchStr) || 0;
+        }
+
+        let cleanCurrStr = String(currentStr).replace(/\s+/g, '').replace('A', '');
+        let currentMatch = cleanCurrStr.match(/[\d.,]+/);
+        let currentNum = 0;
+        if (currentMatch) {
+            let matchStr = currentMatch[0];
+            if (matchStr.includes(',') && matchStr.includes('.')) {
+                matchStr = matchStr.replace(/\./g, '').replace(',', '.');
+            } else if (matchStr.includes(',')) {
+                matchStr = matchStr.replace(',', '.');
+            }
+            currentNum = parseFloat(matchStr) || 0;
+        }
+
+        return {
+            tag,
+            desc,
+            modelStr: String(modelStr),
+            currentStr: String(currentStr),
+            modelNum,
+            currentNum,
+            panel
+        };
+    },
+
     extractLoads() {
         const proposal = store.getState().activeTechnicalProposal;
         if (!proposal) return [];
@@ -212,52 +268,35 @@ const CalculosEletricosModule = {
         // 1. Priorizar dados do Estado (detailedLoadItems)
         const detailedLoads = proposal.detailedLoadItems || [];
         if (detailedLoads.length > 0) {
-            return detailedLoads.map(load => {
-                const tag = load.tag || '-';
-                const desc = load.desc || '-';
-                const modelStr = load.model || '0';
-                const currentStr = load.no || '0';
-                const panel = load.panelTag || 'Geral';
-
-                let cleanModelStr = String(modelStr).replace(/\s+/g, '').replace('CV', '').replace('kW', '').replace('Kvar', '');
-                let modelMatch = cleanModelStr.match(/[\d.,]+/);
-                let modelNum = 0;
-                if (modelMatch) {
-                    let matchStr = modelMatch[0];
-                    if (matchStr.includes(',') && matchStr.includes('.')) {
-                        matchStr = matchStr.replace(/\./g, '').replace(',', '.');
-                    } else if (matchStr.includes(',')) {
-                        matchStr = matchStr.replace(',', '.');
-                    }
-                    modelNum = parseFloat(matchStr) || 0;
-                }
-
-                let cleanCurrStr = String(currentStr).replace(/\s+/g, '').replace('A', '');
-                let currentMatch = cleanCurrStr.match(/[\d.,]+/);
-                let currentNum = 0;
-                if (currentMatch) {
-                    let matchStr = currentMatch[0];
-                    if (matchStr.includes(',') && matchStr.includes('.')) {
-                        matchStr = matchStr.replace(/\./g, '').replace(',', '.');
-                    } else if (matchStr.includes(',')) {
-                        matchStr = matchStr.replace(',', '.');
-                    }
-                    currentNum = parseFloat(matchStr) || 0;
-                }
-
-                return {
-                    tag,
-                    desc,
-                    modelStr: String(modelStr),
-                    currentStr: String(currentStr),
-                    modelNum,
-                    currentNum,
-                    panel
-                };
-            });
+            return detailedLoads.map(load => this._parseLoadEntry({
+                tag: load.tag,
+                desc: load.desc,
+                model: load.model,
+                no: load.no,
+                panelTag: load.panelTag
+            }));
         }
 
-        // 2. Fallback para parsing do DOM caso o estado esteja vazio (por exemplo, na criação de nova proposta antes de salvar)
+        // 2. Ler de equipments[].loads (dados persistidos)
+        if (proposal.equipments) {
+            const allLoads = [];
+            proposal.equipments.forEach(eq => {
+                (eq.loads || []).forEach(load => {
+                    allLoads.push({
+                        tag: load.tag || eq.tag || '-',
+                        desc: load.desc || '-',
+                        model: load.power || '0',
+                        no: load.current || '0',
+                        panelTag: eq.tag || 'Geral'
+                    });
+                });
+            });
+            if (allLoads.length > 0) {
+                return allLoads.map(load => this._parseLoadEntry(load));
+            }
+        }
+
+        // 3. Fallback para parsing do DOM
         const rows = document.querySelectorAll('#view-proposta-tecnica .detailed-load-row');
         const loads = [];
 
@@ -268,54 +307,20 @@ const CalculosEletricosModule = {
             const currentInput = row.querySelector('input[name^="dload_current_"]') || row.querySelector('input[name^="dload_no_"]');
             const panelInput = row.querySelector('input[name^="dload_panel_"]');
 
-            const tag = tagInput ? tagInput.value || '-' : '-';
-            const desc = descInput ? descInput.value || '-' : '-';
-            const modelStr = modelInput ? modelInput.value || '0' : '0';
-            const currentStr = currentInput ? currentInput.value || '0' : '0';
-            const panel = panelInput ? panelInput.value || 'Geral' : 'Geral';
-
-
-            let cleanModelStr = modelStr.replace(/\s+/g, '').replace('CV', '').replace('kW', '').replace('Kvar', '');
-            let modelMatch = cleanModelStr.match(/[\d.,]+/);
-            let modelNum = 0;
-            if (modelMatch) {
-                let matchStr = modelMatch[0];
-                if (matchStr.includes(',') && matchStr.includes('.')) {
-                    matchStr = matchStr.replace(/\./g, '').replace(',', '.');
-                } else if (matchStr.includes(',')) {
-                    matchStr = matchStr.replace(',', '.');
-                }
-                modelNum = parseFloat(matchStr) || 0;
-            }
-
-            let cleanCurrStr = currentStr.replace(/\s+/g, '').replace('A', '');
-            let currentMatch = cleanCurrStr.match(/[\d.,]+/);
-            let currentNum = 0;
-            if (currentMatch) {
-                let matchStr = currentMatch[0];
-                if (matchStr.includes(',') && matchStr.includes('.')) {
-                    matchStr = matchStr.replace(/\./g, '').replace(',', '.');
-                } else if (matchStr.includes(',')) {
-                    matchStr = matchStr.replace(',', '.');
-                }
-                currentNum = parseFloat(matchStr) || 0;
-            }
-
-            if ((tag !== '-' && tag !== '') || modelNum > 0 || currentNum > 0) {
-                loads.push({
-                    tag,
-                    desc,
-                    modelStr,
-                    currentStr,
-                    modelNum,
-                    currentNum,
-                    panel
-                });
-            }
-
+            loads.push({
+                tag: (tagInput ? tagInput.value : '') || '-',
+                desc: (descInput ? descInput.value : '') || '-',
+                model: (modelInput ? modelInput.value : '') || '0',
+                no: (currentInput ? currentInput.value : '') || '0',
+                panelTag: (panelInput ? panelInput.value : '') || 'Geral'
+            });
         });
 
-        return loads;
+        const parsed = loads.map(load => this._parseLoadEntry(load));
+        const valid = parsed.filter(l => (l.tag !== '-' && l.tag !== '') || l.modelNum > 0 || l.currentNum > 0);
+        if (valid.length > 0) return valid;
+
+        return [];
     }
 };
 

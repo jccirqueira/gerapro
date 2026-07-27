@@ -1218,27 +1218,11 @@ const PropostaTecnicaModule = {
 
 
 
-        // Auto-inicializar com um equipamento se estiver totalmente vazio
+        // Se estiver vazio, apenas marca índice -1 (sem auto-criar equipamento)
 
         if (data.equipments.length === 0) {
 
-            data.equipments.push({
-
-                id: Date.now(),
-
-                tag: 'TAG-01',
-
-                type: 'CCM-BT',
-
-                norms: ['nbr_iec_61439', 'nr10'],
-
-                technical: { tensao: '380V', icc: '50kA', ip: 'IP-42' },
-
-                loads: []
-
-            });
-
-            this.activeEquipmentIndex = 0;
+            this.activeEquipmentIndex = -1;
 
         }
 
@@ -3928,24 +3912,33 @@ const PropostaTecnicaModule = {
         
 
         // Migração para estrutura hierárquica se necessário
+        // Só cria TAG-MIGRADO se houver dados legados para preservar
 
         if (!proposal.equipments || proposal.equipments.length === 0) {
 
-            proposal.equipments = [{
+            if (proposal.detailedLoadItems?.length || proposal.norms?.length) {
 
-                id: Date.now(),
+                proposal.equipments = [{
 
-                tag: 'TAG-MIGRADO',
+                    id: Date.now(),
 
-                type: 'CCM-BT',
+                    tag: 'TAG-MIGRADO',
 
-                norms: proposal.norms || [],
+                    type: 'CCM-BT',
 
-                technical: { tensao: '380V' },
+                    norms: proposal.norms || [],
 
-                loads: proposal.detailedLoadItems || []
+                    technical: { tensao: '380V' },
 
-            }];
+                    loads: proposal.detailedLoadItems || []
+
+                }];
+
+            } else {
+
+                proposal.equipments = [];
+
+            }
 
         }
 

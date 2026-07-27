@@ -879,6 +879,34 @@ function handleListPtcs(res, empresaId) {
     }
 }
 
+function handleListPtcFiles(ptcFolder, subfolder, res, empresaId) {
+    if (!ptcFolder) {
+        sendJson(res, 400, { success: false, error: 'Missing ptcFolder param' });
+        return;
+    }
+    const targetDir = subfolder || 'Documentação Cliente';
+    const dir = path.join(getFullPtcPath(empresaId, ptcFolder), targetDir);
+    if (!fs.existsSync(dir)) {
+        sendJson(res, 200, { success: true, files: [] });
+        return;
+    }
+    try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        const files = entries
+            .filter(e => e.isFile())
+            .map(e => {
+                const ext = path.extname(e.name);
+                return {
+                    nome: e.name,
+                    extensao: ext.replace('.', '').toLowerCase()
+                };
+            });
+        sendJson(res, 200, { success: true, files });
+    } catch (err) {
+        sendJson(res, 500, { success: false, error: err.message });
+    }
+}
+
 function handleGetRevisions(ptcFolder, res, empresaId) {
     if (!ptcFolder) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -2658,6 +2686,13 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
             handleListPtcs(res, empresaId); return;
+        }
+        if (pathname === '/api/list-ptc-files' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            const empresaId = tokenUser.empresa_id || 'default';
+            handleListPtcFiles(parsedUrl.query.ptc, parsedUrl.query.subfolder, res, empresaId);
+            return;
         }
         if (pathname === '/api/list-templates' && req.method === 'GET') {
             const tokenUser = getTokenUser(req);

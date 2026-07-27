@@ -840,6 +840,7 @@ const App = {
             'despesas': 'Gestão de Despesas de Projeto',
             'orcamentos': 'Propostas & Orçamentos',
             'paineis': 'Cadastros de Painéis',
+            'chaparia': 'Catálogo de Típicos de Chaparia',
             'tipicos': 'Engenharia de Típicos',
             'cubiculos': 'Engenharia de Cubículos',
             'cargas': 'Lista de Cargas',
@@ -860,13 +861,14 @@ const App = {
             'composicoes': 'Composições de Mão de Obra',
             'regras-derivacao': 'Regras de Derivação',
             'crm': 'CRM — Gestão de Leads',
-            'manufatura': 'Gestão de Manufatura'
+            'manufatura': 'Gestão de Manufatura',
+            'automacao-rede': 'Arquitetura de Rede Industrial'
         };
         this.dom.pageTitle.textContent = 'GeraPro_1.0';
 
         // 4. Trigger specific module loads if necessary
         // Reset viewMode for modules that support it
-        const modulesToReset = ['clientes', 'fornecedores', 'materiais', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'paineis', 'tipicos', 'cubiculos'];
+        const modulesToReset = ['clientes', 'fornecedores', 'materiais', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'automacao-rede'];
         modulesToReset.forEach(m => {
             const moduleName = m.replace(/-([a-z])/g, (g) => g[1].toUpperCase()); // camelCase
             const module = window.app[moduleName] || window[`${moduleName}Module`];
@@ -954,6 +956,9 @@ const App = {
         }
         if (viewName === 'manufatura' && window.app.manufatura) {
             window.app.manufatura.render();
+        }
+        if (viewName === 'automacao-rede' && window.automacaoRedeUI) {
+            window.automacaoRedeUI.render();
         }
 
         // DVT visibility / theme

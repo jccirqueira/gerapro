@@ -681,6 +681,7 @@ const PropostaTecnicaModule = {
             uf: '',
             vendorList: initialVendorList,
             materialOverrides: {},
+            clientDocuments: [],
 
             revisions: [{ no: '00', desc: 'Emissão Inicial', elab: '', verif: '', aprov: '', data: new Date().toLocaleDateString() }],
             engenheiroResponsavel: '',
@@ -1099,12 +1100,18 @@ const PropostaTecnicaModule = {
                         channels
                     };
                 });
+                const fabEl = document.querySelector(`[name="io_rack_fabricante_${ri}"]`);
+                const compactEl = document.querySelector(`[name="io_rack_compact_${ri}"]`);
+                const modelEl = document.querySelector(`[name="io_rack_modelo_${ri}"]`);
                 return {
                     position: formData.get(`io_rack_pos_${ri}`) ?? rack.position ?? ri + 1,
                     backplane: formData.get(`io_rack_bp_${ri}`) ?? rack.backplane ?? '',
                     cpu: formData.get(`io_rack_cpu_${ri}`) ?? rack.cpu ?? '',
                     powerSupply: formData.get(`io_rack_ps_${ri}`) ?? rack.powerSupply ?? '',
                     comm: formData.get(`io_rack_comm_${ri}`) ?? rack.comm ?? '',
+                    fabricante: fabEl ? fabEl.value : (rack.fabricante || ''),
+                    compactMode: compactEl ? compactEl.checked : !!rack.compactMode,
+                    modelo: modelEl ? modelEl.value : (rack.modelo || ''),
                     slots
                 };
             });
@@ -1733,6 +1740,7 @@ const PropostaTecnicaModule = {
             loads: [],
             materials: [],
             painelTypeId: null,
+            autoChaparia: true,
 
             ...(isAutomation ? {
                 ioList: {
@@ -1845,6 +1853,8 @@ const PropostaTecnicaModule = {
 
         return {
 
+            fabricante: 'Allen-Bradley',
+
             tensao: '380V',
 
             comando: '24Vcc',
@@ -1956,69 +1966,147 @@ const PropostaTecnicaModule = {
     _gerarMateriaisChaparia(eq) {
         const painelType = (store.getState().painelTypes || []).find(p => p.id === eq.painelTypeId);
         const cabinets = eq.layoutConfig?.cabinetAssignments;
-        if (!painelType || !cabinets || Object.keys(cabinets).length === 0) return null;
+        if (!cabinets || Object.keys(cabinets).length === 0) return null;
 
-        const bomBase = painelType.items || [];
-        if (bomBase.length === 0) return null;
+        const fabricante = eq.technical?.fabricante || '';
+        const bomBase = painelType?.items || [];
+        const chapariaLists = store.getState().chapariaLists || [];
+        const layoutConfig = eq.layoutConfig || this._getDefaultLayoutConfig();
+        const gerados = [];
 
-        // Group cabinets by width
         const cabIds = Object.keys(cabinets);
-        const porLargura = {};
+
+        // ── Per-cabinet chaparia typical lookup ──
         cabIds.forEach(cabId => {
             const cab = cabinets[cabId];
             const w = cab.width || 800;
-            if (!porLargura[w]) porLargura[w] = [];
-            porLargura[w].push(cab);
+            const h = cab.height || 2300;
+            const d = cab.depth || 600;
+
+            // Try to find a chaparia typical matching fabricante + dimensions
+            let typical = null;
+            if (fabricante) {
+                typical = chapariaLists.find(c =>
+                    c.fabricante === fabricante &&
+                    c.largura_mm === w &&
+                    c.altura_mm === h &&
+                    (c.profundidade_mm === d || c.profundidade_mm === 0)
+                );
+                if (!typical) {
+                    typical = chapariaLists.find(c =>
+                        c.fabricante === fabricante &&
+                        c.largura_mm === w &&
+                        c.altura_mm === h
+                    );
+                }
+            }
+            if (!typical) {
+                typical = chapariaLists.find(c =>
+                    (!c.fabricante || c.fabricante === fabricante) &&
+                    c.largura_mm === w &&
+                    c.altura_mm === h &&
+                    (c.profundidade_mm === d || c.profundidade_mm === 0)
+                );
+            }
+
+            if (typical && typical.items && typical.items.length > 0) {
+                // Use chaparia typical items
+                typical.items.forEach(item => {
+                    gerados.push({
+                        _origin: 'chaparia',
+                        _cabId: cabId,
+                        materialId: item.materialId || '',
+                        descricao: item.descricao || '',
+                        fabricante: item.fabricante || typical.fabricante || '',
+                        codigoFabricante: item.codigoFabricante || '',
+                        modelo: '',
+                        custo: item.custo || 0,
+                        qtd: item.qtd || 1,
+                        _typicalId: typical.id
+                    });
+                });
+            } else if (bomBase.length > 0) {
+                // Fallback: use painelType BOM items × 1 cabinet
+                bomBase.forEach(item => {
+                    const descMatch = item.descricao ? item.descricao.match(/(\d{3,4})\s*mm/) : null;
+                    const itemWidth = descMatch ? parseInt(descMatch[1]) : null;
+                    const desc = itemWidth && itemWidth !== w
+                        ? item.descricao.replace(String(itemWidth), String(w))
+                        : item.descricao;
+                    gerados.push({
+                        _origin: 'chaparia',
+                        _cabId: cabId,
+                        materialId: item.materialId || '',
+                        descricao: desc || item.descricao,
+                        fabricante: item.fabricante || '',
+                        codigoFabricante: item.codigoFabricante || '',
+                        modelo: '',
+                        custo: item.custo || 0,
+                        qtd: item.qtd || 1
+                    });
+                });
+            }
         });
 
-        // Identify side panel items in BOM to handle separately
-        const bomSemLaterais = bomBase.filter(i => !(i.descricao || '').toLowerCase().includes('lateral'));
-        const bomLaterais = bomBase.filter(i => (i.descricao || '').toLowerCase().includes('lateral'));
-
-        const gerados = [];
-
-        // For each width group, replicate base BOM items
-        Object.entries(porLargura).forEach(([largura, cabs]) => {
-            const qtd = cabs.length;
-            bomSemLaterais.forEach(item => {
-                const descMatch = item.descricao ? item.descricao.match(/(\d{3,4})\s*mm/) : null;
-                const itemWidth = descMatch ? parseInt(descMatch[1]) : null;
-                const desc = itemWidth && itemWidth !== parseInt(largura)
-                    ? item.descricao.replace(String(itemWidth), String(largura))
-                    : item.descricao;
+        // ── Canaletas from layout ──
+        const canaletas = layoutConfig.canaletas || [];
+        if (canaletas.length > 0) {
+            const barrasPorModelo = {};
+            for (const can of canaletas) {
+                const key = can.modelo || '50x50';
+                if (!barrasPorModelo[key]) barrasPorModelo[key] = { qtd: 0, comprimento: 0 };
+                if (can.tipo === 'quadro' && can.segmentos) {
+                    for (const seg of can.segmentos) {
+                        barrasPorModelo[key].comprimento += seg.comprimento || 0;
+                    }
+                } else {
+                    barrasPorModelo[key].comprimento += can.comprimento || 0;
+                }
+            }
+            for (const [modelo, dados] of Object.entries(barrasPorModelo)) {
+                const barras = Math.ceil(dados.comprimento / 2000);
                 gerados.push({
                     _origin: 'chaparia',
-                    materialId: item.materialId || '',
-                    descricao: desc || item.descricao,
-                    fabricante: item.fabricante || '',
-                    codigoFabricante: item.codigoFabricante || '',
+                    materialId: '',
+                    descricao: `Canaleta ${modelo} — barra 2000mm`,
+                    fabricante: '',
+                    codigoFabricante: '',
                     modelo: '',
-                    custo: item.custo || 0,
-                    qtd: (item.qtd || 1) * qtd
+                    custo: 0,
+                    qtd: barras
                 });
-            });
-        });
+            }
+        }
 
-        // Add side panels: always 2 regardless of cabinet count
-        if (bomLaterais.length > 0) {
-            const lat = bomLaterais[0];
+        // ── Trilho DIN from layout lines ──
+        const linhas = layoutConfig.linhas || this._getDefaultLayoutConfig().linhas;
+        const linhasComTrilho = linhas.filter(l => l.temTrilho);
+        if (linhasComTrilho.length > 0) {
+            const larguraUtil = layoutConfig.larguraTrilhoDIN || 35;
+            const comprimentoTotal = layoutConfig.comprimentoTrilho || cabIds.length * 1600;
+            const barrasTrilho = Math.ceil(comprimentoTotal / 2000);
             gerados.push({
                 _origin: 'chaparia',
-                materialId: lat.materialId || '',
-                descricao: lat.descricao,
-                fabricante: lat.fabricante || '',
-                codigoFabricante: lat.codigoFabricante || '',
+                materialId: '',
+                descricao: `Trilho DIN ${larguraUtil}mm — barra 2000mm`,
+                fabricante: '',
+                codigoFabricante: '',
                 modelo: '',
-                custo: lat.custo || 0,
-                qtd: 2
+                custo: 0,
+                qtd: barrasTrilho
             });
-        } else {
-            // Fallback: generic side panel entry
+        }
+
+        // ── Side panels: always 2 ──
+        const hasSidePanelItem = gerados.some(i =>
+            (i.descricao || '').toLowerCase().includes('lateral')
+        );
+        if (!hasSidePanelItem) {
             gerados.push({
                 _origin: 'chaparia',
                 materialId: '',
                 descricao: 'Fechamento Lateral (par)',
-                fabricante: '',
+                fabricante: fabricante,
                 codigoFabricante: '',
                 modelo: '',
                 custo: 0,
@@ -2026,12 +2114,12 @@ const PropostaTecnicaModule = {
             });
         }
 
-        // Consolidate items with same description+custo
+        // ── Consolidate items with same description+custo+fabricante ──
         const consolidado = {};
         gerados.forEach(item => {
-            const key = item.descricao + '|' + item.custo + '|' + item.fabricante;
+            const key = (item.descricao || '') + '|' + (item.custo || 0) + '|' + (item.fabricante || '');
             if (consolidado[key]) {
-                consolidado[key].qtd += item.qtd;
+                consolidado[key].qtd += item.qtd || 0;
             } else {
                 consolidado[key] = { ...item };
             }
@@ -2047,8 +2135,8 @@ const PropostaTecnicaModule = {
         if (!eq) return;
 
         const itens = this._gerarMateriaisChaparia(eq);
-        if (!itens) {
-            app.toast('Defina um Tipo de Painel (Ficha Técnica) e crie armários no Layout primeiro.', 'warning');
+        if (!itens || itens.length === 0) {
+            app.toast('Crie armários no Layout primeiro.', 'warning');
             return;
         }
 
@@ -2808,6 +2896,20 @@ const PropostaTecnicaModule = {
 
                         <input type="text" name="objeto" class="form-control${isAi('objeto') ? ' ai-filled' : ''}" value="${data.objeto || 'FORNECIMENTO DE PAIN�?�?�IS EL�?�?�TRICOS'}" onfocus="this.classList.remove('ai-filled');this.closest('.form-group')?.querySelector('.ai-label')?.remove();window.propostaTecnicaModule.clearAiField(this.name)">
 
+                    </div>
+
+                    <div id="client-docs-section" class="form-group" style="margin-top:12px;${!data.clientDocuments?.length ? 'display:none' : ''}">
+                        <label style="font-weight:600;font-size:13px;color:#1e293b;display:block;margin-bottom:6px;">
+                            <i class="ph ph-files"></i> Documentos Recebidos do Cliente
+                        </label>
+                        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                            ${(data.clientDocuments || []).map(d =>
+                                `<span style="display:inline-flex;align-items:center;gap:4px;background:#f1f5f9;border:1px solid #e2e8f0;padding:4px 10px;border-radius:6px;font-size:12px;color:#334155;">
+                                    <i class="ph ph-file"></i>
+                                    ${d.nome}
+                                </span>`
+                            ).join('')}
+                        </div>
                     </div>
 
                     <div class="row" style="display: flex; gap: 12px;">
@@ -3816,6 +3918,8 @@ const PropostaTecnicaModule = {
 
                         ` : (eq.type === 'PLC' || eq.type === 'REM') ? `
 
+                            ${this.renderDSGroup('Fabricante', 'fabricante', eq.technical?.fabricante, ['Allen-Bradley', 'Siemens', 'ABB', 'Schneider Electric', 'WEG', 'Phoenix Contact', 'Mitsubishi', 'Omron', 'Outro'])}
+
                             ${this.renderDSGroup('Tensão de Comando', 'comando', eq.technical?.comando, ['220Vca', '110Vca', '125Vcc', '24Vcc'])}
 
                             ${this.renderDSGroup('Fonte de Comando', 'comando_fonte', eq.technical?.comando_fonte, ['Interna', 'Externa'])}
@@ -3884,9 +3988,13 @@ const PropostaTecnicaModule = {
 
                             ${this.renderDSGroup('Coordenação Proteção', 'coordenacao', eq.technical?.coordenacao, ['Tipo 1', 'Tipo 2'])}
 
+                            ${this.renderDSGroup('Forma de Segregação', 'segregacao', eq.technical?.segregacao, ['Forma 1', 'Forma 2a', 'Forma 2b', 'Forma 3a', 'Forma 3b', 'Forma 4a', 'Forma 4b'])}
+
                             ${this.renderDSGroup('Tipo de Execução', 'execucao', eq.technical?.execucao, ['Fixa', 'Extraível', 'Plug-in'])}
 
-                            ${this.renderDSGroup('Fabricante', 'fabricante', eq.technical?.fabricante, ['Genérico', 'KitFrame'])}
+                            ${this.renderDSGroup('Fabricante', 'fabricante', eq.technical?.fabricante, ['Genérico', 'KitFrame', 'Eletropoll'])}
+
+                            ${this._isForma34(eq.technical?.segregacao || '') && eq.technical?.fabricante === 'Eletropoll' ? this.renderDSGroup('Tipo de Gaveta', 'tipoGaveta', eq.technical?.tipoGaveta || 'Fixo', ['Fixo', 'Extraível']) : ''}
 
                             ${this.renderDSGroup('Tipo de Montagem', 'montagem', eq.technical?.montagem, ['Em Linha', 'Back to Back'])}
 
@@ -3902,13 +4010,11 @@ const PropostaTecnicaModule = {
 
                             ${this._renderPainelTypeSelector(eq)}
 
-                            ${this.renderDSGroup('Altura do Painel (mm)', 'alturaPainel', eq.technical?.alturaPainel, ['1500', '1700', '1900', '2200'])}
+                            ${this._isForma34(eq.technical?.segregacao || '') && eq.technical?.fabricante === 'Eletropoll' ? '' : this.renderDSGroup('Altura do Painel (mm)', 'alturaPainel', eq.technical?.alturaPainel, ['1500', '1700', '1900', '2200'])}
 
-                            ${this.renderDSGroup('Largura do Painel (mm)', 'larguraPainel', eq.technical?.larguraPainel, ['400', '600', '800', '1000', '1200'])}
+                            ${this._isForma34(eq.technical?.segregacao || '') && eq.technical?.fabricante === 'Eletropoll' ? '' : this.renderDSGroup('Largura do Painel (mm)', 'larguraPainel', eq.technical?.larguraPainel, ['400', '600', '800', '1000', '1200'])}
 
                             ${this.renderDSGroup('Profundidade do Painel (mm)', 'profundidadePainel', eq.technical?.profundidadePainel, ['400', '600', '800', '1000', '1200'])}
-
-                            ${this.renderDSGroup('Forma de Segregação', 'segregacao', eq.technical?.segregacao, ['Forma 1', 'Forma 2a', 'Forma 2b', 'Forma 3a', 'Forma 3b', 'Forma 4a', 'Forma 4b'])}
 
                             ${this.renderDSGroup('Entrada de Cabos', 'entrada_cabos', eq.technical?.entrada_cabos, ['Inferior', 'Superior', 'Lateral'])}
 
@@ -4283,8 +4389,15 @@ const PropostaTecnicaModule = {
             contentHtml = `
                 <div style="animation: fadeIn 0.3s ease;">
                     <div style="max-width: 800px; margin-bottom: 20px;">
-                        <h4 style="margin: 0; color: #1e3a8a; font-size: 16px; font-weight: 800;">Lista de I/O: ${eq.tag}</h4>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Configure os racks, módulos e canais de entrada/saída.</div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <h4 style="margin: 0; color: #1e3a8a; font-size: 16px; font-weight: 800;">Lista de I/O: ${eq.tag}</h4>
+                                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Configure os racks, módulos e canais de entrada/saída.</div>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="app.navigateTo('automacao-rede')" title="Gerar arquitetura de rede industrial com base nas I/Os configuradas">
+                                <i class="ph ph-network"></i> Gerar Arquitetura de Rede
+                            </button>
+                        </div>
                     </div>
                     ${this.renderIOList(eq)}
                 </div>
@@ -4369,12 +4482,12 @@ const PropostaTecnicaModule = {
         }
 
         const fabricante = eq.technical?.fabricante || 'Genérico';
-        if (this._isForma34(seg) && fabricante !== 'KitFrame') {
+        if (this._isForma34(seg) && !this._isForma34EstruturaModular(seg, fabricante)) {
             return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
                 <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
                 <br>
                 <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível para este fabricante</div>
-                <div style="font-size:13px;margin-top:6px;">Para Formas <strong>3a, 3b, 4a, 4b</strong>, selecione <strong>KitFrame</strong> como Fabricante na Ficha Técnica.</div>
+                <div style="font-size:13px;margin-top:6px;">Para Formas <strong>3a, 3b, 4a, 4b</strong>, selecione <strong>KitFrame</strong> ou <strong>Eletropoll</strong> como Fabricante na Ficha Técnica.</div>
             </div>`;
         }
 
@@ -4482,7 +4595,8 @@ const PropostaTecnicaModule = {
             const dataUrlT = canvasT.toDataURL('image/png');
 
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
-        const hasExternalViewB2B = isForma2 || seg === 'Forma 1';
+        const isEletropollFixo = seg && this._isForma34(seg) && eq.technical?.fabricante === 'Eletropoll' && eq.technical?.tipoGaveta === 'Fixo';
+        const hasExternalViewB2B = isForma2 || seg === 'Forma 1' || isEletropollFixo;
             let dataUrlExtF = '', dataUrlExtR = '';
             if (hasExternalViewB2B) {
                 const offFE = document.createElement('canvas');
@@ -4508,7 +4622,7 @@ const PropostaTecnicaModule = {
                 </div>
             ` : '';
 
-            const isForma2b2b = seg === 'Forma 2a' || seg === 'Forma 2b' || this._isForma34KitFrame(seg, eq.technical?.fabricante);
+            const isForma2b2b = seg === 'Forma 2a' || seg === 'Forma 2b' || this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
         const baseCabs = Object.entries(eq.layoutConfig?.cabinetAssignments || {}).map(([id, d]) => ({ id, name: d.name, width: d.width || 600, height: d.height, depth: d.depth || 600 }));
 
             return `
@@ -4523,7 +4637,7 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._showLayoutConfigPanel()" style="gap:4px;">
                                 <i class="ph ph-gear"></i> Configurar
                             </button>
-                            ${this._isForma34KitFrame(seg, eq.technical?.fabricante) ? `
+                            ${this._isForma34EstruturaModular(seg, eq.technical?.fabricante) ? `
                             <button type="button" class="btn btn-sm btn-primary" onclick="window.propostaTecnicaModule._onCriarArranjoOtimizado()" style="gap:4px;background:#059669;border-color:#059669;">
                                 <i class="ph ph-stars"></i> Criar Arranjo Otimizado
                             </button>` : ''}
@@ -4539,6 +4653,9 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
+                                <input type="checkbox" id="chk_auto_chaparia_b2b" onchange="window.propostaTecnicaModule._onChangeAutoChaparia(this.checked)" ${eq.autoChaparia !== false ? 'checked' : ''}> Auto Chaparia
+                            </label>
                             <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_side_view_b2b" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
@@ -4648,7 +4765,8 @@ const PropostaTecnicaModule = {
         const dataUrl = offscreen.toDataURL('image/png');
 
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
-        const hasExternalView = isForma2 || seg === 'Forma 1';
+        const isEletropollFixo = seg && this._isForma34(seg) && eq.technical?.fabricante === 'Eletropoll' && eq.technical?.tipoGaveta === 'Fixo';
+        const hasExternalView = isForma2 || seg === 'Forma 1' || isEletropollFixo;
         let dataUrlExt = '';
         if (hasExternalView) {
             const offscreenExt = document.createElement('canvas');
@@ -4691,7 +4809,7 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._showLayoutConfigPanel()" style="gap:4px;">
                                 <i class="ph ph-gear"></i> Configurar
                             </button>
-                            ${this._isForma34KitFrame(seg, eq.technical?.fabricante) ? `
+                            ${this._isForma34EstruturaModular(seg, eq.technical?.fabricante) ? `
                             <button type="button" class="btn btn-sm btn-primary" onclick="window.propostaTecnicaModule._onCriarArranjoOtimizado()" style="gap:4px;background:#059669;border-color:#059669;">
                                 <i class="ph ph-stars"></i> Criar Arranjo Otimizado
                             </button>` : ''}
@@ -4707,6 +4825,9 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
+                                <input type="checkbox" id="chk_auto_chaparia" onchange="window.propostaTecnicaModule._onChangeAutoChaparia(this.checked)" ${eq.autoChaparia !== false ? 'checked' : ''}> Auto Chaparia
+                            </label>
                             <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
@@ -4736,7 +4857,7 @@ const PropostaTecnicaModule = {
                             const cabId = c._cabId || '';
                             const currentWidth = c._userWidth || c.width;
                             const cabH = c.segregacao ? null : (c.height || 2300);
-                            const isForma2Cab = c.segregacao === 'Forma 2a' || c.segregacao === 'Forma 2b' || this._isForma34KitFrame(c.segregacao, c._fabricante);
+                            const isForma2Cab = c.segregacao === 'Forma 2a' || c.segregacao === 'Forma 2b' || this._isForma34EstruturaModular(c.segregacao, c._fabricante);
                             const gavetas = c._gavetas || [];
                             const gavInfo = gavetas.length > 0
                                 ? gavetas.length + ' gav. (' + gavetas.reduce((s, g) => s + g.height, 0) + '/1800mm)'
@@ -4870,9 +4991,12 @@ const PropostaTecnicaModule = {
                         </div>`;
                     }).join('');
 
-                const isKF = this._isForma34KitFrame(eq.technical?.segregacao || '', eq.technical?.fabricante);
+                const isKF = this._isForma34EstruturaModular(eq.technical?.segregacao || '', eq.technical?.fabricante);
+                const isEletropoll = eq.technical?.fabricante === 'Eletropoll';
                 const gavList = (cab.loads ? Object.keys(cab.loads) : []);
-                const ccwCab = cab.layoutConfig?.colunaCabosWidth || 200;
+                const ccwCab = cab.layoutConfig?.colunaCabosWidth || (isEletropoll ? 400 : 200);
+                const temExaustor = cab.layoutConfig?.exaustor !== false;
+                const gavetaWidthCab = isEletropoll ? (cab.width - 400) : 600;
                 return `<div class="cab-config-block" data-cab-id="${blockCabId}" style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;overflow:hidden;">
                     <div class="cab-config-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f8fafc;cursor:pointer;user-select:none;"
                         onclick="const b=this.nextElementSibling;if(b){const d=b.style.display;b.style.display=d==='none'?'':'none';this.querySelector('.cab-arrow').textContent=b.style.display==='none'?'▶':'▼'}">
@@ -4884,11 +5008,13 @@ const PropostaTecnicaModule = {
                             <span style="color:#64748b;font-size:11px;">${label ? label + ' — ' : ''}${qtdMats} materiais${gavList.length > 0 ? ' — ' + gavList.length + ' gavetas' : ''}</span>
                         </div>
                         <div style="display:flex;align-items:center;gap:6px;">
-                            ${isKF ? `<select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;font-weight:600;" onchange="window.propostaTecnicaModule._onChangeCcwArmario('${blockCabId}',this.value)" onclick="event.stopPropagation();">
+                            ${isKF ? (isEletropoll ? `
+                            <span style="font-size:11px;color:#64748b;font-weight:600;">${gavetaWidthCab}mm + 400mm</span>` : `
+                            <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;font-weight:600;" onchange="window.propostaTecnicaModule._onChangeCcwArmario('${blockCabId}',this.value)" onclick="event.stopPropagation();">
                                 <option value="200" ${ccwCab === 200 ? 'selected' : ''}>200mm</option>
                                 <option value="300" ${ccwCab === 300 ? 'selected' : ''}>300mm</option>
                                 <option value="400" ${ccwCab === 400 ? 'selected' : ''}>400mm</option>
-                            </select>` : `
+                            </select>`) : `
                             <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
                                 onchange="window.propostaTecnicaModule._setLarguraArmario('${blockCabId}',this.value)" onclick="event.stopPropagation();">
                                 <option value="400" ${largura == 400 ? 'selected' : ''}>400mm</option>
@@ -4906,7 +5032,23 @@ const PropostaTecnicaModule = {
                             <div style="margin-top:4px;max-height:200px;overflow-y:auto;">
                                 ${gavList.map(tag => `<div style="padding:2px 4px;font-size:11px;border-bottom:1px solid #f1f5f9;">${tag}</div>`).join('')}
                             </div>
-                            <div style="margin-top:8px;font-size:11px;color:#94a3b8;">KitFrame — 600mm (gavetas) + ${ccwCab}mm (coluna cabos) = ${largura}mm × 2300mm</div>
+                            <div style="margin-top:8px;font-size:11px;color:#94a3b8;">${isEletropoll ? 'Eletropoll' : 'KitFrame'} — ${gavetaWidthCab}mm (gavetas) + ${isEletropoll ? 400 : ccwCab}mm (coluna cabos) = ${largura}mm × 2300mm</div>
+                            ${isEletropoll ? `
+                            <div style="margin-top:8px;display:flex;gap:12px;align-items:center;">
+                                <label style="font-size:11px;color:#64748b;font-weight:600;">
+                                    <input type="checkbox" ${temExaustor ? 'checked' : ''} onchange="window.propostaTecnicaModule._onChangeExaustorArmario('${blockCabId}',this.checked)" onclick="event.stopPropagation();">
+                                    Exaustor
+                                </label>
+                                <label style="font-size:11px;color:#64748b;font-weight:600;">Profundidade:</label>
+                                <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
+                                    onchange="window.propostaTecnicaModule._onChangeProfundidadeArmario('${blockCabId}',this.value)" onclick="event.stopPropagation();">
+                                    <option value="600" ${(cab.depth || 600) == 600 ? 'selected' : ''}>600mm</option>
+                                    <option value="800" ${(cab.depth || 600) == 800 ? 'selected' : ''}>800mm</option>
+                                    ${eq.technical?.montagem === 'Back to Back' ? `
+                                    <option value="1000" ${(cab.depth || 600) == 1000 ? 'selected' : ''}>1000mm</option>
+                                    <option value="1200" ${(cab.depth || 600) == 1200 ? 'selected' : ''}>1200mm</option>` : ''}
+                                </select>
+                            </div>` : ''}
                             <div style="margin-top:8px;">
                                 <label style="font-size:11px;color:#64748b;font-weight:600;">Modo:</label>
                                 <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
@@ -5014,7 +5156,7 @@ const PropostaTecnicaModule = {
                         <div style="margin-top:6px;font-size:11px;color:#64748b;max-height:150px;overflow-y:auto;">
                             ${unallocated.map(l => `
                             <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f1f5f9;">
-                                <span>• ${l.tag} - ${l.desc || l.tag} (${this._getDrawerHeight(l)}mm)</span>
+                                <span>• ${l.tag} - ${l.desc || l.tag} (${this._getDrawerHeight(l, eq.technical?.fabricante, eq.technical?.tipoGaveta || 'Fixo')}mm)</span>
                                 <button class="btn btn-xs btn-ghost" style="color:#059669;font-size:10px;margin-left:auto;" onclick="window.propostaTecnicaModule._adicionarArmario()">+ Novo Armário</button>
                             </div>`).join('')}
                         </div>
@@ -5683,8 +5825,99 @@ const PropostaTecnicaModule = {
         return this._isForma34(seg) && (fabricante === 'KitFrame');
     },
 
+    _isForma34EstruturaModular(seg, fabricante) {
+        return this._isForma34(seg) && (fabricante === 'KitFrame' || fabricante === 'Eletropoll');
+    },
+
+    _getEletropollDrawerConfig() {
+        return {
+            fixo: {
+                'Partida Direta': [
+                    { maxCV: 3,    largura: 600, altura: 100 },
+                    { maxCV: 50,   largura: 600, altura: 150 },
+                    { maxCV: 150,  largura: 600, altura: 200 },
+                    { maxCV: 175,  largura: 600, altura: 800 },
+                    { maxCV: 270,  largura: 800, altura: 1000 },
+                    { maxCV: 500,  largura: 800, altura: 1200 },
+                    { maxCV: Infinity, largura: 800, altura: 1200, consultar: true }
+                ],
+                'Soft-Starter': [
+                    { maxCV: 15,   largura: 600, altura: 300 },
+                    { maxCV: 50,   largura: 600, altura: 400 },
+                    { maxCV: 150,  largura: 600, altura: 600 },
+                    { maxCV: 175,  largura: 600, altura: 800 },
+                    { maxCV: 270,  largura: 800, altura: 1000 },
+                    { maxCV: 500,  largura: 800, altura: 1200 },
+                    { maxCV: Infinity, largura: 800, altura: 1200, consultar: true }
+                ],
+                'Inversor de Frequência': [
+                    { maxCV: 15,   largura: 600, altura: 300 },
+                    { maxCV: 50,   largura: 600, altura: 400 },
+                    { maxCV: 175,  largura: 600, altura: 600 },
+                    { maxCV: 200,  largura: 600, altura: 1000 },
+                    { maxCV: 250,  largura: 800, altura: 1600 },
+                    { maxCV: 500,  largura: 800, altura: 1800 },
+                    { maxCV: Infinity, largura: 800, altura: 1800, consultar: true }
+                ]
+            },
+            extraivel: {
+                'Partida Direta': [
+                    { maxCV: 50,   largura: 600, altura: 150 },
+                    { maxCV: 150,  largura: 600, altura: 200 },
+                    { maxCV: 175,  largura: 600, altura: 300, consultar: true },
+                    { maxCV: Infinity, largura: 600, altura: 300, consultar: true }
+                ],
+                'Soft-Starter': [
+                    { maxCV: 50,   largura: 600, altura: 300 },
+                    { maxCV: 150,  largura: 600, altura: 400 },
+                    { maxCV: 175,  largura: 600, altura: 800, consultar: true },
+                    { maxCV: Infinity, largura: 600, altura: 800, consultar: true }
+                ],
+                'Inversor de Frequência': [
+                    { maxCV: 15,   largura: 600, altura: 300 },
+                    { maxCV: 175,  largura: 600, altura: 400 },
+                    { maxCV: Infinity, largura: 600, altura: 400, consultar: true }
+                ]
+            }
+        };
+    },
+
+    _getTipoPartidaParaCarga(carga) {
+        const desc = (carga?.tipico || carga?.desc || '').toLowerCase();
+        if (desc.includes('inversor') || desc.includes('frequencia') || desc.includes('freq')) {
+            return 'Inversor de Frequência';
+        }
+        if (desc.includes('soft') || desc.includes('starter')) {
+            return 'Soft-Starter';
+        }
+        return 'Partida Direta';
+    },
+
+    _getEletropollDrawerHeight(carga, tipoMontagem) {
+        if (!carga) return null;
+        const cv = parseFloat(carga.cv) || (parseFloat(carga.power) / 0.736) || 0;
+        const config = this._getEletropollDrawerConfig();
+        const tipo = tipoMontagem === 'Extraível' ? 'extraivel' : 'fixo';
+        const tipoPartida = this._getTipoPartidaParaCarga(carga);
+        const tabela = config[tipo]?.[tipoPartida];
+        if (!tabela) return null;
+        for (const row of tabela) {
+            if (cv <= row.maxCV) {
+                if (row.consultar) {
+                    return { height: null, width: null, consultar: true, tipoPartida };
+                }
+                return { height: row.altura, width: row.largura, consultar: false, tipoPartida };
+            }
+        }
+        return { height: null, width: null, consultar: true, tipoPartida };
+    },
+
     // Gaveta height table: smallest height that satisfies BOTH kW and A
-    _getDrawerHeight(carga) {
+    _getDrawerHeight(carga, fabricante, tipoMontagem) {
+        if (fabricante === 'Eletropoll') {
+            const result = this._getEletropollDrawerHeight(carga, tipoMontagem);
+            if (result && !result.consultar && result.height != null) return result.height;
+        }
         const kw = parseFloat(carga?.power) || 0;
         const a = parseFloat(carga?.current) || 0;
         const table = [
@@ -5779,7 +6012,7 @@ const PropostaTecnicaModule = {
         return result;
     },
 
-    _autoStackGavetas(cargas, cabLoads, cabNumber = 1, mode = 'sequential', reserveCombo = null) {
+    _autoStackGavetas(cargas, cabLoads, cabNumber = 1, mode = 'sequential', reserveCombo = null, fabricante, tipoMontagem) {
         const MAX_HEIGHT = 1800;
         const excessLoads = [];
         let gavIdx = 0;
@@ -5799,7 +6032,12 @@ const PropostaTecnicaModule = {
 
         for (const carga of cargasOrdered) {
             if (!carga.tag) continue;
-            const h = this._getDrawerHeight(carga);
+            let h = this._getDrawerHeight(carga, fabricante, tipoMontagem);
+            const epResult = (fabricante === 'Eletropoll') ? this._getEletropollDrawerHeight(carga, tipoMontagem) : null;
+            if (epResult && epResult.consultar) {
+                excessLoads.push({ ...carga, _consultar: true });
+                continue;
+            }
             if (usedH + h > MAX_HEIGHT) {
                 excessLoads.push(carga);
                 continue;
@@ -5850,12 +6088,12 @@ const PropostaTecnicaModule = {
         return { colunas: [{ index: 0, gavetas, totalAltura: usedH }], excessLoads };
     },
 
-    _distributeLoadsAcrossCabinets(cargas) {
+    _distributeLoadsAcrossCabinets(cargas, fabricante, tipoMontagem) {
         const MAX = 1800;
 
         const loads = cargas
             .filter(c => c.tag)
-            .map(c => ({ ...c, h: this._getDrawerHeight(c) }))
+            .map(c => ({ ...c, h: this._getDrawerHeight(c, fabricante, tipoMontagem) }))
             .sort((a, b) => {
                 const pa = parseFloat(a.power) || 0;
                 const pb = parseFloat(b.power) || 0;
@@ -5926,9 +6164,10 @@ const PropostaTecnicaModule = {
     },
 
     _drawCabinetForma34(ctx, cab, x, y, scale, fontMult, cabW, cabHeight, displayName) {
-        const ccw = cab.layoutConfig?.colunaCabosWidth || 200;
+        const isEletropoll = cab._fabricante === 'Eletropoll';
+        const ccw = isEletropoll ? 400 : (cab.layoutConfig?.colunaCabosWidth || 200);
         const L = cab.width || (600 + ccw);
-        const gavetasW = 600 * scale;
+        const gavetasW = isEletropoll ? (cabW - ccw * scale) : (600 * scale);
         const colunaCabosW = ccw * scale;
         const barraSecY = 300;
         const gavetasSecY = barraSecY + 1800;
@@ -5952,24 +6191,41 @@ const PropostaTecnicaModule = {
         ctx.textBaseline = 'middle';
         ctx.fillText('Barramentos', x + cabW / 2, barY + barH / 2);
 
+        // ── Olhais para içamento (apenas Eletropoll) ──
+        if (isEletropoll) {
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(x, y, 60 * scale, 60 * scale);
+            ctx.strokeRect(x + cabW - 60 * scale, y, 60 * scale, 60 * scale);
+            ctx.beginPath();
+            ctx.arc(x + 30 * scale, y + 30 * scale, 10 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + cabW - 30 * scale, y + 30 * scale, 10 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         // ── Exaustor de teto (500×100mm acima da área de gavetas) ──
-        const exW = 500 * scale;
-        const exH = 100 * scale;
-        const exX = x + cabW / 2 - exW / 2;
-        const exY = y - exH;
-        ctx.fillStyle = '#e0f2fe';
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 0.5;
-        ctx.fillRect(exX, exY, exW, exH);
-        ctx.strokeRect(exX, exY, exW, exH);
-        ctx.strokeStyle = '#93c5fd';
-        ctx.lineWidth = 0.3;
-        ctx.strokeRect(exX + 3 * scale, exY - 3 * scale, exW - 6 * scale, exH - 6 * scale);
-        ctx.fillStyle = '#0284c7';
-        ctx.font = `${Math.round(6 * fontMult)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Exaustor', exX + exW / 2, exY + exH / 2);
+        const temExaustor = isEletropoll ? (cab.layoutConfig?.exaustor !== false) : true;
+        if (temExaustor) {
+            const exW = 500 * scale;
+            const exH = 100 * scale;
+            const exX = x + cabW / 2 - exW / 2;
+            const exY = y - exH;
+            ctx.fillStyle = '#e0f2fe';
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 0.5;
+            ctx.fillRect(exX, exY, exW, exH);
+            ctx.strokeRect(exX, exY, exW, exH);
+            ctx.strokeStyle = '#93c5fd';
+            ctx.lineWidth = 0.3;
+            ctx.strokeRect(exX + 3 * scale, exY - 3 * scale, exW - 6 * scale, exH - 6 * scale);
+            ctx.fillStyle = '#0284c7';
+            ctx.font = `${Math.round(6 * fontMult)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Exaustor', exX + exW / 2, exY + exH / 2);
+        }
 
         // ── Coluna de Cabos (Y=300 to 2200, right side) ──
         const colCabX = x + gavetasW;
@@ -5992,7 +6248,7 @@ const PropostaTecnicaModule = {
         ctx.fillText('Coluna', colCabX + colunaCabosW / 2, colCabY + 30 * scale);
         ctx.fillText('Cabos', colCabX + colunaCabosW / 2, colCabY + 50 * scale);
 
-        // ── Gavetas (Y=300 to 2100, left 600mm) ──
+        // ── Gavetas (Y=300 to 2100, left area) ──
         const gavY = y + barraSecY * scale;
         const gavH = (gavetasSecY - barraSecY) * scale;
         const gavetas = cab._gavetas || [];
@@ -6161,8 +6417,9 @@ const PropostaTecnicaModule = {
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø) — apenas Forma 1/2
-            if (!this._isForma34KitFrame(cab.segregacao, cab._fabricante)) {
+            // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø) — Forma 1/2 e Eletropoll
+            const temOlhais = !this._isForma34EstruturaModular(cab.segregacao, cab._fabricante) || cab._fabricante === 'Eletropoll';
+            if (temOlhais) {
                 const olhalSize = 60 * scale;
                 const furoR = 10 * scale;
                 const olhalTopY = y - olhalSize;
@@ -6267,7 +6524,7 @@ const PropostaTecnicaModule = {
             } else {
                 // Vista Interna - conteúdo normal
                 const isForma2 = cab.segregacao === 'Forma 2a' || cab.segregacao === 'Forma 2b';
-                const isForma34 = this._isForma34KitFrame(cab.segregacao, cab._fabricante);
+                const isForma34 = this._isForma34EstruturaModular(cab.segregacao, cab._fabricante);
 
                 if (isForma2) {
                     // "Barramentos" centered at Y=150mm (middle of 0-300mm zone)
@@ -6479,7 +6736,7 @@ const PropostaTecnicaModule = {
         }
 
         // Legend (apenas vista interna, exceto KitFrame)
-        const allKitFrame = cabinets.length > 0 && cabinets.every(c => this._isForma34KitFrame(c.segregacao, c._fabricante));
+        const allKitFrame = cabinets.length > 0 && cabinets.every(c => this._isForma34EstruturaModular(c.segregacao, c._fabricante));
         if (!externalOnly && !allKitFrame) {
             const legendY = CANVAS_HEIGHT - Math.round(14 * fontMult);
             ctx.font = `${Math.round(7 * fontMult)}px sans-serif`;
@@ -7090,7 +7347,7 @@ const PropostaTecnicaModule = {
 
         const seg = eq.technical?.segregacao || '';
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
-        const isKitFrame = this._isForma34KitFrame(seg, eq.technical?.fabricante);
+        const isKitFrame = this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
         const defaultHeight = isForma2 ? 2300 : (parseInt(eq.technical?.alturaPainel) || 2200) + 100;
         const alturaOptions = [1600, 1800, 2000, 2300].map(h =>
             `<option value="${h}" ${h === defaultHeight ? 'selected' : ''}>${h} mm</option>`
@@ -7165,7 +7422,7 @@ const PropostaTecnicaModule = {
         const layoutConfig = eq.layoutConfig || this._getDefaultLayoutConfig();
         if (!layoutConfig.cabinetAssignments) layoutConfig.cabinetAssignments = {};
         const seg = eq.technical?.segregacao || '';
-        const isKitFrame = this._isForma34KitFrame(seg, eq.technical?.fabricante);
+        const isKitFrame = this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
 
         const nome = document.getElementById('arm_add_nome')?.value?.trim() || 'Armário';
         const depth = parseInt(document.getElementById('arm_add_profundidade')?.value) || 600;
@@ -7515,19 +7772,37 @@ const PropostaTecnicaModule = {
                     const calcW = items.length > 0 ? this._simulateMinWidth(items, cabConfig) : 200;
                     const stdW = cabData.width ? getStdWidth(cabData.width) : getStdWidth(calcW);
                     const segregacaoCab = eq.technical?.segregacao || '';
-                    const isForma34 = this._isForma34KitFrame(segregacaoCab, eq.technical?.fabricante);
+                    const isForma34 = this._isForma34EstruturaModular(segregacaoCab, eq.technical?.fabricante);
                     const cabPanelH = cabData.height || (isForma34 ? 2300 : ((segregacaoCab === 'Forma 2a' || segregacaoCab === 'Forma 2b') ? 2300 : (parseInt(eq.technical?.alturaPainel) || 2200) + 100));
                     if (isForma34) {
-                        const ccw = cabConfig.colunaCabosWidth || 200;
-                        const forma34width = 600 + ccw;
-                        cabData.width = forma34width;
-                        // Build colunas/gavetas for KitFrame
+                        const isEletropoll = eq.technical?.fabricante === 'Eletropoll';
+                        let forma34width;
+                        let ccw;
+                        if (isEletropoll) {
+                            ccw = 400;
+                            const tipoGaveta = eq.technical?.tipoGaveta || 'Fixo';
+                            let maxGavetaW = 600;
+                            for (const carga of (eq.loads || [])) {
+                                if (!carga.tag) continue;
+                                const epRes = this._getEletropollDrawerHeight(carga, tipoGaveta);
+                                if (epRes && !epRes.consultar && epRes.width && epRes.width > maxGavetaW) {
+                                    maxGavetaW = epRes.width;
+                                }
+                            }
+                            forma34width = maxGavetaW + ccw;
+                            cabData.width = forma34width;
+                        } else {
+                            ccw = cabConfig.colunaCabosWidth || 200;
+                            forma34width = 600 + ccw;
+                            cabData.width = forma34width;
+                        }
+                        // Build colunas/gavetas for KitFrame/Eletropoll
                         const parentForLoads = face ? cabData.faces?.[face] : cabData;
                         const cabLoads = parentForLoads?.loads || {};
                         // Collect loads that have materials assigned to this cabinet
                         const cargaList = (eq.loads || []).filter(l => l.tag && cabLoads[l.tag]);
                         const reserveCombo = cabData._reserveCombo || (face ? cabData.faces?.[face]?._reserveCombo : null);
-                        const { colunas, excessLoads } = this._autoStackGavetas(cargaList, cabLoads, cabIdx, cabConfig.gavetaMode || 'sequential', reserveCombo);
+                        const { colunas, excessLoads } = this._autoStackGavetas(cargaList, cabLoads, cabIdx, cabConfig.gavetaMode || 'sequential', reserveCombo, eq.technical?.fabricante, eq.technical?.tipoGaveta || 'Fixo');
                         const gavetasFlat = colunas.flatMap(c => c.gavetas);
                         cabinets.push({ _cabId: cabId, _assignData: cabData, name: cabData.name + suf, layoutConfig: cabConfig, items, doorItems: cabDoorItems, _fabricante: eq.technical?.fabricante, width: forma34width, height: cabPanelH,                     depth: cabData.depth || maxD || 600, calculatedWidth: forma34width, _userWidth: forma34width, _face: face || null, segregacao: segregacaoCab, _gavetas: gavetasFlat, _colunas: colunas, _excessLoads: excessLoads });
                     } else {
@@ -7538,16 +7813,28 @@ const PropostaTecnicaModule = {
                 }
             }
         } else {
-            // Auto-create cabinet for KitFrame when no assignments exist
-            const isForma34Auto = this._isForma34KitFrame(eq.technical?.segregacao || '', eq.technical?.fabricante);
+            // Auto-create cabinet for KitFrame/Eletropoll when no assignments exist
+            const isForma34Auto = this._isForma34EstruturaModular(eq.technical?.segregacao || '', eq.technical?.fabricante);
             if (isForma34Auto) {
                 if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
                 if (!eq.layoutConfig.cabinetAssignments) eq.layoutConfig.cabinetAssignments = {};
                 const cabId = 'cab_' + Date.now();
-                const ccwAuto = 200;
+                const isEletropollAuto = eq.technical?.fabricante === 'Eletropoll';
+                const ccwAuto = isEletropollAuto ? 400 : 200;
+                let autoGavetaW = 600;
+                const tipoGavetaAuto = eq.technical?.tipoGaveta || 'Fixo';
+                if (isEletropollAuto) {
+                    for (const load of (eq.loads || [])) {
+                        if (!load.tag) continue;
+                        const epRes = this._getEletropollDrawerHeight(load, tipoGavetaAuto);
+                        if (epRes && !epRes.consultar && epRes.width && epRes.width > autoGavetaW) {
+                            autoGavetaW = epRes.width;
+                        }
+                    }
+                }
                 eq.layoutConfig.cabinetAssignments[cabId] = {
-                    name: eq.tag || 'KitFrame',
-                    width: 600 + ccwAuto,
+                    name: eq.tag || (isEletropollAuto ? 'Eletropoll' : 'KitFrame'),
+                    width: (isEletropollAuto ? autoGavetaW : 600) + ccwAuto,
                     height: 2300,
                     depth: 600,
                     assigned: {},
@@ -7614,13 +7901,13 @@ const PropostaTecnicaModule = {
                             }
                         }
                         const cabConfig2 = cabData2.layoutConfig || this._getDefaultLayoutConfig();
-                        const forma34width2 = 600 + ccwAuto;
+                        const forma34width2 = isEletropollAuto ? (cabData2.width || (autoGavetaW + 400)) : (600 + ccwAuto);
                         const cabPanelHAuto = 2300;
                         const parentForLoadsAuto = face ? cabData2.faces?.[face] : cabData2;
                         const cabLoadsAuto = parentForLoadsAuto?.loads || {};
                         const cargaListAuto = (eq.loads || []).filter(l => l.tag && cabLoadsAuto[l.tag]);
                         const reserveComboAuto = cabData2._reserveCombo || (face ? cabData2.faces?.[face]?._reserveCombo : null);
-                        const { colunas: colunasAuto, excessLoads: excessLoadsAuto } = this._autoStackGavetas(cargaListAuto, cabLoadsAuto, 1, cabConfig2.gavetaMode || 'sequential', reserveComboAuto);
+                        const { colunas: colunasAuto, excessLoads: excessLoadsAuto } = this._autoStackGavetas(cargaListAuto, cabLoadsAuto, 1, cabConfig2.gavetaMode || 'sequential', reserveComboAuto, eq.technical?.fabricante, eq.technical?.tipoGaveta || 'Fixo');
                         const gavetasFlatAuto = colunasAuto.flatMap(c => c.gavetas);
                         cabinets.push({ _cabId: cabId2, _assignData: cabData2, name: (cabData2.name || cabId2) + suf, layoutConfig: cabConfig2, items: items2, doorItems: [], _fabricante: eq.technical?.fabricante, width: forma34width2, height: cabPanelHAuto, depth: cabData2.depth || maxD2 || 600, calculatedWidth: forma34width2, _userWidth: forma34width2, _face: face || null, segregacao: eq.technical?.segregacao || '', _gavetas: gavetasFlatAuto, _colunas: colunasAuto, _excessLoads: excessLoadsAuto });
                         totalCalculatedWidth += forma34width2;
@@ -7635,7 +7922,7 @@ const PropostaTecnicaModule = {
         if (isRear) cabinets.reverse();
 
         for (const cab of cabinets) {
-            const isCabForma34 = this._isForma34KitFrame(cab.segregacao, cab._fabricante);
+            const isCabForma34 = this._isForma34EstruturaModular(cab.segregacao, cab._fabricante);
             if (!isCabForma34) {
                 cab.rows = this._layoutCabinetRows(cab);
                 cab.doorRows = this._layoutDoorRows(cab);
@@ -7757,12 +8044,12 @@ const PropostaTecnicaModule = {
         }
 
         const fabricanteAE = eq.technical?.fabricante || 'Genérico';
-        if (this._isForma34(seg) && fabricanteAE !== 'KitFrame') {
+        if (this._isForma34(seg) && !this._isForma34EstruturaModular(seg, fabricanteAE)) {
             return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
                 <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
                 <br>
                 <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível para este fabricante</div>
-                <div style="font-size:13px;margin-top:6px;">Para Formas <strong>3a, 3b, 4a, 4b</strong>, selecione <strong>KitFrame</strong> como Fabricante na Ficha Técnica.</div>
+                <div style="font-size:13px;margin-top:6px;">Para Formas <strong>3a, 3b, 4a, 4b</strong>, selecione <strong>KitFrame</strong> ou <strong>Eletropoll</strong> como Fabricante na Ficha Técnica.</div>
             </div>`;
         }
 
@@ -7860,6 +8147,8 @@ const PropostaTecnicaModule = {
                                 <img id="layout-canvas-external" src="${dataUrlExt}" style="display:block;margin:0 auto;" alt="Vista Frontal Externa">
                             </div>
                         </div>` : '';
+
+        const baseCabs = Object.entries(eq.layoutConfig?.cabinetAssignments || {}).map(([id, d]) => ({ id, name: d.name, width: d.width || 600, height: d.height, depth: d.depth || 600 }));
 
         return `
             <div style="animation:fadeIn 0.3s ease;padding:20px;">
@@ -8235,7 +8524,7 @@ const PropostaTecnicaModule = {
                     let xInputHtml = '';
                     let alocEntryHtml = '';
                     const matchCab = cabinets.find(c => c._cabId === baseCabId);
-                    const isKitFrameCab = matchCab ? this._isForma34KitFrame(matchCab.segregacao, matchCab._fabricante) : false;
+                    const isKitFrameCab = matchCab ? this._isForma34EstruturaModular(matchCab.segregacao, matchCab._fabricante) : false;
                     if (matchCab?._assignData) {
                         const cabLinhas = (matchCab.layoutConfig?.linhas || this._getDefaultLayoutConfig().linhas);
                         const cabDoorLinhas = (matchCab.layoutConfig?.doorLinhas || this._getDefaultLayoutConfig().doorLinhas);
@@ -8886,7 +9175,8 @@ const PropostaTecnicaModule = {
             if (bodyDiv) {
                 const infoDiv = bodyDiv.querySelector('div:last-child');
                 if (infoDiv) {
-                    infoDiv.textContent = `KitFrame — 600mm (gavetas) + ${ccw}mm (coluna cabos) = ${600 + ccw}mm × 2300mm`;
+                    const isEletropoll = eq.technical?.fabricante === 'Eletropoll';
+                    infoDiv.textContent = isEletropoll ? `Eletropoll — ${cab.width - 400}mm (gavetas) + 400mm (coluna cabos) = ${cab.width}mm × 2300mm` : `KitFrame — 600mm (gavetas) + ${ccw}mm (coluna cabos) = ${600 + ccw}mm × 2300mm`;
                 }
             }
         }
@@ -8907,6 +9197,51 @@ const PropostaTecnicaModule = {
         eqs[idx] = eq;
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); }
         this._redrawLayoutCanvas();
+    },
+
+    _onChangeExaustorArmario(blockCabId, value) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        const parts = blockCabId ? blockCabId.split('|') : [];
+        const cabId = parts[0];
+        const cab = eq.layoutConfig?.cabinetAssignments?.[cabId];
+        if (!cab) return;
+        if (!cab.layoutConfig) cab.layoutConfig = this._getDefaultLayoutConfig();
+        cab.layoutConfig.exaustor = !!value;
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); }
+        this._redrawLayoutCanvas();
+    },
+
+    _onChangeProfundidadeArmario(blockCabId, value) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        const parts = blockCabId ? blockCabId.split('|') : [];
+        const cabId = parts[0];
+        const cab = eq.layoutConfig?.cabinetAssignments?.[cabId];
+        if (!cab) return;
+        cab.depth = parseInt(value, 10) || 600;
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); }
+        this._redrawLayoutCanvas();
+    },
+
+    _onChangeAutoChaparia(value) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        eq.autoChaparia = !!value;
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); }
+        app.toast(`Inserção automática de chaparia ${eq.autoChaparia ? 'ativada' : 'desativada'}.`, 'info');
     },
 
     async _showReserveSetupDialog(cabinetReserves) {
@@ -8966,12 +9301,14 @@ const PropostaTecnicaModule = {
         if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
         eq.layoutConfig.cabinetAssignments = {};
 
-        const arrangement = this._rebalanceCabinets(this._distributeLoadsAcrossCabinets(eq.loads || []));
+        const isEletropollArranjo = eq.technical?.fabricante === 'Eletropoll';
+        const tipoGavetaArranjo = eq.technical?.tipoGaveta || 'Fixo';
+        const arrangement = this._rebalanceCabinets(this._distributeLoadsAcrossCabinets(eq.loads || [], eq.technical?.fabricante, tipoGavetaArranjo));
         const tipicos = store.getState().tipicos || [];
         const materiais = store.getState().materiais || [];
         const MAX_H = 1800;
-        const defaultCCW = 200;
-        const cabWidth = 600 + defaultCCW;
+        const defaultCCW = isEletropollArranjo ? 400 : 200;
+        const cabWidth = isEletropollArranjo ? 1000 : (600 + defaultCCW);
 
         const cabEntries = [];
         for (let i = 0; i < arrangement.length; i++) {
@@ -8979,9 +9316,22 @@ const PropostaTecnicaModule = {
             const cabId = 'cab_' + Date.now() + '_' + i;
             const cabName = 'Coluna ' + (i + 1).toString().padStart(2, '0');
 
+            let widthArranjo = cabWidth;
+            if (isEletropollArranjo) {
+                let maxGW = 600;
+                for (const carga of (group.loads || [])) {
+                    if (!carga.tag) continue;
+                    const epRes = this._getEletropollDrawerHeight(carga, tipoGavetaArranjo);
+                    if (epRes && !epRes.consultar && epRes.width && epRes.width > maxGW) {
+                        maxGW = epRes.width;
+                    }
+                }
+                widthArranjo = maxGW + defaultCCW;
+            }
+
             const cabEntry = {
                 name: cabName,
-                width: cabWidth,
+                width: widthArranjo,
                 height: 2300,
                 depth: 600,
                 assigned: {},
@@ -9053,6 +9403,15 @@ const PropostaTecnicaModule = {
         eqs[idx] = eq;
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Arranjo] store error:', e); }
 
+        // Auto-insert chaparia if enabled
+        if (eq.autoChaparia !== false) {
+            const itens = this._gerarMateriaisChaparia(eq);
+            if (itens && itens.length > 0) {
+                eq.materials = [...(eq.materials || []).filter(m => m._origin !== 'chaparia'), ...itens];
+                app.toast(`${itens.length} itens de chaparia inseridos automaticamente na LM.`, 'info');
+            }
+        }
+
         this._redrawLayoutCanvas();
         this._showLayoutConfigPanel();
     },
@@ -9069,7 +9428,7 @@ const PropostaTecnicaModule = {
                 <h3 style="margin:0 0 8px;color:#dc2626;font-size:16px;">⚠️ Capacidade máxima atingida</h3>
                 <p style="font-size:13px;color:#475569;margin:0 0 12px;">${excessLoads.length} carga(s) não puderam ser alocadas:</p>
                 <div style="font-size:12px;color:#64748b;margin-bottom:16px;">
-                    ${excessLoads.map(l => `<div style="padding:3px 0;">• ${l.tag} - ${l.desc || l.tag} (${this._getDrawerHeight(l)}mm)</div>`).join('')}
+                    ${excessLoads.map(l => `<div style="padding:3px 0;">• ${l.tag} - ${l.desc || l.tag} (${this._getDrawerHeight(l, data?.equipments?.[this.activeEquipmentIndex]?.technical?.fabricante, data?.equipments?.[this.activeEquipmentIndex]?.technical?.tipoGaveta || 'Fixo')}mm)</div>`).join('')}
                 </div>
                 <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #e2e8f0;padding-top:16px;">
                     <button class="btn btn-sm btn-ghost" onclick="this.closest('#_excess_loads_dlg').remove()" style="color:#64748b;">Cancelar</button>
@@ -9090,7 +9449,7 @@ const PropostaTecnicaModule = {
         if (!eq) return;
 
         const seg = eq.technical?.segregacao || '';
-        const isKF = this._isForma34KitFrame(seg, eq.technical?.fabricante);
+        const isKF = this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
         if (!isKF || !eq.layoutConfig?.cabinetAssignments) return;
         if (!excessLoads || excessLoads.length === 0) return;
 
@@ -9936,15 +10295,15 @@ const PropostaTecnicaModule = {
 
                             <tr style="background: var(--color-accent); border-bottom: 2px solid #e2e8f0; color: #fff;">
 
-                                <th style="padding: 14px; text-align: left; width: 210px;">Área</th>
+                                <th style="padding: 14px; text-align: left; width: 210px; color:#fff;">Área</th>
 
-                                <th style="padding: 14px; text-align: left;">Função / Atividade</th>
+                                <th style="padding: 14px; text-align: left; color:#fff;">Função / Atividade</th>
 
-                                <th style="padding: 14px; text-align: center; width: 100px;">Horas</th>
+                                <th style="padding: 14px; text-align: center; width: 100px; color:#fff;">Horas</th>
 
-                                <th style="padding: 14px; text-align: right; width: 120px;">Valor/h (R$)</th>
+                                <th style="padding: 14px; text-align: right; width: 120px; color:#fff;">Valor/h (R$)</th>
 
-                                <th style="padding: 14px; text-align: right; width: 140px;">Subtotal</th>
+                                <th style="padding: 14px; text-align: right; width: 140px; color:#fff;">Subtotal</th>
 
                             </tr>
 
@@ -10149,15 +10508,15 @@ const PropostaTecnicaModule = {
 
                             <tr style="background: var(--color-accent); border-bottom: 2px solid #e2e8f0; color: #fff;">
 
-                                <th style="padding: 14px; text-align: left;">Descrição da Despesa</th>
+                                <th style="padding: 14px; text-align: left; color:#fff;">Descrição da Despesa</th>
 
-                                <th style="padding: 14px; text-align: center; width: 80px;">Qtd</th>
+                                <th style="padding: 14px; text-align: center; width: 80px; color:#fff;">Qtd</th>
 
-                                <th style="padding: 14px; text-align: right; width: 120px;">Unitário (R$)</th>
+                                <th style="padding: 14px; text-align: right; width: 120px; color:#fff;">Unitário (R$)</th>
 
-                                <th style="padding: 14px; text-align: right; width: 130px;">Subtotal</th>
+                                <th style="padding: 14px; text-align: right; width: 130px; color:#fff;">Subtotal</th>
 
-                                <th style="padding: 14px; width: 60px;"></th>
+                                <th style="padding: 14px; width: 60px; color:#fff;"></th>
 
                             </tr>
 
@@ -10765,10 +11124,10 @@ const PropostaTecnicaModule = {
 
                         <thead>
                             <tr style="background: var(--color-accent); border-bottom: 2px solid #e2e8f0;">
-                                <th style="padding: 14px; text-align: left; font-weight: 800; color: #1e3a8a; font-size: 13px;">Componente / Material</th>
-                                <th style="padding: 14px; text-align: left; font-weight: 800; color: #1e3a8a; font-size: 13px;">Fabricante Sugerido (Padrão)</th>
-                                <th style="padding: 14px; text-align: left; font-weight: 800; color: #1e3a8a; font-size: 13px;">Alternativas Aceitáveis</th>
-                                <th style="padding: 14px; width: 50px; color: #1e3a8a; font-size: 13px;">Ações</th>
+                                <th style="padding: 14px; text-align: left; font-weight: 800; color: #ffffff; font-size: 13px;">Componente / Material</th>
+                                <th style="padding: 14px; text-align: left; font-weight: 800; color: #ffffff; font-size: 13px;">Fabricante Sugerido (Padrão)</th>
+                                <th style="padding: 14px; text-align: left; font-weight: 800; color: #ffffff; font-size: 13px;">Alternativas Aceitáveis</th>
+                                <th style="padding: 14px; width: 50px; color: #ffffff; font-size: 13px;">Ações</th>
                             </tr>
                         </thead>
 
@@ -10907,17 +11266,17 @@ const PropostaTecnicaModule = {
 
                         <tr style="background: var(--color-accent); border-bottom: 2px solid #e2e8f0;">
 
-                            <th style="padding: 14px; width: 70px; color: #1e3a8a; font-size: 13px;">Nú</th>
+                            <th style="padding: 14px; width: 70px; color: #ffffff; font-size: 13px;">Nú</th>
 
-                            <th style="padding: 14px; color: #1e3a8a; font-size: 13px;">Descrição</th>
+                            <th style="padding: 14px; color: #ffffff; font-size: 13px;">Descrição</th>
 
-                            <th style="padding: 14px; width: 70px; text-align: center; color: #1e3a8a; font-size: 13px;">Elab.</th>
+                            <th style="padding: 14px; width: 70px; text-align: center; color: #ffffff; font-size: 13px;">Elab.</th>
 
-                            <th style="padding: 14px; width: 70px; text-align: center; color: #1e3a8a; font-size: 13px;">Verif.</th>
+                            <th style="padding: 14px; width: 70px; text-align: center; color: #ffffff; font-size: 13px;">Verif.</th>
 
-                            <th style="padding: 14px; width: 70px; text-align: center; color: #1e3a8a; font-size: 13px;">Aprov.</th>
+                            <th style="padding: 14px; width: 70px; text-align: center; color: #ffffff; font-size: 13px;">Aprov.</th>
 
-                            <th style="padding: 14px; width: 120px; text-align: center; color: #1e3a8a; font-size: 13px;">Data</th>
+                            <th style="padding: 14px; width: 120px; text-align: center; color: #ffffff; font-size: 13px;">Data</th>
 
                             <th style="padding: 14px; width: 50px;"></th>
 
@@ -11452,9 +11811,9 @@ const PropostaTecnicaModule = {
 
             <td style="padding: 6px;"><input type="text" name="dload_desc_${index}" class="form-control" style="font-size: 11px;"></td>
 
-            <td style="padding: 6px; text-align: center;"><input type="text" name="dload_model_${index}" class="form-control" style="text-align: center; font-size: 11px;"></td>
+            <td style="padding: 6px; text-align: center;"><input type="text" name="dload_power_${index}" class="form-control" style="text-align: center; font-size: 11px;"></td>
 
-            <td style="padding: 6px; text-align: center;"><input type="text" name="dload_no_${index}" class="form-control" style="text-align: center; font-size: 11px;"></td>
+            <td style="padding: 6px; text-align: center;"><input type="text" name="dload_current_${index}" class="form-control" style="text-align: center; font-size: 11px;"></td>
 
             <td style="padding: 6px; text-align: center;"><input type="text" name="dload_typical_${index}" class="form-control" style="text-align: center; font-size: 11px;"></td>
 
@@ -12711,24 +13070,33 @@ const PropostaTecnicaModule = {
         
 
         // Migração para estrutura hierárquica se necessário
+        // Só cria TAG-MIGRADO se houver dados legados para preservar
 
         if (!proposal.equipments || proposal.equipments.length === 0) {
 
-            proposal.equipments = [{
+            if (proposal.detailedLoadItems?.length || proposal.norms?.length) {
 
-                id: Date.now(),
+                proposal.equipments = [{
 
-                tag: 'TAG-MIGRADO',
+                    id: Date.now(),
 
-                type: 'CCM-BT',
+                    tag: 'TAG-MIGRADO',
 
-                norms: proposal.norms || [],
+                    type: 'CCM-BT',
 
-                technical: { tensao: '380V' },
+                    norms: proposal.norms || [],
 
-                loads: proposal.detailedLoadItems || []
+                    technical: { tensao: '380V' },
 
-            }];
+                    loads: proposal.detailedLoadItems || []
+
+                }];
+
+            } else {
+
+                proposal.equipments = [];
+
+            }
 
         }
 
@@ -12754,11 +13122,47 @@ const PropostaTecnicaModule = {
 
         this.renderModal(proposalCopy);
 
+        // Buscar documentos do cliente na pasta Documentação Cliente
+        const ptcFolder = proposalCopy.ptc_folder || window.app.currentPtc?.folder;
+        if (ptcFolder) {
+            this._fetchClientDocuments(ptcFolder);
+        }
+
         if (proposalCopy.cliente) {
             setTimeout(() => this.updateContactDropdown(proposalCopy.cliente), 50);
         }
     },
 
+    async _fetchClientDocuments(ptcFolder) {
+        if (!ptcFolder) return;
+        try {
+            const _tk = store.getState().auth?.token;
+            const headers = _tk ? { 'Authorization': 'Bearer ' + _tk } : {};
+            const res = await fetch(`/api/list-ptc-files?ptc=${encodeURIComponent(ptcFolder)}&subfolder=${encodeURIComponent('Documentação Cliente')}`, { headers });
+            const data = await res.json();
+            if (data.success) {
+                const state = store.getState().activeTechnicalProposal;
+                if (state) {
+                    state.clientDocuments = data.files;
+                    store.setState({ activeTechnicalProposal: state });
+                    const section = document.getElementById('client-docs-section');
+                    if (section) {
+                        section.style.display = data.files.length ? 'block' : 'none';
+                        const listEl = section.querySelector('div');
+                        if (listEl) {
+                            listEl.innerHTML = data.files.map(d =>
+                                `<span style="display:inline-flex;align-items:center;gap:4px;background:#f1f5f9;border:1px solid #e2e8f0;padding:4px 10px;border-radius:6px;font-size:12px;color:#334155;">
+                                    <i class="ph ph-file"></i> ${d.nome}
+                                </span>`
+                            ).join('');
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Erro ao buscar documentos do cliente:', e);
+        }
+    },
 
 
     switchCargasSubView(view) {
@@ -13324,19 +13728,43 @@ const PropostaTecnicaModule = {
                         <i class="ph ph-plugs" style="font-size: 48px; opacity: 0.2;"></i>
                         <p style="margin-top: 10px;">Nenhum rack configurado. Clique em "+ Novo Rack" ou importe do Excel.</p>
                     </div>
-                ` : racks.map((rack, ri) => `
+                ` : racks.map((rack, ri) => {
+        const rackFab = this._getRackFabricante(rack, eq);
+        const rackPH = this._getRackPlaceholders(rackFab);
+        return `
                     <div class="io-rack-row" style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 16px; overflow: hidden; background: white;">
                         <div style="background: #f1f5f9; padding: 10px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #e2e8f0;">
                             <span style="font-weight: 700; font-size: 13px; color: #1e293b; min-width: 60px;">Rack ${ri + 1}</span>
                             <input type="text" name="io_rack_pos_${ri}" value="${rack.position ?? ri + 1}" placeholder="Pos." style="width: 50px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
+                            <span style="font-size: 11px; color: #64748b;">Fabr.:</span>
+                            <select name="io_rack_fabricante_${ri}" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 3px 4px;" onchange="window.propostaTecnicaModule.onRackFabricanteChange(${ri})">
+                                <option value="" ${!rack.fabricante ? 'selected' : ''}>Herdar</option>
+                                <option value="Allen-Bradley" ${rack.fabricante === 'Allen-Bradley' ? 'selected' : ''}>Allen-Bradley</option>
+                                <option value="Siemens" ${rack.fabricante === 'Siemens' ? 'selected' : ''}>Siemens</option>
+                                <option value="ABB" ${rack.fabricante === 'ABB' ? 'selected' : ''}>ABB</option>
+                                <option value="Schneider Electric" ${rack.fabricante === 'Schneider Electric' ? 'selected' : ''}>Schneider Electric</option>
+                                <option value="WEG" ${rack.fabricante === 'WEG' ? 'selected' : ''}>WEG</option>
+                                <option value="Phoenix Contact" ${rack.fabricante === 'Phoenix Contact' ? 'selected' : ''}>Phoenix Contact</option>
+                                <option value="Mitsubishi" ${rack.fabricante === 'Mitsubishi' ? 'selected' : ''}>Mitsubishi</option>
+                                <option value="Omron" ${rack.fabricante === 'Omron' ? 'selected' : ''}>Omron</option>
+                            </select>
+                            <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #64748b;">
+                                <input type="checkbox" name="io_rack_compact_${ri}" value="1" ${rack.compactMode ? 'checked' : ''} onchange="window.propostaTecnicaModule.toggleRackCompactMode(${ri})" style="width: 14px; height: 14px; accent-color: #6366f1;">
+                                Compacto
+                            </label>
+                            ${rack.compactMode ? `
+                            <span style="font-size: 11px; color: #64748b;">Modelo:</span>
+                            <input type="text" name="io_rack_modelo_${ri}" value="${rack.modelo || ''}" placeholder="${rackPH.modelo}" style="width: 180px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
+                            ` : `
                             <span style="font-size: 11px; color: #64748b;">BP:</span>
-                            <input type="text" name="io_rack_bp_${ri}" value="${rack.backplane || ''}" placeholder="Ex: 1756-A7" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
+                            <input type="text" name="io_rack_bp_${ri}" value="${rack.backplane || ''}" placeholder="${rackPH.bp}" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
                             <span style="font-size: 11px; color: #64748b;">Fonte:</span>
-                            <input type="text" name="io_rack_ps_${ri}" value="${rack.powerSupply || ''}" placeholder="Ex: 1756-PA72" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
+                            <input type="text" name="io_rack_ps_${ri}" value="${rack.powerSupply || ''}" placeholder="${rackPH.ps}" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
                             <span style="font-size: 11px; color: #64748b;">CPU:</span>
-                            <input type="text" name="io_rack_cpu_${ri}" value="${rack.cpu || ''}" placeholder="Ex: 1756-L71" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
+                            <input type="text" name="io_rack_cpu_${ri}" value="${rack.cpu || ''}" placeholder="${rackPH.cpu}" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
                             <span style="font-size: 11px; color: #64748b;">COMM:</span>
-                            <input type="text" name="io_rack_comm_${ri}" value="${rack.comm || ''}" placeholder="Ex: 1756-EN2T" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
+                            <input type="text" name="io_rack_comm_${ri}" value="${rack.comm || ''}" placeholder="${rackPH.comm}" style="width: 100px; font-size: 11px; border:1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px;">
+                            `}
                             <div style="flex:1;"></div>
                             <button type="button" onclick="window.propostaTecnicaModule.duplicateIORack(${ri})" class="btn-icon" style="color: #64748b; background: white; border: 1px solid #e2e8f0; width: 26px; height: 26px; border-radius: 4px;" title="Duplicar Rack"><i class="ph ph-copy"></i></button>
                             <button type="button" onclick="window.propostaTecnicaModule.addIOSlot(${ri})" class="btn-icon" style="color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; width: 26px; height: 26px; border-radius: 4px;" title="Adicionar Slot"><i class="ph ph-plus"></i></button>
@@ -13422,7 +13850,8 @@ const PropostaTecnicaModule = {
                             </table>
                         </div>
                     </div>
-                `).join('')}
+                `;
+            }).join('')}
             </div>
         `;
     },
@@ -13758,6 +14187,24 @@ const PropostaTecnicaModule = {
         return { totalDI, totalDO, totalAI, totalAO, spareDI, spareDO, spareAI, spareAO };
     },
 
+    _getRackFabricante(rack, eq) {
+        return rack.fabricante || eq.technical?.fabricante || 'Allen-Bradley';
+    },
+
+    _getRackPlaceholders(fabricante) {
+        const map = {
+            'Allen-Bradley': { bp: 'Ex: 1756-A7', ps: 'Ex: 1756-PA72', cpu: 'Ex: 1756-L71', comm: 'Ex: 1756-EN2T', modelo: 'Ex: 1756-L71' },
+            'Siemens': { bp: 'Ex: 6ES7 155-6AU01-0BN0', ps: 'Ex: 6ES7 507-0KA00-0AB0', cpu: 'Ex: 6ES7 517-3AP00-0AB0', comm: 'Ex: 6ES7 543-1G00-0AB0', modelo: 'Ex: 6ES7 517-3AP00-0AB0' },
+            'ABB': { bp: 'Ex: TU830', ps: 'Ex: SD831', cpu: 'Ex: PM573-ETH', comm: 'Ex: CI546', modelo: 'Ex: PM573-ETH' },
+            'Schneider Electric': { bp: 'Ex: BMXXBP0400', ps: 'Ex: BMXCPS2010', cpu: 'Ex: BMXP342020', comm: 'Ex: BMXNOE0100', modelo: 'Ex: BMXP342020' },
+            'WEG': { bp: 'Ex: BP-01', ps: 'Ex: PS-01', cpu: 'Ex: CPU300-16', comm: 'Ex: ETH-01', modelo: 'Ex: CPU300-16' },
+            'Phoenix Contact': { bp: 'Ex: AXL F BP', ps: 'Ex: AXL F PS', cpu: 'Ex: AXC F 2152', comm: 'Ex: AXL F ETH', modelo: 'Ex: AXC F 2152' },
+            'Mitsubishi': { bp: 'Ex: Q38B', ps: 'Ex: Q61P', cpu: 'Ex: Q06UDEH', comm: 'Ex: QJ71E71', modelo: 'Ex: Q06UDEH' },
+            'Omron': { bp: 'Ex: CJ1W-PA205R', ps: 'Ex: CJ1W-PA205R', cpu: 'Ex: CJ2M-CPU31', comm: 'Ex: CJ1W-ETN21', modelo: 'Ex: CJ2M-CPU31' }
+        };
+        return map[fabricante] || { bp: 'Ex: BP-001', ps: 'Ex: PS-001', cpu: 'Ex: CPU-001', comm: 'Ex: COMM-001', modelo: 'Ex: CPU-001' };
+    },
+
     renderAutomationBOM(eq) {
         const io = eq.ioList || { racks: [] };
         const hasRacks = io.racks && io.racks.length > 0 && io.racks.some(r => (r.slots || []).length > 0);
@@ -13957,14 +14404,17 @@ const PropostaTecnicaModule = {
         const eq = data.equipments[this.activeEquipmentIndex];
         if (!eq || (eq.type !== 'PLC' && eq.type !== 'REM')) return;
         if (!eq.ioList) eq.ioList = { racks: [], totalDI: 0, totalDO: 0, totalAI: 0, totalAO: 0, spareDI: 0, spareDO: 0, spareAI: 0, spareAO: 0 };
-        eq.ioList.racks.push({
-            position: eq.ioList.racks.length + 1,
-            backplane: '',
-            cpu: '',
-            powerSupply: '',
-            comm: '',
-            slots: []
-        });
+eq.ioList.racks.push({
+                position: eq.ioList.racks.length + 1,
+                backplane: '',
+                cpu: '',
+                powerSupply: '',
+                comm: '',
+                modelo: '',
+                fabricante: '',
+                compactMode: false,
+                slots: []
+            });
         store.setState({ activeTechnicalProposal: data });
         this.renderModal(data);
     },
@@ -14021,6 +14471,32 @@ const PropostaTecnicaModule = {
             status: 'active',
             notes: ''
         });
+        store.setState({ activeTechnicalProposal: data });
+        this.renderModal(data);
+    },
+
+    toggleRackCompactMode(index) {
+        this.captureEquipmentData();
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data.equipments[this.activeEquipmentIndex];
+        if (!eq || !eq.ioList) return;
+        const rack = eq.ioList.racks[index];
+        if (!rack) return;
+        const el = document.querySelector(`[name="io_rack_compact_${index}"]`);
+        rack.compactMode = el ? el.checked : !rack.compactMode;
+        store.setState({ activeTechnicalProposal: data });
+        this.renderModal(data);
+    },
+
+    onRackFabricanteChange(index) {
+        this.captureEquipmentData();
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data.equipments[this.activeEquipmentIndex];
+        if (!eq || !eq.ioList) return;
+        const rack = eq.ioList.racks[index];
+        if (!rack) return;
+        const el = document.querySelector(`[name="io_rack_fabricante_${index}"]`);
+        rack.fabricante = el ? el.value : '';
         store.setState({ activeTechnicalProposal: data });
         this.renderModal(data);
     },
@@ -16109,6 +16585,7 @@ const PropostaTecnicaModule = {
             scopeItems: [],
             exclusions: makeDefaultExclusions(),
             vendorList: initialVendorList,
+            clientDocuments: [],
             revisions: [{ no: '00', desc: 'Emissão Inicial', elab: '', verif: '', aprov: '', data: new Date().toLocaleDateString() }],
             engenheiroResponsavel: '',
             vendedor: ptc?.vendedor || '',
@@ -16765,8 +17242,9 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 d.setActiveLayer(L_CAB);
                 d.rect(x, yf(CAB_H), cabW, CAB_H);
 
-                // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø) — apenas Forma 1/2
-                if (!this._isForma34KitFrame(cab.segregacao, cab._fabricante)) {
+                // Olhais para içamento (60×60mm acima da linha 0, círculo 20mm Ø) — Forma 1/2 e Eletropoll
+                const temOlhaisDxf = !this._isForma34EstruturaModular(cab.segregacao, cab._fabricante) || cab._fabricante === 'Eletropoll';
+                if (temOlhaisDxf) {
                     d.rect(x, yf(0), 60, 60);                              // canto esquerdo
                     d.rect(x + cabW - 60, yf(0), 60, 60);                 // canto direito
                     d.circle(x + 30, yf(-30), 10);                         // furo central esquerdo
@@ -16783,12 +17261,13 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 d.setActiveLayer(L_TXT);
                 d.text(x + cabW / 2, yf(20), 20, 0, cab.name, 'ARIAL');
 
-                const isCabForma34 = this._isForma34KitFrame(cab.segregacao, cab._fabricante);
+                const isCabForma34 = this._isForma34EstruturaModular(cab.segregacao, cab._fabricante);
+                const isEletropollDxf = cab._fabricante === 'Eletropoll';
 
                 if (isCabForma34) {
-                    // ── KitFrame Forma 3A-4B: barramentos, gavetas, coluna cabos, barra terra ──
-                    const ccwDxf = cfg.colunaCabosWidth || 200;
-                    const gavWDxf = 600;
+                    // ── KitFrame / Eletropoll Forma 3A-4B: barramentos, gavetas, coluna cabos, barra terra ──
+                    const ccwDxf = isEletropollDxf ? 400 : (cfg.colunaCabosWidth || 200);
+                    const gavWDxf = isEletropollDxf ? (cabW - ccwDxf) : 600;
                     const colCabWDxf = ccwDxf;
 
                     // Barramentos (Y=0-300, full width)
@@ -16800,7 +17279,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                     d.text(x + cabW / 2, yf(150), 20, 0, 'Barramentos', 'ARIAL');
 
                     // ── Exaustor de teto (500×100mm acima da área de gavetas) ──
-                    {
+                    const temExaustorDxf = isEletropollDxf ? (cab.layoutConfig?.exaustor !== false) : true;
+                    if (temExaustorDxf) {
                         const exWDxf = 500;
                         const exHDxf = 100;
                         const exXDxf = x + cabW / 2 - 250;
@@ -16819,7 +17299,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                     d.setActiveLayer(L_TXT);
                     d.text(colCabXDxf + colCabWDxf / 2, yf(2170), 15, 0, 'Coluna Cabos', 'ARIAL');
 
-                    // Gavetas area (Y=300-2100, left 600mm)
+                    // Gavetas area (Y=300-2100, left area)
                     const gavDxf = cab._gavetas || [];
                     if (gavDxf.length > 0) {
                         let gavYOffDxf = 300;
@@ -17068,7 +17548,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const showSide = eq.layoutConfig?.showSideView;
         const seg = eq.technical?.segregacao;
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
-        const isForma34dxf = this._isForma34KitFrame(seg, eq.technical?.fabricante);
+        const isForma34dxf = this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
+        const isEletropollFixoDxf = seg && this._isForma34(seg) && eq.technical?.fabricante === 'Eletropoll' && eq.technical?.tipoGaveta === 'Fixo';
         const panelH = (isForma2 || isForma34dxf) ? 2200 : parseInt(eq.technical?.alturaPainel) || 2200;
         const panelW = parseInt(eq.technical?.larguraPainel) || 800;
         const panelD = parseInt(eq.technical?.profundidadePainel) || 600;
@@ -17089,7 +17570,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             if (!isForma2 && !isForma34dxf) { CAB_H = maxH_auto; panelH = maxH_auto - 100; }
             drawCabinetGroup(frontCabinets, 0);
             const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
-            if (isForma2 || seg === 'Forma 1') drawDoorCabinetGroup(frontCabinets, totalW + 200);
+            if (isForma2 || seg === 'Forma 1' || isEletropollFixoDxf) drawDoorCabinetGroup(frontCabinets, totalW + 200);
         } else if (isB2B) {
             const resultF = this.suggestLayout(eq, 'front');
             const resultR = this.suggestLayout(eq, 'rear');
@@ -17104,7 +17585,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
                 drawCabinetGroup(rearCabinets, totalW + 200);
             }
-            if ((isForma2 || seg === 'Forma 1') && frontCabinets.length > 0 && rearCabinets.length > 0) {
+            if ((isForma2 || seg === 'Forma 1' || isEletropollFixoDxf) && frontCabinets.length > 0 && rearCabinets.length > 0) {
                 const doorStart = frontCabinets.reduce((s, c) => s + c.width, 0) + 200 + rearCabinets.reduce((s, c) => s + c.width, 0) + 200;
                 drawDoorCabinetGroup(frontCabinets, doorStart);
                 const doorFrontEnd = doorStart + frontCabinets.reduce((s, c) => s + c.width, 0) + 200;
@@ -17121,7 +17602,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             const maxH_single = Math.max(...frontCabinets.map(c => c.height || 2300), 2300);
             if (!isForma2 && !isForma34dxf) { CAB_H = maxH_single; panelH = maxH_single - 100; }
             drawCabinetGroup(frontCabinets, 0);
-            if (isForma2 || seg === 'Forma 1') {
+            if (isForma2 || seg === 'Forma 1' || isEletropollFixoDxf) {
                 const totalW = frontCabinets.reduce((s, c) => s + c.width, 0);
                 drawDoorCabinetGroup(frontCabinets, totalW + 200);
             }
@@ -17142,15 +17623,16 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 ? Math.max(...rearCabinets.map(c => c.depth || 600))
                 : 0;
             const totalDepth = isB2B ? frontDepth : frontDepth + rearDepth;
-            const isForma34Side = cabinets.some(c => this._isForma34KitFrame(c.segregacao, c._fabricante));
+            const isForma34Side = cabinets.some(c => this._isForma34EstruturaModular(c.segregacao, c._fabricante));
             const sx = startX;
 
             // Cabinet outline (single combined box)
             d.setActiveLayer(L_CAB);
             d.rect(sx, yf(CAB_H), totalDepth, CAB_H);
 
-            // Olhais para içamento — vista lateral (corte): 4×60mm, faces internas distanciadas 485mm — apenas Forma 1/2
-            if (!isForma34Side) {
+            // Olhais para içamento — vista lateral (corte): 4×60mm, faces internas distanciadas 485mm — Forma 1/2 e Eletropoll
+            const temOlhaisSide = !isForma34Side || cabinets.some(c => c._fabricante === 'Eletropoll');
+            if (temOlhaisSide) {
                 const eyeW_dx = 4, eyeH_dx = 60, innerDist_dx = 485;
                 const marginEyeDx = (totalDepth - innerDist_dx - eyeW_dx * 2) / 2;
                 if (marginEyeDx > 0) {
@@ -17902,6 +18384,9 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
 
 
+            // Atualizar documentos do cliente antes de exportar
+            await this._fetchClientDocuments(data.ptc_folder || window.app.currentPtc?.folder);
+
             // Preparar dados do template
             const clientObj = (store.getState().clientes || []).find(c => c.razaoSocial === data.cliente);
             const _isAUTPRO = store.getState().company?.folderName?.startsWith('AUT_');
@@ -18007,6 +18492,11 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
                 objeto: data.objeto || '',
                 objeto_do_fornecimento: data.objeto || '',
+                documentos_cliente: (data.clientDocuments || []).map((d, i) => ({
+                    index: i + 1,
+                    nome: d.nome || '',
+                    extensao: d.extensao || ''
+                })),
                 cidade: data.cidade || '',
                 uf: data.uf || '',
 

@@ -97,7 +97,8 @@ const initialState = {
     crmWebhooks: [],
     crmSequencias: [],
     crmEmailTemplates: [],
-    crmStages: []
+    crmStages: [],
+    activeNetworkArchitecture: null
 };
 
 class Store {

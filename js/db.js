@@ -371,6 +371,11 @@ function initSchema() {
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
             name TEXT,
+            fabricante TEXT DEFAULT '',
+            descricao TEXT DEFAULT '',
+            largura_mm REAL DEFAULT 0,
+            altura_mm REAL DEFAULT 0,
+            profundidade_mm REAL DEFAULT 0,
             items TEXT,
             createdAt TEXT,
             updatedAt TEXT
@@ -646,6 +651,13 @@ function initSchema() {
 
     // Migration: add codigo_cliente column to clientes (for AUTPRO numbering)
     try { db.exec("ALTER TABLE clientes ADD COLUMN codigo_cliente TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+
+    // Migration: add fabricante, dimensoes columns to chaparia_lists
+    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN fabricante TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN descricao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN largura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN altura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN profundidade_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
 
     // Migration: add probability column to crm_stages (for weighted forecast)
     try { db.exec("ALTER TABLE crm_stages ADD COLUMN probability INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
