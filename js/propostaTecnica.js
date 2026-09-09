@@ -17092,45 +17092,36 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
         console.log('[PDF] imagesHtml length:', imagesHtml.length);
 
-        const overlay = document.createElement('div');
-        overlay.id = '_layout_print_overlay';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:999999;display:flex;justify-content:center;align-items:center;overflow:auto;';
-        overlay.innerHTML = imagesHtml;
-        document.body.appendChild(overlay);
+        const printFrame = document.createElement('iframe');
+        printFrame.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
+        document.body.appendChild(printFrame);
 
-        const hiddenEls = [];
-        for (const child of document.body.children) {
-            if (child.id !== '_layout_print_overlay') {
-                child.style.setProperty('display', 'none', 'important');
-                hiddenEls.push(child);
-            }
-        }
+        const printDoc = printFrame.contentWindow.document;
+        printDoc.open();
+        printDoc.write(`<!DOCTYPE html><html><head>
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                body { display:flex; justify-content:center; align-items:flex-start; background:white; }
+                img { max-width:100%; height:auto; }
+                @media print {
+                    body { display:flex; justify-content:center; align-items:flex-start; }
+                    img { max-width:100%; height:auto; page-break-inside:avoid; }
+                }
+            </style>
+        </head><body>${imagesHtml}</body></html>`);
+        printDoc.close();
 
-        const styleTag = document.createElement('style');
-        styleTag.id = '_print_only_style';
-        styleTag.textContent = `
-            @media print {
-                body > *:not(#_layout_print_overlay) { display: none !important; }
-                #_layout_print_overlay { position:static;width:auto;height:auto;overflow:visible; }
-                #_layout_print_overlay img { max-width:100%;max-height:none;object-fit:contain; }
-            }
-        `;
-        document.head.appendChild(styleTag);
-
-        console.log('[PDF] overlay visible, calling print');
+        console.log('[PDF] iframe ready, calling print');
 
         const cleanup = () => {
-            const el = document.getElementById('_layout_print_overlay');
-            if (el) el.remove();
-            const st = document.getElementById('_print_only_style');
-            if (st) st.remove();
-            for (const h of hiddenEls) { h.style.display = ''; }
+            document.body.removeChild(printFrame);
             window.removeEventListener('afterprint', cleanup);
         };
 
         window.addEventListener('afterprint', cleanup);
+        printFrame.contentWindow.focus();
         requestAnimationFrame(() => {
-            window.print();
+            printFrame.contentWindow.print();
         });
         setTimeout(cleanup, 30000);
         } catch(e) { console.error('[PDF] error:', e); app.toast('Erro ao exportar PDF: ' + e.message, 'error'); }
