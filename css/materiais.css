@@ -3,12 +3,42 @@
    Material list display with uppercase text
    ===================================================================== */
 
+/* Main materiais view */
 #view-materiais td,
 #view-materiais th {
     text-transform: uppercase;
     font-size: 12px;
 }
 
-#view-materiais .text-xs {
+/* Tipicos builder BOM table */
+#builder-items-body td {
+    text-transform: uppercase;
+}
+
+/* LM (Lista de Materiais) table */
+#lm-list-body td {
+    text-transform: uppercase;
+}
+
+/* Cubiculos BOM table */
+#cubiculos-bom-body td {
+    text-transform: uppercase;
+}
+
+/* Chaparia BOM table */
+#chaparia-bom-body td {
+    text-transform: uppercase;
+}
+
+/* Paineis BOM table */
+#paineis-bom-body td {
+    text-transform: uppercase;
+}
+
+/* Keep small meta text normal case */
+#view-materiais .text-xs,
+.lm-group-card .text-xs,
+#builder-items-body .text-xs {
     text-transform: none;
+    font-size: 11px;
 }
