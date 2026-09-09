@@ -17094,31 +17094,37 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
         const overlay = document.createElement('div');
         overlay.id = '_layout_print_overlay';
-        overlay.innerHTML = `
-            <style>
-                @media print {
-                    body > *:not(#_layout_print_overlay) { display: none !important; }
-                    #_layout_print_overlay {
-                        display: flex !important;
-                        position: fixed; top: 0; left: 0;
-                        width: 100vw; height: 100vh;
-                        background: white; margin: 0; padding: 0;
-                        justify-content: center; align-items: center;
-                    }
-                    #_layout_print_overlay img { max-width: 100%; max-height: 100vh; object-fit: contain; }
-                }
-                @media screen {
-                    #_layout_print_overlay { display: none; }
-                }
-            </style>
-            ${imagesHtml}
-        `;
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:white;z-index:999999;display:flex;justify-content:center;align-items:center;overflow:auto;';
+        overlay.innerHTML = imagesHtml;
         document.body.appendChild(overlay);
-        console.log('[PDF] overlay appended, calling print');
+
+        const hiddenEls = [];
+        for (const child of document.body.children) {
+            if (child.id !== '_layout_print_overlay') {
+                child.style.setProperty('display', 'none', 'important');
+                hiddenEls.push(child);
+            }
+        }
+
+        const styleTag = document.createElement('style');
+        styleTag.id = '_print_only_style';
+        styleTag.textContent = `
+            @media print {
+                body > *:not(#_layout_print_overlay) { display: none !important; }
+                #_layout_print_overlay { position:static;width:auto;height:auto;overflow:visible; }
+                #_layout_print_overlay img { max-width:100%;max-height:none;object-fit:contain; }
+            }
+        `;
+        document.head.appendChild(styleTag);
+
+        console.log('[PDF] overlay visible, calling print');
 
         const cleanup = () => {
             const el = document.getElementById('_layout_print_overlay');
             if (el) el.remove();
+            const st = document.getElementById('_print_only_style');
+            if (st) st.remove();
+            for (const h of hiddenEls) { h.style.display = ''; }
             window.removeEventListener('afterprint', cleanup);
         };
 
@@ -17126,7 +17132,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         requestAnimationFrame(() => {
             window.print();
         });
-        setTimeout(cleanup, 10000);
+        setTimeout(cleanup, 30000);
         } catch(e) { console.error('[PDF] error:', e); app.toast('Erro ao exportar PDF: ' + e.message, 'error'); }
     },
 
