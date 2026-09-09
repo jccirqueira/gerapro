@@ -4735,10 +4735,6 @@ const PropostaTecnicaModule = {
                 </div>
             </div>
         `;
-                    </div>
-                </div>
-            </div>
-        `;
     },
 
     _lsFormatGrouped(arr, prop, unit) {
