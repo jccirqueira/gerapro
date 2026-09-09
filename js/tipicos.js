@@ -535,6 +535,7 @@ const TipicosModule = {
                                     <table class="table table-striped" style="margin: 0;">
                                         <thead>
                                             <tr>
+                                                <th style="width: 30px;"></th>
                                                 <th style="width: 60px; text-align: center;">QTD</th>
                                                 <th style="padding-left: 10px;">DESCRIÇÃO</th>
                                                 <th style="width: 100px; text-align: center;">MODELO</th>
