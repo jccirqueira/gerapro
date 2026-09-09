@@ -1102,8 +1102,7 @@ const TipicosModule = {
 
         let total = 0;
 
-        tbody.innerHTML = this.currentBuilderState.items.map((index) => {
-            const item = this.currentBuilderState.items[index];
+        tbody.innerHTML = this.currentBuilderState.items.map((item, index) => {
             const mat = store.getState().materiais.find(m => m.id === item.materialId) || item;
             const custo = item.custo || mat.custo || 0;
             const subtotal = custo * item.qtd;
