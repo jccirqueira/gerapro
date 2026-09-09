@@ -1078,7 +1078,12 @@ const TipicosModule = {
         } else {
             this.currentBuilderState.items.push({
                 materialId: material.id,
-                qtd: qtd
+                qtd: qtd,
+                descricao: material.descricao || '',
+                modelo: material.modelo || '',
+                codigoFabricante: material.codigoFabricante || '',
+                fabricante: material.fabricante || '',
+                custo: material.custo || 0
             });
         }
 
@@ -1097,8 +1102,11 @@ const TipicosModule = {
 
         let total = 0;
 
-        tbody.innerHTML = this.currentBuilderState.items.map((item, index) => {
-            const subtotal = item.custo * item.qtd;
+        tbody.innerHTML = this.currentBuilderState.items.map((index) => {
+            const item = this.currentBuilderState.items[index];
+            const mat = store.getState().materiais.find(m => m.id === item.materialId) || item;
+            const custo = item.custo || mat.custo || 0;
+            const subtotal = custo * item.qtd;
             total += subtotal;
             return `
                 <tr data-index="${index}">
@@ -1107,18 +1115,18 @@ const TipicosModule = {
                     </td>
                     <td style="text-align: center;"><input type="number" class="form-control" style="padding: 2px; height: 24px; text-align: center;" value="${item.qtd}" onchange="app.tipicos.updateQtd(${index}, this.value)"></td>
                     <td style="padding-left: 10px;">
-                        <div style="font-size: 13px;">${item.descricao || '-'}</div>
+                        <div style="font-size: 13px;">${item.descricao || mat.descricao || '-'}</div>
                     </td>
                     <td style="text-align: center;">
-                        <div class="text-xs text-muted">${item.modelo || '-'}</div>
+                        <div class="text-xs text-muted">${item.modelo || mat.modelo || '-'}</div>
                     </td>
                     <td style="text-align: center;">
-                         <div class="text-xs text-muted" style="font-family: monospace;">${item.codigoFabricante || (store.getState().materiais.find(m => m.id === item.materialId)?.codigoFabricante || '-')}</div>
+                         <div class="text-xs text-muted" style="font-family: monospace;">${item.codigoFabricante || mat.codigoFabricante || '-'}</div>
                     </td>
                     <td style="text-align: center;">
-                        <div class="text-xs text-muted">${item.fabricante || (store.getState().materiais.find(m => m.id === item.materialId)?.fabricante || '-')}</div>
+                        <div class="text-xs text-muted">${item.fabricante || mat.fabricante || '-'}</div>
                     </td>
-                    <td style="text-align: right;">${app.formatCurrency(item.custo)}</td>
+                    <td style="text-align: right;">${app.formatCurrency(custo)}</td>
                     <td style="text-align: right;">${app.formatCurrency(subtotal)}</td>
                     <td>${store.canDelete() ? `<button class="btn btn-ghost text-danger" onclick="app.tipicos.removeItem(${index})"><i class="ph ph-trash"></i></button>` : ''}</td>
                 </tr>
