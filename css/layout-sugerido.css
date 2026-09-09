@@ -1,0 +1,263 @@
+/* =====================================================================
+   LAYOUT SUGERIDO — Proposta Técnica > Equipamentos
+   ===================================================================== */
+
+/* ── Header ── */
+.ls-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.ls-header-title {
+    margin: 0;
+    color: var(--color-section-navy);
+    font-size: 18px;
+}
+.ls-header-subtitle {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+}
+.ls-header-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* ── Summary Cards ── */
+.ls-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.ls-summary-card {
+    background: var(--color-bg-panel);
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    padding: 16px;
+    text-align: center;
+}
+.ls-summary-label {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.ls-summary-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-section-navy);
+    margin-top: 4px;
+}
+.ls-summary-value--small {
+    font-size: 18px;
+}
+.ls-summary-value--green {
+    color: var(--color-success);
+}
+
+/* ── Canvas Container ── */
+.ls-canvas-box {
+    background: var(--color-bg-panel);
+    border-radius: 12px;
+    overflow: auto;
+    padding: 16px;
+}
+.ls-canvas-box--front {
+    border: 2px solid var(--blue-500);
+}
+.ls-canvas-box--rear {
+    border: 2px dashed var(--cyan-600);
+}
+.ls-canvas-box--external {
+    border: 2px solid var(--purple-500);
+}
+.ls-canvas-box--side {
+    border: 2px solid var(--purple-500);
+}
+.ls-canvas-img {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+}
+.ls-canvas-label {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    letter-spacing: 2px;
+}
+
+/* ── Section Title ── */
+.ls-section-title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+.ls-section-title--front { color: var(--color-section-navy); }
+.ls-section-title--external { color: var(--purple-600); }
+.ls-section-title--rear { color: var(--cyan-700); }
+.ls-section-title--side { color: var(--purple-600); }
+
+/* ── Views Container ── */
+.ls-views {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ── Warnings ── */
+.ls-warning {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #92400e;
+}
+.ls-excess {
+    background: #fef2f2;
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #991b1b;
+}
+
+/* ── Cabinet Assignment Controls ── */
+.ls-cab-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    justify-content: center;
+}
+.ls-cab-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f8fafc;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+.ls-cab-name {
+    font-weight: 600;
+    color: var(--color-section-navy);
+}
+.ls-cab-sep {
+    color: #94a3b8;
+}
+.ls-cab-label {
+    color: var(--color-text-muted);
+}
+.ls-cab-select {
+    font-size: 11px;
+    padding: 2px 4px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+}
+.ls-cab-gaveta {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    background: var(--neutral-200);
+    border-radius: 4px;
+    padding: 1px 6px;
+}
+
+/* ── BOM Section ── */
+.ls-bom {
+    margin-top: 20px;
+    background: var(--color-bg-panel);
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+}
+.ls-bom-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--color-border);
+    user-select: none;
+}
+.ls-bom-header:hover {
+    background: var(--neutral-100);
+}
+.ls-bom-body {
+    padding: 16px;
+}
+
+/* ── Empty State ── */
+.ls-empty {
+    text-align: center;
+    padding: 40px;
+    background: var(--color-bg-panel);
+    border-radius: 12px;
+    border: 2px dashed var(--color-border-strong);
+    margin-bottom: 20px;
+}
+.ls-empty-desc {
+    font-size: 13px;
+    color: #94a3b8;
+    max-width: 420px;
+    margin: 16px auto 0;
+    line-height: 1.6;
+}
+
+/* ── Side View Selector ── */
+.ls-side-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 8px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+    .ls-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 768px) {
+    .ls-summary {
+        grid-template-columns: 1fr 1fr;
+    }
+    .ls-summary-value {
+        font-size: 22px;
+    }
+    .ls-summary-value--small {
+        font-size: 15px;
+    }
+    .ls-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .ls-header-actions {
+        width: 100%;
+    }
+    .ls-cab-controls {
+        flex-direction: column;
+    }
+}
+@media (max-width: 480px) {
+    .ls-summary {
+        grid-template-columns: 1fr;
+    }
+}

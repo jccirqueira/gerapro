@@ -4515,69 +4515,26 @@ const PropostaTecnicaModule = {
             return `
             <div style="animation:fadeIn 0.3s ease;padding:20px;">
                 <div style="max-width:100%;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:15px;margin-bottom:20px;">
+                    <div class="ls-header">
                         <div>
-                            <h4 style="margin:0;color:#1e3a8a;font-size:18px;">Layout Sugerido: ${eq.tag}</h4>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Distribuição física dos armários com base nas cargas × típicos × materiais</div>
+                            <h4 class="ls-header-title">Layout Sugerido: ${eq.tag}</h4>
+                            <div class="ls-header-subtitle">Distribuição física dos armários com base nas cargas × típicos × materiais</div>
                         </div>
                     </div>
-                    <div style="text-align:center;padding:40px 40px;background:white;border-radius:12px;border:2px dashed #cbd5e1;margin-bottom:20px;">
+                    <div class="ls-empty">
                         <i class="ph ph-frame-corners" style="font-size:48px;color:#94a3b8;opacity:0.3;margin-bottom:12px;"></i>
-                        <div style="font-size:16px;font-weight:700;color:#64748b;margin-bottom:16px;">Nenhum armário definido</div>
+                        <div style="font-size:16px;font-weight:700;color:var(--color-text-muted);margin-bottom:16px;">Nenhum armário definido</div>
                         <button class="btn btn-primary" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:13px;padding:8px 20px;">
                             + Criar Armário
                         </button>
-                        <div style="font-size:13px;color:#94a3b8;max-width:420px;margin:16px auto 0;line-height:1.6;">
+                        <div class="ls-empty-desc">
                             Para começar, vá até a <strong>Lista de Materiais</strong> abaixo, selecione uma carga e clique em <strong>"Alocar Carga"</strong> para posicionar todos os materiais nos armários criados.
                         </div>
                     </div>
-                    <div style="margin-top:16px;background:white;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
-                        <div onclick="const e=document.getElementById('bom_body_empty');const v=e.style.display;e.style.display=v==='none'?'':'none';this.querySelector('.bom-arrow').textContent=v==='none'?'▼':'▶'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:#f8fafc;border-bottom:1px solid #e2e8f0;user-select:none;">
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <span class="bom-arrow" style="font-size:10px;">▶</span>
-                                <strong style="font-size:14px;">Lista de Materiais (${totalMateriais} itens)</strong>
-                            </div>
-                            <span style="font-size:11px;color:#64748b;">Aloque materiais aos armários expandindo cada carga</span>
-                        </div>
-                        <div id="bom_body_empty" style="display:none;padding:16px;">
-                            ${bomHtml}
-                        </div>
-                    </div>
+                    ${this._lsRenderBom(bomHtml, totalMateriais, 'bom_body_empty')}
                 </div>
             </div>`;
         }
-
-        const formatGrouped = (arr, prop, unit) => {
-            const counts = {};
-            for (const c of arr) {
-                const v = c[prop] || 600;
-                counts[v] = (counts[v] || 0) + 1;
-            }
-            return Object.entries(counts)
-                .sort(([a], [b]) => b - a)
-                .map(([v, n]) => n > 1 ? `${n}×${v}${unit}` : `${v}${unit}`)
-                .join(', ');
-        };
-        const summaryCards = `
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
-                <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;padding:16px;text-align:center;">
-                    <div style="color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Armários</div>
-                    <div style="font-size:28px;font-weight:800;color:#1e3a8a;margin-top:4px;">${cabinets.length}</div>
-                </div>
-                <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;padding:16px;text-align:center;">
-                    <div style="color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Larguras Instaladas</div>
-                    <div style="font-size:18px;font-weight:800;color:#16a34a;margin-top:4px;">${formatGrouped(cabinets, 'width', 'mm')}</div>
-                </div>
-                <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;padding:16px;text-align:center;">
-                    <div style="color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Altura Instalada</div>
-                    <div style="font-size:18px;font-weight:800;color:#1e3a8a;margin-top:4px;">${formatGrouped(cabinets, 'height', 'mm')}</div>
-                </div>
-                <div style="background:white;border-radius:10px;border:1px solid #e2e8f0;padding:16px;text-align:center;">
-                    <div style="color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Profundidade Instalada</div>
-                    <div style="font-size:18px;font-weight:800;color:#1e3a8a;margin-top:4px;">${formatGrouped(cabinets, 'depth', 'mm')}</div>
-                </div>
-            </div>
-        `;
 
         const arvore = this._geraArvoreMateriais(eq);
         const bomHtml = this._renderBOMAlocacao(arvore, cabinets, eq.technical?.montagem);
@@ -4595,9 +4552,9 @@ const PropostaTecnicaModule = {
             this._drawLayoutCanvas(canvasT, cabsRear);
             const dataUrlT = canvasT.toDataURL('image/png');
 
-        const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
-        const isEletropollFixo = seg && this._isForma34(seg) && eq.technical?.fabricante === 'Eletropoll' && eq.technical?.tipoGaveta === 'Fixo';
-        const hasExternalViewB2B = isForma2 || seg === 'Forma 1' || isEletropollFixo;
+            const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+            const isEletropollFixo = seg && this._isForma34(seg) && eq.technical?.fabricante === 'Eletropoll' && eq.technical?.tipoGaveta === 'Fixo';
+            const hasExternalViewB2B = isForma2 || seg === 'Forma 1' || isEletropollFixo;
             let dataUrlExtF = '', dataUrlExtR = '';
             if (hasExternalViewB2B) {
                 const offFE = document.createElement('canvas');
@@ -4608,33 +4565,17 @@ const PropostaTecnicaModule = {
                 dataUrlExtR = offRE.toDataURL('image/png');
             }
 
-            const warningsF = cabinets.filter(c => c.warning).map(c => `
-                <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
-                    <strong>${c.name}:</strong> ${c.warning}
-                </div>
-            `).join('');
-
-            const allExcess = cabinets.filter(c => c._excessLoads?.length > 0).flatMap(c => c._excessLoads);
-            const excessDataAttr = allExcess.length > 0 ? encodeURIComponent(JSON.stringify(allExcess.map(l => ({ tag: l.tag, desc: l.desc || l.tag, power: l.power, current: l.current })))) : '';
-            const excessWarning = allExcess.length > 0 ? `
-                <div style="background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#991b1b;">
-                    <strong>⚠️ Capacidade máxima atingida:</strong> ${allExcess.length} carga(s) não puderam ser alocadas.
-                    <button class="btn btn-xs btn-primary" data-excess='${excessDataAttr}' onclick="window.propostaTecnicaModule._showExcessLoadsDialog(JSON.parse(decodeURIComponent(this.dataset.excess)))" style="margin-left:8px;background:#dc2626;border-color:#dc2626;">Resolver</button>
-                </div>
-            ` : '';
-
             const isForma2b2b = seg === 'Forma 2a' || seg === 'Forma 2b' || this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
-        const baseCabs = Object.entries(eq.layoutConfig?.cabinetAssignments || {}).map(([id, d]) => ({ id, name: d.name, width: d.width || 600, height: d.height, depth: d.depth || 600 }));
 
             return `
             <div style="animation:fadeIn 0.3s ease;padding:20px;">
                 <div style="max-width:100%;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:15px;margin-bottom:20px;">
+                    <div class="ls-header">
                         <div>
-                            <h4 style="margin:0;color:#1e3a8a;font-size:18px;">Layout Sugerido: ${eq.tag}</h4>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Montagem <strong>Back to Back</strong> — Vistas Frontal e Traseira</div>
+                            <h4 class="ls-header-title">Layout Sugerido: ${eq.tag}</h4>
+                            <div class="ls-header-subtitle">Montagem <strong>Back to Back</strong> — Vistas Frontal e Traseira</div>
                         </div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <div class="ls-header-actions">
                             <button type="button" class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._showLayoutConfigPanel()" style="gap:4px;">
                                 <i class="ph ph-gear"></i> Configurar
                             </button>
@@ -4654,109 +4595,60 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_auto_chaparia_b2b" onchange="window.propostaTecnicaModule._onChangeAutoChaparia(this.checked)" ${eq.autoChaparia !== false ? 'checked' : ''}> Auto Chaparia
                             </label>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_side_view_b2b" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
                     </div>
-                    ${summaryCards}
-                    ${warningsF}${excessWarning}
-                    <div style="display:flex;flex-direction:column;gap:24px;">
+                    ${this._lsRenderSummary(cabinets)}
+                    ${this._lsRenderWarnings(cabinets)}
+                    <div class="ls-views">
                         <div>
-                            <h5 style="margin:0 0 8px;color:#1e3a8a;font-size:14px;font-weight:700;">▸ VISTA FRONTAL INTERNA</h5>
-                            <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #3b82f6;">
-                                <img id="layout-canvas-front" src="${dataUrlF}" style="display:block;margin:0 auto;" alt="Vista Frontal">
+                            <h5 class="ls-section-title ls-section-title--front">▸ VISTA FRONTAL INTERNA</h5>
+                            <div class="ls-canvas-box ls-canvas-box--front">
+                                <img id="layout-canvas-front" src="${dataUrlF}" class="ls-canvas-img" alt="Vista Frontal">
                             </div>
                         </div>
                         ${hasExternalViewB2B ? `
                         <div>
-                            <h5 style="margin:0 0 8px;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA FRONTAL EXTERNA</h5>
-                            <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #7c3aed;">
-                                <img id="layout-canvas-external-front" src="${dataUrlExtF}" style="display:block;margin:0 auto;" alt="Vista Frontal Externa">
+                            <h5 class="ls-section-title ls-section-title--external">▸ VISTA FRONTAL EXTERNA</h5>
+                            <div class="ls-canvas-box ls-canvas-box--external">
+                                <img id="layout-canvas-external-front" src="${dataUrlExtF}" class="ls-canvas-img" alt="Vista Frontal Externa">
                             </div>
                         </div>
                         ` : ''}
                         <div>
-                            <h5 style="margin:0 0 8px;color:#0e7490;font-size:14px;font-weight:700;">▸ VISTA TRASEIRA INTERNA</h5>
-                            <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px dashed #0e7490;">
-                                <img id="layout-canvas-rear" src="${dataUrlT}" style="display:block;margin:0 auto;" alt="Vista Traseira">
+                            <h5 class="ls-section-title ls-section-title--rear">▸ VISTA TRASEIRA INTERNA</h5>
+                            <div class="ls-canvas-box ls-canvas-box--rear">
+                                <img id="layout-canvas-rear" src="${dataUrlT}" class="ls-canvas-img" alt="Vista Traseira">
                             </div>
                         </div>
                         ${hasExternalViewB2B ? `
                         <div>
-                            <h5 style="margin:0 0 8px;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA TRASEIRA EXTERNA</h5>
-                            <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px dashed #7c3aed;">
-                                <img id="layout-canvas-external-rear" src="${dataUrlExtR}" style="display:block;margin:0 auto;" alt="Vista Traseira Externa">
+                            <h5 class="ls-section-title ls-section-title--external">▸ VISTA TRASEIRA EXTERNA</h5>
+                            <div class="ls-canvas-box ls-canvas-box--external">
+                                <img id="layout-canvas-external-rear" src="${dataUrlExtR}" class="ls-canvas-img" alt="Vista Traseira Externa">
                             </div>
                         </div>
                         ` : ''}
                         <div id="side-view-container-b2b" style="display:${eq.layoutConfig?.showSideView ? 'block' : 'none'};">
-                            <div style="display:flex;align-items:center;gap:12px;margin:0 0 8px;">
-                                <h5 style="margin:0;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA LATERAL (CORTE)</h5>
-                                <select id="sel_side_view_cabinet_b2b" onchange="window.propostaTecnicaModule._onChangeSideViewCabinet()" style="font-size:12px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:4px;">
+                            <div class="ls-side-header">
+                                <h5 class="ls-section-title ls-section-title--side">▸ VISTA LATERAL (CORTE)</h5>
+                                <select id="sel_side_view_cabinet_b2b" onchange="window.propostaTecnicaModule._onChangeSideViewCabinet()" class="ls-cab-select">
                                     <option value="-1" ${(eq.layoutConfig?.sideViewCabinetIndex ?? -1) === -1 ? 'selected' : ''}>Todos (Combinado)</option>
                                     ${cabinets.map((c, i) => `<option value="${i}" ${eq.layoutConfig?.sideViewCabinetIndex === i ? 'selected' : ''}>${c.name}</option>`).join('')}
                                 </select>
                             </div>
-                            <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #7c3aed;">
-                                <img id="layout-canvas-side-b2b" style="display:block;margin:0 auto;" alt="Vista Lateral Frontal">
+                            <div class="ls-canvas-box ls-canvas-box--side">
+                                <img id="layout-canvas-side-b2b" class="ls-canvas-img" alt="Vista Lateral Frontal">
                             </div>
                         </div>
-
                     </div>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;justify-content:center;">
-                        ${baseCabs.map(bc => {
-                            const cabH = bc.height || ((isForma2b2b) ? 2300 : (parseInt(eq.technical?.alturaPainel) || 2200) + 100);
-                            return `<div style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;">
-                                <span style="font-weight:600;color:#1e3a8a;">${bc.name}</span>
-                                <span style="color:#94a3b8;">|</span>
-                                <span style="color:#64748b;">Largura:</span>
-                                <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
-                                    onchange="window.propostaTecnicaModule._setLarguraArmario('${bc.id}',this.value)">
-                                    <option value="400" ${bc.width === 400 ? 'selected' : ''}>400mm</option>
-                                    <option value="600" ${bc.width === 600 ? 'selected' : ''}>600mm</option>
-                                    <option value="800" ${bc.width === 800 ? 'selected' : ''}>800mm</option>
-                                    <option value="1000" ${bc.width === 1000 ? 'selected' : ''}>1000mm</option>
-                                </select>
-                                 ${!isForma2b2b ? `<span style="color:#94a3b8;">|</span>
-                                 <span style="color:#64748b;">Altura:</span>
-                                 <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
-                                     onchange="window.propostaTecnicaModule._setAlturaArmario('${bc.id}',this.value)">
-                                     <option value="1600" ${cabH === 1600 ? 'selected' : ''}>1600mm</option>
-                                     <option value="1800" ${cabH === 1800 ? 'selected' : ''}>1800mm</option>
-                                     <option value="2000" ${cabH === 2000 ? 'selected' : ''}>2000mm</option>
-                                     <option value="2300" ${cabH === 2300 ? 'selected' : ''}>2300mm</option>
-                                 </select>` : ''}
-                                 <span style="color:#94a3b8;">|</span>
-                                 <span style="color:#64748b;">Profundidade:</span>
-                                 <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
-                                     onchange="window.propostaTecnicaModule._setProfundidadeArmario('${bc.id}',this.value)">
-                                     <option value="400" ${(bc.depth || 600) === 400 ? 'selected' : ''}>400mm</option>
-                                     <option value="600" ${(bc.depth || 600) === 600 ? 'selected' : ''}>600mm</option>
-                                     <option value="800" ${(bc.depth || 600) === 800 ? 'selected' : ''}>800mm</option>
-                                     <option value="1000" ${(bc.depth || 600) === 1000 ? 'selected' : ''}>1000mm</option>
-                                     <option value="1200" ${(bc.depth || 600) === 1200 ? 'selected' : ''}>1200mm</option>
-                                 </select>
-                                 <button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._removerArmario('${bc.id}')" style="color:#ef4444;font-size:11px;padding:2px 4px;" title="Remover armário">✕</button>
-                            </div>`;
-                        }).join('')}
-                        <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:11px;padding:6px 10px;">+ Adicionar Armário</button>
-                    </div>
-                    <div style="margin-top:20px;background:white;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
-                        <div onclick="const e=document.getElementById('bom_body');const v=e.style.display;e.style.display=v==='none'?'':'none';this.querySelector('.bom-arrow').textContent=v==='none'?'▼':'▶'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:#f8fafc;border-bottom:1px solid #e2e8f0;user-select:none;">
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <span class="bom-arrow" style="font-size:10px;">▶</span>
-                                <strong style="font-size:14px;">Lista de Materiais (${totalMateriais} itens)</strong>
-                            </div>
-                            <span style="font-size:11px;color:#64748b;">Aloque materiais aos armários (Frente / Traseira)</span>
-                        </div>
-                        <div id="bom_body" style="display:none;padding:16px;">
-                            ${bomHtml}
-                        </div>
-                    </div>
+                    ${this._lsRenderCabinetControls(cabinets, seg, eq, true)}
+                    ${this._lsRenderBom(bomHtml, totalMateriais, 'bom_body')}
                 </div>
             </div>`;
         }
@@ -4775,38 +4667,23 @@ const PropostaTecnicaModule = {
             dataUrlExt = offscreenExt.toDataURL('image/png');
         }
 
-        const warnings = cabinets.filter(c => c.warning).map(c => `
-            <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#92400e;">
-                <strong>${c.name}:</strong> ${c.warning}
-            </div>
-        `).join('');
-
-        const allExcess = cabinets.filter(c => c._excessLoads?.length > 0).flatMap(c => c._excessLoads);
-        const excessDataAttr = allExcess.length > 0 ? encodeURIComponent(JSON.stringify(allExcess.map(l => ({ tag: l.tag, desc: l.desc || l.tag, power: l.power, current: l.current })))) : '';
-        const excessWarning = allExcess.length > 0 ? `
-                <div style="background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#991b1b;">
-                    <strong>⚠️ Capacidade máxima atingida:</strong> ${allExcess.length} carga(s) não puderam ser alocadas.
-                    <button class="btn btn-xs btn-primary" data-excess='${excessDataAttr}' onclick="window.propostaTecnicaModule._showExcessLoadsDialog(JSON.parse(decodeURIComponent(this.dataset.excess)))" style="margin-left:8px;background:#dc2626;border-color:#dc2626;">Resolver</button>
-                </div>
-            ` : '';
-
         const externalViewHtml = hasExternalView ? `
                         <div style="margin-top:24px;">
-                            <h5 style="margin:0 0 8px;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA FRONTAL EXTERNA</h5>
-                            <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #7c3aed;">
-                                <img id="layout-canvas-external" src="${dataUrlExt}" style="display:block;margin:0 auto;" alt="Vista Frontal Externa">
+                            <h5 class="ls-section-title ls-section-title--external">▸ VISTA FRONTAL EXTERNA</h5>
+                            <div class="ls-canvas-box ls-canvas-box--external">
+                                <img id="layout-canvas-external" src="${dataUrlExt}" class="ls-canvas-img" alt="Vista Frontal Externa">
                             </div>
                         </div>` : '';
 
         return `
             <div style="animation:fadeIn 0.3s ease;padding:20px;">
                 <div style="max-width:100%;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;padding-bottom:15px;margin-bottom:20px;">
+                    <div class="ls-header">
                         <div>
-                            <h4 style="margin:0;color:#1e3a8a;font-size:18px;">Layout Sugerido: ${eq.tag}</h4>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">Distribuição física dos armários com base nas cargas × típicos × materiais</div>
+                            <h4 class="ls-header-title">Layout Sugerido: ${eq.tag}</h4>
+                            <div class="ls-header-subtitle">Distribuição física dos armários com base nas cargas × típicos × materiais</div>
                         </div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <div class="ls-header-actions">
                             <button type="button" class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._showLayoutConfigPanel()" style="gap:4px;">
                                 <i class="ph ph-gear"></i> Configurar
                             </button>
@@ -4826,97 +4703,161 @@ const PropostaTecnicaModule = {
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_auto_chaparia" onchange="window.propostaTecnicaModule._onChangeAutoChaparia(this.checked)" ${eq.autoChaparia !== false ? 'checked' : ''}> Auto Chaparia
                             </label>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;user-select:none;">
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
                                 <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
                     </div>
-                        ${summaryCards}
-                    ${warnings}${excessWarning}
-                    <div style="background:white;border-radius:12px;overflow:auto;padding:16px;">
-                        <img id="layout-canvas" src="${dataUrl}" style="display:block;margin:0 auto;" alt="Layout Sugerido">
-                        <div style="text-align:center;margin-top:12px;font-size:13px;font-weight:700;color:#64748b;letter-spacing:2px;">LAYOUT ORIENTATIVO</div>
+                    ${this._lsRenderSummary(cabinets)}
+                    ${this._lsRenderWarnings(cabinets)}
+                    <div class="ls-canvas-box">
+                        <img id="layout-canvas" src="${dataUrl}" class="ls-canvas-img" alt="Layout Sugerido">
+                        <div class="ls-canvas-label">LAYOUT ORIENTATIVO</div>
                     </div>
                     ${externalViewHtml}
                     <div id="side-view-container" style="display:${eq.layoutConfig?.showSideView ? 'block' : 'none'};margin-top:20px;">
-                        <div style="display:flex;align-items:center;gap:12px;margin:0 0 8px;">
-                            <h5 style="margin:0;color:#7c3aed;font-size:14px;font-weight:700;">▸ VISTA LATERAL (CORTE)</h5>
-                            <select id="sel_side_view_cabinet" onchange="window.propostaTecnicaModule._onChangeSideViewCabinet()" style="font-size:12px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:4px;">
+                        <div class="ls-side-header">
+                            <h5 class="ls-section-title ls-section-title--side">▸ VISTA LATERAL (CORTE)</h5>
+                            <select id="sel_side_view_cabinet" onchange="window.propostaTecnicaModule._onChangeSideViewCabinet()" class="ls-cab-select">
                                 <option value="-1" ${(eq.layoutConfig?.sideViewCabinetIndex ?? -1) === -1 ? 'selected' : ''}>Todos (Combinado)</option>
                                 ${cabinets.map((c, i) => `<option value="${i}" ${eq.layoutConfig?.sideViewCabinetIndex === i ? 'selected' : ''}>${c.name}</option>`).join('')}
                             </select>
                         </div>
-                        <div style="background:white;border-radius:12px;overflow:auto;padding:16px;border:2px solid #7c3aed;">
-                            <img id="layout-canvas-side" style="display:block;margin:0 auto;" alt="Vista Lateral">
+                        <div class="ls-canvas-box ls-canvas-box--side">
+                            <img id="layout-canvas-side" class="ls-canvas-img" alt="Vista Lateral">
                         </div>
                     </div>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center;">
-                        ${cabinets.map((c, idx) => {
-                            const cabId = c._cabId || '';
-                            const currentWidth = c._userWidth || c.width;
-                            const cabH = c.segregacao ? null : (c.height || 2300);
-                            const isForma2Cab = c.segregacao === 'Forma 2a' || c.segregacao === 'Forma 2b' || this._isForma34EstruturaModular(c.segregacao, c._fabricante);
-                            const gavetas = c._gavetas || [];
-                            const gavInfo = gavetas.length > 0
-                                ? gavetas.length + ' gav. (' + gavetas.reduce((s, g) => s + g.height, 0) + '/1800mm)'
-                                : '';
-                            return `<div style="display:flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;">
-                                <span style="font-weight:600;color:#1e3a8a;">${c.name}</span>
-                                ${gavInfo ? `<span style="color:#64748b;font-size:11px;background:#e2e8f0;border-radius:4px;padding:1px 6px;" title="${gavetas.map(g => g.cargaTag + ' (' + g.height + 'mm)').join(', ')}">${gavInfo}</span>` : ''}
-                                <span style="color:#94a3b8;">|</span>
-                                <span style="color:#64748b;">Largura:</span>
-                                <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
-                                    onchange="window.propostaTecnicaModule._setLarguraArmario('${cabId}',this.value)"
-                                    ${!cabId ? 'disabled' : ''}>
-                                    <option value="400" ${currentWidth === 400 ? 'selected' : ''}>400mm</option>
-                                    <option value="600" ${currentWidth === 600 ? 'selected' : ''}>600mm</option>
-                                    <option value="800" ${currentWidth === 800 ? 'selected' : ''}>800mm</option>
-                                    <option value="1000" ${currentWidth === 1000 ? 'selected' : ''}>1000mm</option>
-                                </select>
-                                 ${!isForma2Cab ? `<span style="color:#94a3b8;">|</span>
-                                 <span style="color:#64748b;">Altura:</span>
-                                 <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
-                                     onchange="window.propostaTecnicaModule._setAlturaArmario('${cabId}',this.value)"
-                                     ${!cabId ? 'disabled' : ''}>
-                                     <option value="1600" ${c.height === 1600 ? 'selected' : ''}>1600mm</option>
-                                     <option value="1800" ${c.height === 1800 ? 'selected' : ''}>1800mm</option>
-                                     <option value="2000" ${c.height === 2000 ? 'selected' : ''}>2000mm</option>
-                                     <option value="2300" ${(!c.height || c.height === 2300) ? 'selected' : ''}>2300mm</option>
-                                 </select>` : ''}
-                                 <span style="color:#94a3b8;">|</span>
-                                 <span style="color:#64748b;">Profundidade:</span>
-                                 <select style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;"
-                                     onchange="window.propostaTecnicaModule._setProfundidadeArmario('${cabId}',this.value)"
-                                     ${!cabId ? 'disabled' : ''}>
-                                     <option value="400" ${(c.depth || 600) === 400 ? 'selected' : ''}>400mm</option>
-                                     <option value="600" ${(c.depth || 600) === 600 ? 'selected' : ''}>600mm</option>
-                                     <option value="800" ${(c.depth || 600) === 800 ? 'selected' : ''}>800mm</option>
-                                     <option value="1000" ${(c.depth || 600) === 1000 ? 'selected' : ''}>1000mm</option>
-                                     <option value="1200" ${(c.depth || 600) === 1200 ? 'selected' : ''}>1200mm</option>
-                                 </select>
-                                 ${cabId ? `<button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._removerArmario('${cabId}')" style="color:#ef4444;font-size:11px;padding:2px 4px;" title="Remover armário">✕</button>` : ''}
-                            </div>`;
-                        }).join('')}
-                        <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:11px;padding:6px 10px;">+ Adicionar Armário</button>
-                    </div>
-                    <div style="margin-top:20px;background:white;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
-                        <div onclick="const e=document.getElementById('bom_body');const v=e.style.display;e.style.display=v==='none'?'':'none';this.querySelector('.bom-arrow').textContent=v==='none'?'▼':'▶'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;background:#f8fafc;border-bottom:1px solid #e2e8f0;user-select:none;">
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <span class="bom-arrow" style="font-size:10px;">▶</span>
-                                <strong style="font-size:14px;">Lista de Materiais (${totalMateriais} itens)</strong>
-                            </div>
-                            <span style="font-size:11px;color:#64748b;">Aloque materiais aos armários</span>
-                        </div>
-                        <div id="bom_body" style="display:none;padding:16px;">
-                            ${bomHtml}
-                        </div>
+                    ${this._lsRenderCabinetControls(cabinets, seg, eq, false)}
+                    ${this._lsRenderBom(bomHtml, totalMateriais, 'bom_body')}
+                </div>
+            </div>
+        `;
                     </div>
                 </div>
             </div>
         `;
+    },
+
+    _lsFormatGrouped(arr, prop, unit) {
+        const counts = {};
+        for (const c of arr) {
+            const v = c[prop] || 600;
+            counts[v] = (counts[v] || 0) + 1;
+        }
+        return Object.entries(counts)
+            .sort(([a], [b]) => b - a)
+            .map(([v, n]) => n > 1 ? `${n}×${v}${unit}` : `${v}${unit}`)
+            .join(', ');
+    },
+
+    _lsRenderSummary(cabinets) {
+        const fmt = (arr, prop, unit) => this._lsFormatGrouped(arr, prop, unit);
+        return `
+            <div class="ls-summary">
+                <div class="ls-summary-card">
+                    <div class="ls-summary-label">Armários</div>
+                    <div class="ls-summary-value">${cabinets.length}</div>
+                </div>
+                <div class="ls-summary-card">
+                    <div class="ls-summary-label">Larguras Instaladas</div>
+                    <div class="ls-summary-value ls-summary-value--small ls-summary-value--green">${fmt(cabinets, 'width', 'mm')}</div>
+                </div>
+                <div class="ls-summary-card">
+                    <div class="ls-summary-label">Altura Instalada</div>
+                    <div class="ls-summary-value ls-summary-value--small">${fmt(cabinets, 'height', 'mm')}</div>
+                </div>
+                <div class="ls-summary-card">
+                    <div class="ls-summary-label">Profundidade Instalada</div>
+                    <div class="ls-summary-value ls-summary-value--small">${fmt(cabinets, 'depth', 'mm')}</div>
+                </div>
+            </div>`;
+    },
+
+    _lsRenderWarnings(cabinets) {
+        const warnings = cabinets.filter(c => c.warning).map(c => `
+            <div class="ls-warning"><strong>${c.name}:</strong> ${c.warning}</div>
+        `).join('');
+
+        const allExcess = cabinets.filter(c => c._excessLoads?.length > 0).flatMap(c => c._excessLoads);
+        const excessDataAttr = allExcess.length > 0 ? encodeURIComponent(JSON.stringify(allExcess.map(l => ({ tag: l.tag, desc: l.desc || l.tag, power: l.power, current: l.current })))) : '';
+        const excessWarning = allExcess.length > 0 ? `
+            <div class="ls-excess">
+                <strong>⚠️ Capacidade máxima atingida:</strong> ${allExcess.length} carga(s) não puderam ser alocadas.
+                <button class="btn btn-xs btn-primary" data-excess='${excessDataAttr}' onclick="window.propostaTecnicaModule._showExcessLoadsDialog(JSON.parse(decodeURIComponent(this.dataset.excess)))" style="margin-left:8px;background:#dc2626;border-color:#dc2626;">Resolver</button>
+            </div>` : '';
+
+        return warnings + excessWarning;
+    },
+
+    _lsRenderCabinetControls(cabinets, seg, eq, isB2B) {
+        const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+        const isForma2b2b = isForma2 || this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
+        const baseCabs = isB2B
+            ? Object.entries(eq.layoutConfig?.cabinetAssignments || {}).map(([id, d]) => ({ id, name: d.name, width: d.width || 600, height: d.height, depth: d.depth || 600 }))
+            : cabinets;
+
+        return `
+            <div class="ls-cab-controls">
+                ${baseCabs.map(bc => {
+                    const cabId = isB2B ? bc.id : (bc._cabId || '');
+                    const currentWidth = isB2B ? bc.width : (bc._userWidth || bc.width);
+                    const cabH = isB2B ? bc.height || ((isForma2b2b) ? 2300 : (parseInt(eq.technical?.alturaPainel) || 2200) + 100) : bc.height;
+                    const isForma2Cab = isB2B ? (isForma2 || this._isForma34EstruturaModular(seg, eq.technical?.fabricante)) : (bc.segregacao === 'Forma 2a' || bc.segregacao === 'Forma 2b' || this._isForma34EstruturaModular(bc.segregacao, bc._fabricante));
+                    const gavetas = isB2B ? [] : (bc._gavetas || []);
+                    const gavInfo = gavetas.length > 0 ? gavetas.length + ' gav. (' + gavetas.reduce((s, g) => s + g.height, 0) + '/1800mm)' : '';
+                    return `<div class="ls-cab-item">
+                        <span class="ls-cab-name">${bc.name}</span>
+                        ${gavInfo ? `<span class="ls-cab-gaveta" title="${gavetas.map(g => g.cargaTag + ' (' + g.height + 'mm)').join(', ')}">${gavInfo}</span>` : ''}
+                        <span class="ls-cab-sep">|</span>
+                        <span class="ls-cab-label">Largura:</span>
+                        <select class="ls-cab-select" onchange="window.propostaTecnicaModule._setLarguraArmario('${cabId}',this.value)" ${!cabId ? 'disabled' : ''}>
+                            <option value="400" ${currentWidth === 400 ? 'selected' : ''}>400mm</option>
+                            <option value="600" ${currentWidth === 600 ? 'selected' : ''}>600mm</option>
+                            <option value="800" ${currentWidth === 800 ? 'selected' : ''}>800mm</option>
+                            <option value="1000" ${currentWidth === 1000 ? 'selected' : ''}>1000mm</option>
+                        </select>
+                        ${!isForma2Cab ? `<span class="ls-cab-sep">|</span>
+                        <span class="ls-cab-label">Altura:</span>
+                        <select class="ls-cab-select" onchange="window.propostaTecnicaModule._setAlturaArmario('${cabId}',this.value)" ${!cabId ? 'disabled' : ''}>
+                            <option value="1600" ${cabH === 1600 ? 'selected' : ''}>1600mm</option>
+                            <option value="1800" ${cabH === 1800 ? 'selected' : ''}>1800mm</option>
+                            <option value="2000" ${cabH === 2000 ? 'selected' : ''}>2000mm</option>
+                            <option value="2300" ${(!cabH || cabH === 2300) ? 'selected' : ''}>2300mm</option>
+                        </select>` : ''}
+                        <span class="ls-cab-sep">|</span>
+                        <span class="ls-cab-label">Profundidade:</span>
+                        <select class="ls-cab-select" onchange="window.propostaTecnicaModule._setProfundidadeArmario('${cabId}',this.value)" ${!cabId ? 'disabled' : ''}>
+                            <option value="400" ${(isB2B ? bc.depth : (bc.depth || 600)) === 400 ? 'selected' : ''}>400mm</option>
+                            <option value="600" ${(isB2B ? bc.depth : (bc.depth || 600)) === 600 ? 'selected' : ''}>600mm</option>
+                            <option value="800" ${(isB2B ? bc.depth : (bc.depth || 600)) === 800 ? 'selected' : ''}>800mm</option>
+                            <option value="1000" ${(isB2B ? bc.depth : (bc.depth || 600)) === 1000 ? 'selected' : ''}>1000mm</option>
+                            <option value="1200" ${(isB2B ? bc.depth : (bc.depth || 600)) === 1200 ? 'selected' : ''}>1200mm</option>
+                        </select>
+                        ${isB2B ? `<button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._removerArmario('${bc.id}')" style="color:#ef4444;font-size:11px;padding:2px 4px;" title="Remover armário">✕</button>`
+                            : (cabId ? `<button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._removerArmario('${cabId}')" style="color:#ef4444;font-size:11px;padding:2px 4px;" title="Remover armário">✕</button>` : '')}
+                    </div>`;
+                }).join('')}
+                <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:11px;padding:6px 10px;">+ Adicionar Armário</button>
+            </div>`;
+    },
+
+    _lsRenderBom(bomHtml, totalMateriais, bomId) {
+        return `
+            <div class="ls-bom">
+                <div class="ls-bom-header" onclick="const e=document.getElementById('${bomId}');const v=e.style.display;e.style.display=v==='none'?'':'none';this.querySelector('.bom-arrow').textContent=v==='none'?'▼':'▶'">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="bom-arrow" style="font-size:10px;">▶</span>
+                        <strong style="font-size:14px;">Lista de Materiais (${totalMateriais} itens)</strong>
+                    </div>
+                    <span style="font-size:11px;color:var(--color-text-muted);">Aloque materiais aos armários</span>
+                </div>
+                <div id="${bomId}" class="ls-bom-body" style="display:none;">
+                    ${bomHtml}
+                </div>
+            </div>`;
     },
 
     _showLayoutConfigPanel() {
