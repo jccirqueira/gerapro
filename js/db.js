@@ -354,6 +354,8 @@ function initSchema() {
             model TEXT DEFAULT 'qwen2.5:14b',
             api_key TEXT DEFAULT '',
             ollama_url TEXT DEFAULT 'http://localhost:11434',
+            timeout_minutes INTEGER DEFAULT 10,
+            use_cache INTEGER DEFAULT 1,
             updatedAt TEXT
         );
 
@@ -393,6 +395,48 @@ function initSchema() {
             created_at TEXT,
             updated_at TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS extraction_history (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            proposal_id TEXT,
+            filename TEXT,
+            data_json TEXT,
+            provider TEXT,
+            model TEXT,
+            created_at TEXT,
+            applied_fields TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS comparison_sessions (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            proposal_id TEXT,
+            nome TEXT DEFAULT 'Comparação',
+            created_at TEXT,
+            updated_at TEXT,
+            documentos_json TEXT,
+            status TEXT DEFAULT 'draft'
+        );
+
+        CREATE TABLE IF NOT EXISTS comparison_results (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            descricao TEXT,
+            unidade TEXT DEFAULT 'un',
+            qtd_documento REAL DEFAULT 0,
+            qtd_levantamento REAL DEFAULT 0,
+            diferenca REAL DEFAULT 0,
+            percentual REAL DEFAULT 0,
+            status TEXT DEFAULT 'ok',
+            matched INTEGER DEFAULT 1,
+            item_a_json TEXT,
+            item_b_json TEXT,
+            FOREIGN KEY (session_id) REFERENCES comparison_sessions(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_comparison_results_session ON comparison_results(session_id);
+        CREATE INDEX IF NOT EXISTS idx_extraction_history_proposal ON extraction_history(proposal_id);
 
         CREATE INDEX IF NOT EXISTS idx_price_history_material ON price_history(material_id);
         CREATE TABLE IF NOT EXISTS pipeline_items (
@@ -639,6 +683,10 @@ function initSchema() {
             updated_at TEXT
         );
     `);
+
+    // Migration: add new columns to ai_settings
+    try { db.exec('ALTER TABLE ai_settings ADD COLUMN timeout_minutes INTEGER DEFAULT 10'); } catch (e) {}
+    try { db.exec('ALTER TABLE ai_settings ADD COLUMN use_cache INTEGER DEFAULT 1'); } catch (e) {}
 
     // Migration: add interacoes column to existing pipeline_items tables
     try { db.exec('ALTER TABLE pipeline_items ADD COLUMN interacoes TEXT'); } catch (e) { /* column may already exist */ }
@@ -1375,35 +1423,126 @@ function getAiSettings(empresaId = 'default') {
             provider: row.provider || 'ollama',
             model: row.model || 'qwen2.5:14b',
             apiKey: row.api_key || '',
-            ollamaUrl: row.ollama_url || 'http://localhost:11434'
+            ollamaUrl: row.ollama_url || 'http://localhost:11434',
+            timeoutMinutes: row.timeout_minutes || 10,
+            useCache: row.use_cache !== 0
         };
     }
-    return { provider: 'ollama', model: 'qwen2.5:14b', apiKey: '', ollamaUrl: 'http://localhost:11434' };
+    return { provider: 'ollama', model: 'qwen2.5:14b', apiKey: '', ollamaUrl: 'http://localhost:11434', timeoutMinutes: 10, useCache: true };
 }
 
 function saveAiSettings(data, empresaId = 'default') {
     const existing = db.prepare('SELECT * FROM ai_settings WHERE empresa_id = ?').get(empresaId);
     if (existing) {
-        const stmt = db.prepare(`UPDATE ai_settings SET provider = ?, model = ?, api_key = ?, ollama_url = ?, updatedAt = ? WHERE empresa_id = ?`);
+        const stmt = db.prepare(`UPDATE ai_settings SET provider = ?, model = ?, api_key = ?, ollama_url = ?, timeout_minutes = ?, use_cache = ?, updatedAt = ? WHERE empresa_id = ?`);
         stmt.run(
             data.provider || 'ollama',
             data.model || 'qwen2.5:14b',
             data.apiKey || '',
             data.ollamaUrl || 'http://localhost:11434',
+            data.timeoutMinutes || 10,
+            data.useCache !== false ? 1 : 0,
             new Date().toISOString(),
             empresaId
         );
     } else {
-        const stmt = db.prepare(`INSERT INTO ai_settings (empresa_id, provider, model, api_key, ollama_url, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`);
+        const stmt = db.prepare(`INSERT INTO ai_settings (empresa_id, provider, model, api_key, ollama_url, timeout_minutes, use_cache, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
         stmt.run(
             empresaId,
             data.provider || 'ollama',
             data.model || 'qwen2.5:14b',
             data.apiKey || '',
             data.ollamaUrl || 'http://localhost:11434',
+            data.timeoutMinutes || 10,
+            data.useCache !== false ? 1 : 0,
             new Date().toISOString()
         );
     }
+}
+
+function addExtractionHistory(data) {
+    const stmt = db.prepare(`INSERT INTO extraction_history (id, empresa_id, proposal_id, filename, data_json, provider, model, created_at, applied_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    stmt.run(
+        data.id || crypto.randomUUID(),
+        data.empresa_id || 'default',
+        data.proposal_id || '',
+        data.filename || '',
+        data.data_json || '{}',
+        data.provider || '',
+        data.model || '',
+        data.created_at || new Date().toISOString(),
+        data.applied_fields || '[]'
+    );
+}
+
+function listExtractionHistory(empresaId = 'default', proposalId = null) {
+    if (proposalId) {
+        return db.prepare('SELECT * FROM extraction_history WHERE empresa_id = ? AND proposal_id = ? ORDER BY created_at DESC').all(empresaId, proposalId);
+    }
+    return db.prepare('SELECT * FROM extraction_history WHERE empresa_id = ? ORDER BY created_at DESC LIMIT 50').all(empresaId);
+}
+
+function saveComparisonSession(session) {
+    const existing = db.prepare('SELECT * FROM comparison_sessions WHERE id = ?').get(session.id);
+    if (existing) {
+        db.prepare(`UPDATE comparison_sessions SET nome = ?, documentos_json = ?, status = ?, updated_at = ? WHERE id = ?`).run(
+            session.nome || 'Comparação',
+            session.documentos_json || '[]',
+            session.status || 'draft',
+            new Date().toISOString(),
+            session.id
+        );
+        db.prepare('DELETE FROM comparison_results WHERE session_id = ?').run(session.id);
+    } else {
+        db.prepare(`INSERT INTO comparison_sessions (id, empresa_id, proposal_id, nome, created_at, updated_at, documentos_json, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+            session.id,
+            session.empresa_id || 'default',
+            session.proposal_id || '',
+            session.nome || 'Comparação',
+            session.created_at || new Date().toISOString(),
+            new Date().toISOString(),
+            session.documentos_json || '[]',
+            session.status || 'draft'
+        );
+    }
+    if (session.results) {
+        const insertResult = db.prepare(`INSERT INTO comparison_results (id, session_id, descricao, unidade, qtd_documento, qtd_levantamento, diferenca, percentual, status, matched, item_a_json, item_b_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        for (const r of session.results) {
+            insertResult.run(
+                r.id || crypto.randomUUID(),
+                session.id,
+                r.descricao || '',
+                r.unidade || 'un',
+                r.qtd_documento || 0,
+                r.qtd_levantamento || 0,
+                r.diferenca || 0,
+                r.percentual || 0,
+                r.status || 'ok',
+                r.matched !== false ? 1 : 0,
+                r.item_a_json || '{}',
+                r.item_b_json || '{}'
+            );
+        }
+    }
+}
+
+function listComparisonSessions(empresaId = 'default', proposalId = null) {
+    if (proposalId) {
+        return db.prepare('SELECT * FROM comparison_sessions WHERE empresa_id = ? AND proposal_id = ? ORDER BY created_at DESC').all(empresaId, proposalId);
+    }
+    return db.prepare('SELECT * FROM comparison_sessions WHERE empresa_id = ? ORDER BY created_at DESC LIMIT 50').all(empresaId);
+}
+
+function getComparisonSession(sessionId) {
+    const session = db.prepare('SELECT * FROM comparison_sessions WHERE id = ?').get(sessionId);
+    if (!session) return null;
+    session.results = db.prepare('SELECT * FROM comparison_results WHERE session_id = ?').all(sessionId);
+    return session;
+}
+
+function deleteComparisonSession(sessionId) {
+    db.prepare('DELETE FROM comparison_results WHERE session_id = ?').run(sessionId);
+    db.prepare('DELETE FROM comparison_sessions WHERE id = ?').run(sessionId);
 }
 
 function saveSettings(data, empresaId = 'default') {
@@ -2343,5 +2482,10 @@ module.exports = {
     markEmailOpened,
     getUnidadesByCliente,
     peekNextAutproSequence,
-    consumeNextAutproSequence
+    consumeNextAutproSequence,
+    saveComparisonSession,
+    listComparisonSessions,
+    getComparisonSession,
+    deleteComparisonSession,
+    listExtractionHistory
 };

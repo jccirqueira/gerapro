@@ -1,0 +1,129 @@
+/* =====================================================================
+   BUTTONS — Table of Contents
+   =====================================================================
+   1. Base Button
+   2. Sizes (btn-xs, btn-sm, btn-lg)
+   3. Variants (primary, secondary, danger, ghost, etc.)
+   4. Specific Button Overrides
+   5. Icon-only Button
+   6. Drag States
+   ===================================================================== */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    padding: 0 14px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color var(--transition-base), box-shadow var(--transition-base);
+    border: 1px solid transparent;
+    gap: 6px;
+    text-decoration: none;
+    user-select: none;
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--blue-500);
+    outline-offset: 2px;
+}
+
+/* ── Sizes ── */
+.btn-xs { font-size: 11px; padding: 0 6px; height: 24px; }
+.btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn-lg { height: 42px; padding: 0 20px; font-size: 15px; }
+
+/* ── Variants ── */
+.btn-primary {
+    background-color: var(--color-accent);
+    color: #fff;
+}
+.btn-primary:hover { background-color: var(--color-accent-hover); }
+.btn-primary:active { background-color: var(--blue-800); }
+
+.btn-secondary {
+    background-color: transparent;
+    border-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+}
+.btn-secondary:hover { background-color: var(--neutral-100); border-color: var(--neutral-400); }
+
+.btn-danger {
+    background-color: var(--color-danger);
+    color: #fff;
+}
+.btn-danger:hover { background-color: var(--red-700); }
+.btn-danger:active { background-color: var(--red-800); }
+
+.btn-ghost {
+    background-color: transparent;
+    color: var(--color-text-secondary);
+    border-color: transparent;
+}
+.btn-ghost:hover { background-color: var(--neutral-100); color: var(--color-text-primary); }
+
+.btn-success {
+    background-color: var(--color-success);
+    color: #fff;
+}
+.btn-success:hover { background-color: var(--green-700); }
+
+.btn-warning {
+    background-color: var(--yellow-500);
+    color: #fff;
+}
+.btn-warning:hover { background-color: var(--yellow-600); }
+
+.btn-outline {
+    background-color: transparent;
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text-primary);
+}
+.btn-outline:hover { background-color: var(--neutral-100); }
+
+.btn-cancel {
+    background-color: var(--color-accent);
+    color: white;
+}
+.btn-cancel:hover { background-color: var(--red-700); border-color: var(--red-700); color: white; }
+
+.btn-add {
+    background-color: var(--green-500);
+    color: #fff;
+}
+.btn-add:hover { background-color: var(--green-600); }
+.btn-add:active { background-color: var(--green-700); }
+
+/* ── Specific Button Overrides ── */
+#btn-buscar-ptc:hover { background-color: var(--blue-800); border-color: var(--blue-800); }
+#btn-iniciar-ptc:hover { background-color: #0de0c8; border-color: #0de0c8; }
+#btn-add-equipment:hover { background-color: #1e3a8a; border-color: #1e3a8a; }
+#btn-resumo-consolidado:hover { background-color: var(--yellow-600); border-color: var(--yellow-600); color: white; }
+
+/* ── Icon-only Button ── */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xs);
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--transition-base);
+}
+.btn-icon:hover { background-color: var(--neutral-100); }
+
+/* ── Danger Delete Button in Config ── */
+.btn-delete-inline {
+    color: var(--color-danger);
+}
+
+/* ── Drag States ── */
+.eq-item.dragging { opacity: 0.4; }
+.eq-item.drag-over { border-top: 2px solid var(--color-accent) !important; }

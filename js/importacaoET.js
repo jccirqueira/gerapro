@@ -93,28 +93,54 @@ const ImportacaoETModule = {
         const body = document.getElementById('import-et-body');
         if (!body) return;
 
+        const ai = store.getState().aiSettings || {};
+        const timeoutMin = ai.timeoutMinutes || 10;
+        const provider = ai.provider || 'ollama';
+        const model = ai.model || 'qwen2.5:14b';
+        const useCache = ai.useCache !== false;
+
         body.innerHTML = `
             <div style="text-align:center;padding:40px 20px;">
                 <i class="ph ph-spinner ph-spin" style="font-size:48px;color:#16a34a;"></i>
                 <p style="margin-top:16px;font-weight:600;color:#1e293b;">Analisando ${file.name}...</p>
-                <div style="margin-top:12px;font-size:13px;color:#64748b;line-height:1.6;">
-                    <span id="import-et-step">Extraindo texto do documento...</span>
+                <div style="margin-top:16px;max-width:400px;margin-left:auto;margin-right:auto;">
+                    <div style="background:#e2e8f0;border-radius:6px;height:8px;overflow:hidden;">
+                        <div id="import-et-progress" style="background:#16a34a;height:100%;width:5%;transition:width 0.5s ease;"></div>
+                    </div>
                 </div>
-                <div style="margin-top:12px;font-size:11px;color:#94a3b8;">
-                    A primeira análise pode levar de 3 a 8 minutos enquanto o modelo de IA carrega.
-                    <br>Análises seguintes serão mais rápidas (~1 min).
+                <div style="margin-top:12px;font-size:13px;color:#64748b;line-height:1.6;">
+                    <span id="import-et-step">Preparando...</span>
+                </div>
+                <div style="margin-top:8px;font-size:11px;color:#94a3b8;">
+                    <span id="import-et-detail">${provider === 'ollama' ? 'Ollama' : provider} — ${model}</span>
+                    ${useCache ? '<span style="margin-left:8px;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-size:10px;">cache ativo</span>' : ''}
+                    <span style="margin-left:8px;color:#94a3b8;">timeout: ${timeoutMin}min</span>
                 </div>
             </div>
         `;
 
-        try {
-            const stepEl = document.getElementById('import-et-step');
-            stepEl.textContent = 'Extraindo texto do documento...';
-            const base64 = await this._readFileAsBase64(file);
+        const setProgress = (pct) => {
+            const bar = document.getElementById('import-et-progress');
+            if (bar) bar.style.width = Math.min(pct, 100) + '%';
+        };
+        const setStep = (text) => {
+            const el = document.getElementById('import-et-step');
+            if (el) el.textContent = text;
+        };
 
-            stepEl.textContent = 'Consultando IA para extrair dados técnicos...';
+        try {
+            setProgress(5);
+            setStep('Extraindo texto do documento...');
+            const base64 = await this._readFileAsBase64(file);
+            setProgress(15);
+
+            setStep('Enviando para processamento...');
+            setProgress(20);
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 660000);
+            const timeoutMs = timeoutMin * 60 * 1000;
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            setStep(`IA processando (timeout: ${timeoutMin}min)...`);
+            setProgress(30);
             const res = await fetch('/api/import-document', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -126,8 +152,11 @@ const ImportacaoETModule = {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
+            setProgress(80);
+            setStep('Parseando resultado...');
 
             const result = await res.json();
+            setProgress(95);
 
             if (!result.success) {
                 body.innerHTML = `
@@ -158,6 +187,8 @@ const ImportacaoETModule = {
             }
 
             this._extractedData = result.data;
+            setProgress(100);
+            setStep('Concluído!');
             this._renderPreview();
 
         } catch (err) {
@@ -167,7 +198,7 @@ const ImportacaoETModule = {
                 <div style="text-align:center;padding:40px 20px;">
                     <i class="ph ph-${isTimeout ? 'clock' : 'plugs'}" style="font-size:48px;color:#${isTimeout ? 'f59e0b' : 'ef4444'};"></i>
                     <p style="margin-top:16px;font-weight:600;color:#${isTimeout ? 'd97706' : 'dc2626'};">${isTimeout ? 'Tempo esgotado' : 'Erro de conexão'}</p>
-                    <p style="font-size:13px;color:#64748b;margin-top:8px;">${isTimeout ? 'A IA está demorando mais que 11 minutos para responder. Tente novamente — a segunda tentativa costuma ser mais rápida.' : 'Verifique se o servidor está rodando em localhost:8082 e se o provedor de IA está acessível.'}</p>
+                    <p style="font-size:13px;color:#64748b;margin-top:8px;">${isTimeout ? `A IA está demorando mais que ${timeoutMin} minutos para responder. Tente novamente — a segunda tentativa costuma ser mais rápida.` : 'Verifique se o servidor está rodando em localhost:8082 e se o provedor de IA está acessível.'}</p>
                     <p style="font-size:11px;color:#94a3b8;">${err.message}</p>
                     <button class="btn btn-secondary" style="margin-top:16px;" onclick="app.importacaoET.open()">Tentar novamente</button>
                 </div>
@@ -805,16 +836,23 @@ const ImportacaoETModule = {
     _getProviderBadge() {
         const ai = store.getState().aiSettings || {};
         const provider = ai.provider || 'ollama';
-
-        if (provider === 'openai') {
-            const model = ai.model || 'gpt-4o-mini';
-            return `<span style="color:#10b981;">Powered by OpenAI</span> — <span style="color:#64748b;">${model}</span> <span style="font-size:10px;color:#94a3b8;">(documentos processados via API)</span>`;
-        }
-
+        const useCache = ai.useCache !== false;
         const model = ai.model || 'qwen2.5:14b';
-        return `<span style="color:#16a34a;">Powered by Ollama</span> — <span style="color:#64748b;">${model}</span> <span style="font-size:10px;color:#94a3b8;">(processamento local, seguro)</span>`;
+
+        const providerName = {
+            'ollama': 'Ollama (Local)',
+            'openai': 'OpenAI',
+            'anthropic': 'Anthropic Claude',
+            'gemini': 'Google Gemini',
+            'deepseek': 'DeepSeek'
+        }[provider] || provider;
+
+        return `<span style="color:#16a34a;">${providerName}</span> — <span style="color:#64748b;">${model}</span>${useCache ? ' <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 4px;border-radius:3px;">cache</span>' : ''}`;
     }
 };
+
+window.importacaoETModule = ImportacaoETModule;
+ImportacaoETModule.init();
 
 window.importacaoETModule = ImportacaoETModule;
 ImportacaoETModule.init();

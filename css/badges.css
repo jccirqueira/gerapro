@@ -1,0 +1,40 @@
+/* =====================================================================
+   STATUS BADGES — Table of Contents
+   =====================================================================
+   1. Badge Base
+   2. Badge Variants (green, blue, gray, danger)
+   3. Text Color Utilities
+   ===================================================================== */
+
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+.status-green {
+    background-color: var(--green-100);
+    color: var(--green-700);
+}
+
+.status-blue {
+    background-color: var(--blue-100);
+    color: var(--blue-700);
+}
+
+.status-gray {
+    background-color: var(--neutral-100);
+    color: var(--neutral-600);
+}
+
+.status-danger {
+    background-color: var(--red-100);
+    color: var(--red-700);
+}
+
+.text-success { color: var(--color-success); }
+.text-danger  { color: var(--color-danger); }
+.text-warning { color: var(--color-warning); }

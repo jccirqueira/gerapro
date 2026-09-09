@@ -1,0 +1,261 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   RESUMO DE IMPLEMENTAÇÕES — 30/07/2026                                         ║
+║   Módulo: Comparar Documentos                                                    ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+================================================================================
+ÍNDICE
+================================================================================
+1.  BUGFIX: Worksheet name already exists (XLSX)
+2.  BUGFIX: Threshold de cabos (0.5 → 0.3)
+3.  BUGFIX: TERMINAL CABO 240MM2 classificado como cabo
+4.  BUGFIX: Label duplicado "Descrição" — Doc 2 exibia dados do Doc 1
+5.  BUGFIX: mergeItems usava Math.max em vez de somar quantidades
+6.  FEATURE: Exportar PDF profissional via pdfmake
+7.  DOCS: Atualização dos arquivos de explicação
+8.  Arquivos Alterados
+
+================================================================================
+1. BUGFIX: Worksheet name already exists (XLSX)
+================================================================================
+
+ARQUIVO:  server_new.js
+LINHAS:   ~2142-2156
+
+PROBLEMA:
+  Ao exportar XLSX no modo Individual, se dois documentos tivessem o mesmo
+  label (ex: ambos "Descrição"), o nome da aba era idêntico, causando:
+    "Worksheet name already exists: vs Descrição"
+
+SOLUÇÃO:
+  Adicionado `_uniqueSheetName(base)` que usa um `Set` global `_usedSheetNames`
+  para rastrear nomes já usados. Quando ocorre colisão, apenda " (1)", " (2)", etc.
+  Resetado a cada chamada de `handleExportComparison`.
+
+  Código adicionado:
+    const _usedSheetNames = new Set();
+    function _uniqueSheetName(base) {
+        let name = sanitizeSheetName(base).slice(0, 31);
+        if (!name) name = 'Sheet';
+        let final = name;
+        let counter = 1;
+        while (_usedSheetNames.has(final)) {
+            const suffix = ` (${counter})`;
+            final = (name + suffix).slice(0, 31);
+            counter++;
+        }
+        _usedSheetNames.add(final);
+        return final;
+    }
+
+  Todas as 6 chamadas de `workbook.addWorksheet(...)` em `handleExportComparison`
+  foram substituídas por `workbook.addWorksheet(_uniqueSheetName(...))`.
+
+
+================================================================================
+2. BUGFIX: Threshold de cabos (0.5 → 0.3)
+================================================================================
+
+ARQUIVOS: comparacaoDocumentos.js, server_new.js
+LINHAS:   ~1599 e ~2047
+
+PROBLEMA:
+  Para cabos com descrição simples (ex: "CABO 240MM2"), o `cableSpecScore`
+  retornava apenas 0.5 (só o campo seção batia). Multiplicado por 0.6 no
+  `multiFieldScore`, o total era 0.30, que ficava abaixo do threshold de 0.5
+  para cabos. O match era rejeitado, e o item aparecia como "Só Ref" e
+  simultaneamente como órfão nos docs comparados.
+
+SOLUÇÃO:
+  Threshold unificado para 0.3 (igual ao de não-cabos):
+    Antes: const threshold = isCableItem(a) ? 0.5 : 0.3;
+    Depois: const threshold = 0.3;
+
+  Isso garante que "CABO 240MM2" (score 0.30) alcance o threshold e seja
+  corretamente casado entre REF e docs comparados.
+
+
+================================================================================
+3. BUGFIX: TERMINAL CABO 240MM2 classificado como cabo
+================================================================================
+
+ARQUIVOS: comparacaoDocumentos.js (linha 1478), server_new.js (linha 1421)
+
+PROBLEMA:
+  Itens como "TERMINAL CABO 240MM2" continham "240MM2" no nome e o
+  `extractCableSpec` extraía {secao: 240, material: null, ...}. Consequências:
+  a) `isCableItem()` retornava true → tratava terminal como cabo
+  b) `cableSpecScore()` casava TERMINAL com CABO real (score 0.5)
+  c) `groupItemsBySpec()` agrupava TERMINAL junto com CABO pela chave "240|||",
+     fundindo os dois itens (qtd somada, descrição do primeiro).
+
+SOLUÇÃO:
+  Adicionada verificação de termos de acessório logo no início de
+  `extractCableSpec`, antes de qualquer extração:
+
+    const accessoryTerms = /\b(terminal|conector|luva|emenda|pino|ilha|plug|soquete)\b/i;
+    if (accessoryTerms.test(s)) return null;
+
+  Isso faz a função retornar null para esses itens, resolvendo em cascata:
+  - `isCableItem()` → false → usa `textScore()` no matching
+  - `groupItemsBySpec()` → não agrupa → TERMINAL vira item individual
+  - `suggestMatching()` → compara TERMINAL vs CABO via textScore (~0.53 < 0.3)
+    → não casa incorretamente
+
+
+================================================================================
+4. BUGFIX: Label duplicado "Descrição" — Doc 2 exibia dados do Doc 1
+================================================================================
+
+ARQUIVO:  comparacaoDocumentos.js
+LINHAS:   1718, 1749, 664, 675, 689, 703, 1295-1329
+
+PROBLEMA:
+  Na visão Individual, a busca dos dados de cada par era feita por label:
+    const comp = row.comparisons.find(c => c.label === cd.label);
+  Quando dois documentos tinham o mesmo label (ex: ambos "Descrição"),
+  `Array.find()` retornava sempre o PRIMEIRO match, então Doc 2 exibia
+  os mesmos dados de Doc 1 para todos os itens.
+
+SOLUÇÃO:
+  Substituída a identificação por label por `pairIndex` (índice do par):
+
+  Em `computeUnifiedTable`:
+    compareDocs.map((cd, pi) => ({ ..., pairIndex: pi }))
+
+  Na renderização e em `_updateMultiQtd`:
+    row.comparisons.find(c => c.pairIndex === pi)   // em vez de .label === cd.label
+
+  No `_updateMultiQtd`:
+    - Assinatura mudou de (origIdx, label, pi, val) para (origIdx, pi, val)
+    - Ref qty usa pi = -1 (antes 'label === "__ref__"')
+    - Acesso direto a compareDocs[pi] em vez de find por label
+
+  Locais alterados:
+    • computeUnifiedTable — main rows  (linha 1718)
+    • computeUnifiedTable — orphan rows (linha 1749)
+    • _renderMultiMatchResult — cells   (linha 664)
+    • _renderMultiMatchResult — inline edit handler (linha 675)
+    • _renderMultiMatchResult — ref cell handler    (linha 689)
+    • _renderMultiMatchResult — orphan cells        (linha 703)
+    • _updateMultiQtd — signature + lógica interna  (linha 1295)
+
+
+================================================================================
+5. BUGFIX: mergeItems usava Math.max em vez de somar quantidades
+================================================================================
+
+ARQUIVO:  comparacaoDocumentos.js
+LINHA:    1695
+
+PROBLEMA:
+  No modo Agregado, `mergeItems` usava `Math.max` para combinar quantidades
+  de itens similares entre múltiplos documentos:
+    existing.qtd = Math.max(existing.qtd || 0, item.qtd || 0);
+  Isso pegava a MAIOR quantidade, em vez de SOMAR. Ex: Lista B (62m) + Lista C
+  (122m) virava 122m em vez de 184m.
+
+SOLUÇÃO:
+  Mudado para soma:
+    existing.qtd = (existing.qtd || 0) + (item.qtd || 0);
+
+
+================================================================================
+6. FEATURE: Exportar PDF profissional via pdfmake
+================================================================================
+
+ARQUIVOS: server_new.js, comparacaoDocumentos.js
+NOVO:     fonts/ (Roboto .ttf)
+
+DESCRIÇÃO:
+  Substituída a exportação via `window.print()` por geração server-side
+  usando a biblioteca `pdfmake`, seguindo o mesmo padrão do XLSX.
+
+INSTALAÇÃO:
+  npm install pdfmake
+  Fontes Roboto copiadas de node_modules/pdfmake/build/fonts/Roboto/ → fonts/
+
+SERVER (server_new.js):
+  • Nova função: `handleExportComparisonPdf(body, res)` — logo após
+    `handleExportComparison`
+  • Nova rota: `POST /api/export-comparison-pdf` — registrada após a rota
+    de export-comparison
+
+  Estrutura do PDF gerado:
+    - pageSize: A4, margins [35,50,35,50]
+    - header: "Comparação de Documentos — GeraPro"
+    - footer: "Página X de Y"
+    - Conteúdo:
+        • Título + subtítulo com ref vs docs + data
+        • Tabela de resumo (Total, OK, Excedente, Faltante, Só Ref, Só Doc)
+        • Tabela principal com dados completos
+    - Estilos:
+        • Cabeçalhos verdes (#16a34a)
+        • Zebra nas linhas (fundo #f8fafc)
+        • Cores nos status (verde/amarelo/vermelho/azul/roxo)
+        • Cores no match % (verde ≥ 80%, amarelo ≥ 50%, vermelho < 50%)
+
+  Visão Agregada: tabela com Descrição, UN, Ref, Doc, Diferença, %, Status,
+  Match, Preço (R$), Dif. Total (R$).
+
+  Visão Individual: tabela com Descrição, UN, Match, Ref, e para cada par
+  colunas Qtd + Diferença, mais resumo individual por par.
+
+CLIENT (comparacaoDocumentos.js):
+  • Novo método: `_exportPdf()` — POST para /api/export-comparison-pdf,
+    recebe Blob, faz download como Comparacao_XXXXXXXX.pdf
+  • Exposto em init(): `_exportPdf: this._exportPdf.bind(this)`
+  • Botões substituídos:
+    - Individual (linha 748): window.print() → _exportPdf()
+    - Agregado (linha 886): window.print() → _exportPdf()
+  • Ícone trocado de ph-printer para ph-file-pdf
+
+
+================================================================================
+7. DOCS: Atualização dos arquivos de explicação
+================================================================================
+
+ARQUIVOS: docs/explicacao-comparar-documentos.html
+           docs/explicacao-comparar-documentos.txt
+
+ALTERAÇÕES NO HTML:
+  • Seção 7 (Exportar): PDF descrito como "profissional gerado pelo servidor"
+    com detalhes de cabeçalho, resumo, tabela, preço, rodapé, A4, Roboto
+  • Seção 10 (Passo a Passo): Etapa 6 atualizada — "baixar um PDF profissional
+    gerado pelo servidor"
+  • Seção 13 (Problemas): Adicionado problema "Exportar PDF baixou um arquivo
+    que não abre" com solução sugerindo reiniciar servidor
+  • Remember section: ícone trocado para ph-file-pdf
+
+ALTERAÇÕES NO TXT:
+  • Seção 7: PDF descrito com detalhes (cabeçalho, resumo, tabela, preço,
+    rodapé, A4, Roboto)
+  • Etapa 6: "baixar um PDF profissional gerado pelo servidor"
+
+
+================================================================================
+8. ARQUIVOS ALTERADOS
+================================================================================
+
+  ARQUIVO                            | TIPO         | O QUE FOI FEITO
+  ------------------------------------+--------------+-------------------------------------------
+  server_new.js                       | Server       | _uniqueSheetName, threshold 0.3,
+                                      |              | accessoryTerms, handleExportComparisonPdf,
+                                      |              | rota /api/export-comparison-pdf
+  js/comparacaoDocumentos.js          | Client       | threshold 0.3, accessoryTerms,
+                                      |              | pairIndex, mergeItems soma,
+                                      |              | _exportPdf(), botões PDF
+  package.json                        | Deps         | + pdfmake
+  fonts/ (4 arquivos .ttf)            | Fontes       | Roboto Regular, Medium, Italic,
+                                      |              | MediumItalic
+  docs/explicacao-comparar-documentos | Documentação | Seção 7, Etapa 6, Problemas,
+      .html                           |              | Remember (PDF profissional)
+  docs/explicacao-comparar-documentos | Documentação | Seção 7, Etapa 6 (PDF profissional)
+      .txt                            |              |
+  30-07/resumo.txt                    | Documentação | Este arquivo
+
+================================================================================
+FIM DO RESUMO
+================================================================================

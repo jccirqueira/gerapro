@@ -63,8 +63,12 @@ const initialState = {
         provider: 'ollama',
         model: 'qwen2.5:14b',
         apiKey: '',
-        ollamaUrl: 'http://localhost:11434'
+        ollamaUrl: 'http://localhost:11434',
+        timeoutMinutes: 10,
+        useCache: true
     },
+    comparisonSessions: [],
+    extractionHistory: [],
     loginTheme: {
         logoUrl: '',
         backgroundType: 'gradient',
@@ -519,6 +523,24 @@ class Store {
         return data.success;
     }
 
+    async loadAiSettingsFromServer() {
+        const token = this.state.auth.token;
+        if (!token) return;
+        try {
+            const res = await fetch(`${this._getServerUrl()}/api/settings/ai`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.data) {
+                    this.setState({ aiSettings: { ...this.state.aiSettings, ...data.data } });
+                }
+            }
+        } catch (e) {
+            console.warn('[State] Failed to load AI settings:', e.message);
+        }
+    }
+
     async saveLoginTheme(loginTheme) {
         const token = this.state.auth.token;
         if (!token) throw new Error('Não autenticado');
@@ -575,6 +597,143 @@ class Store {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         try { return await res.json(); } catch { return { success: false, error: 'Resposta vazia do servidor' }; }
+    }
+
+    async clearAiCache() {
+        const token = this.state.auth.token;
+        if (!token) return { success: false, error: 'Não autenticado' };
+        const res = await fetch(`${this._getServerUrl()}/api/settings/ai/clear-cache`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return res.json();
+    }
+
+    // === COMPARISON SESSIONS ===
+
+    async fetchComparisonSessions(proposalId = null) {
+        const token = this.state.auth.token;
+        if (!token) return [];
+        const url = proposalId
+            ? `${this._getServerUrl()}/api/compare-sessions?proposalId=${encodeURIComponent(proposalId)}`
+            : `${this._getServerUrl()}/api/compare-sessions`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return [];
+        const data = await res.json();
+        if (data.success) {
+            this.setState({ comparisonSessions: data.sessions || [] });
+        }
+        return data.sessions || [];
+    }
+
+    async saveComparisonSession(session) {
+        const token = this.state.auth.token;
+        if (!token) throw new Error('Não autenticado');
+        const res = await fetch(`${this._getServerUrl()}/api/compare-sessions`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(session)
+        });
+        if (!res.ok) {
+            let errMsg = 'Erro ao salvar sessão de comparação';
+            try { const e = await res.json(); errMsg = e.error || errMsg; } catch {}
+            throw new Error(errMsg);
+        }
+        const data = await res.json();
+        await this.fetchComparisonSessions(session.proposal_id);
+        return data;
+    }
+
+    async deleteComparisonSession(id) {
+        const token = this.state.auth.token;
+        if (!token) return;
+        await fetch(`${this._getServerUrl()}/api/compare-sessions/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    }
+
+    async getComparisonSession(id) {
+        const token = this.state.auth.token;
+        if (!token) return null;
+        const res = await fetch(`${this._getServerUrl()}/api/compare-sessions/${id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.session || null;
+    }
+
+    // === EXTRACTION HISTORY ===
+
+    async fetchExtractionHistory(proposalId = null) {
+        const token = this.state.auth.token;
+        if (!token) return [];
+        const url = proposalId
+            ? `${this._getServerUrl()}/api/extraction-history?proposalId=${encodeURIComponent(proposalId)}`
+            : `${this._getServerUrl()}/api/extraction-history`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) return [];
+        const data = await res.json();
+        if (data.success) {
+            this.setState({ extractionHistory: data.history || [] });
+        }
+        return data.history || [];
+    }
+
+    // === DOCUMENT COMPARISON ===
+
+    async compareDocuments(documents, searchTerms) {
+        const token = this.state.auth.token;
+        if (!token) throw new Error('Não autenticado');
+        const res = await fetch(`${this._getServerUrl()}/api/compare-documents`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documents, searchTerms })
+        });
+        if (!res.ok) {
+            let errMsg = 'Erro ao comparar documentos';
+            try { const e = await res.json(); errMsg = e.error || errMsg; } catch {}
+            throw new Error(errMsg);
+        }
+        return res.json();
+    }
+
+    async suggestMatch(itemsA, itemsB) {
+        const token = this.state.auth.token;
+        if (!token) throw new Error('Não autenticado');
+        const res = await fetch(`${this._getServerUrl()}/api/compare-suggest-match`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemsA, itemsB })
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.matches || [];
+    }
+
+    async exportComparisonXlsx(results, documents, multiResults = null) {
+        const token = this.state.auth.token;
+        if (!token) throw new Error('Não autenticado');
+        const res = await fetch(`${this._getServerUrl()}/api/export-comparison`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results, documents, multiResults })
+        });
+        if (!res.ok) {
+            let errMsg = 'Erro ao exportar';
+            try { const e = await res.json(); errMsg = e.error || errMsg; } catch {}
+            throw new Error(errMsg);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Comparacao_${Date.now()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     // === CRUD Actions (optimistic cache + background sync) ===

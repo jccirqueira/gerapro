@@ -1,0 +1,31 @@
+/* =====================================================================
+   BASE STYLES — Table of Contents
+   =====================================================================
+   1. Box-sizing Reset
+   2. Body
+   3. Scrollbar Styles
+   ===================================================================== */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-family);
+    background-color: var(--color-bg-app);
+    color: var(--color-text-main);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--neutral-100); }
+::-webkit-scrollbar-thumb { background: var(--neutral-300); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--neutral-400); }

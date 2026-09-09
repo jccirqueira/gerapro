@@ -1,0 +1,132 @@
+/* =====================================================================
+   RESPONSIVE BREAKPOINTS — Table of Contents
+   =====================================================================
+   1. Tablet (≤ 1024px)
+   2. Mobile (≤ 768px)
+   3. Small Mobile (≤ 480px)
+   4. Reduced Motion
+   ===================================================================== */
+
+/* ── Tablet (< 1024px) ── */
+@media (max-width: 1024px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .crm-summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .crm-form-grid {
+        grid-template-columns: 1fr;
+    }
+    .config-card .row {
+        flex-direction: column;
+    }
+    .config-card .row .form-group {
+        flex: none !important;
+    }
+}
+
+/* ── Mobile (< 768px) ── */
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 0px;
+    }
+    .app-container {
+        grid-template-columns: 1fr;
+    }
+    .app-sidebar {
+        position: fixed;
+        top: 0;
+        left: -280px;
+        width: 280px;
+        height: 100vh;
+        z-index: 1100;
+        transition: left 0.25s ease;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+    }
+    .app-sidebar.open {
+        left: 0;
+    }
+    .app-header {
+        grid-column: 1fr;
+    }
+    .app-content {
+        grid-column: 1fr;
+    }
+    .module-fullview {
+        margin: calc(-1 * var(--spacing-sm));
+    }
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    .crm-kanban {
+        flex-direction: column;
+    }
+    .crm-kanban-col {
+        max-width: none;
+        min-width: auto;
+    }
+    .crm-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    .crm-cal-grid {
+        grid-template-columns: repeat(7, 1fr);
+    }
+    .crm-cal-day {
+        min-height: 48px;
+        padding: 2px;
+    }
+    .modal {
+        width: 95vw;
+        max-width: none;
+        margin: 8px;
+    }
+    .crm-modal-overlay {
+        padding: 16px 8px;
+    }
+    .crm-summary-cards {
+        grid-template-columns: 1fr 1fr;
+    }
+    .chart-filter-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* ── Small Mobile (< 480px) ── */
+@media (max-width: 480px) {
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    .crm-summary-cards {
+        grid-template-columns: 1fr;
+    }
+    .module-fullview-header {
+        padding: 16px;
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+    .module-fullview-body {
+        padding: var(--spacing-md);
+    }
+}
+
+/* =====================================================================
+   REDUCED MOTION
+   ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .fade-in {
+        animation: none !important;
+    }
+    .tab-content {
+        animation: none !important;
+    }
+}

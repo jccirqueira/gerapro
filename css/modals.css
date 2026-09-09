@@ -1,0 +1,64 @@
+/* =====================================================================
+   MODALS — Table of Contents
+   =====================================================================
+   1. Overlay
+   2. Modal Dialog
+   3. Header / Body / Footer
+   4. Focus Trap Indicator
+   ===================================================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: var(--color-bg-panel);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    width: 600px;
+    max-width: 90vw;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    border: 1px solid var(--color-divider);
+}
+
+.modal-header {
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--color-divider);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body {
+    padding: var(--spacing-md);
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: var(--spacing-md) var(--spacing-md);
+    border-top: 1px solid var(--color-divider);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    background: transparent;
+}
+
+/* ── Focus Trap Indicator ── */
+.modal-overlay:focus {
+    outline: none;
+}
+
+.modal[aria-modal="true"]:focus {
+    outline: none;
+}

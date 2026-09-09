@@ -2515,6 +2515,7 @@ const PropostaTecnicaModule = {
                     <div style="display: flex; gap: 10px;">
 
                         <button class="btn btn-sm btn-ghost" onclick="window.importacaoETModule.open()" style="color: white; border: 1px solid rgba(255,255,255,0.3);" title="Extrair dados de documento técnico com IA"><i class="ph ph-robot"></i> Importar de Documento</button>
+                        <button class="btn btn-sm btn-ghost" onclick="window.comparacaoDocumentosModule.openFromToolbar(); return false;" style="color: white; border: 1px solid rgba(255,255,255,0.3);" title="Comparar documentos e quantitativos"><i class="ph ph-git-diff"></i> Comparar Documentos</button>
 
                         <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule.closeModal()" style="color: white; border: 1px solid rgba(255,255,255,0.3);"><i class="ph ph-arrow-left"></i> Voltar</button>
 

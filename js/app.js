@@ -171,8 +171,16 @@ const App = {
 
         // Sidebar Toggle
         this.dom.toggleSidebar.addEventListener('click', () => {
-            // Simple toggle for now, could be persisted in state
-            this.dom.sidebar.classList.toggle('collapsed'); // CSS needs to handle this if we want it
+            const sidebar = this.dom.sidebar;
+            const backdrop = document.getElementById('sidebar-backdrop');
+            const isMobile = window.innerWidth <= 768;
+
+            if (isMobile) {
+                sidebar.classList.toggle('open');
+                backdrop?.classList.toggle('visible', sidebar.classList.contains('open'));
+            } else {
+                sidebar.classList.toggle('collapsed');
+            }
         });
 
         // Theme Toggle
@@ -188,6 +196,13 @@ const App = {
             const btn = document.getElementById('btn-user-menu');
             if (dropdown && btn && !btn.contains(e.target) && !dropdown.contains(e.target)) {
                 dropdown.classList.add('hidden-module');
+            }
+        });
+
+        // Escape key closes sidebar on mobile
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeSidebar();
             }
         });
 
@@ -776,6 +791,11 @@ const App = {
     navigateTo(viewName) {
         console.log(`Navigating to: ${viewName}`);
 
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768) {
+            this.closeSidebar();
+        }
+
         store.setState({ ui: { ...store.getState().ui, currentView: viewName } });
 
         // Permission check for admin-only views
@@ -862,7 +882,8 @@ const App = {
             'regras-derivacao': 'Regras de Derivação',
             'crm': 'CRM — Gestão de Leads',
             'manufatura': 'Gestão de Manufatura',
-            'automacao-rede': 'Arquitetura de Rede Industrial'
+            'automacao-rede': 'Arquitetura de Rede Industrial',
+            'comparacao-documentos': 'Comparação de Documentos'
         };
         this.dom.pageTitle.textContent = 'GeraPro_1.0';
 
@@ -960,6 +981,9 @@ const App = {
         if (viewName === 'automacao-rede' && window.automacaoRedeUI) {
             window.automacaoRedeUI.render();
         }
+        if (viewName === 'comparacao-documentos' && window.comparacaoDocumentosModule) {
+            window.comparacaoDocumentosModule.render();
+        }
 
         // DVT visibility / theme
         const company = store.getState().company || {};
@@ -978,6 +1002,13 @@ const App = {
         const root = document.documentElement;
         root.style.setProperty('--color-accent', dvt ? 'rgb(67, 101, 17)' : 'rgb(3, 92, 169)');
         root.style.setProperty('--color-accent-hover', dvt ? 'rgb(82, 124, 21)' : 'rgb(56, 86, 14)');
+    },
+
+    closeSidebar() {
+        const sidebar = this.dom.sidebar;
+        const backdrop = document.getElementById('sidebar-backdrop');
+        sidebar?.classList.remove('open');
+        backdrop?.classList.remove('visible');
     },
 
     // === Auth Methods ===
@@ -1181,7 +1212,7 @@ const App = {
                 <div class="modal" style="width: 750px; max-width: 95vw;">
                     <div class="modal-header">
                         <h3 class="card-title"><i class="ph ph-shield-check"></i> Gerenciar Usuários</h3>
-                        <button class="btn btn-ghost" onclick="document.getElementById('${modalId}').remove()"><i class="ph ph-x"></i></button>
+                        <button class="btn btn-ghost" onclick="app.releaseFocus(document.getElementById('modal-user-manager')?.querySelector('.modal')); document.getElementById('${modalId}').remove()"><i class="ph ph-x"></i></button>
                     </div>
                     <div class="modal-body">
                         <table class="user-manager-table">
@@ -1223,6 +1254,10 @@ const App = {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', html);
+
+        // Trap focus in modal
+        const modal = document.getElementById('modal-user-manager')?.querySelector('.modal');
+        if (modal) this.trapFocus(modal);
 
         // Expose helper methods
         window.app.editUser = (userId) => this._editUserModal(userId, users, empresas);
@@ -1835,43 +1870,68 @@ const App = {
         const provEl = document.getElementById('conf-ai-provider');
         if (provEl) provEl.value = provider;
 
-        const openaiEl = document.getElementById('ai-openai-fields');
-        const ollamaEl = document.getElementById('ai-ollama-fields');
+        const fields = {
+            'ollama': 'ai-ollama-fields',
+            'openai': 'ai-openai-fields',
+            'anthropic': 'ai-anthropic-fields',
+            'gemini': 'ai-gemini-fields',
+            'deepseek': 'ai-deepseek-fields'
+        };
+        Object.keys(fields).forEach(key => {
+            const el = document.getElementById(fields[key]);
+            if (el) el.style.display = key === provider ? 'block' : 'none';
+        });
+        ['ollama', 'openai', 'anthropic', 'gemini', 'deepseek'].forEach(p => {
+            const el = document.getElementById('conf-ai-model-' + p);
+            if (el) el.style.display = p === provider ? 'block' : 'none';
+        });
 
-        if (provider === 'openai') {
-            if (openaiEl) openaiEl.style.display = 'block';
-            if (ollamaEl) ollamaEl.style.display = 'none';
-        } else {
-            if (openaiEl) openaiEl.style.display = 'none';
-            if (ollamaEl) ollamaEl.style.display = 'block';
+        if (ai.apiKey) {
+            ['openai', 'anthropic', 'gemini', 'deepseek'].forEach(p => {
+                const el = document.getElementById('conf-ai-key-' + p);
+                if (el) el.value = ai.apiKey;
+            });
         }
 
-        const keyEl = document.getElementById('conf-ai-key');
-        if (keyEl && ai.apiKey) keyEl.value = ai.apiKey;
-
-        if (provider === 'openai') {
-            const modelEl = document.getElementById('conf-ai-model-openai');
-            if (modelEl) modelEl.value = ai.model || 'gpt-4o-mini';
-        } else {
-            const modelEl = document.getElementById('conf-ai-model-ollama');
-            if (modelEl) modelEl.value = ai.model || 'qwen2.5:14b';
-        }
+        const modelMap = {
+            'ollama': 'conf-ai-model-ollama',
+            'openai': 'conf-ai-model-openai',
+            'anthropic': 'conf-ai-model-anthropic',
+            'gemini': 'conf-ai-model-gemini',
+            'deepseek': 'conf-ai-model-deepseek'
+        };
+        const modelEl = document.getElementById(modelMap[provider] || 'conf-ai-model-ollama');
+        if (modelEl) modelEl.value = ai.model || 'qwen2.5:14b';
 
         const urlEl = document.getElementById('conf-ai-ollama-url');
         if (urlEl) urlEl.value = ai.ollamaUrl || 'http://localhost:11434';
+
+        const timeoutEl = document.getElementById('conf-ai-timeout');
+        if (timeoutEl) timeoutEl.value = ai.timeoutMinutes || 10;
+
+        const cacheEl = document.getElementById('conf-ai-cache');
+        if (cacheEl) cacheEl.checked = ai.useCache !== false;
     },
 
     onAiProviderChange() {
-        const provider = document.getElementById('conf-ai-provider').value;
-        const openaiEl = document.getElementById('ai-openai-fields');
-        const ollamaEl = document.getElementById('ai-ollama-fields');
-        if (provider === 'openai') {
-            if (openaiEl) openaiEl.style.display = 'block';
-            if (ollamaEl) ollamaEl.style.display = 'none';
-        } else {
-            if (openaiEl) openaiEl.style.display = 'none';
-            if (ollamaEl) ollamaEl.style.display = 'block';
-        }
+        const provider = document.getElementById('conf-ai-provider')?.value || 'ollama';
+        const fields = {
+            'ollama': 'ai-ollama-fields',
+            'openai': 'ai-openai-fields',
+            'anthropic': 'ai-anthropic-fields',
+            'gemini': 'ai-gemini-fields',
+            'deepseek': 'ai-deepseek-fields'
+        };
+        Object.keys(fields).forEach(key => {
+            const el = document.getElementById(fields[key]);
+            if (el) el.style.display = key === provider ? 'block' : 'none';
+        });
+        const modelSelect = document.getElementById('conf-ai-model-' + provider);
+        if (modelSelect) modelSelect.style.display = 'block';
+        ['ollama', 'openai', 'anthropic', 'gemini', 'deepseek'].forEach(p => {
+            const el = document.getElementById('conf-ai-model-' + p);
+            if (el && el !== modelSelect) el.style.display = 'none';
+        });
     },
 
     toggleAiKeyVisibility() {
@@ -1888,18 +1948,35 @@ const App = {
     },
 
     async saveAiSettings() {
-        const provider = document.getElementById('conf-ai-provider').value;
-        const apiKey = document.getElementById('conf-ai-key')?.value || '';
+        const provider = document.getElementById('conf-ai-provider')?.value || 'ollama';
+        let apiKey = '';
         const ollamaUrl = document.getElementById('conf-ai-ollama-url')?.value || 'http://localhost:11434';
-        const model = provider === 'openai'
-            ? document.getElementById('conf-ai-model-openai')?.value || 'gpt-4o-mini'
-            : document.getElementById('conf-ai-model-ollama')?.value || 'qwen2.5:14b';
+        let model = '';
+
+        if (provider === 'ollama') {
+            model = document.getElementById('conf-ai-model-ollama')?.value || 'qwen2.5:14b';
+        } else if (provider === 'openai') {
+            apiKey = document.getElementById('conf-ai-key-openai')?.value || '';
+            model = document.getElementById('conf-ai-model-openai')?.value || 'gpt-4o-mini';
+        } else if (provider === 'anthropic') {
+            apiKey = document.getElementById('conf-ai-key-anthropic')?.value || '';
+            model = document.getElementById('conf-ai-model-anthropic')?.value || 'claude-3-haiku-20240307';
+        } else if (provider === 'gemini') {
+            apiKey = document.getElementById('conf-ai-key-gemini')?.value || '';
+            model = document.getElementById('conf-ai-model-gemini')?.value || 'gemini-1.5-flash';
+        } else if (provider === 'deepseek') {
+            apiKey = document.getElementById('conf-ai-key-deepseek')?.value || '';
+            model = document.getElementById('conf-ai-model-deepseek')?.value || 'deepseek-chat';
+        }
+
+        const timeoutMinutes = parseInt(document.getElementById('conf-ai-timeout')?.value) || 10;
+        const useCache = document.getElementById('conf-ai-cache')?.checked !== false;
 
         const btn = document.getElementById('btn-ai-save');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Salvando...'; }
 
         try {
-            await store.saveAiSettings({ provider, model, apiKey, ollamaUrl });
+            await store.saveAiSettings({ provider, model, apiKey, ollamaUrl, timeoutMinutes, useCache });
             this.loadAiSettingsForm();
             this.showToast('Configurações de IA salvas com sucesso!', 'success');
         } catch (err) {
@@ -2697,6 +2774,67 @@ const App = {
         }
     },
 
+    // --- Focus Trap for Modals ---
+
+    _previousFocus: null,
+
+    trapFocus(modalElement) {
+        if (!modalElement) return;
+
+        this._previousFocus = document.activeElement;
+
+        const focusableSelectors = [
+            'a[href]',
+            'button:not([disabled]):not([tabindex="-1"])',
+            'input:not([disabled]):not([type="hidden"]):not([tabindex="-1"])',
+            'select:not([disabled]):not([tabindex="-1"])',
+            'textarea:not([disabled]):not([tabindex="-1"])',
+            '[tabindex]:not([tabindex="-1"])'
+        ].join(', ');
+
+        const focusableElements = modalElement.querySelectorAll(focusableSelectors);
+        if (focusableElements.length === 0) return;
+
+        const firstFocusable = focusableElements[0];
+        const lastFocusable = focusableElements[focusableElements.length - 1];
+
+        // Focus first focusable element
+        firstFocusable.focus();
+
+        const trapHandler = (e) => {
+            if (e.key !== 'Tab') return;
+
+            if (e.shiftKey) {
+                if (document.activeElement === firstFocusable) {
+                    e.preventDefault();
+                    lastFocusable.focus();
+                }
+            } else {
+                if (document.activeElement === lastFocusable) {
+                    e.preventDefault();
+                    firstFocusable.focus();
+                }
+            }
+        };
+
+        modalElement._focusTrapHandler = trapHandler;
+        modalElement.addEventListener('keydown', trapHandler);
+    },
+
+    releaseFocus(modalElement) {
+        if (!modalElement) return;
+
+        if (modalElement._focusTrapHandler) {
+            modalElement.removeEventListener('keydown', modalElement._focusTrapHandler);
+            delete modalElement._focusTrapHandler;
+        }
+
+        if (this._previousFocus && this._previousFocus.focus) {
+            this._previousFocus.focus();
+            this._previousFocus = null;
+        }
+    },
+
     // --- PTC Creation Logic ---
 
     async openPtcModal() {
@@ -2730,10 +2868,10 @@ const App = {
 
         const html = `
             <div id="modal-ptc" class="modal-overlay">
-                <div class="modal" style="width: 500px;">
+                <div class="modal" style="width: 500px;" role="dialog" aria-modal="true" aria-labelledby="ptc-modal-title">
                     <div class="modal-header">
-                        <h3 class="card-title">Iniciar Nova PTC</h3>
-                        <button class="btn btn-ghost" onclick="document.getElementById('modal-ptc').remove()"><i class="ph ph-x"></i></button>
+                        <h3 class="card-title" id="ptc-modal-title">Iniciar Nova PTC</h3>
+                        <button class="btn btn-ghost" onclick="app.releaseFocus(document.getElementById('modal-ptc')?.querySelector('.modal')); document.getElementById('modal-ptc').remove()"><i class="ph ph-x"></i></button>
                     </div>
                     <div class="modal-body">
                         <div class="form-group">
@@ -2854,6 +2992,10 @@ const App = {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', html);
+
+        // Trap focus in PTC modal
+        const ptcModal = document.getElementById('modal-ptc')?.querySelector('.modal');
+        if (ptcModal) this.trapFocus(ptcModal);
     },
 
     populatePtcContactFields(clientName) {
@@ -3263,9 +3405,9 @@ const App = {
         return new Promise((resolve) => {
             const html = `
                 <div id="modal-confirm-overlay" class="modal-overlay" style="z-index: 99999;">
-                    <div class="modal modal-confirm">
+                    <div class="modal modal-confirm" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
                         <div class="icon-box"><i class="ph ph-warning"></i></div>
-                        <h3>${title}</h3>
+                        <h3 id="confirm-title">${title}</h3>
                         <p>${message}</p>
                         <div class="btns">
                             <button class="btn btn-cancel" id="btn-confirm-cancel">Cancelar</button>
@@ -3277,16 +3419,26 @@ const App = {
             document.body.insertAdjacentHTML('beforeend', html);
 
             const overlay = document.getElementById('modal-confirm-overlay');
+            const modal = overlay.querySelector('.modal');
             const btnCancel = document.getElementById('btn-confirm-cancel');
             const btnOk = document.getElementById('btn-confirm-ok');
 
+            // Trap focus inside modal
+            this.trapFocus(modal);
+
             const close = (result) => {
+                this.releaseFocus(modal);
                 overlay.remove();
                 resolve(result);
             };
 
             btnCancel.onclick = () => close(false);
             btnOk.onclick = () => close(true);
+
+            // Close on Escape
+            overlay.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') close(false);
+            });
         });
     }
     ,
@@ -3316,10 +3468,10 @@ const App = {
 
             const html = `
                 <div id="modal-search-ptc" class="modal-overlay">
-                    <div class="modal" style="width: 600px;">
+                    <div class="modal" style="width: 600px;" role="dialog" aria-modal="true" aria-labelledby="search-ptc-title">
                         <div class="modal-header">
-                            <h3 class="card-title">Buscar PTC Existente</h3>
-                            <button class="btn btn-ghost" onclick="app.closeSearchPtcModal()"><i class="ph ph-x"></i></button>
+                            <h3 class="card-title" id="search-ptc-title">Buscar PTC Existente</h3>
+                            <button class="btn btn-ghost" onclick="app.releaseFocus(document.getElementById('modal-search-ptc')?.querySelector('.modal')); app.closeSearchPtcModal()"><i class="ph ph-x"></i></button>
                         </div>
                         <div class="modal-body">
                             <div class="form-group">
@@ -3374,6 +3526,10 @@ const App = {
                 </div>
             `;
             document.body.insertAdjacentHTML('beforeend', html);
+
+            // Trap focus in search modal
+            const searchModal = document.getElementById('modal-search-ptc')?.querySelector('.modal');
+            if (searchModal) this.trapFocus(searchModal);
 
             // Overlay click to close
             const overlay = document.getElementById('modal-search-ptc');
@@ -3436,7 +3592,11 @@ const App = {
 
     closeSearchPtcModal() {
         const m = document.getElementById('modal-search-ptc');
-        if (m) m.remove();
+        if (m) {
+            const modal = m.querySelector('.modal');
+            this.releaseFocus(modal);
+            m.remove();
+        }
         if (window.app._searchPtcEscHandler) {
             document.removeEventListener('keydown', window.app._searchPtcEscHandler);
             window.app._searchPtcEscHandler = null;

@@ -1,0 +1,201 @@
+/* =====================================================================
+   LOGIN & USER MANAGER STYLES
+   Extracted from index.html inline <style> block
+   ===================================================================== */
+
+/* ── Layout Overrides ── */
+.hidden-module {
+    display: none !important;
+}
+
+.fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Login Screen ── */
+.login-view {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+    z-index: var(--z-login);
+}
+
+.login-card {
+    background: var(--color-primary-light);
+    border: 1px solid var(--neutral-300);
+    border-radius: 16px;
+    padding: 40px;
+    width: 380px;
+    max-width: 95vw;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+}
+
+.login-card .login-logo {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--blue-400);
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+}
+
+.login-card .login-subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: var(--neutral-400);
+    margin-bottom: 32px;
+}
+
+.login-card .form-group {
+    margin-bottom: 20px;
+}
+
+.login-card .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--neutral-500);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.login-card .form-group input {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--color-primary);
+    border: 1px solid var(--neutral-300);
+    border-radius: 8px;
+    color: var(--neutral-200);
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.login-card .form-group input:focus {
+    border-color: var(--blue-400);
+}
+
+.login-card .form-group input::placeholder {
+    color: var(--neutral-600);
+}
+
+.login-card .btn-login {
+    width: 100%;
+    padding: 12px;
+    background: var(--blue-400);
+    color: var(--color-primary);
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 8px;
+}
+
+.login-card .btn-login:hover {
+    background: var(--blue-300);
+}
+
+.login-card .btn-login:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.login-card .login-error {
+    color: var(--red-400);
+    font-size: 13px;
+    text-align: center;
+    margin-top: 12px;
+    min-height: 20px;
+}
+
+.login-card .login-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--neutral-600);
+}
+
+.login-card .login-footer a {
+    color: var(--blue-400);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.login-card .login-footer a:hover {
+    text-decoration: underline;
+}
+
+.login-card .login-footer .login-powered {
+    margin-top: 14px;
+    font-size: 10px;
+    opacity: 0.55;
+    line-height: 1.4;
+}
+
+.login-card .login-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--color-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── User Manager Modal ── */
+.user-manager-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.user-manager-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--neutral-50);
+    font-weight: 600;
+    color: var(--neutral-600);
+    border-bottom: 2px solid var(--color-border);
+}
+
+.user-manager-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--neutral-50);
+}
+
+.user-level-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.user-level-badge.admin { background: var(--red-100); color: var(--red-300); }
+.user-level-badge.engenheiro { background: var(--blue-100); color: var(--blue-300); }
+.user-level-badge.visualizador { background: var(--neutral-50); color: var(--neutral-400); }

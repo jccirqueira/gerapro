@@ -1,0 +1,103 @@
+/* =====================================================================
+   UTILITY CLASSES — Table of Contents
+   =====================================================================
+   1. Text Utilities
+   2. Text Truncation
+   3. Flex Utilities
+   4. Spacing Utilities
+   5. Width Utilities
+   6. Focus Visible (Accessibility)
+   7. Visually Hidden (Screen Readers)
+   ===================================================================== */
+
+/* ── Text ── */
+.text-xs  { font-size: var(--font-size-xs); }
+.text-sm  { font-size: var(--font-size-sm); }
+.text-base{ font-size: var(--font-size-base); }
+.text-muted { color: var(--color-text-muted); }
+.text-secondary { color: var(--color-text-secondary); }
+.font-medium { font-weight: var(--font-weight-medium); }
+.font-semibold { font-weight: var(--font-weight-semibold); }
+.font-bold { font-weight: var(--font-weight-bold); }
+.hidden { display: none !important; }
+.hidden-module { display: none !important; }
+
+/* ── Text Truncation ── */
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ── Flex Utilities ── */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.gap-xs { gap: var(--spacing-xs); }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+.gap-lg { gap: var(--spacing-lg); }
+.flex-1 { flex: 1; }
+
+/* ── Spacing Utilities ── */
+.mt-xs { margin-top: var(--spacing-xs); }
+.mt-sm { margin-top: var(--spacing-sm); }
+.mt-md { margin-top: var(--spacing-md); }
+.mt-lg { margin-top: var(--spacing-lg); }
+.mb-xs { margin-bottom: var(--spacing-xs); }
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+
+/* ── Width Utilities ── */
+.w-full { width: 100%; }
+.min-w-0 { min-width: 0; }
+
+/* ── Focus Visible (Accessibility) ── */
+.nav-item:focus-visible,
+.tab-btn:focus-visible,
+.page-btn:focus-visible,
+.crm-lead-card:focus-visible,
+.crm-cal-day:focus-visible,
+.dropdown-item:focus-visible,
+.btn-icon:focus-visible,
+.help-trigger:focus-visible,
+.ajuda-item:focus-visible,
+.ajuda-sidebar-section:focus-visible,
+.crm-modal-close:focus-visible,
+.crm-tab:focus-visible {
+    outline: 2px solid var(--blue-500);
+    outline-offset: 2px;
+}
+
+/* ── Visually Hidden (Screen Readers) ── */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}

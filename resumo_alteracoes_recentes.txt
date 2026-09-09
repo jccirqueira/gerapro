@@ -1,10 +1,55 @@
 RESUMO DE ALTERAÇÕES RECENTES - GeraPro
 =========================================
-Data: 28/05/2026
+Data: 19/08/2026
 
 ======================================================================
-1. LOGO DO CLIENTE NO CADASTRO (NOVA FUNCIONALIDADE)
+1. PROPOSTA COMERCIAL - MÓDULO RESTAURADO (CORREÇÃO CRÍTICA)
 ======================================================================
+
+Problema:
+- Ao abrir uma proposta comercial, aparecia a mensagem
+  "Erro ao carregar proposta. (Pode estar vazia na revisão)".
+  No console: "TypeError: window.app.propostaComercial.renderModal
+  is not a function" (app.js loadProposalVersion).
+
+Causa raiz:
+- O arquivo js/propostaComercial.js estava corrompido: havia sido
+  substituído por um stub de ~136 linhas (sem renderModal, create, edit,
+  save, exportToWord, etc.) em vez das ~2.000 linhas originais.
+  O app.js chamava window.app.propostaComercial.renderModal(data),
+  que não existia no módulo -> TypeError.
+
+Correção:
+- Restaurado o módulo completo (versão c7fdbc1 do git) com todos os
+  métodos: renderModal, create, edit, save, exportToWord, closeModal,
+  switchTab, addRevisionRow, addPagamentoEventoRow, etc.
+- Reintegrada a feature "Unidade do Cliente (AUTPRO)" na proposta
+  comercial, espelhando a implementação da proposta técnica:
+  * Campo pc_unidade_cliente no formulário (exibido apenas para
+    empresas AUTPRO)
+  * Novo método handleUnidadeChange() - carrega contatos da unidade
+    selecionada e preenche e-mail/telefone automaticamente
+  * updateContactDropdown() popula o dropdown de unidades por cliente
+    e restaura a unidade salva (activeCommercialProposal, currentPtc
+    ou currentPtcInfo.autpro.codigoUnidade)
+  * handleContactSelection() prioriza contatos da unidade quando AUTPRO
+  * save() e _captureFormData() persistem/preservam unidade_cliente
+    (inclusive ao trocar de aba via switchTab)
+  * _createFromPtc() usa default de unidade_cliente da PTC/AUTPRO
+- Corrigida a codificação dos acentos (mojibake UTF-8, ex.: "Descri├º├úo")
+  que surgiu durante a restauração: arquivo restaurado byte a byte via
+  git checkout, preservando o UTF-8 correto (sem BOM).
+
+Arquivos alterados:
+- js/propostaComercial.js (restauração completa + integração unidade)
+
+======================================================================
+REGISTRO ANTERIOR - 28/05/2026
+======================================================================
+
+=====================================================================
+1. LOGO DO CLIENTE NO CADASTRO (NOVA FUNCIONALIDADE)
+=====================================================================
 
 Objetivo:
 - Salvar a logo do cliente no cadastro (clientes) e carregá-la automaticamente
@@ -41,9 +86,9 @@ e) js/_chunk2.js
    - Espelhada a mesma alteração do handleClientChange (slug + logo load)
 
 
-======================================================================
+=====================================================================
 2. IMPORTAÇÃO IA - NORMALIZAÇÃO E MAPEAMENTO DE CAMPOS
-======================================================================
+=====================================================================
 
 Arquivos alterados: js/importacaoET.js, js/propostaTecnica.js,
                      js/server_new.js, js/_chunk2.js
@@ -109,18 +154,18 @@ m) AI Prompt (server_new.js):
    - Tabela VALORES ESPERADOS para inferência de campo pelo valor
 
 
-======================================================================
+=====================================================================
 3. CORREÇÕES ADICIONAIS
-======================================================================
+=====================================================================
 
 - propostaTecnica.js:2620 - '80 õm' corrigido para '80 um' (+ 90, 100)
 - handleClientChange auto-trigger em renderModal (propostaTecnica.js:1744)
 - Tensão padrão em cargas alterada de '440' para '380'
 
 
-======================================================================
+=====================================================================
 ARQUIVOS MODIFICADOS (lista completa)
-======================================================================
+=====================================================================
 
 C:\Users\jcc\Documents\Workspace_A\GeraPro\js\propostaTecnica.js
 C:\Users\jcc\Documents\Workspace_A\GeraPro\js\importacaoET.js

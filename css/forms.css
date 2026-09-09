@@ -1,0 +1,48 @@
+/* =====================================================================
+   FORM CONTROLS — Table of Contents
+   =====================================================================
+   1. Form Group & Label
+   2. Input / Select / Textarea
+   3. Focus States
+   ===================================================================== */
+
+.form-group { margin-bottom: var(--spacing-sm); }
+
+.form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-divider-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-panel);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    line-height: var(--line-height-normal);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--blue-500);
+    box-shadow: 0 0 0 3px rgba(81, 149, 246, .15);
+}
+
+.form-control::placeholder {
+    color: var(--neutral-400);
+}
+
+select.form-control {
+    appearance: auto;
+    padding-right: 8px;
+}

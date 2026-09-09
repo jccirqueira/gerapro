@@ -1431,6 +1431,136 @@
     ]
   },
 
+  chaparia: {
+    titulo: 'Típicos de Chaparia',
+    icone: 'ph-cube',
+    descricao: 'Catálogo de típicos de invólucros metálicos com dimensões, fabricante e lista de materiais (BOM) para associação automática com o layout da Proposta Técnica.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral',
+        screenshot: 'prints/chaparia/visao-geral.png',
+        texto: 'O módulo de Típicos de Chaparia gerencia o catálogo de invólucros metálicos padronizados (armários, painéis) utilizados na montagem dos equipamentos da Proposta Técnica.\n\nCada típico representa um modelo de invólucro com:\n\n- Nome e descrição do modelo\n- Fabricante (KitFrame, Eletropoll, Siemens, ABB, Schneider, WEG ou Genérico)\n- Dimensões: Largura × Altura × Profundidade (mm)\n- Lista de Materiais (BOM) com os componentes estruturais\n\nA principal finalidade é permitir a associação automática no Layout da Proposta Técnica: ao definir um armário com determinadas dimensões e fabricante, o sistema busca automaticamente o típico de chaparia correspondente para compor a estrutura.'
+      },
+      {
+        id: 'cadastro',
+        titulo: 'Como Cadastrar um Típico de Chaparia',
+        screenshot: 'prints/chaparia/cadastro.png',
+        passos: [
+          'Acesse o módulo "Típicos de Chaparia" no menu Engenharia.',
+          'Clique no botão "Novo Típico de Chaparia" no canto superior direito.',
+          'No painel esquerdo "Propriedades", preencha o Nome (obrigatório), Fabricante, Descrição e as Dimensões (Largura, Altura e Profundidade em mm).',
+          'No painel direito "Lista de Materiais", clique em "Adicionar Material" para abrir o seletor de materiais.',
+          'Busque o material por descrição, código ou fabricante, e clique em "Selecionar" para adicioná-lo à BOM.',
+          'Ajuste a quantidade de cada item conforme necessário.',
+          'Clique em "Salvar" no canto superior direito para concluir.'
+        ]
+      },
+      {
+        id: 'campos',
+        titulo: 'Campos do Formulário',
+        screenshot: 'prints/chaparia/campos.png',
+        campos: [
+          { nome: 'Nome *', descricao: 'Identificação do típico. Ex: KX600x2300x600. Campo obrigatório.' },
+          { nome: 'Fabricante', descricao: 'Fabricante do invólucro: KitFrame, Eletropoll, Siemens, ABB, Schneider, WEG ou Genérico (vazio).' },
+          { nome: 'Descrição', descricao: 'Descrição complementar. Ex: Invólucro CCM 600x2300x600.' },
+          { nome: 'Largura (mm)', descricao: 'Largura do invólucro em milímetros.' },
+          { nome: 'Altura (mm)', descricao: 'Altura do invólucro em milímetros.' },
+          { nome: 'Profundidade (mm)', descricao: 'Profundidade do invólucro em milímetros.' }
+        ]
+      },
+      {
+        id: 'bom',
+        titulo: 'Lista de Materiais (BOM)',
+        screenshot: 'prints/chaparia/bom.png',
+        texto: 'A BOM do típico de chaparia lista todos os materiais estruturais que compõem o invólucro: perfis, cantoneiras, portas, fundos, laterais, etc.\n\n- Os materiais são selecionados do banco de dados de Materiais\n- É possível filtrar por descrição, código do fabricante ou fabricante\n- A quantidade de cada item é ajustável individualmente\n- O custo estimado total é exibido no cabeçalho do formulário\n- A associação automática no layout da PT usa: Fabricante + Largura + Altura + Profundidade'
+      },
+      {
+        id: 'associacao-layout',
+        titulo: 'Associação Automática com o Layout',
+        screenshot: 'prints/chaparia/associacao-layout.png',
+        texto: 'Quando um equipamento na Proposta Técnica tem um armário configurado com fabricante e dimensões, o sistema busca automaticamente o típico de chaparia correspondente.\n\nA busca segue esta ordem de precedência:\n1. Match exato: fabricante + largura + altura + profundidade\n2. Match parcial: fabricante + largura + altura (qualquer profundidade)\n3. Match sem profundidade: fabricante + largura + altura (profundidade zero)\n\nSe nenhum típico for encontrado, o armário é marcado como "Sem chaparia associada" no layout.'
+      }
+    ]
+  },
+
+  'automacao-rede': {
+    titulo: 'Arquitetura de Rede',
+    icone: 'ph-network',
+    descricao: 'Geração automática de topologia de rede industrial, BOM de switches/cabos, plano de endereçamento IP, memorial descritivo e exportação para SVG, DXF e PDF.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral',
+        screenshot: 'prints/automacao-rede/visao-geral.png',
+        texto: 'O módulo de Arquitetura de Rede Industrial gera automaticamente toda a documentação de rede a partir dos controladores (PLC/REM) configurados na Proposta Técnica ativa.\n\nResultados gerados:\n- Topologia em 3 níveis: Campo, Célula/Controle e Gestão/IIoT\n- Diagrama visual da topologia (SVG interativo + exportação DXF)\n- Lista de Materiais de Rede (BOM) com switches, cabos, conectores, conversores\n- Plano de Endereçamento IP com VLANs\n- Memorial Descritivo Técnico completo\n- Fichas Técnicas dos equipamentos de rede\n- Conformidade Normativa (PROFINET, IEC 62439, etc.)'
+      },
+      {
+        id: 'parametros',
+        titulo: 'Parâmetros de Configuração',
+        screenshot: 'prints/automacao-rede/parametros.png',
+        texto: 'Antes de gerar a arquitetura, configure os parâmetros da rede industrial:\n\n**Protocolos:**\n- Protocolo Industrial Ethernet: PROFINET, EtherNet/IP ou Modbus TCP\n- Protocolo de Campo: Profibus DP, Modbus RTU ou IO-Link\n\n**Topologia:** Anel (com redundância MRP), Estrela, Linha/Daisy-Chain ou Árvore\n\n**Infraestrutura:** Distância estimada (m), categoria do cabo (CAT5e, CAT6, CAT6a, CAT7), IP base e prefixo, quantidade de VLANs\n\n**Integrações opcionais:** SCADA (OPC UA), IIoT (MQTT), Fibra Óptica, Firewall Industrial (DMZ), Roteador WAN (4G/5G), Access Point Wi-Fi (IWLAN)',
+        passos: [
+          'Certifique-se de que a Proposta Técnica ativa possui equipamentos do tipo PLC ou REM com Lista de I/O configurada.',
+          'Acesse o módulo "Arquitetura de Rede" no menu Engenharia.',
+          'Confira os controladores detectados e o total de pontos I/O no card "Controladores Detectados".',
+          'No card "Parâmetros da Rede", selecione o protocolo industrial, protocolo de campo e topologia desejados.',
+          'Configure o comprimento estimado de cabos, categoria, IP base e quantidade de VLANs.',
+          'Ative as integrações desejadas (SCADA, IIoT, Fibra, Firewall, etc.).',
+          'Clique em "Gerar Arquitetura" para processar.'
+        ],
+        campos: [
+          { nome: 'Protocolo Industrial Ethernet', descricao: 'PROFINET, EtherNet/IP ou Modbus TCP. Define o barramento principal da rede.' },
+          { nome: 'Protocolo de Campo', descricao: 'Profibus DP, Modbus RTU ou IO-Link. Protocolo para dispositivos de campo.' },
+          { nome: 'Topologia da Rede', descricao: 'Anel (MRP), Estrela, Linha/Daisy-Chain ou Árvore.' },
+          { nome: 'Distância Estimada (m)', descricao: 'Comprimento total estimado de cabos de rede em metros.' },
+          { nome: 'Categoria do Cabo', descricao: 'CAT5e, CAT6 (padrão), CAT6a ou CAT7.' },
+          { nome: 'IP Base', descricao: 'Endereço base para o plano de endereçamento. Ex: 10.0.0.0.' },
+          { nome: 'Prefixo IP', descricao: '/24 (254 hosts), /23 (510 hosts) ou /22 (1022 hosts).' },
+          { nome: 'Qtd VLANs', descricao: 'Número de VLANs a serem criadas (1 a 10).' }
+        ]
+      },
+      {
+        id: 'opcoes-avancadas',
+        titulo: 'Opções Avançadas PROFINET',
+        screenshot: 'prints/automacao-rede/opcoes-avancadas.png',
+        texto: 'Quando o protocolo PROFINET é selecionado, opções avançadas específicas ficam disponíveis:\n\n**Classe de Conformidade (CC):**\n- CC-A: Básico (switch não-gerenciável, RT)\n- CC-B: Diagnóstico (switch gerenciável, SNMP)\n- CC-C: IRT (ASIC dedicado, motion control)\n- CC-D: TSN (Gigabit, convergência TI/TA)\n\n**Tempo Real:** RT (Real-Time, 1-10ms) ou IRT (Isochronous RT, jitter <1μs)\n\n**Redundância:** MRP (recuperação <200ms) ou MRPD (zero-loss, duplicação de frames)\n\n**Tipo de Cabo Industrial:** Tipo A (fixo), B (flexível), C (altamente flexível), R (robótica)\n\n**Conector de Campo:** RJ45 IP20, M12 D-Coded, M12 X-Coded (Gigabit), SCRJ Fibra Óptica\n\n**Recursos adicionais:** Dispositivos Siemens no barramento e PROFIsafe (segurança funcional SIL 3)'
+      },
+      {
+        id: 'geracao',
+        titulo: 'Gerar Arquitetura',
+        screenshot: 'prints/automacao-rede/geracao.png',
+        passos: [
+          'Após configurar todos os parâmetros, clique em "Gerar Arquitetura".',
+          'O sistema processa os controladores e gera: topologia em 3 níveis, lista de materiais, plano IP, memorial descritivo.',
+          'O resultado é exibido na mesma tela com as seções: Topologia (Campo, Célula, Gestão), Diagrama Visual, BOM, Conformidade, Endereçamento IP e Memorial.',
+          'O cabeçalho exibe um resumo: protocolo, topologia, total de CLPs e pontos I/O.',
+          'Use os botões no cabeçalho para exportar os resultados.'
+        ]
+      },
+      {
+        id: 'exportacao',
+        titulo: 'Exportação dos Resultados',
+        screenshot: 'prints/automacao-rede/exportacao.png',
+        texto: 'O módulo oferece múltiplas opções de exportação:\n\n**Diagrama de Topologia:**\n- SVG: vetor escalável para edição em vetores ou inserção em documentos\n- DXF: formato CAD para importação em AutoCAD, QElectroTech, etc.\n\n**Lista de Materiais (BOM):**\n- BOM CSV: arquivo CSV com switches, cabos, conectores categorizados\n\n**JSON Completo:**\n- Exporta todo o resultado (topologia, BOM, memorial, IP, fichas técnicas) em JSON\n\n**Memorial Descritivo:**\n- Exportar PDF: gera uma página HTML formatada para impressão/PDF\n- Copiar Memorial: copia o texto do memorial para a área de transferência\n\n**Regenerar:** Reexecuta a geração com os mesmos parâmetros (útil após alterações na PT)',
+        passos: [
+          'No cabeçalho do resultado, clique em "Exportar JSON" para baixar o arquivo .json completo.',
+          'Clique em "BOM CSV" para baixar a lista de materiais de rede em formato CSV.',
+          'Clique em "SVG" ou "DXF" na seção "Diagrama de Topologia" para baixar o diagrama.',
+          'Clique em "Exportar PDF" para abrir a visualização de impressão do memorial descritivo.',
+          'Clique em "Copiar Memorial" para copiar o texto do memorial para a área de transferência.',
+          'Use "Regenerar" para recalcular a arquitetura se houver alterações na PT.'
+        ]
+      },
+      {
+        id: 'resultados',
+        titulo: 'Seções do Resultado',
+        screenshot: 'prints/automacao-rede/resultados.png',
+        texto: 'Após a geração, o resultado é organizado nas seguintes seções:\n\n**Topologia — Nível de Campo:** Barramentos de campo com mestres, nós, protocolos, distância máxima e indicadores de necessidade de repetidor ou conversor de fibra.\n\n**Topologia — Nível de Célula/Controle:** Controladores (CLPs) com seus totais I/O, switches industriais (CORE/ACCESS), topologia e badges de conformidade.\n\n**Topologia — Nível de Gestão/IIoT:** Dispositivos de gestão (firewall, roteador, access point, gateway OPC UA/MQTT).\n\n**Diagrama de Topologia:** Representação visual SVG interativa com todos os níveis e conexões.\n\n**Lista de Materiais de Rede:** Switches, cabos, conectores, conversores com quantidades e custo total estimado.\n\n**Conformidade Normativa:** Check-list de normas atendidas (PROFINET, IEC 62439, NR-10, etc.).\n\n**Plano de Endereçamento IP:** Tabela de VLANs (ID, sub-rede, gateway) e dispositivos (tag, IP, VLAN, station name).\n\n**Fichas Técnicas:** Especificações técnicas dos equipamentos de rede sugeridos.\n\n**Memorial Descritivo Técnico:** Texto completo formatado para cópia ou exportação PDF.'
+      }
+    ]
+  },
+
   orcamentos: {
     titulo: 'Orçamentos',
     icone: 'ph-briefcase',
@@ -1707,15 +1837,46 @@
         texto: 'Formatos aceitos:\n- PDF (.pdf): extrai texto via pdf-parse\n- Word (.docx): extrai texto via mammoth\n- Excel (.xlsx, .xls, .csv): extrai dados de todas as planilhas\n\nLimitações:\n- Tamanho máximo: 10 MB\n- Documentos scaneados (imagem) podem não ter texto extraível\n- A IA analisa até 12.000 caracteres do documento\n- Para melhores resultados, use documentos com texto selecionável (não digitalizados)\n- Tabelas muito complexas podem ter extração parcial\n- A qualidade da extração depende da clareza do documento original'
       }
     ]
-  }
+  },
 
+  comparacaoDocumentos: {
+    titulo: 'Comparação de Documentos',
+    icone: 'ph-git-diff',
+    descricao: 'Compare quantitativos entre documentos técnicos usando IA.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral',
+        texto: 'O módulo de Comparação de Documentos permite comparar quantitativos de materiais entre dois ou mais documentos (PDF, XLSX, DOCX).\n\n Fluxo:\n1. Faça upload de 2+ documentos\n2. A IA extrai automaticamente os itens com quantidades\n3. O sistema sugere correspondências entre itens similares\n4. Revise a tabela de diferenças com código de cores\n5. Exporte o resultado em XLSX ou salve a sessão para consulta futura\n\n Casos de uso:\n- Comparar orçamento do fornecedor vs levantamento interno\n- Conferir quantidades de cabos, eletrocalhas, barramentos\n- Validar se o escopo do cliente cobre todos os itens do projeto'
+      },
+      {
+        id: 'como-usar',
+        titulo: 'Como Usar',
+        passos: [
+          'Acesse "Comparar Documentos" pelo menu lateral ou pelo botão na Proposta Técnica.',
+          'Adicione pelo menos 2 documentos (PDF, XLSX, DOCX).',
+          'Dê um rótulo para cada documento (ex: "Proposta Cliente", "Levantamento Interno").',
+          'Clique em "Comparar" e aguarde a extração dos itens pela IA.',
+          'Revise os itens extraídos de cada documento nas colunas lado a lado.',
+          'Veja a tabela de diferenças com cores: verde (igual), amarelo (excedente), vermelho (faltante).',
+          'Use o filtro "Mostrar apenas diferenças" para focar nas divergências.',
+          'Exporte o relatório em XLSX ou salve a sessão para referência futura.'
+        ]
+      },
+      {
+        id: 'dicas',
+        titulo: 'Dicas e Limitações',
+        texto: 'Dicas:\n- Use documentos com texto selecionável (não digitalizados) para melhor extração\n- Nomeie os documentos com rótulos descritivos para identificar cada origem\n- A similaridade textual é usada para sugerir correspondências entre itens\n- Revise sempre as correspondências sugeridas antes de exportar\n\n Limitações:\n- Máximo 15MB por arquivo\n- A extração depende da clareza e estrutura do documento original\n- Itens com descrições muito diferentes podem não ser pareados automaticamente\n- Documentos escaneados podem precisar de OCR (suporte automático para PDFs imagem)'
+      }
+    ]
+  }
 };
 
 window.AJUDA_CATEGORIAS = [
   { label: 'Principal', modules: ['dashboard'] },
   { label: 'Cadastros', modules: ['clientes', 'fornecedores'] },
-  { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'precificacao', 'orcamentos', 'importacaoET'] },
-  { label: 'Engenharia', modules: ['materiais', 'paineis', 'tipicos', 'cubiculos', 'cargas', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'calculos-eletricos', 'calculos-mecanicos', 'lm', 'manufatura'] },
+  { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'precificacao', 'orcamentos', 'importacaoET', 'comparacaoDocumentos'] },
+  { label: 'Engenharia', modules: ['materiais', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'cargas', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'calculos-eletricos', 'calculos-mecanicos', 'lm', 'automacao-rede', 'manufatura'] },
   { label: 'Relatórios', modules: ['relatorio-propostas', 'relatorio-cadastros', 'relatorio-tipicos', 'relatorio-manufatura'] },
   { label: 'Configurações', modules: ['importacao', 'configuracoes'] }
 ];

@@ -1,0 +1,311 @@
+/* =====================================================================
+   LAYOUT — Table of Contents
+   =====================================================================
+   1. App Container Grid
+   2. Sidebar Components
+   3. Full-viewport Module Pattern
+   4. KPI Grid
+   5. Import Drop Zone
+   6. Section Header (Config)
+   7. Sync Indicator
+   8. Active PTC Badge
+   9. User Avatar / Info / Dropdown
+  10. Dropdown Item
+  11. Chart Filter Row
+  12. Empty Activity State
+  13. Info Callout
+   ===================================================================== */
+
+/* App Layout */
+.app-container {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: var(--header-height) 1fr;
+    height: 100vh;
+}
+
+.app-sidebar {
+    grid-row: 1 / -1;
+    background: var(--color-bg-sidebar);
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-header {
+    grid-column: 2;
+    background-color: var(--color-bg-header);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-md);
+    justify-content: space-between;
+}
+
+.module-header-sticky {
+    background: var(--color-accent);
+    color: white;
+}
+
+.app-content {
+    grid-column: 2;
+    padding: var(--spacing-md);
+    overflow-y: auto;
+    position: relative;
+}
+
+/* ── Sidebar Components ── */
+.sidebar-brand {
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-md);
+    font-weight: 700;
+    font-size: 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    background: var(--color-accent);
+}
+
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.sidebar-section-label {
+    margin: 10px 16px 5px;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: white;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 12px 16px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    background: var(--color-accent);
+}
+
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 1099;
+}
+.sidebar-backdrop.visible {
+    display: block;
+}
+
+/* ── Full-viewport Module Pattern ── */
+.module-fullview {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 120px);
+    background: var(--color-bg-panel);
+    margin: calc(-1 * var(--spacing-md));
+    position: relative;
+}
+.module-fullview-header {
+    color: white;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow-md);
+    z-index: var(--z-sticky);
+}
+.module-fullview-header h2 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.module-fullview-header .subtitle {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-top: 2px;
+}
+.module-fullview-body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+.module-fullview-header .btn-ghost {
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+/* ── KPI Grid ── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ── Import Drop Zone ── */
+.import-dropzone {
+    background: var(--neutral-50);
+    border: 2px dashed var(--neutral-300);
+    border-radius: var(--radius-md);
+    padding: 40px;
+    text-align: center;
+    margin-bottom: var(--spacing-lg);
+}
+.import-dropzone h4 {
+    margin: 0;
+    color: var(--color-section-csv);
+    font-weight: var(--font-weight-bold);
+}
+.import-dropzone-label {
+    background: var(--color-section-csv);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+}
+
+/* ── Section Header (Config cards) ── */
+.section-header {
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--color-border);
+    padding-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.section-header-navy    { color: var(--color-section-navy); }
+.section-header-purple  { color: var(--color-section-purple); }
+.section-header-green   { color: var(--color-section-green); }
+.section-header-amber   { color: var(--color-section-amber); }
+.section-header-violet  { color: var(--color-section-violet); }
+.section-header-telegram { color: var(--color-section-telegram); }
+.section-header-blue    { color: var(--color-section-blue); }
+.section-header-indigo  { color: var(--color-section-indigo); }
+
+/* ── Sync Indicator ── */
+.sync-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+.sync-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    background: var(--color-text-muted);
+}
+
+/* ── Active PTC Badge ── */
+.ptc-badge {
+    display: none;
+    background-color: var(--color-bg-sidebar);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: var(--font-weight-semibold);
+    white-space: nowrap;
+    align-items: center;
+    gap: 4px;
+}
+
+/* ── User Avatar ── */
+.user-avatar {
+    width: 28px;
+    height: 28px;
+    background: var(--neutral-200);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--font-weight-bold);
+    font-size: 12px;
+    color: var(--neutral-600);
+}
+
+/* ── User Info ── */
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+.user-info-name {
+    font-size: 12px;
+    font-weight: var(--font-weight-medium);
+}
+.user-info-level {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+}
+
+/* ── User Dropdown ── */
+.user-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--color-bg-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-dropdown);
+    min-width: 180px;
+    padding: 6px;
+}
+
+/* ── Dropdown Item ── */
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+}
+.dropdown-item:hover { background: var(--neutral-50); }
+
+/* ── Chart Filter Row ── */
+.chart-filter-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── Empty Activity State ── */
+.activity-placeholder {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 60px;
+}
+
+/* ── Info Callout (e.g. Ollama privacy) ── */
+.info-callout {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    padding: 8px 12px;
+    background: var(--green-100);
+    border-radius: 6px;
+    border-left: 3px solid var(--green-600);
+}

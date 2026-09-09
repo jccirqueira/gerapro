@@ -15,6 +15,73 @@ const DxfParser = require('dxf-parser');
 const crypto = require('crypto');
 const { gerarProjetoQet } = require('./js/geradorQet');
 
+// AI Cache
+const aiCache = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000;
+
+function getCacheKey(text, model, provider) {
+    const hash = crypto.createHash('md5').update(text.slice(0, 2000) + '|' + model + '|' + provider).digest('hex');
+    return hash;
+}
+
+function getFromCache(key) {
+    const entry = aiCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > CACHE_TTL) {
+        aiCache.delete(key);
+        return null;
+    }
+    return entry.data;
+}
+
+function setCache(key, data) {
+    aiCache.set(key, { data, ts: Date.now() });
+}
+
+function clearAiCache() {
+    aiCache.clear();
+    console.log('[AI-Cache] Cache limpo');
+}
+
+// Schema validation
+function validateExtractionSchema(data) {
+    if (!data || typeof data !== 'object') return { valid: false, error: 'Resposta não é um objeto' };
+    const errors = [];
+    if (!data.geral || typeof data.geral !== 'object') {
+        data.geral = { cliente: '', projeto: '', localizacao: '', objeto: '', data: '' };
+        errors.push('geral: criado default');
+    }
+    if (!Array.isArray(data.equipments)) {
+        data.equipments = [];
+        errors.push('equipments: criado array vazio');
+    }
+    if (!Array.isArray(data.loads)) {
+        data.loads = [];
+        errors.push('loads: criado array vazio');
+    }
+    if (!Array.isArray(data.normas)) {
+        data.normas = [];
+        errors.push('normas: criado array vazio');
+    }
+    if (!Array.isArray(data.vendorList)) {
+        data.vendorList = [];
+        errors.push('vendorList: criado array vazio');
+    }
+    if (!data.infraestrutura || typeof data.infraestrutura !== 'object') {
+        data.infraestrutura = { disciplinas: [] };
+        errors.push('infraestrutura: criado default');
+    }
+    if (!Array.isArray(data.infraestrutura.disciplinas)) {
+        data.infraestrutura.disciplinas = [];
+    }
+    data.loads.forEach((ld, i) => {
+        if (ld.potenciaCV !== undefined && typeof ld.potenciaCV === 'string') {
+            ld.potenciaCV = parseFloat(ld.potenciaCV) || 0;
+        }
+    });
+    return { valid: true, warnings: errors.length > 0 ? errors : null };
+}
+
 // Mail encryption helpers
 const MAIL_ENCRYPTION_KEY = process.env.MAIL_ENCRYPTION_KEY || 'GeraPro-Mail-Encrypt-Key-2026!';
 
@@ -123,7 +190,9 @@ function getAiConfig() {
                 ollamaModel: dbSettings.model || OLLAMA_MODEL,
                 ollamaUrl: dbSettings.ollamaUrl || OLLAMA_URL,
                 openaiKey: dbSettings.apiKey || OPENAI_KEY,
-                openaiModel: dbSettings.model || OPENAI_MODEL
+                openaiModel: dbSettings.model || OPENAI_MODEL,
+                timeoutMinutes: dbSettings.timeoutMinutes || 10,
+                useCache: dbSettings.useCache !== false
             };
         }
     } catch (e) {
@@ -134,7 +203,9 @@ function getAiConfig() {
         ollamaModel: OLLAMA_MODEL,
         ollamaUrl: OLLAMA_URL,
         openaiKey: OPENAI_KEY,
-        openaiModel: OPENAI_MODEL
+        openaiModel: OPENAI_MODEL,
+        timeoutMinutes: 10,
+        useCache: true
     };
 }
 
@@ -1252,13 +1323,182 @@ async function extractTextFromPDF(buffer) {
     return result.text || '';
 }
 
-function extractTextFromExcel(buffer, ext) {
+function extractTextFromExcel(buffer, ext, selectedSheets = null) {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheets = workbook.SheetNames.map(name => {
+    const sheetNames = selectedSheets && selectedSheets.length > 0
+        ? workbook.SheetNames.filter(n => selectedSheets.includes(n))
+        : workbook.SheetNames;
+    const sheets = sheetNames.map(name => {
         const sheet = workbook.Sheets[name];
-        return XLSX.utils.sheet_to_csv(sheet);
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        if (!jsonData || jsonData.length === 0) {
+            const csv = XLSX.utils.sheet_to_csv(sheet);
+            return `=== Sheet: ${name} ===\n${csv}`;
+        }
+        const headers = Object.keys(jsonData[0]);
+        const rows = jsonData.map(row => headers.map(h => String(row[h] || '')).join(' | '));
+        return `=== Sheet: ${name} ===\nColunas: ${headers.join(' | ')}\n${rows.join('\n')}`;
     });
     return sheets.join('\n\n');
+}
+
+function extractItemsFromExcel(buffer, selectedSheets = null) {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetNames = selectedSheets && selectedSheets.length > 0
+        ? workbook.SheetNames.filter(n => selectedSheets.includes(n))
+        : workbook.SheetNames;
+    const allItems = [];
+    for (const name of sheetNames) {
+        const sheet = workbook.Sheets[name];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', header: 1 });
+        if (!rows || rows.length === 0) { console.log(`[Extract] ${name}: 0 rows, skipping`); continue; }
+
+        let headerRowIdx = -1;
+        let colMap = null;
+        for (let r = 0; r < Math.min(15, rows.length); r++) {
+            const row = rows[r];
+            if (!row || row.length === 0) continue;
+
+            const isCableSheet = row.some(v => /cabo/i.test(String(v))) && row.some(v => /^tipo$/i.test(String(v)));
+            const descChecks = isCableSheet
+                ? [/^tipo$/i, /descrição|descricao|especifica/i, /item/i, /material/i, /produto/i, /descritivo/i]
+                : [/descrição|descricao|especifica/i, /item/i, /material/i, /produto/i, /descritivo/i, /^tipo$/i];
+
+            const descIdx = row.findIndex(v => descChecks.some(re => re.test(String(v))));
+            const qtdIdx = row.findIndex(v => /^qtd$|^qtde$|^quant\.?$|quantidade|amount|compr/i.test(String(v)));
+            if (descIdx >= 0) {
+                headerRowIdx = r;
+                colMap = {
+                    desc: descIdx,
+                    qtd: qtdIdx >= 0 ? qtdIdx : row.findIndex(v => /qtd|quant|qtde|amount|quantidade|compr/i.test(String(v))),
+                    un: row.findIndex(v => /^un\.?$|^und\.?$|^unid\.?$|unidade|medida|uom/i.test(String(v))),
+                    cod: row.findIndex(v => /^cod\.?$|^código|code|ref$/i.test(String(v))),
+                    preco: row.findIndex(v => /preço|preco|preço\s*unit|preco\s*unit|r\$\s*|valor\s*unit|v\.\s*unit/i.test(String(v)))
+                };
+                console.log(`[Extract] ${name}: headerRow=${headerRowIdx} isCableSheet=${isCableSheet} descIdx=${descIdx} colMap=${JSON.stringify(colMap)}`);
+                break;
+            }
+        }
+        if (!colMap) { console.log(`[Extract] ${name}: no header row found, skipping`); continue; }
+
+        const dataRows = rows.slice(headerRowIdx + 1);
+        for (const row of dataRows) {
+            if (!row || row.length === 0) continue;
+            const descricao = colMap.desc >= 0 ? String(row[colMap.desc] || '').trim() : '';
+            if (!descricao || descricao.length < 2) continue;
+            let qtd = 0;
+            if (colMap.qtd >= 0) {
+                const raw = String(row[colMap.qtd] || '').trim();
+                qtd = parseFloat(raw.replace(',', '.'));
+                if (isNaN(qtd)) qtd = 0;
+            }
+            if (qtd <= 0) {
+                for (let c = 0; c < row.length; c++) {
+                    if (c === colMap.desc || c === colMap.un || c === colMap.cod) continue;
+                    const v = parseFloat(String(row[c] || '').replace(',', '.'));
+                    if (!isNaN(v) && v > 0) { qtd = v; break; }
+                }
+            }
+            if (qtd <= 0) continue;
+            const rawPreco = colMap.preco >= 0 ? String(row[colMap.preco] || '').trim() : '';
+            const preco = rawPreco ? parseFloat(rawPreco.replace(/[R$\s.]/g, '').replace(',', '.')) : null;
+            allItems.push({
+                codigo: colMap.cod >= 0 ? String(row[colMap.cod] || '').trim() : '',
+                descricao,
+                qtd,
+                un: colMap.un >= 0 ? (String(row[colMap.un] || '').trim() || 'un') : 'un',
+                preco_unitario: (!isNaN(preco) && preco > 0) ? preco : null
+            });
+        }
+    }
+    console.log(`[Extract] total: ${allItems.length} itens de [${sheetNames.join(', ')}]`);
+    return allItems;
+}
+
+function extractCableSpec(desc) {
+    if (!desc) return null;
+    const s = String(desc).toLowerCase().replace(/\s+/g, ' ').trim();
+    const accessoryTerms = /\b(terminal|conector|luva|emenda|pino|ilha|plug|soquete)\b/i;
+    if (accessoryTerms.test(s)) return null;
+    const secaoMatch = s.match(/(\d+[,.]?\d*)\s*mm[²2]/i);
+    const secao = secaoMatch ? parseFloat(secaoMatch[1].replace(',', '.')) : null;
+    const material = /cobre/i.test(s) ? 'cobre' : /aluminio|alumínio/i.test(s) ? 'aluminio' : null;
+    const multCond = s.match(/(\d+)\s*x\s*(\d+[,.]?\d*)\s*mm/i);
+    const nConds = multCond ? parseInt(multCond[1]) : (s.match(/multipolar|singelo/i) ? (/(\d+)\s*x\s*\d+/i.test(s) ? parseInt(s.match(/(\d+)\s*x\s*\d+/i)[1]) : 1) : null);
+    const tensaoMatch = s.match(/(\d+[,.]?\d*)\s*\/\s*(\d+)\s*kv/i);
+    const tensao = tensaoMatch ? `${tensaoMatch[1].replace(',', '.')}/${tensaoMatch[2]}kV` : null;
+    const caboTipo = s.match(/(\d+)x(\d+)\/c#([\d,]+)/i);
+    if (caboTipo) {
+        return {
+            secao: parseFloat(caboTipo[3].replace(',', '.')),
+            material: 'cobre',
+            nConds: parseInt(caboTipo[2]),
+            tensao: null
+        };
+    }
+    return { secao, material, nConds, tensao };
+}
+
+function cableSpecScore(descA, descB) {
+    const sa = extractCableSpec(descA);
+    const sb = extractCableSpec(descB);
+    if (!sa || !sb) return 0;
+    let score = 0;
+    if (sa.secao && sb.secao) {
+        const ratio = Math.abs(sa.secao - sb.secao) / Math.max(sa.secao, sb.secao);
+        if (ratio <= 0.1) score += 0.5;
+    }
+    if (sa.material && sb.material && sa.material === sb.material) score += 0.3;
+    if (sa.nConds != null && sb.nConds != null) {
+        if (sa.nConds !== sb.nConds) return 0;
+        score += 0.15;
+    }
+    if (sa.tensao && sb.tensao && sa.tensao === sb.tensao) score += 0.15;
+    return Math.min(score, 1);
+}
+
+function filterItemsBySearchTerms(items, searchTerms) {
+    if (!searchTerms || !searchTerms.trim()) return items;
+    const terms = searchTerms.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    if (terms.length === 0) return items;
+    const hasCableTerm = terms.some(t => /cabo|singelo|multipolar|mm[²2]|bitola|condutor|controle|comando|instrumentação|sinal|optico|otico|fibra/i.test(t));
+    const filtered = items.filter(item => {
+        const desc = (item.descricao || '').toLowerCase();
+        if (terms.some(term => desc.includes(term))) return true;
+        const spec = extractCableSpec(item.descricao);
+        if (spec && spec.material && terms.some(term => spec.material.includes(term) || term.includes(spec.material))) {
+            console.log(`[Filter] PASS via spec.material: "${item.descricao.substring(0, 50)}"`);
+            return true;
+        }
+        if (spec && spec.secao && hasCableTerm) {
+            console.log(`[Filter] PASS via spec.secao: "${item.descricao.substring(0, 50)}"`);
+            return true;
+        }
+        console.log(`[Filter] FAIL: "${item.descricao.substring(0, 60)}"`);
+        return false;
+    });
+    console.log(`[Filter] ${items.length} -> ${filtered.length}`);
+    return filtered;
+}
+
+function groupItemsBySpec(items) {
+    const cableGroups = new Map();
+    const nonCable = [];
+    for (const item of items) {
+        const spec = extractCableSpec(item.descricao);
+        if (spec && spec.secao) {
+            const key = `${spec.secao}|${spec.material || ''}|${spec.nConds ?? ''}|${spec.tensao || ''}`;
+            if (!cableGroups.has(key)) {
+                cableGroups.set(key, { ...item, qtd: 0 });
+            }
+            cableGroups.get(key).qtd += item.qtd;
+        } else {
+            nonCable.push(item);
+        }
+    }
+    const grouped = [...cableGroups.values()];
+    console.log(`[Group] ${items.length} -> ${grouped.length} cabos + ${nonCable.length} outros`);
+    return [...grouped, ...nonCable];
 }
 
 function buildExtractionPrompt(text) {
@@ -1414,103 +1654,214 @@ Retorne este JSON exato:
 }`;
 }
 
-async function callAIForExtraction(text) {
-    const prompt = buildExtractionPrompt(text);
+async function callAIForExtraction(text, promptOverride = null) {
+    const prompt = promptOverride || buildExtractionPrompt(text);
     const cfg = getAiConfig();
+    const model = cfg.provider === 'ollama' ? cfg.ollamaModel : cfg.openaiModel;
 
-        if (cfg.provider === 'ollama') {
-            return new Promise((resolve) => {
-                try {
-                    const postData = JSON.stringify({
-                        model: cfg.ollamaModel,
-                        messages: [
-                            { role: 'system', content: 'Você é um assistente que retorna apenas JSON válido, sem markdown, sem explicações.' },
-                            { role: 'user', content: prompt }
-                        ],
-                        stream: false,
-                        keep_alive: '48h',
-                        options: { temperature: 0.1 }
-                    });
-
-                    const parsed = url.parse(cfg.ollamaUrl);
-                    const req = http.request({
-                        hostname: parsed.hostname,
-                        port: parsed.port || 11434,
-                        path: '/api/chat',
-                        method: 'POST',
-                        timeout: 600000,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Content-Length': Buffer.byteLength(postData)
-                        }
-                    }, (res) => {
-                        let body = '';
-                        res.on('data', chunk => { body += chunk; });
-                        res.on('end', () => {
-                            try {
-                                const data = JSON.parse(body);
-                                const rawText = data.message?.content || '';
-                                resolve(robustParseJSON(rawText));
-                            } catch (e) {
-                                resolve({ _error: 'Resposta inválida do Ollama.', _raw: body.slice(0, 500) });
-                            }
-                        });
-                    });
-
-                    req.on('timeout', () => {
-                        req.destroy();
-                        console.error('[AI-Ollama] Timeout após 10 minutos aguardando resposta do modelo.');
-                        resolve({ _error: 'O modelo de IA está demorando muito para responder (>10 min). Tente novamente — a segunda tentativa costuma ser mais rápida pois o modelo já estará carregado.', _raw: prompt });
-                    });
-
-                    req.on('error', (err) => {
-                        console.error('[AI-Ollama] Error:', err.message);
-                        if (err.code === 'ECONNREFUSED') {
-                            resolve({ _error: 'Ollama indisponível. Verifique se está rodando em ' + cfg.ollamaUrl, _raw: prompt });
-                        } else if (err.code === 'ECONNRESET') {
-                            resolve({ _error: 'Conexão com Ollama foi interrompida. O modelo pode estar sobrecarregado. Tente novamente.', _raw: prompt });
-                        } else {
-                            resolve({ _error: 'Erro de conexão com Ollama (' + err.code + '): ' + err.message, _raw: prompt });
-                        }
-                    });
-
-                    req.write(postData);
-                    req.end();
-                } catch (err) {
-                    console.error('[AI-Ollama] Error:', err.message);
-                    resolve({ _error: 'Erro ao comunicar com Ollama. ' + err.message, _raw: prompt });
-                }
-            });
-        }
-
-    if (cfg.provider === 'openai') {
-        if (!cfg.openaiKey) return { _error: 'Chave da API OpenAI não configurada. Configure em Ajustes > IA.' };
-        try {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${cfg.openaiKey}`
-                },
-                body: JSON.stringify({
-                    model: cfg.openaiModel,
-                    messages: [
-                        { role: 'system', content: 'Você é um assistente que retorna apenas JSON válido, sem markdown, sem explicações.' },
-                        { role: 'user', content: prompt }
-                    ],
-                    temperature: 0.1
-                })
-            });
-            const data = await response.json();
-            const rawText = data.choices?.[0]?.message?.content || '';
-            return robustParseJSON(rawText);
-        } catch (err) {
-            console.error('[AI-OpenAI] Error:', err.message);
-            return { _error: 'Erro na API OpenAI: ' + err.message };
+    if (cfg.useCache) {
+        const cacheKey = getCacheKey(text, model, cfg.provider);
+        const cached = getFromCache(cacheKey);
+        if (cached) {
+            console.log('[AI-Cache] Cache hit for:', cacheKey.slice(0, 12));
+            return cached;
         }
     }
 
-    return { _error: 'Provider não configurado. Defina AI_PROVIDER=ollama ou AI_PROVIDER=openai' };
+    let result;
+    switch (cfg.provider) {
+        case 'ollama':
+            result = await callOllama(prompt, cfg);
+            break;
+        case 'openai':
+            result = await callOpenAI(prompt, cfg);
+            break;
+        case 'anthropic':
+            result = await callAnthropic(prompt, cfg);
+            break;
+        case 'gemini':
+            result = await callGemini(prompt, cfg);
+            break;
+        case 'deepseek':
+            result = await callDeepSeek(prompt, cfg);
+            break;
+        default:
+            return { _error: 'Provider desconhecido: ' + cfg.provider };
+    }
+
+    if (!result._error && cfg.useCache) {
+        const cacheKey = getCacheKey(text, model, cfg.provider);
+        setCache(cacheKey, result);
+    }
+
+    if (!result._error && !promptOverride) {
+        validateExtractionSchema(result);
+    }
+
+    return result;
+}
+
+async function callOllama(prompt, cfg) {
+    return new Promise((resolve) => {
+        try {
+            const timeoutMs = (cfg.timeoutMinutes || 10) * 60 * 1000;
+            const postData = JSON.stringify({
+                model: cfg.ollamaModel,
+                messages: [
+                    { role: 'system', content: 'Você é um assistente que retorna apenas JSON válido, sem markdown, sem explicações.' },
+                    { role: 'user', content: prompt }
+                ],
+                stream: false,
+                keep_alive: '48h',
+                options: { temperature: 0.1 }
+            });
+
+            const parsed = url.parse(cfg.ollamaUrl);
+            const req = http.request({
+                hostname: parsed.hostname,
+                port: parsed.port || 11434,
+                path: '/api/chat',
+                method: 'POST',
+                timeout: timeoutMs,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(postData)
+                }
+            }, (res) => {
+                let body = '';
+                res.on('data', chunk => { body += chunk; });
+                res.on('end', () => {
+                    try {
+                        const data = JSON.parse(body);
+                        const rawText = data.message?.content || '';
+                        resolve(robustParseJSON(rawText));
+                    } catch (e) {
+                        resolve({ _error: 'Resposta inválida do Ollama.', _raw: body.slice(0, 500) });
+                    }
+                });
+            });
+
+            req.on('timeout', () => {
+                req.destroy();
+                resolve({ _error: `O modelo de IA está demorando muito para responder (>{cfg.timeoutMinutes || 10} min). Tente novamente — a segunda tentativa costuma ser mais rápida.`, _raw: prompt });
+            });
+
+            req.on('error', (err) => {
+                if (err.code === 'ECONNREFUSED') {
+                    resolve({ _error: 'Ollama indisponível. Verifique se está rodando em ' + cfg.ollamaUrl, _raw: prompt });
+                } else if (err.code === 'ECONNRESET') {
+                    resolve({ _error: 'Conexão com Ollama foi interrompida. O modelo pode estar sobrecarregado. Tente novamente.', _raw: prompt });
+                } else {
+                    resolve({ _error: 'Erro de conexão com Ollama (' + err.code + '): ' + err.message, _raw: prompt });
+                }
+            });
+
+            req.write(postData);
+            req.end();
+        } catch (err) {
+            resolve({ _error: 'Erro ao comunicar com Ollama. ' + err.message, _raw: prompt });
+        }
+    });
+}
+
+async function callOpenAI(prompt, cfg) {
+    const key = cfg.openaiKey;
+    if (!key) return { _error: 'Chave da API OpenAI não configurada.' };
+    try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify({
+                model: cfg.openaiModel,
+                messages: [
+                    { role: 'system', content: 'Você é um assistente que retorna apenas JSON válido, sem markdown, sem explicações.' },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.1
+            })
+        });
+        const data = await response.json();
+        const rawText = data.choices?.[0]?.message?.content || '';
+        return robustParseJSON(rawText);
+    } catch (err) {
+        return { _error: 'Erro na API OpenAI: ' + err.message };
+    }
+}
+
+async function callAnthropic(prompt, cfg) {
+    const key = cfg.apiKey;
+    if (!key) return { _error: 'Chave da API Anthropic não configurada.' };
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: cfg.openaiModel || 'claude-3-haiku-20240307',
+                max_tokens: 4000,
+                system: 'Você é um assistente que retorna apenas JSON válido, sem markdown, sem explicações.',
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.1
+            })
+        });
+        const data = await response.json();
+        const rawText = data.content?.[0]?.text || '';
+        return robustParseJSON(rawText);
+    } catch (err) {
+        return { _error: 'Erro na API Anthropic: ' + err.message };
+    }
+}
+
+async function callGemini(prompt, cfg) {
+    const key = cfg.apiKey;
+    if (!key) return { _error: 'Chave da API Gemini não configurada.' };
+    try {
+        const model = cfg.openaiModel || 'gemini-1.5-flash';
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: 'Você é um assistente que retorna apenas JSON válido, sem markdown, sem explicações.\n\n' + prompt
+                    }]
+                }],
+                generationConfig: { temperature: 0.1 }
+            })
+        });
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return robustParseJSON(rawText);
+    } catch (err) {
+        return { _error: 'Erro na API Gemini: ' + err.message };
+    }
+}
+
+async function callDeepSeek(prompt, cfg) {
+    const key = cfg.apiKey;
+    if (!key) return { _error: 'Chave da API DeepSeek não configurada.' };
+    try {
+        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+            body: JSON.stringify({
+                model: cfg.openaiModel || 'deepseek-chat',
+                messages: [
+                    { role: 'system', content: 'Você é um assistente que retorna apenas JSON válido, sem markdown, sem explicações.' },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.1
+            })
+        });
+        const data = await response.json();
+        const rawText = data.choices?.[0]?.message?.content || '';
+        return robustParseJSON(rawText);
+    } catch (err) {
+        return { _error: 'Erro na API DeepSeek: ' + err.message };
+    }
 }
 
 function robustParseJSON(raw) {
@@ -1549,11 +1900,693 @@ function robustParseJSON(raw) {
     }
 }
 
+// === OCR ===
+
+async function extractTextWithOCR(buffer) {
+    try {
+        const Tesseract = require('tesseract.js');
+        console.log('[OCR] Iniciando OCR no documento...');
+        const { data } = await Tesseract.recognize(
+            buffer,
+            'por',
+            { logger: (m) => { if (m.status === 'recognizing text') console.log('[OCR] Progresso:', Math.round(m.progress * 100) + '%'); } }
+        );
+        console.log(`[OCR] Texto extraído: ${data.text.length} chars (confiança: ${Math.round(data.confidence)}%)`);
+        return data.text || '';
+    } catch (err) {
+        console.error('[OCR] Erro:', err.message);
+        return '';
+    }
+}
+
+// === COMPARISON FUNCTIONS ===
+
+function buildComparisonExtractPrompt(text, searchTerms) {
+    let focusInstruction = '';
+    if (searchTerms && searchTerms.trim()) {
+        const terms = searchTerms.split(',').map(t => t.trim()).filter(Boolean).join(', ');
+        focusInstruction = `\nFOCO: Extraia APENAS itens que contenham QUALQUER UM destes termos: ${terms}. Um item que contém UM dos termos já deve ser incluído, mesmo que não contenha os demais. Ignore completamente itens que não contenham NENHUM destes termos.\n`;
+    }
+    return `Você é um engenheiro eletricista experiente analisando um documento técnico.
+Extraia APENAS itens com QUANTIDADE do documento abaixo.
+Para cada item, extraia: descricao (descrição completa), qtd (quantidade numérica), un (unidade de medida), codigo (código do item, se houver), preco_unitario (preço unitário em R$, apenas se explicitamente informado no documento, senão deixe vazio).${focusInstruction}
+REGRAS:
+- Retorne APENAS o JSON, sem markdown, sem explicações, sem \`\`\`json
+- Se um campo não for encontrado, use string vazia "" ou 0
+- Quantidades sempre como números (ex: "100" → 100, "65,5" → 65.5)
+- Preço unitário sempre como número, sem símbolos (ex: "R$ 150,00" → 150.00)
+- Unidades comuns: m, un, kg, m², m³, L, pc, barra, conjunto, vb, km
+- Para cabos: incluir a bitola na descrição (ex: "Cabo de Cobre 240mm²")
+- Para eletrocalhas, bandejas, leitos: incluir dimensões
+- O documento pode conter múltiplas abas/seções. Cada aba é delimitada por "=== Sheet: ... ===". Extraia itens de TODAS as abas.
+
+DOCUMENTO:
+${text.slice(0, 60000)}
+
+Retorne este JSON exato:
+{
+  "items": [
+    {
+      "codigo": "",
+      "descricao": "",
+      "qtd": 0,
+      "un": "un",
+      "preco_unitario": null
+    }
+  ]
+}`;
+}
+
+function suggestMatching(itemsA, itemsB) {
+    const matches = [];
+    const usedB = new Set();
+
+    function normalize(s) {
+        if (!s) return '';
+        return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ');
+    }
+
+    function textScore(a, b) {
+        const na = normalize(a);
+        const nb = normalize(b);
+        const aWords = na.split(/\s+/).filter(w => w.length > 2);
+        const bWords = nb.split(/\s+/).filter(w => w.length > 2);
+        if (aWords.length === 0 || bWords.length === 0) return 0;
+        let hits = 0;
+        for (const w of aWords) {
+            if (bWords.some(bw => bw.includes(w) || w.includes(bw))) hits++;
+        }
+        return hits / Math.max(aWords.length, bWords.length);
+    }
+
+    function isCableItem(item) {
+        const spec = extractCableSpec(item.descricao);
+        return !!(spec && spec.secao);
+    }
+
+    function codeScore(a, b) {
+        if (!a || !b) return 0;
+        const na = String(a).toLowerCase().trim();
+        const nb = String(b).toLowerCase().trim();
+        if (na === nb) return 1;
+        if (na.includes(nb) || nb.includes(na)) return 0.6;
+        return 0;
+    }
+
+    function unitPenalty(unA, unB) {
+        if (!unA || !unB) return 0;
+        const na = String(unA).toLowerCase().trim();
+        const nb = String(unB).toLowerCase().trim();
+        if (na === nb) return 0;
+        const equivalentes = { 'm': ['metros', 'metro'], 'un': ['unidade', 'und', 'pc', 'pç', 'unid'], 'kg': ['quilograma', 'quilo'], 'm2': ['m²', 'metro2'], 'm3': ['m³', 'metro3'] };
+        for (const [canon, vars] of Object.entries(equivalentes)) {
+            if ((na === canon || vars.includes(na)) && (nb === canon || vars.includes(nb))) return 0;
+        }
+        return -0.3;
+    }
+
+    function multiFieldScore(a, b) {
+        const descA = a.descricao || '';
+        const descB = b.descricao || '';
+        const aIsCable = isCableItem(a);
+        const bIsCable = isCableItem(b);
+
+        let descScore;
+        if (aIsCable && bIsCable) {
+            descScore = cableSpecScore(descA, descB);
+        } else if (!aIsCable && !bIsCable) {
+            descScore = textScore(descA, descB);
+        } else {
+            descScore = 0;
+        }
+
+        const codScore = codeScore(a.codigo, b.codigo);
+        const unPen = unitPenalty(a.un, b.un);
+
+        return {
+            total: descScore * 0.6 + codScore * 0.4 + unPen,
+            descScore,
+            codScore,
+            unMismatch: unPen < 0
+        };
+    }
+
+    for (let i = 0; i < itemsA.length; i++) {
+        const a = itemsA[i];
+        if (!a.descricao) continue;
+        let bestResult = null;
+        let bestJ = -1;
+        for (let j = 0; j < itemsB.length; j++) {
+            if (usedB.has(j)) continue;
+            const b = itemsB[j];
+            if (!b.descricao) continue;
+            const r = multiFieldScore(a, b);
+            if (!bestResult || r.total > bestResult.total) {
+                bestResult = r;
+                bestJ = j;
+            }
+        }
+        const threshold = 0.3;
+        if (bestJ >= 0 && bestResult && bestResult.total >= threshold) {
+            usedB.add(bestJ);
+            matches.push({
+                itemA: itemsA[i],
+                itemB: itemsB[bestJ],
+                score: Math.round(Math.max(0, bestResult.total) * 100) / 100,
+                matched: true,
+                unMismatch: bestResult.unMismatch
+            });
+        } else {
+            matches.push({
+                itemA: itemsA[i],
+                itemB: null,
+                score: 0,
+                matched: false,
+                unMismatch: false
+            });
+        }
+    }
+
+    for (let j = 0; j < itemsB.length; j++) {
+        if (!usedB.has(j)) {
+            matches.push({
+                itemA: null,
+                itemB: itemsB[j],
+                score: 0,
+                matched: false,
+                unMismatch: false
+            });
+        }
+    }
+
+    return matches;
+}
+
+function calculateDiff(matches) {
+    return matches.map(m => {
+        if (!m.itemA && !m.itemB) return null;
+        const qtdDoc = m.itemA?.qtd || 0;
+        const qtdLev = m.itemB?.qtd || 0;
+        const diff = qtdDoc - qtdLev;
+        const pct = qtdLev > 0 ? Math.round((diff / qtdLev) * 10000) / 100 : (diff !== 0 ? (diff > 0 ? 100 : -100) : 0);
+        let status = 'ok';
+        if (!m.itemB) status = 'apenas_documento';
+        else if (!m.itemA) status = 'apenas_levantamento';
+        else if (diff > 0) status = 'excedente';
+        else if (diff < 0) status = 'faltante';
+        return {
+            descricao: m.itemA?.descricao || m.itemB?.descricao || '',
+            unidade: m.itemA?.un || m.itemB?.un || 'un',
+            qtd_documento: qtdDoc,
+            qtd_levantamento: qtdLev,
+            diferenca: diff,
+            percentual: pct,
+            status,
+            matched: m.matched !== false,
+            match_score: m.score || 0,
+            un_match: m.itemA && m.itemB ? (m.itemA.un || '') === (m.itemB.un || '') : true,
+            un_mismatch: m.unMismatch || false,
+            item_a_json: m.itemA ? JSON.stringify(m.itemA) : '{}',
+            item_b_json: m.itemB ? JSON.stringify(m.itemB) : '{}'
+        };
+    }).filter(Boolean);
+}
+
+// === EXPORT COMPARISON XLSX ===
+
+function _setDataRange(ws, rowCount, colCount) {
+    if (rowCount < 1) return;
+    try {
+        ws.autoFilter = {
+            from: { row: 1, column: 1 },
+            to: { row: rowCount, column: Math.min(colCount, 26) }
+        };
+    } catch (e) {
+        console.warn('autoFilter not supported, skipping:', e.message);
+    }
+}
+
+function _fillRowCells(row, numCols, fillColor, fontColor) {
+    for (let i = 1; i <= numCols; i++) {
+        const cell = row.getCell(i);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+        if (fontColor) cell.font = { bold: true, color: { argb: fontColor } };
+    }
+}
+
+function sanitizeSheetName(name) {
+    if (!name) return 'Sheet';
+    return String(name).replace(/[\[\]:\*?\/\\]/g, '').trim() || 'Sheet';
+}
+
+const _usedSheetNames = new Set();
+
+function _uniqueSheetName(base) {
+    let name = sanitizeSheetName(base).slice(0, 31);
+    if (!name) name = 'Sheet';
+    let final = name;
+    let counter = 1;
+    while (_usedSheetNames.has(final)) {
+        const suffix = ` (${counter})`;
+        final = (name + suffix).slice(0, 31);
+        counter++;
+    }
+    _usedSheetNames.add(final);
+    return final;
+}
+
+async function handleExportComparison(body, res) {
+    const { results, documents, multiResults } = body;
+    if (!results || !Array.isArray(results)) {
+        sendJson(res, 400, { success: false, error: 'results é obrigatório' });
+        return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'GeraPro';
+    workbook.lastModifiedBy = 'GeraPro';
+    _usedSheetNames.clear();
+
+    const statusColors = {
+        'ok': 'FF16A34A',
+        'excedente': 'FFF59E0B',
+        'faltante': 'FFEF4444',
+        'apenas_documento': 'FF3B82F6',
+        'apenas_levantamento': 'FF8B5CF6'
+    };
+
+    if (multiResults && multiResults.viewMode === 'individual' && multiResults.compareDocs) {
+        const refLabel = (multiResults.refDoc && multiResults.refDoc.label) || 'Referência';
+
+        // Sheet 1: Resumo por par
+        const wsSummary = workbook.addWorksheet(_uniqueSheetName('Resumo'));
+        const sr1 = wsSummary.addRow(['Par', 'Total Itens', 'OK', 'Excedente', 'Faltante', 'Só Ref', 'Só Doc']);
+        _fillRowCells(sr1, 7, 'FF16A34A', 'FFFFFFFF');
+        multiResults.compareDocs.forEach((pair, pi) => {
+            const r = pair.results || [];
+            const iguais = r.filter(x => x.status === 'ok').length;
+            const excedentes = r.filter(x => x.status === 'excedente').length;
+            const faltantes = r.filter(x => x.status === 'faltante').length;
+            const apenasDoc = r.filter(x => x.status === 'apenas_documento').length;
+            const apenasLev = r.filter(x => x.status === 'apenas_levantamento').length;
+            wsSummary.addRow([pair.label, r.length, iguais, excedentes, faltantes, apenasDoc, apenasLev]);
+        });
+        wsSummary.columns = [{ width: 30 }, { width: 12 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 10 }, { width: 10 }];
+        _setDataRange(wsSummary, 1 + multiResults.compareDocs.length, 7);
+
+        // Sheet for each pair
+        multiResults.compareDocs.forEach((pair, pi) => {
+            const ws = workbook.addWorksheet(_uniqueSheetName(`vs ${pair.label || ''}`));
+            const h = ['Descrição', 'Unidade', `Qtd ${refLabel}`, `Qtd ${pair.label}`, 'Diferença', 'Dif. %', 'Status'];
+            const hr = ws.addRow(h);
+            _fillRowCells(hr, 7, 'FF16A34A', 'FFFFFFFF');
+            (pair.results || []).forEach((r, idx) => {
+                const row = ws.addRow([
+                    r.descricao || '',
+                    r.unidade || 'un',
+                    r.qtd_documento || 0,
+                    r.qtd_levantamento || 0,
+                    r.diferenca || 0,
+                    r.percentual !== undefined ? r.percentual + '%' : '',
+                    r.status || 'ok'
+                ]);
+                row.alignment = { vertical: 'middle', wrapText: true };
+                const color = statusColors[r.status] || 'FFFFFFFF';
+                const cell = row.getCell(7);
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+                if (idx % 2 === 0) {
+                    for (let i = 1; i <= 6; i++) {
+                        row.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                    }
+                }
+            });
+            ws.columns = h.map(() => ({ width: 24 }));
+            ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+            _setDataRange(ws, 1 + (pair.results || []).length, 7);
+        });
+
+        // Doc sheets
+        if (documents && Array.isArray(documents)) {
+            documents.forEach((doc, di) => {
+                const ws = workbook.addWorksheet(_uniqueSheetName(`Doc ${di + 1}: ${doc.label || doc.filename || ''}`));
+                const h = ['Código', 'Descrição', 'Qtd', 'Unidade'];
+                const hr = ws.addRow(h);
+                _fillRowCells(hr, 4, 'FF2563EB', 'FFFFFFFF');
+                (doc.items || []).forEach(item => {
+                    ws.addRow([item.codigo || '', item.descricao || '', item.qtd || 0, item.un || 'un']);
+                });
+                ws.columns = h.map(() => ({ width: 30 }));
+                ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+                _setDataRange(ws, 1 + (doc.items || []).length, 4);
+            });
+        }
+    } else {
+        // Original behavior (simple 1-to-1)
+        const ws1 = workbook.addWorksheet(_uniqueSheetName('Diferenças'));
+        const h1 = ['Descrição', 'Unidade', 'Qtd Doc. A', 'Qtd Doc. B', 'Diferença', 'Dif. %', 'Status'];
+        const hr1 = ws1.addRow(h1);
+        _fillRowCells(hr1, 7, 'FF16A34A', 'FFFFFFFF');
+        hr1.height = 22;
+
+        results.forEach((r, idx) => {
+            const row = ws1.addRow([
+                r.descricao || '',
+                r.unidade || 'un',
+                r.qtd_documento || 0,
+                r.qtd_levantamento || 0,
+                r.diferenca || 0,
+                r.percentual !== undefined ? r.percentual + '%' : '',
+                r.status || 'ok'
+            ]);
+            row.alignment = { vertical: 'middle', wrapText: true };
+            const color = statusColors[r.status] || 'FFFFFFFF';
+            const cell = row.getCell(7);
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+            cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+            if (idx % 2 === 0) {
+                for (let i = 1; i <= 6; i++) {
+                    row.getCell(i).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                }
+            }
+        });
+        ws1.columns = h1.map(() => ({ width: 24 }));
+        ws1.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+        _setDataRange(ws1, 1 + results.length, 7);
+
+        // Sheet 2: Resumo
+        const ws2 = workbook.addWorksheet(_uniqueSheetName('Resumo'));
+        const totalItens = results.length;
+        const excedentes = results.filter(r => r.status === 'excedente').length;
+        const faltantes = results.filter(r => r.status === 'faltante').length;
+        const apenasDoc = results.filter(r => r.status === 'apenas_documento').length;
+        const apenasLev = results.filter(r => r.status === 'apenas_levantamento').length;
+        const iguais = results.filter(r => r.status === 'ok').length;
+
+        const summaryData = [
+            ['Total de Itens', totalItens],
+            ['Itens Iguais', iguais],
+            ['Excedentes (Doc A > Doc B)', excedentes],
+            ['Faltantes (Doc A < Doc B)', faltantes],
+            ['Apenas no Documento A', apenasDoc],
+            ['Apenas no Documento B', apenasLev],
+        ];
+        const hr2 = ws2.addRow(['Indicador', 'Valor']);
+        _fillRowCells(hr2, 2, 'FF16A34A', 'FFFFFFFF');
+        summaryData.forEach(([label, val]) => ws2.addRow([label, val]));
+        ws2.columns = [{ width: 40 }, { width: 20 }];
+        _setDataRange(ws2, 1 + summaryData.length, 2);
+
+        // Sheet 3: Documentos (if provided)
+        if (documents && Array.isArray(documents)) {
+            documents.forEach((doc, di) => {
+                const ws = workbook.addWorksheet(_uniqueSheetName(`Doc ${di + 1}: ${doc.label || doc.filename || ''}`));
+                const h = ['Código', 'Descrição', 'Qtd', 'Unidade'];
+                const hr = ws.addRow(h);
+                _fillRowCells(hr, 4, 'FF2563EB', 'FFFFFFFF');
+                (doc.items || []).forEach(item => {
+                    ws.addRow([item.codigo || '', item.descricao || '', item.qtd || 0, item.un || 'un']);
+                });
+                ws.columns = h.map(() => ({ width: 30 }));
+                ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+                _setDataRange(ws, 1 + (doc.items || []).length, 4);
+            });
+        }
+    }
+
+    const filename = `Comparacao_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    try {
+        await workbook.xlsx.write(res);
+    } catch (writeErr) {
+        console.error('[ExportComparison] Erro ao escrever workbook:', writeErr.message);
+        sendJson(res, 500, { success: false, error: 'Erro ao gerar arquivo: ' + writeErr.message });
+        return;
+    }
+    res.end();
+}
+
+async function handleExportComparisonPdf(body, res) {
+    const { results, documents, multiResults } = body;
+    if (!results || !Array.isArray(results)) {
+        sendJson(res, 400, { success: false, error: 'results é obrigatório' });
+        return;
+    }
+
+    const PdfPrinter = require('pdfmake');
+    const fonts = {
+        Roboto: { normal: path.join(__dirname, 'fonts', 'Roboto-Regular.ttf'), bold: path.join(__dirname, 'fonts', 'Roboto-Medium.ttf'), italics: path.join(__dirname, 'fonts', 'Roboto-Italic.ttf'), bolditalics: path.join(__dirname, 'fonts', 'Roboto-MediumItalic.ttf') }
+    };
+    const printer = new PdfPrinter(fonts);
+
+    const preco = parseFloat(multiResults?.defaultPreco) || 0;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const isIndividual = multiResults && multiResults.viewMode === 'individual';
+    const refLabel = multiResults?.refDoc?.label || 'Referência';
+
+    function statusBadge(status) {
+        const colors = { ok: '#16a34a', excedente: '#f59e0b', faltante: '#ef4444', apenas_documento: '#3b82f6', apenas_levantamento: '#8b5cf6' };
+        const labels = { ok: 'OK', excedente: 'Excedente', faltante: 'Faltante', apenas_documento: 'Só Ref', apenas_levantamento: 'Só Doc' };
+        return { text: labels[status] || status, color: colors[status] || '#64748b', fontSize: 8, bold: true };
+    }
+
+    function calcDifTotal(refQtd, docQtd) {
+        return preco > 0 ? ((refQtd || 0) - (docQtd || 0)) * preco : 0;
+    }
+
+    function buildRows(rowsData) {
+        return rowsData.map((r, idx) => {
+            const cells = r.map(cell => {
+                if (typeof cell === 'object' && cell !== null) return cell;
+                return { text: String(cell ?? ''), fontSize: 8, alignment: 'center' };
+            });
+            if (idx % 2 === 1) {
+                cells.forEach(c => { c.fillColor = '#f8fafc'; });
+            }
+            return cells;
+        });
+    }
+
+    function headerCell(text, width) {
+        return { text, fontSize: 8, bold: true, alignment: 'center', fillColor: '#16a34a', color: 'white', margin: [2, 3, 2, 3] };
+    }
+
+    const content = [];
+
+    // Title
+    content.push({ text: 'Comparação de Documentos', style: 'title' });
+    const docList = multiResults?.compareDocs?.map(d => d.label).join(', ') || 'Documentos';
+    content.push({ text: `Referência: ${refLabel} vs ${multiResults?.mergedLabel || docList}`, style: 'subtitle', margin: [0, 2, 0, 0] });
+    content.push({ text: `Gerado em: ${dateStr}`, style: 'date', margin: [0, 0, 0, 10] });
+
+    if (isIndividual && multiResults.compareDocs) {
+        // --- Individual view ---
+        const pairs = multiResults.compareDocs;
+
+        // Summary per pair
+        pairs.forEach((pair, pi) => {
+            const r = pair.results || [];
+            const total = r.length;
+            const iguais = r.filter(x => x.status === 'ok').length;
+            const excedentes = r.filter(x => x.status === 'excedente').length;
+            const faltantes = r.filter(x => x.status === 'faltante').length;
+            const apenasRef = r.filter(x => x.status === 'apenas_documento').length;
+            const apenasDoc = r.filter(x => x.status === 'apenas_levantamento').length;
+            content.push({ text: `Par ${pi + 1}: ${pair.label}`, style: 'section', margin: [0, 8, 0, 2] });
+            content.push({
+                table: {
+                    widths: ['auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
+                    body: [
+                        [{ text: 'Total', style: 'th' }, { text: 'OK', style: 'th' }, { text: 'Excedente', style: 'th' }, { text: 'Faltante', style: 'th' }, { text: 'Só Ref', style: 'th' }, { text: 'Só Doc', style: 'th' }],
+                        [total, iguais, excedentes, faltantes, apenasRef, apenasDoc].map(v => ({ text: String(v), fontSize: 8, alignment: 'center' }))
+                    ]
+                },
+                layout: 'lightHorizontalLines',
+                margin: [0, 2, 0, 4]
+            });
+        });
+
+        // Main table — compute unified rows
+        const refItems = multiResults.refDoc?.items || [];
+        const unifiedRows = [];
+
+        for (const refItem of refItems) {
+            const desc = refItem.descricao || refItem.codigo || '';
+            if (!desc) continue;
+            const comparisons = pairs.map(cd => {
+                const match = cd.matches.find(m => m.itemA && (m.itemA === refItem || m.itemA.descricao === desc));
+                if (match && match.itemB) return { qtd: match.itemB.qtd || 0, score: match.score || 0 };
+                return null;
+            });
+            const bestScore = Math.max(...comparisons.map(c => c ? c.score : 0), 0);
+            unifiedRows.push({ descricao: desc, un: refItem.un || 'un', refQtd: refItem.qtd || 0, comparisons, bestScore });
+        }
+
+        // Build headers for individual table
+        const tableHeaders = [headerCell('Descrição'), headerCell('UN'), headerCell('Match')];
+        const colWidths = [100, 25, 35];
+        tableHeaders.push(headerCell(`Ref\n${refLabel}`));
+        colWidths.push(35);
+        pairs.forEach((pair, pi) => {
+            tableHeaders.push(headerCell(`${pair.label}\nQtd`));
+            colWidths.push(45);
+            tableHeaders.push(headerCell(`Dif.`));
+            colWidths.push(35);
+        });
+
+        const tableBody = [tableHeaders];
+
+        for (const row of unifiedRows) {
+            const cells = [
+                { text: row.descricao, fontSize: 8, alignment: 'left', bold: true },
+                { text: row.un, fontSize: 8, alignment: 'center' },
+                { text: row.bestScore > 0 ? Math.round(row.bestScore * 100) + '%' : '—', fontSize: 8, alignment: 'center', color: row.bestScore >= 0.8 ? '#16a34a' : row.bestScore >= 0.5 ? '#f59e0b' : '#ef4444', bold: true },
+                { text: String(row.refQtd), fontSize: 8, alignment: 'center', bold: true }
+            ];
+            pairs.forEach((pair, pi) => {
+                const comp = row.comparisons[pi];
+                if (comp) {
+                    const diff = row.refQtd - comp.qtd;
+                    const diffStr = diff > 0 ? `+${diff}` : String(diff);
+                    const diffColor = diff > 0 ? '#f59e0b' : diff < 0 ? '#ef4444' : '#16a34a';
+                    cells.push({ text: String(comp.qtd), fontSize: 8, alignment: 'center' });
+                    cells.push({ text: diffStr, fontSize: 8, alignment: 'center', color: diffColor, bold: true });
+                } else {
+                    cells.push({ text: '—', fontSize: 8, alignment: 'center', color: '#cbd5e1' });
+                    cells.push({ text: '—', fontSize: 8, alignment: 'center', color: '#cbd5e1' });
+                }
+            });
+            tableBody.push(cells);
+        }
+
+        content.push({ text: 'Detalhamento dos Itens', style: 'section', margin: [0, 10, 0, 2] });
+        content.push({
+            table: { widths: colWidths, body: tableBody },
+            layout: {
+                hLineWidth: function(i, node) { return i === 0 || i === node.table.body.length ? 1 : 0.5; },
+                vLineWidth: function() { return 0.3; },
+                hLineColor: function() { return '#e2e8f0'; },
+                vLineColor: function() { return '#e2e8f0'; },
+                paddingLeft: function() { return 3; },
+                paddingRight: function() { return 3; },
+                paddingTop: function() { return 2; },
+                paddingBottom: function() { return 2; }
+            },
+            margin: [0, 2, 0, 0]
+        });
+
+    } else {
+        // --- Aggregate or simple view ---
+        const totalItens = results.length;
+        const excedentes = results.filter(r => r.status === 'excedente').length;
+        const faltantes = results.filter(r => r.status === 'faltante').length;
+        const apenasDoc = results.filter(r => r.status === 'apenas_documento').length;
+        const apenasLev = results.filter(r => r.status === 'apenas_levantamento').length;
+        const iguais = results.filter(r => r.status === 'ok').length;
+
+        content.push({ text: 'Resumo', style: 'section', margin: [0, 8, 0, 2] });
+        content.push({
+            table: {
+                widths: ['auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
+                body: [
+                    [{ text: 'Total', style: 'th' }, { text: 'OK', style: 'th' }, { text: 'Excedente', style: 'th' }, { text: 'Faltante', style: 'th' }, { text: 'Só Ref', style: 'th' }, { text: 'Só Doc', style: 'th' }],
+                    [totalItens, iguais, excedentes, faltantes, apenasDoc, apenasLev].map(v => ({ text: String(v), fontSize: 8, alignment: 'center' }))
+                ]
+            },
+            layout: 'lightHorizontalLines',
+            margin: [0, 2, 0, 8]
+        });
+
+        const tableHeaders = [
+            headerCell('Descrição'), headerCell('UN'), headerCell('Ref'), headerCell('Doc'),
+            headerCell('Diferença'), headerCell('%'), headerCell('Status'), headerCell('Match'),
+            headerCell('Preço (R$)'), headerCell('Dif. Total (R$)')
+        ];
+        const colWidths = [100, 25, 35, 35, 45, 30, 45, 35, 45, 50];
+        const tableBody = [tableHeaders];
+
+        for (const r of results) {
+            const docQtd = r.qtd_levantamento || 0;
+            const refQtd = r.qtd_documento || 0;
+            const diff = r.diferenca || 0;
+            const pct = r.percentual !== undefined ? r.percentual + '%' : '—';
+            const score = r.match_score || 0;
+            const matchText = score > 0 ? Math.round(score * 100) + '%' : '—';
+            const matchColor = score >= 0.8 ? '#16a34a' : score >= 0.5 ? '#f59e0b' : '#ef4444';
+            const diffColor = diff > 0 ? '#f59e0b' : diff < 0 ? '#ef4444' : '#16a34a';
+            const diffSign = diff > 0 ? '+' : '';
+            const difTotal = calcDifTotal(refQtd, docQtd);
+
+            tableBody.push([
+                { text: r.descricao || '', fontSize: 8, alignment: 'left', bold: true },
+                { text: r.unidade || 'un', fontSize: 8, alignment: 'center' },
+                { text: String(refQtd), fontSize: 8, alignment: 'center' },
+                { text: String(docQtd), fontSize: 8, alignment: 'center' },
+                { text: diffSign + String(diff), fontSize: 8, alignment: 'center', color: diffColor, bold: true },
+                { text: pct, fontSize: 8, alignment: 'center' },
+                statusBadge(r.status),
+                { text: matchText, fontSize: 8, alignment: 'center', color: matchColor, bold: true },
+                { text: preco > 0 ? preco.toFixed(2) : '—', fontSize: 8, alignment: 'center' },
+                { text: preco > 0 ? `R$ ${difTotal.toFixed(2)}` : '—', fontSize: 8, alignment: 'center', color: diffColor, bold: true }
+            ]);
+        }
+
+        content.push({ text: 'Detalhamento dos Itens', style: 'section', margin: [0, 10, 0, 2] });
+        content.push({
+            table: { widths: colWidths, body: tableBody },
+            layout: {
+                hLineWidth: function(i, node) { return i === 0 || i === node.table.body.length ? 1 : 0.5; },
+                vLineWidth: function() { return 0.3; },
+                hLineColor: function() { return '#e2e8f0'; },
+                vLineColor: function() { return '#e2e8f0'; },
+                paddingLeft: function() { return 3; },
+                paddingRight: function() { return 3; },
+                paddingTop: function() { return 2; },
+                paddingBottom: function() { return 2; }
+            },
+            margin: [0, 2, 0, 0]
+        });
+    }
+
+    const docDefinition = {
+        pageSize: 'A4',
+        pageMargins: [35, 50, 35, 50],
+        header: function() {
+            return { text: 'Comparação de Documentos — GeraPro', alignment: 'center', fontSize: 8, color: '#94a3b8', margin: [35, 8, 35, 0] };
+        },
+        footer: function(currentPage, pageCount) {
+            return { text: `Página ${currentPage} de ${pageCount}`, alignment: 'center', fontSize: 7, color: '#94a3b8', margin: [0, 5, 0, 0] };
+        },
+        content,
+        styles: {
+            title: { fontSize: 16, bold: true, color: '#1e293b', margin: [0, 0, 0, 2] },
+            subtitle: { fontSize: 10, color: '#64748b' },
+            date: { fontSize: 8, color: '#94a3b8' },
+            section: { fontSize: 11, bold: true, color: '#334155' },
+            th: { fontSize: 8, bold: true, alignment: 'center', fillColor: '#16a34a', color: 'white', margin: [2, 3, 2, 3] }
+        },
+        defaultStyle: { font: 'Roboto', fontSize: 8 }
+    };
+
+    try {
+        const pdfDoc = printer.createPdfKitDocument(docDefinition);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Comparacao_${Date.now()}.pdf"`);
+        pdfDoc.pipe(res);
+        pdfDoc.end();
+    } catch (err) {
+        console.error('[ExportComparisonPdf] Erro:', err.message);
+        sendJson(res, 500, { success: false, error: 'Erro ao gerar PDF: ' + err.message });
+    }
+}
+
 // === AI IMPORT DOCUMENT ===
 
 async function handleImportDocument(body, res) {
     try {
-        const { filename, content, mimeType } = body;
+        const { filename, content, mimeType, useOcr } = body;
         if (!filename || !content) {
             sendJson(res, 400, { success: false, error: 'filename e content obrigatórios' });
             return;
@@ -1562,19 +2595,29 @@ async function handleImportDocument(body, res) {
         const buffer = Buffer.from(content, 'base64');
         const ext = path.extname(filename).toLowerCase();
         let text = '';
+        let method = 'pdf-parse';
 
         if (ext === '.pdf' || mimeType === 'application/pdf') {
             console.log('[Import] Extracting PDF text...');
             text = await extractTextFromPDF(buffer);
+            method = 'pdf-parse';
+            if ((!text || text.trim().length < 50) && useOcr !== false) {
+                console.log('[Import] PDF text too short, trying OCR...');
+                text = await extractTextWithOCR(buffer);
+                method = 'ocr';
+            }
         } else if (['.docx', '.doc'].includes(ext) || mimeType?.includes('word')) {
             console.log('[Import] Extracting DOCX text...');
             const result = await mammoth.extractRawText({ buffer });
             text = result.value || '';
+            method = 'mammoth';
         } else if (['.xlsx', '.xls', '.csv'].includes(ext) || mimeType?.includes('spreadsheet') || mimeType?.includes('excel')) {
             console.log('[Import] Extracting Excel/CSV text...');
             text = extractTextFromExcel(buffer, ext);
+            method = 'xlsx';
         } else {
             text = buffer.toString('utf8');
+            method = 'raw';
         }
 
         if (!text || text.trim().length < 10) {
@@ -1582,8 +2625,24 @@ async function handleImportDocument(body, res) {
             return;
         }
 
-        console.log(`[Import] Text extracted (${text.length} chars). Calling AI...`);
+        console.log(`[Import] Text extracted (${text.length} chars, method: ${method}). Calling AI...`);
         const result = await callAIForExtraction(text);
+
+        if (!result._error) {
+            result._metadata = { extractionMethod: method, charCount: text.length };
+            try {
+                const cfg = getAiConfig();
+                db.addExtractionHistory({
+                    id: crypto.randomUUID(),
+                    filename: filename,
+                    data_json: JSON.stringify(result),
+                    provider: cfg.provider,
+                    model: cfg.provider === 'ollama' ? cfg.ollamaModel : cfg.openaiModel
+                });
+            } catch (histErr) {
+                console.warn('[Import] Failed to save extraction history:', histErr.message);
+            }
+        }
 
         sendJson(res, 200, { success: true, data: result });
     } catch (err) {
@@ -1626,7 +2685,46 @@ async function testAiConnection() {
             return { success: false, error: `Erro ao conectar com OpenAI: ${err.message}` };
         }
     }
-    return { success: false, error: 'Nenhum provider configurado (selecione Ollama ou OpenAI).' };
+    if (cfg.provider === 'anthropic') {
+        if (!cfg.apiKey) return { success: false, error: 'API Key da Anthropic não configurada.' };
+        try {
+            const res = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
+                body: JSON.stringify({ model: cfg.openaiModel || 'claude-3-haiku-20240307', max_tokens: 10, messages: [{ role: 'user', content: 'test' }] }),
+                signal: AbortSignal.timeout(10000)
+            });
+            if (!res.ok) return { success: false, error: `Anthropic retornou status ${res.status}.` };
+            return { success: true, message: `Anthropic conectada. Modelo configurado: ${cfg.openaiModel}` };
+        } catch (err) {
+            return { success: false, error: `Erro ao conectar com Anthropic: ${err.message}` };
+        }
+    }
+    if (cfg.provider === 'gemini') {
+        if (!cfg.apiKey) return { success: false, error: 'API Key da Gemini não configurada.' };
+        try {
+            const model = cfg.openaiModel || 'gemini-1.5-flash';
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}?key=${cfg.apiKey}`, { signal: AbortSignal.timeout(10000) });
+            if (!res.ok) return { success: false, error: `Gemini retornou status ${res.status}.` };
+            return { success: true, message: `Gemini conectada. Modelo configurado: ${model}` };
+        } catch (err) {
+            return { success: false, error: `Erro ao conectar com Gemini: ${err.message}` };
+        }
+    }
+    if (cfg.provider === 'deepseek') {
+        if (!cfg.apiKey) return { success: false, error: 'API Key da DeepSeek não configurada.' };
+        try {
+            const res = await fetch('https://api.deepseek.com/v1/models', {
+                headers: { 'Authorization': `Bearer ${cfg.apiKey}` },
+                signal: AbortSignal.timeout(10000)
+            });
+            if (!res.ok) return { success: false, error: `DeepSeek retornou status ${res.status}.` };
+            return { success: true, message: `DeepSeek conectada. Modelo configurado: ${cfg.openaiModel}` };
+        } catch (err) {
+            return { success: false, error: `Erro ao conectar com DeepSeek: ${err.message}` };
+        }
+    }
+    return { success: false, error: 'Nenhum provider configurado.' };
 }
 
 // === Helpers ===
@@ -2877,6 +3975,30 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        if (pathname === '/api/settings/ai/clear-cache' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            clearAiCache();
+            sendJson(res, 200, { success: true, message: 'Cache de IA limpo com sucesso.' });
+            return;
+        }
+
+        if (pathname === '/api/settings/ai/providers' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            sendJson(res, 200, {
+                success: true,
+                providers: [
+                    { id: 'ollama', name: 'Ollama (Local)', models: ['qwen2.5:14b', 'qwen2.5:7b', 'qwen2.5:32b', 'llama3.1:8b', 'mistral:7b', 'deepseek-r1:14b'] },
+                    { id: 'openai', name: 'OpenAI', models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1', 'gpt-3.5-turbo'] },
+                    { id: 'anthropic', name: 'Anthropic Claude', models: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'] },
+                    { id: 'gemini', name: 'Google Gemini', models: ['gemini-1.5-pro', 'gemini-1.5-flash'] },
+                    { id: 'deepseek', name: 'DeepSeek', models: ['deepseek-chat', 'deepseek-reasoner'] }
+                ]
+            });
+            return;
+        }
+
         // === TELEGRAM SETTINGS ===
 
         if (pathname === '/api/settings/telegram' && req.method === 'GET') {
@@ -3650,6 +4772,171 @@ const server = http.createServer(async (req, res) => {
 
         if (pathname === '/api/import-document' && req.method === 'POST') { handleImportDocument(await readBody(req), res); return; }
         if (pathname === '/api/export-ai-extraction' && req.method === 'POST') { handleExportAIExtraction(await readBody(req), res); return; }
+
+        // === COMPARISON ENDPOINTS ===
+
+        if (pathname === '/api/compare-documents' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const body = await readBody(req);
+                const { documents, searchTerms } = body;
+                if (!documents || !Array.isArray(documents) || documents.length < 2) {
+                    sendJson(res, 400, { success: false, error: 'Envie pelo menos 2 documentos' });
+                    return;
+                }
+                const results = [];
+                for (const doc of documents) {
+                    const buf = Buffer.from(doc.content, 'base64');
+                    const ext = path.extname(doc.filename).toLowerCase();
+                    let items = [];
+                    let error = null;
+                    let usedAi = false;
+                    if (['.xlsx', '.xls', '.csv'].includes(ext)) {
+                        console.log(`[Compare] ${doc.filename}: calling extractItemsFromExcel sheets=${JSON.stringify(doc.selectedSheets)}`);
+                        const direct = extractItemsFromExcel(buf, doc.selectedSheets);
+                        console.log(`[Compare] ${doc.filename}: extractItemsFromExcel returned ${direct ? direct.length : 0} itens`);
+                        if (direct && direct.length > 0) {
+                            items = direct;
+                            console.log(`[Compare] ${doc.filename}: ${direct.length} itens extraídos diretamente (sem AI) — primeiro: "${(items[0] || {}).descricao}"`);
+                        } else {
+                            usedAi = true;
+                            const text = extractTextFromExcel(buf, ext, doc.selectedSheets);
+                            const result = await callAIForExtraction(text, buildComparisonExtractPrompt(text, searchTerms));
+                            items = result.items || [];
+                            error = result._error || null;
+                            console.log(`[Compare] ${doc.filename}: fallback AI - ${items.length} itens`);
+                        }
+                    } else {
+                        usedAi = true;
+                        let text = '';
+                        if (ext === '.pdf') {
+                            text = await extractTextFromPDF(buf);
+                            if (!text || text.trim().length < 50) text = await extractTextWithOCR(buf);
+                        } else if (['.docx', '.doc'].includes(ext)) {
+                            const r = await mammoth.extractRawText({ buffer: buf });
+                            text = r.value || '';
+                        } else {
+                            text = buf.toString('utf8');
+                        }
+                        if (text && text.trim().length >= 10) {
+                            const result = await callAIForExtraction(text, buildComparisonExtractPrompt(text, searchTerms));
+                            items = result.items || [];
+                            error = result._error || null;
+                        }
+                    }
+                    if (items.length > 0 && searchTerms && searchTerms.trim()) {
+                        const before = items.length;
+                        items = filterItemsBySearchTerms(items, searchTerms);
+                        console.log(`[Compare] ${doc.filename}: filtrado ${before} → ${items.length} itens (search terms)`);
+                    }
+                    if (items.length > 0) {
+                        const before = items.length;
+                        items = groupItemsBySpec(items);
+                        console.log(`[Compare] ${doc.filename}: agrupado ${before} → ${items.length} itens`);
+                    }
+                    results.push({
+                        filename: doc.filename,
+                        label: doc.label || doc.filename,
+                        items,
+                        error,
+                        _usedAi: usedAi
+                    });
+                }
+                sendJson(res, 200, { success: true, results });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/compare-suggest-match' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const body = await readBody(req);
+                const matches = suggestMatching(body.itemsA || [], body.itemsB || []);
+                sendJson(res, 200, { success: true, matches });
+            } catch (err) { sendJson(res, 200, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/export-comparison' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                await handleExportComparison(await readBody(req), res);
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/export-comparison-pdf' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                await handleExportComparisonPdf(await readBody(req), res);
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/compare-sessions' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const empresaId = tokenUser.empresa_id || 'default';
+                const proposalId = url.parse(req.url, true).query.proposalId || null;
+                const sessions = db.listComparisonSessions(empresaId, proposalId);
+                sendJson(res, 200, { success: true, sessions });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/compare-sessions' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const body = await readBody(req);
+                body.empresa_id = tokenUser.empresa_id || 'default';
+                db.saveComparisonSession(body);
+                sendJson(res, 200, { success: true });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        const sessionMatch = pathname.match(/^\/api\/compare-sessions\/(.+)$/);
+        if (sessionMatch && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const session = db.getComparisonSession(sessionMatch[1]);
+                if (!session) { sendJson(res, 404, { success: false, error: 'Sessão não encontrada' }); return; }
+                sendJson(res, 200, { success: true, session });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (sessionMatch && req.method === 'DELETE') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                db.deleteComparisonSession(sessionMatch[1]);
+                sendJson(res, 200, { success: true });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        // === EXTRACTION HISTORY ===
+
+        if (pathname === '/api/extraction-history' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const empresaId = tokenUser.empresa_id || 'default';
+                const proposalId = url.parse(req.url, true).query.proposalId || null;
+                const history = db.listExtractionHistory(empresaId, proposalId);
+                sendJson(res, 200, { success: true, history });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
         if (pathname === '/api/export-io-bom' && req.method === 'POST') { handleExportIOBOM(await readBody(req), res); return; }
         if (pathname === '/api/export-io-list' && req.method === 'POST') { handleExportIOList(await readBody(req), res); return; }
         if (pathname === '/api/export-lm' && req.method === 'POST') { handleExportLM(await readBody(req), res); return; }
