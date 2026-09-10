@@ -4867,6 +4867,60 @@ const PropostaTecnicaModule = {
             </div>`;
     },
 
+    _renderLinhasTable(linhas, dflt) {
+        return linhas.map((l, i) => {
+            const yCentro = l.yCentroTrilho ?? Math.round(((l.yInicio || 0) + (l.yFim || 0)) / 2);
+            return `<tr>
+                <td style="display:none;"><input type="hidden" class="lcfg_id" value="${l.id || ''}"></td>
+                <td><input type="text" class="form-control lcfg_nome" value="${l.nome}" style="width:120px;font-size:12px;"></td>
+                <td><input type="number" class="form-control lcfg_yCentro" value="${yCentro}" style="width:70px;font-size:12px;"></td>
+                <td style="text-align:center;"><input type="checkbox" class="lcfg_trilho" ${l.temTrilho !== false ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;"></td>
+                <td><input type="text" class="form-control lcfg_cats" value="${l.categorias.join(', ')}" style="width:160px;font-size:12px;" placeholder="DISJUNTOR, CONTATOR..."></td>
+                <td style="text-align:center;"><button type="button" class="btn btn-xs btn-ghost" onclick="this.closest('tr').remove()" style="color:#ef4444;font-size:14px;padding:2px 4px;">✕</button></td>
+            </tr>`;
+        }).join('');
+    },
+
+    _renderGapsGrid(lc, dflt) {
+        const gapsCombo = { ...dflt.gapsTermicos, ...(lc.gapsTermicos || {}) };
+        return Object.entries(gapsCombo).map(([cat, gap]) => `
+            <div class="form-group" style="margin:0;">
+                <label class="form-label" style="font-size:10px;white-space:nowrap;">${cat}</label>
+                <input type="number" class="form-control cab-gap" data-gap-cat="${cat}" value="${gap}" style="width:100%;font-size:12px;" min="0" step="1">
+            </div>
+        `).join('');
+    },
+
+    _renderCanaletasList(canaletas, blockCabId) {
+        if (canaletas.length === 0) {
+            return '<div style="font-size:11px;color:#94a3b8;padding:4px 0;">Nenhuma canaleta adicional.</div>';
+        }
+        return canaletas.map(can => {
+            const detalhe = can.tipo === 'quadro'
+                ? `${can.modelo}, ${can.larguraQuadro}x${can.alturaQuadro}mm`
+                : `${can.modelo}, ${can.orientacao === 'V' ? 'Vertical' : 'Horizontal'}, ${can.comprimento}mm`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:#f8fafc;border-radius:4px;margin-bottom:2px;font-size:11px;">
+                <span>${can.tipo === 'quadro' ? '📐' : '📏'} ${detalhe}</span>
+                <div>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation();window.propostaTecnicaModule._editarCanaleta('${can.id}','${blockCabId}')" style="color:#3b82f6;font-size:10px;">✏️</button>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation();window.propostaTecnicaModule._removerCanaleta('${can.id}','${blockCabId}')" style="color:#ef4444;font-size:10px;">✕</button>
+                </div>
+            </div>`;
+        }).join('');
+    },
+
+    _renderDoorLinhasTable(doorLinhas, dflt) {
+        return (doorLinhas || dflt.doorLinhas).map((l, i) => {
+            const yCentro = l.yCentro ?? l.yCentroTrilho ?? 200;
+            return `<tr>
+                <td style="display:none;"><input type="hidden" class="dlcfg_id" value="${l.id || ''}"></td>
+                <td><input type="text" class="form-control dlcfg_nome" value="${l.nome}" style="width:140px;font-size:12px;"></td>
+                <td><input type="number" class="form-control dlcfg_yCentro" value="${yCentro}" style="width:70px;font-size:12px;"></td>
+                <td style="text-align:center;"><button type="button" class="btn btn-xs btn-ghost" onclick="this.closest('tr').remove()" style="color:#ef4444;font-size:14px;padding:2px 4px;">✕</button></td>
+            </tr>`;
+        }).join('');
+    },
+
     _showLayoutConfigPanel() {
         const data = store.getState().activeTechnicalProposal;
         const eq = data?.equipments?.[this.activeEquipmentIndex];
@@ -4900,45 +4954,14 @@ const PropostaTecnicaModule = {
                     const blockName = face ? cab.name + suffix : cab.name;
 
                 // Linhas table
-                const linhasHtml = (lc.linhas || dflt.linhas).map((l, i) => {
-                    const yCentro = l.yCentroTrilho ?? Math.round(((l.yInicio || 0) + (l.yFim || 0)) / 2);
-                    return `<tr>
-                        <td style="display:none;"><input type="hidden" class="lcfg_id" value="${l.id || ''}"></td>
-                        <td><input type="text" class="form-control lcfg_nome" value="${l.nome}" style="width:120px;font-size:12px;"></td>
-                        <td><input type="number" class="form-control lcfg_yCentro" value="${yCentro}" style="width:70px;font-size:12px;"></td>
-                        <td style="text-align:center;"><input type="checkbox" class="lcfg_trilho" ${l.temTrilho !== false ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;"></td>
-                        <td><input type="text" class="form-control lcfg_cats" value="${l.categorias.join(', ')}" style="width:160px;font-size:12px;" placeholder="DISJUNTOR, CONTATOR..."></td>
-                        <td style="text-align:center;"><button type="button" class="btn btn-xs btn-ghost" onclick="this.closest('tr').remove()" style="color:#ef4444;font-size:14px;padding:2px 4px;">✕</button></td>
-                    </tr>`;
-                }).join('');
+                const linhasHtml = this._renderLinhasTable(lc.linhas || dflt.linhas, dflt);
 
                 // Gaps grid
-                const gapsCombo = { ...dflt.gapsTermicos, ...(lc.gapsTermicos || {}) };
-                const gapsHtml = Object.entries(gapsCombo).map(([cat, gap]) => `
-                    <div class="form-group" style="margin:0;">
-                        <label class="form-label" style="font-size:10px;white-space:nowrap;">${cat}</label>
-                        <input type="number" class="form-control cab-gap" data-gap-cat="${cat}" value="${gap}" style="width:100%;font-size:12px;" min="0" step="1">
-                    </div>
-                `).join('');
+                const gapsHtml = this._renderGapsGrid(lc, dflt);
 
                 // Canaletas list
                 const canaletas = lc.canaletas || [];
-                console.log('[Render] cabId:', blockCabId, 'lc === cab.layoutConfig?', lc === (cab.layoutConfig || null), 'lc === dflt?', lc === dflt);
-                console.log('[Render] IDs:', canaletas.map(c => c.id));
-                const canaletasHtml = canaletas.length === 0
-                    ? '<div style="font-size:11px;color:#94a3b8;padding:4px 0;">Nenhuma canaleta adicional.</div>'
-                    : canaletas.map(can => {
-                        const detalhe = can.tipo === 'quadro'
-                            ? `${can.modelo}, ${can.larguraQuadro}x${can.alturaQuadro}mm`
-                            : `${can.modelo}, ${can.orientacao === 'V' ? 'Vertical' : 'Horizontal'}, ${can.comprimento}mm`;
-                        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:#f8fafc;border-radius:4px;margin-bottom:2px;font-size:11px;">
-                            <span>${can.tipo === 'quadro' ? '📐' : '📏'} ${detalhe}</span>
-                            <div>
-                                <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation();window.propostaTecnicaModule._editarCanaleta('${can.id}','${blockCabId}')" style="color:#3b82f6;font-size:10px;">✏️</button>
-                                <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation();window.propostaTecnicaModule._removerCanaleta('${can.id}','${blockCabId}')" style="color:#ef4444;font-size:10px;">✕</button>
-                            </div>
-                        </div>`;
-                    }).join('');
+                const canaletasHtml = this._renderCanaletasList(canaletas, blockCabId);
 
                 const isKF = this._isForma34EstruturaModular(eq.technical?.segregacao || '', eq.technical?.fabricante);
                 const isEletropoll = eq.technical?.fabricante === 'Eletropoll';
@@ -5053,15 +5076,7 @@ const PropostaTecnicaModule = {
                             <table class="table" style="width:100%;">
                                 <thead><tr><th style="font-size:10px;">Nome</th><th style="font-size:10px;">Y Centro</th><th style="width:24px;"></th></tr></thead>
                                 <tbody class="cab-door-linhas-tbody">
-                                    ${(lc.doorLinhas || dflt.doorLinhas).map((l, i) => {
-                                        const yCentro = l.yCentro ?? l.yCentroTrilho ?? 200;
-                                        return `<tr>
-                                            <td style="display:none;"><input type="hidden" class="dlcfg_id" value="${l.id || ''}"></td>
-                                            <td><input type="text" class="form-control dlcfg_nome" value="${l.nome}" style="width:140px;font-size:12px;"></td>
-                                            <td><input type="number" class="form-control dlcfg_yCentro" value="${yCentro}" style="width:70px;font-size:12px;"></td>
-                                            <td style="text-align:center;"><button type="button" class="btn btn-xs btn-ghost" onclick="this.closest('tr').remove()" style="color:#ef4444;font-size:14px;padding:2px 4px;">✕</button></td>
-                                        </tr>`;
-                                    }).join('')}
+                                    ${this._renderDoorLinhasTable(lc.doorLinhas, dflt)}
                                 </tbody>
                             </table>
                         </div>
