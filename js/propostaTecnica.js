@@ -4894,8 +4894,8 @@ const PropostaTecnicaModule = {
                         ? (cab.faces?.[face]?.layoutConfig || cab.layoutConfig || dflt)
                         : (cab.layoutConfig || dflt);
                     const qtdMats = face
-                        ? Object.keys(cab.faces?.[face]?.assigned || {}).length
-                        : Object.keys(cab.assigned || {}).length + Object.values(cab.faces || {}).reduce((s, f) => s + Object.keys(f.assigned || {}).length, 0);
+                        ? Object.keys(this._getLoadsAsFlat(cab.faces?.[face])).length
+                        : Object.keys(this._getLoadsAsFlat(cab)).length + Object.values(cab.faces || {}).reduce((s, f) => s + Object.keys(this._getLoadsAsFlat(f)).length, 0);
                     const largura = cab.width || 'auto';
                     const blockName = face ? cab.name + suffix : cab.name;
 
@@ -5140,11 +5140,11 @@ const PropostaTecnicaModule = {
             const face = parts[1] || null;
             let cab = eq.layoutConfig.cabinetAssignments[cabId];
             if (!cab) {
-                cab = { name: cabId, width: 600, assigned: {} };
+                cab = { name: cabId, width: 600 };
                 eq.layoutConfig.cabinetAssignments[cabId] = cab;
             }
             // Ensure faces exist for B2B
-            if (!cab.faces) cab.faces = { front: { assigned: {}, loads: {}, layoutConfig: null }, rear: { assigned: {}, loads: {}, layoutConfig: null } };
+            if (!cab.faces) cab.faces = { front: { loads: {}, layoutConfig: null }, rear: { loads: {}, layoutConfig: null } };
 
             // Read dimensions
             const dims = {};
@@ -5408,7 +5408,7 @@ const PropostaTecnicaModule = {
         let minPlateD = 0;
         for (const cab of selectedCabins) {
             const cd = cab._assignData;
-            const src = cd && cab._face ? (cd.faces?.[cab._face]?.assigned || {}) : (cd?.assigned || {});
+            const src = cd && cab._face ? this._getLoadsAsFlat(cd.faces?.[cab._face]) : this._getLoadsAsFlat(cd);
             for (const row of cab.rows || []) {
                 for (const item of row.items || []) {
                     const zo = item._matId ? (src[item._matId]?.zOffset ?? item._zOffset) : undefined;
@@ -5427,7 +5427,7 @@ const PropostaTecnicaModule = {
         if (isB2B) {
             for (const cab of rearCabins) {
                 const cd = cab._assignData;
-                const src = cd && cab._face ? (cd.faces?.[cab._face]?.assigned || {}) : (cd?.assigned || {});
+                const src = cd && cab._face ? this._getLoadsAsFlat(cd.faces?.[cab._face]) : this._getLoadsAsFlat(cd);
                 for (const row of cab.rows || []) {
                     for (const item of row.items || []) {
                         const zo = item._matId ? (src[item._matId]?.zOffset ?? item._zOffset) : undefined;
@@ -5585,13 +5585,13 @@ const PropostaTecnicaModule = {
         ctx.textBaseline = 'middle';
         ctx.fillText('Vista Lateral (Corte)', xOff + effectiveDepth / 2 * scale, padding + (maxCabHeight + 180) * scale);
 
-        // Collect all items from selected cabinets with their assigned source
+        // Collect all items from selected cabinets with their load source
         const allItems = [];
         for (const cab of selectedCabins) {
             const cabData = cab._assignData;
             const assignedSource = cabData && cab._face
-                ? (cabData.faces?.[cab._face]?.assigned || {})
-                : (cabData?.assigned || {});
+                ? this._getLoadsAsFlat(cabData.faces?.[cab._face])
+                : this._getLoadsAsFlat(cabData);
 
             for (const row of cab.rows || []) {
                 for (const item of row.items || []) {
@@ -5682,8 +5682,8 @@ const PropostaTecnicaModule = {
             for (const cab of rearCabins) {
                 const cabData = cab._assignData;
                 const assignedSource = cabData && cab._face
-                    ? (cabData.faces?.[cab._face]?.assigned || {})
-                    : (cabData?.assigned || {});
+                    ? this._getLoadsAsFlat(cabData.faces?.[cab._face])
+                    : this._getLoadsAsFlat(cabData);
                 for (const row of cab.rows || []) {
                     for (const item of row.items || []) {
                         allRearItems.push({ item, assignedSource });
@@ -7391,10 +7391,10 @@ const PropostaTecnicaModule = {
         }
 
         layoutConfig.cabinetAssignments[cabId] = {
-            name: nome, height, width, depth, assigned: {},
+            name: nome, height, width, depth,
             faces: {
-                front: { assigned: {}, loads: {}, layoutConfig: null },
-                rear: { assigned: {}, loads: {}, layoutConfig: null }
+                front: { loads: {}, layoutConfig: null },
+                rear: { loads: {}, layoutConfig: null }
             },
             layoutConfig: cabConfig
         };
@@ -7640,7 +7640,7 @@ const PropostaTecnicaModule = {
                 const items = [];
                 let maxD = 0;
                 const parent = face ? cabData.faces?.[face] : cabData;
-                // Merge loads and legacy assigned (deduplicate: skip matIds already in loads)
+                // Merge loads from all load tags (deduplicate: skip matIds already in a load)
                 const mergedSource = {};
                 const loadsMatIds = new Set();
                 if (parent?.loads) {
@@ -7656,19 +7656,6 @@ const PropostaTecnicaModule = {
                             if (ass.porta) mergedSource[matId].porta = true;
                             if (ass.portaLinhaId) mergedSource[matId].portaLinhaId = ass.portaLinhaId;
                         }
-                    }
-                }
-                if (parent?.assigned) {
-                    for (const [matId, ass] of Object.entries(parent.assigned)) {
-                        if (loadsMatIds.has(matId)) continue;
-                        if (!mergedSource[matId]) mergedSource[matId] = { qtd: 0 };
-                        mergedSource[matId].qtd += ass.qtd || 0;
-                        if (ass.linhaId && !mergedSource[matId].linhaId) mergedSource[matId].linhaId = ass.linhaId;
-                        if (ass.xOffset !== undefined && mergedSource[matId].xOffset === undefined) mergedSource[matId].xOffset = ass.xOffset;
-                        if (ass.zOffset !== undefined && mergedSource[matId].zOffset === undefined) mergedSource[matId].zOffset = ass.zOffset;
-                        if (ass.linhaSplit && !mergedSource[matId].linhaSplit) mergedSource[matId].linhaSplit = ass.linhaSplit;
-                        if (ass.porta && !mergedSource[matId].porta) mergedSource[matId].porta = true;
-                        if (ass.portaLinhaId && !mergedSource[matId].portaLinhaId) mergedSource[matId].portaLinhaId = ass.portaLinhaId;
                     }
                 }
                 const cabDoorItems = [];
@@ -7748,7 +7735,7 @@ const PropostaTecnicaModule = {
                         // Build colunas/gavetas for KitFrame/Eletropoll
                         const parentForLoads = face ? cabData.faces?.[face] : cabData;
                         const cabLoads = parentForLoads?.loads || {};
-                        // Collect loads that have materials assigned to this cabinet
+                        // Collect loads that appear in this cabinet's loads map
                         const cargaList = (eq.loads || []).filter(l => l.tag && cabLoads[l.tag]);
                         const reserveCombo = cabData._reserveCombo || (face ? cabData.faces?.[face]?._reserveCombo : null);
                         const { colunas, excessLoads } = this._autoStackGavetas(cargaList, cabLoads, cabIdx, cabConfig.gavetaMode || 'sequential', reserveCombo, eq.technical?.fabricante, eq.technical?.tipoGaveta || 'Fixo');
@@ -7786,11 +7773,10 @@ const PropostaTecnicaModule = {
                     width: (isEletropollAuto ? autoGavetaW : 600) + ccwAuto,
                     height: 2300,
                     depth: 600,
-                    assigned: {},
                     loads: {},
                     faces: {
-                        front: { assigned: {}, loads: {}, layoutConfig: null },
-                        rear: { assigned: {}, loads: {}, layoutConfig: null }
+                        front: { loads: {}, layoutConfig: null },
+                        rear: { loads: {}, layoutConfig: null }
                     },
                     layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
                 };
@@ -7804,9 +7790,6 @@ const PropostaTecnicaModule = {
                             const matId = bucket.material.id;
                             if (!parent.loads[load.tag][matId]) parent.loads[load.tag][matId] = { qtd: 0 };
                             parent.loads[load.tag][matId].qtd += bucket.totalQtd;
-                            if (!parent.assigned[matId]) parent.assigned[matId] = { qtd: 0, loadIds: [] };
-                            parent.assigned[matId].qtd += bucket.totalQtd;
-                            if (!parent.assigned[matId].loadIds.includes(load.tag)) parent.assigned[matId].loadIds.push(load.tag);
                         }
                     }
                 }
@@ -7826,13 +7809,6 @@ const PropostaTecnicaModule = {
                                     if (!mergedSource2[matId]) mergedSource2[matId] = { qtd: 0 };
                                     mergedSource2[matId].qtd += ass.qtd || 0;
                                 }
-                            }
-                        }
-                        if (parent2?.assigned) {
-                            for (const [matId, ass] of Object.entries(parent2.assigned)) {
-                                if (loadsMatIds2.has(matId)) continue;
-                                if (!mergedSource2[matId]) mergedSource2[matId] = { qtd: 0 };
-                                mergedSource2[matId].qtd += ass.qtd || 0;
                             }
                         }
                         for (const [matId, ass] of Object.entries(mergedSource2)) {
@@ -7925,10 +7901,9 @@ const PropostaTecnicaModule = {
                     name: eq.tag || 'PLC',
                     width: 600,
                     depth: 600,
-                    assigned: {},
                     faces: {
-                        front: { assigned: {}, loads: {}, layoutConfig: null },
-                        rear: { assigned: {}, loads: {}, layoutConfig: null }
+                        front: { loads: {}, layoutConfig: null },
+                        rear: { loads: {}, layoutConfig: null }
                     },
                     layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
                 }
@@ -7956,7 +7931,7 @@ const PropostaTecnicaModule = {
                 _assignData: cabData,
                 name: (cabData.name || cabId) + 'F',
                 layoutConfig: cabConfig,
-                items: [...items].map(it => ({ ...it, _zOffset: cabData.assigned?.[it._matId]?.zOffset ?? undefined })),
+                items: [...items].map(it => ({ ...it, _zOffset: this._getLoadsAsFlat(cabData)[it._matId]?.zOffset ?? undefined })),
                 doorItems: [],
                 width: stdW,
                 height: cabPanelH,
@@ -8307,22 +8282,6 @@ const PropostaTecnicaModule = {
                 collectMatIds(cabData.loads);
                 collectMatIds(faces.front?.loads);
                 collectMatIds(faces.rear?.loads);
-
-                // Legacy assigned-based (skip if already handled by loads)
-                const allSources = [
-                    ...Object.entries(cabData.assigned || {}).map(([k, v]) => [k, v, null]),
-                    ...Object.entries(faces.front?.assigned || {}).map(([k, v]) => [k, v, 'front']),
-                    ...Object.entries(faces.rear?.assigned || {}).map(([k, v]) => [k, v, 'rear'])
-                ];
-                for (const [matId, ass, face] of allSources) {
-                    if (handledMatIds.has(matId)) continue;
-                    const key = face ? `${cabId}|${face}` : cabId;
-                    for (const loadKey of Object.keys(arvore)) {
-                        if (arvore[loadKey]?.materiais?.[matId]) {
-                            arvore[loadKey].materiais[matId].alocado[key] = ass.qtd;
-                        }
-                    }
-                }
             }
         }
 
@@ -8393,19 +8352,7 @@ const PropostaTecnicaModule = {
                 collectMatIds(cabData.loads);
                 collectMatIds(faces.front?.loads);
                 collectMatIds(faces.rear?.loads);
-                const allSources = [
-                    ...Object.entries(cabData.assigned || {}).map(([k, v]) => [k, v, null]),
-                    ...Object.entries(faces.front?.assigned || {}).map(([k, v]) => [k, v, 'front']),
-                    ...Object.entries(faces.rear?.assigned || {}).map(([k, v]) => [k, v, 'rear'])
-                ];
-                for (const [matId, ass, face] of allSources) {
-                    if (handledMatIds.has(matId)) continue;
-                    const key = face ? `${cabId}|${face}` : cabId;
-                    for (const loadKey of Object.keys(arvore)) {
-                        if (arvore[loadKey]?.materiais?.[matId]) {
-                            arvore[loadKey].materiais[matId].alocado[key] = ass.qtd;
-                        }
-                    }
+            }
                 }
             }
         }
@@ -8478,8 +8425,7 @@ const PropostaTecnicaModule = {
                         const cabLinhas = (matchCab.layoutConfig?.linhas || this._getDefaultLayoutConfig().linhas);
                         const cabDoorLinhas = (matchCab.layoutConfig?.doorLinhas || this._getDefaultLayoutConfig().doorLinhas);
                         const source = face ? matchCab._assignData.faces?.[face]?.loads?.[loadKey] : matchCab._assignData.loads?.[loadKey];
-                        const sourceLegacy = face ? matchCab._assignData.faces?.[face]?.assigned : matchCab._assignData.assigned;
-                        const matEntry = source?.[matId] || sourceLegacy?.[matId];
+                        const matEntry = source?.[matId];
                         if (matEntry && !isKitFrameCab) {
                             const isPorta = matEntry.porta === true;
                             const isSplit = matEntry.linhaSplit && matEntry.linhaSplit.length > 0;
@@ -8702,11 +8648,11 @@ const PropostaTecnicaModule = {
             cabId = 'cab_' + Date.now();
             const nome = prompt('Nome do novo armário:');
             if (!nome) return;
-            layoutConfig.cabinetAssignments[cabId] = { name: nome, loads: {}, assigned: {}, faces: { front: { loads: {}, assigned: {} }, rear: { loads: {}, assigned: {} } } };
+            layoutConfig.cabinetAssignments[cabId] = { name: nome, loads: {}, faces: { front: { loads: {} }, rear: { loads: {} } } };
         }
 
         if (!layoutConfig.cabinetAssignments[cabId]) {
-            layoutConfig.cabinetAssignments[cabId] = { name: cabId, loads: {}, assigned: {}, faces: { front: { loads: {}, assigned: {} }, rear: { loads: {}, assigned: {} } } };
+            layoutConfig.cabinetAssignments[cabId] = { name: cabId, loads: {}, faces: { front: { loads: {} }, rear: { loads: {} } } };
         }
 
         const initInLoads = (parent, lId, mId, addedQtd) => {
@@ -8716,12 +8662,6 @@ const PropostaTecnicaModule = {
             parent.loads[lId][mId].qtd += addedQtd;
             if (parent.loads[lId][mId].xOffset === undefined) parent.loads[lId][mId].xOffset = null;
             if (parent.loads[lId][mId].zOffset === undefined) parent.loads[lId][mId].zOffset = null;
-            // Also update legacy assigned
-            if (!parent.assigned) parent.assigned = {};
-            if (!parent.assigned[mId]) parent.assigned[mId] = { qtd: 0, loadIds: [] };
-            parent.assigned[mId].qtd += addedQtd;
-            if (!parent.assigned[mId].loadIds) parent.assigned[mId].loadIds = [];
-            if (!parent.assigned[mId].loadIds.includes(lId)) parent.assigned[mId].loadIds.push(lId);
         };
 
         if (face && layoutConfig.cabinetAssignments[cabId].faces) {
@@ -8760,17 +8700,16 @@ const PropostaTecnicaModule = {
             cabId = 'cab_' + Date.now();
             const nome = prompt('Nome do novo armário:');
             if (!nome) return;
-            layoutConfig.cabinetAssignments[cabId] = { name: nome, loads: {}, assigned: {}, faces: { front: { loads: {}, assigned: {} }, rear: { loads: {}, assigned: {} } } };
+            layoutConfig.cabinetAssignments[cabId] = { name: nome, loads: {}, faces: { front: { loads: {} }, rear: { loads: {} } } };
         }
         if (!layoutConfig.cabinetAssignments[cabId]) {
-            layoutConfig.cabinetAssignments[cabId] = { name: cabId, loads: {}, assigned: {}, faces: { front: { loads: {}, assigned: {} }, rear: { loads: {}, assigned: {} } } };
+            layoutConfig.cabinetAssignments[cabId] = { name: cabId, loads: {}, faces: { front: { loads: {} }, rear: { loads: {} } } };
         }
 
         const parent = face
-            ? (layoutConfig.cabinetAssignments[cabId].faces[face] || (layoutConfig.cabinetAssignments[cabId].faces[face] = { loads: {}, assigned: {} }))
+            ? (layoutConfig.cabinetAssignments[cabId].faces[face] || (layoutConfig.cabinetAssignments[cabId].faces[face] = { loads: {} }))
             : layoutConfig.cabinetAssignments[cabId];
         if (!parent.loads) parent.loads = {};
-        if (!parent.assigned) parent.assigned = {};
 
         // Get the tree to know which materials belong to this load
         const isAutomation = eq.type === 'PLC' || eq.type === 'REM';
@@ -8789,9 +8728,6 @@ const PropostaTecnicaModule = {
                 parent.loads[loadId][matId].qtd += disp;
                 if (parent.loads[loadId][matId].xOffset === undefined) parent.loads[loadId][matId].xOffset = null;
                 if (parent.loads[loadId][matId].zOffset === undefined) parent.loads[loadId][matId].zOffset = null;
-                if (!parent.assigned[matId]) parent.assigned[matId] = { qtd: 0, loadIds: [] };
-                parent.assigned[matId].qtd += disp;
-                if (!parent.assigned[matId].loadIds.includes(loadId)) parent.assigned[matId].loadIds.push(loadId);
             }
         }
 
@@ -8832,27 +8768,12 @@ const PropostaTecnicaModule = {
             removed = removeFromLoads(cabData);
         }
 
-        // Also clean up legacy assigned
-        if (!removed) {
-            if (face && cabData.faces?.[face]?.assigned?.[matId]) {
-                delete cabData.faces[face].assigned[matId];
-                removed = true;
-            } else if (cabData.assigned?.[matId]) {
-                delete cabData.assigned[matId];
-                removed = true;
-            }
-        }
-
         if (!removed) return;
-
-        // Rebuild legacy assigned from loads
-        this._rebuildLegacyAssigned(cabData);
 
         // Clean up empty cabinets
         const hasAny = Object.keys(cabData.loads || {}).length > 0
-            || Object.keys(cabData.assigned || {}).length > 0
             || Object.values(cabData.faces || {}).some(f =>
-                Object.keys(f.loads || {}).length > 0 || Object.keys(f.assigned || {}).length > 0);
+                Object.keys(f.loads || {}).length > 0);
         if (!hasAny) {
             delete layoutConfig.cabinetAssignments[realCabId];
         }
@@ -8875,32 +8796,18 @@ const PropostaTecnicaModule = {
                 if (parent?.loads?.[loadId]) {
                     delete parent.loads[loadId];
                 }
-                // Also remove from legacy assigned where loadIds contains this loadId
-                if (parent?.assigned) {
-                    for (const [matId, entry] of Object.entries(parent.assigned)) {
-                        if (entry.loadIds?.includes(loadId)) {
-                            entry.loadIds = entry.loadIds.filter(l => l !== loadId);
-                            if (entry.loadIds.length === 0) {
-                                delete parent.assigned[matId];
-                            }
-                        }
-                    }
-                }
             };
             removeKey(cabData);
             for (const faceKey of ['front', 'rear']) {
                 removeKey(cabData.faces?.[faceKey]);
             }
-            // Rebuild legacy assigned from loads for this cabinet
-            this._rebuildLegacyAssigned(cabData);
         }
 
         // Clean up empty cabinets
         for (const [cabId, cabData] of Object.entries(layoutConfig.cabinetAssignments)) {
             const hasAny = Object.keys(cabData.loads || {}).length > 0
-                || Object.keys(cabData.assigned || {}).length > 0
                 || Object.values(cabData.faces || {}).some(f =>
-                    Object.keys(f.loads || {}).length > 0 || Object.keys(f.assigned || {}).length > 0);
+                    Object.keys(f.loads || {}).length > 0);
             if (!hasAny) delete layoutConfig.cabinetAssignments[cabId];
         }
         if (Object.keys(layoutConfig.cabinetAssignments).length === 0) {
@@ -8910,34 +8817,15 @@ const PropostaTecnicaModule = {
         this._recalcularLayout();
     },
 
-    _rebuildLegacyAssigned(cabData) {
-        if (!cabData) return;
-        // Rebuild cabData.assigned from all loads
-        const newAssigned = {};
-        const collectAssigned = (loadsObj) => {
-            if (!loadsObj) return;
-            for (const [lId, mats] of Object.entries(loadsObj)) {
-                for (const [matId, ass] of Object.entries(mats)) {
-                    if (!newAssigned[matId]) newAssigned[matId] = { qtd: 0, loadIds: [] };
-                    newAssigned[matId].qtd += ass.qtd || 0;
-                    if (!newAssigned[matId].loadIds.includes(lId)) newAssigned[matId].loadIds.push(lId);
-                    if (ass.linhaId) newAssigned[matId].linhaId = ass.linhaId;
-                    if (ass.xOffset !== undefined) newAssigned[matId].xOffset = ass.xOffset;
-                    if (ass.zOffset !== undefined) newAssigned[matId].zOffset = ass.zOffset;
-                    if (ass.linhaSplit) newAssigned[matId].linhaSplit = ass.linhaSplit;
-                }
-            }
-        };
-        collectAssigned(cabData.loads);
-        cabData.assigned = newAssigned;
-        // Same for faces
-        for (const faceKey of ['front', 'rear']) {
-            if (cabData.faces?.[faceKey]) {
-                const newFaceAssigned = {};
-                collectAssigned(cabData.faces[faceKey].loads);
-                cabData.faces[faceKey].assigned = newFaceAssigned;
+    _getLoadsAsFlat(parent) {
+        if (!parent?.loads) return {};
+        const flat = {};
+        for (const [, mats] of Object.entries(parent.loads)) {
+            for (const [matId, entry] of Object.entries(mats)) {
+                if (!flat[matId]) flat[matId] = entry;
             }
         }
+        return flat;
     },
 
     _resetarAlocacoes() {
@@ -8960,10 +8848,10 @@ const PropostaTecnicaModule = {
             const realCabId = cabId.slice(0, pipeIdx);
             const face = cabId.slice(pipeIdx + 1);
             const parent = layoutConfig.cabinetAssignments[realCabId]?.faces?.[face];
-            return parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId] || null;
+            return parent?.loads?.[loadId]?.[matId] || null;
         }
         const parent = layoutConfig.cabinetAssignments[cabId];
-        return parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId] || null;
+        return parent?.loads?.[loadId]?.[matId] || null;
     },
 
     _recalcularLayout() {
@@ -9286,7 +9174,6 @@ const PropostaTecnicaModule = {
                 width: widthArranjo,
                 height: 2300,
                 depth: 600,
-                assigned: {},
                 loads: {},
                 layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
             };
@@ -9433,7 +9320,6 @@ const PropostaTecnicaModule = {
             width: cabWidth,
             height: 2300,
             depth: 600,
-            assigned: {},
             loads: {},
             layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
         };
@@ -9507,10 +9393,10 @@ const PropostaTecnicaModule = {
         if (pipeIdx > 0) {
             const face = cabId.slice(pipeIdx + 1);
             const parent = layoutConfig.cabinetAssignments[baseCabId]?.faces?.[face];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         } else {
             const parent = layoutConfig.cabinetAssignments[baseCabId];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         }
         if (!target) return;
 
@@ -9540,15 +9426,6 @@ const PropostaTecnicaModule = {
 
         target.xOffset = rawValue;
 
-        // Sync to assigned (layout renderer reads from assigned, not loads)
-        const cabData = layoutConfig.cabinetAssignments[realCabId];
-        const assignedParent = pipeIdx > 0 ? cabData?.faces?.[cabId.slice(pipeIdx + 1)] : cabData;
-        if (assignedParent) {
-            if (!assignedParent.assigned) assignedParent.assigned = {};
-            if (!assignedParent.assigned[matId]) assignedParent.assigned[matId] = { qtd: 0, loadIds: [] };
-            assignedParent.assigned[matId].xOffset = rawValue;
-        }
-
         if (!eq.layoutConfig) eq.layoutConfig = layoutConfig;
         else eq.layoutConfig.cabinetAssignments = layoutConfig.cabinetAssignments;
         const _idx = this.activeEquipmentIndex;
@@ -9573,10 +9450,10 @@ const PropostaTecnicaModule = {
         if (pipeIdx > 0) {
             const face = cabId.slice(pipeIdx + 1);
             parent = layoutConfig.cabinetAssignments[baseCabId]?.faces?.[face];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         } else {
             parent = layoutConfig.cabinetAssignments[baseCabId];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         }
         if (!target) return;
 
@@ -9597,14 +9474,6 @@ const PropostaTecnicaModule = {
         }
 
         target.zOffset = rawValue;
-
-        const cabData = layoutConfig.cabinetAssignments[realCabId];
-        const assignedParent = pipeIdx > 0 ? cabData?.faces?.[cabId.slice(pipeIdx + 1)] : cabData;
-        if (assignedParent) {
-            if (!assignedParent.assigned) assignedParent.assigned = {};
-            if (!assignedParent.assigned[matId]) assignedParent.assigned[matId] = { qtd: 0, loadIds: [] };
-            assignedParent.assigned[matId].zOffset = rawValue;
-        }
 
         if (!eq.layoutConfig) eq.layoutConfig = layoutConfig;
         else eq.layoutConfig.cabinetAssignments = layoutConfig.cabinetAssignments;
@@ -9629,10 +9498,10 @@ const PropostaTecnicaModule = {
             realCabId = cabId.slice(0, pipeIdx);
             const face = cabId.slice(pipeIdx + 1);
             const parent = layoutConfig.cabinetAssignments[realCabId]?.faces?.[face];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         } else {
             const parent = layoutConfig.cabinetAssignments[cabId];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         }
         if (!target) return;
 
@@ -9657,10 +9526,10 @@ const PropostaTecnicaModule = {
             realCabId = cabId.slice(0, pipeIdx);
             const face = cabId.slice(pipeIdx + 1);
             const parent = layoutConfig.cabinetAssignments[realCabId]?.faces?.[face];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         } else {
             const parent = layoutConfig.cabinetAssignments[cabId];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         }
         if (!target) return;
 
@@ -9688,10 +9557,10 @@ const PropostaTecnicaModule = {
             realCabId = cabId.slice(0, pipeIdx);
             const face = cabId.slice(pipeIdx + 1);
             const parent = layoutConfig.cabinetAssignments[realCabId]?.faces?.[face];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         } else {
             const parent = layoutConfig.cabinetAssignments[cabId];
-            target = parent?.loads?.[loadId]?.[matId] || parent?.assigned?.[matId];
+            target = parent?.loads?.[loadId]?.[matId] || null;
         }
         if (!target) return;
 
@@ -9829,8 +9698,8 @@ const PropostaTecnicaModule = {
         const leftMargin = layoutConfig.canaletaEsq;
         const assignData = cab._assignData;
         const assignedSource = assignData && cab._face
-            ? (assignData.faces?.[cab._face]?.assigned || {})
-            : (assignData?.assigned || {});
+            ? this._getLoadsAsFlat(assignData.faces?.[cab._face])
+            : this._getLoadsAsFlat(assignData);
 
 
         const grouped = {};
@@ -17613,7 +17482,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 let minPlateZ_dx = null, minPlateD_dx = 0;
                 for (const cab of selectedCabins) {
                     const cd = cab._assignData;
-                    const src = cd && cab._face ? (cd.faces?.[cab._face]?.assigned || {}) : (cd?.assigned || {});
+                    const src = cd && cab._face ? this._getLoadsAsFlat(cd.faces?.[cab._face]) : this._getLoadsAsFlat(cd);
                     for (const row of cab.rows || []) {
                         for (const item of row.items || []) {
                             const zo = item._matId ? (src[item._matId]?.zOffset ?? item._zOffset) : undefined;
@@ -17629,7 +17498,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 if (isB2B) {
                     for (const cab of rearCabinets) {
                         const cd = cab._assignData;
-                        const src = cd && cab._face ? (cd.faces?.[cab._face]?.assigned || {}) : (cd?.assigned || {});
+                        const src = cd && cab._face ? this._getLoadsAsFlat(cd.faces?.[cab._face]) : this._getLoadsAsFlat(cd);
                         for (const row of cab.rows || []) {
                             for (const item of row.items || []) {
                                 const zo = item._matId ? (src[item._matId]?.zOffset ?? item._zOffset) : undefined;
@@ -17767,8 +17636,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 for (const cab of cabList) {
                     const cabData = cab._assignData;
                     const assignedSource = cabData && cab._face
-                        ? (cabData.faces?.[cab._face]?.assigned || {})
-                        : (cabData?.assigned || {});
+                        ? this._getLoadsAsFlat(cabData.faces?.[cab._face])
+                        : this._getLoadsAsFlat(cabData);
                     for (const row of cab.rows || []) {
                         for (const item of row.items || []) {
                             allItems.push({ item, assignedSource });
@@ -17947,21 +17816,17 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
 
             const cabAssignments = eq.layoutConfig?.cabinetAssignments || {};
             const matIds = new Set();
-            for (const cab of Object.values(cabAssignments)) {
-                if (cab.assigned) Object.keys(cab.assigned).forEach(id => matIds.add(id));
-                if (cab.loads) {
-                    for (const loadTag of Object.keys(cab.loads)) {
-                        Object.keys(cab.loads[loadTag]).forEach(id => matIds.add(id));
-                    }
+            const addLoadMatIds = (loadsObj) => {
+                if (!loadsObj) return;
+                for (const loadTag of Object.keys(loadsObj)) {
+                    Object.keys(loadsObj[loadTag]).forEach(id => matIds.add(id));
                 }
+            };
+            for (const cab of Object.values(cabAssignments)) {
+                addLoadMatIds(cab.loads);
                 if (cab.faces) {
                     for (const face of Object.values(cab.faces)) {
-                        if (face.assigned) Object.keys(face.assigned).forEach(id => matIds.add(id));
-                        if (face.loads) {
-                            for (const loadTag of Object.keys(face.loads)) {
-                                Object.keys(face.loads[loadTag]).forEach(id => matIds.add(id));
-                            }
-                        }
+                        addLoadMatIds(face.loads);
                     }
                 }
             }
