@@ -4961,6 +4961,7 @@ const PropostaTecnicaModule = {
     },
 
     _detectMaterialCollisions(rows) {
+        const MIN_OVERLAP = 10;
         const collisions = [];
         for (let i = 0; i < rows.length; i++) {
             for (let j = i + 1; j < rows.length; j++) {
@@ -4969,11 +4970,12 @@ const PropostaTecnicaModule = {
                     for (const itemB of rB.items || []) {
                         const topA = itemA.y, botA = itemA.y + itemA.h;
                         const topB = itemB.y, botB = itemB.y + itemB.h;
+                        const vOverlap = Math.min(botA, botB) - Math.max(topA, topB);
+                        if (vOverlap < MIN_OVERLAP) continue;
                         const leftA = itemA.x, rightA = itemA.x + itemA.w;
                         const leftB = itemB.x, rightB = itemB.x + itemB.w;
-                        const vOverlap = topA < botB && topB < botA;
-                        const hOverlap = leftA < rightB && leftB < rightA;
-                        if (vOverlap && hOverlap) {
+                        const hOverlap = Math.min(rightA, rightB) - Math.max(leftA, leftB);
+                        if (hOverlap >= MIN_OVERLAP) {
                             collisions.push({ itemA, itemB, linhaA: rA.linha?.nome || '?', linhaB: rB.linha?.nome || '?' });
                         }
                     }
@@ -4984,6 +4986,7 @@ const PropostaTecnicaModule = {
     },
 
     _detectZCollisions(items) {
+        const MIN_OVERLAP = 5;
         const collisions = [];
         const sorted = [...items].sort((a, b) => (a.z || 0) - (b.z || 0));
         for (let i = 0; i < sorted.length; i++) {
@@ -4992,12 +4995,15 @@ const PropostaTecnicaModule = {
                 const zA = a.z || 0, zB = b.z || 0;
                 const dA = a.d || 20, dB = b.d || 20;
                 const endA = zA + dA, endB = zB + dB;
-                const zOverlap = zA < endB && zB < endA;
-                if (!zOverlap) break;
+                const zOverlap = Math.min(endA, endB) - Math.max(zA, zB);
+                if (zOverlap < MIN_OVERLAP) {
+                    if (zB >= endA) break;
+                    continue;
+                }
                 const topA = a.y || 0, botA = (a.y || 0) + (a.h || 40);
                 const topB = b.y || 0, botB = (b.y || 0) + (b.h || 40);
-                const vOverlap = topA < botB && topB < botA;
-                if (zOverlap && vOverlap) {
+                const vOverlap = Math.min(botA, botB) - Math.max(topA, topB);
+                if (vOverlap >= MIN_OVERLAP) {
                     collisions.push({ itemA: a, itemB: b });
                 }
             }
