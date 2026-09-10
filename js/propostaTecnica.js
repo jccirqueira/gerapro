@@ -5200,6 +5200,14 @@ const PropostaTecnicaModule = {
                     <h3 style="margin:0;">Configuração do Layout</h3>
                     <button class="btn btn-ghost" onclick="this.closest('#_layout_config_overlay').remove()"><i class="ph ph-x"></i></button>
                 </div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:8px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;">
+                    <label style="font-size:12px;font-weight:600;color:#0369a1;white-space:nowrap;">📋 Template:</label>
+                    <select id="layout-template-select" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid #bae6fd;border-radius:4px;background:#fff;"
+                        onchange="if(this.value)window.propostaTecnicaModule._applyLayoutTemplate(this.value);this.value='';">
+                        <option value="">Selecione um template pré-definido...</option>
+                        ${this._getLayoutTemplates().map(t => `<option value="${t.id}">${t.nome} — ${t.desc}</option>`).join('')}
+                    </select>
+                </div>
                 ${cabinetsHtml}
                 <div style="display:flex;gap:6px;margin-top:12px;">
                     <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:11px;">+ Adicionar Armário</button>
@@ -6987,6 +6995,159 @@ const PropostaTecnicaModule = {
                 { id: 'door_sinalizacao', nome: 'Sinalização', yCentro: 1200 }
             ]
         };
+    },
+
+    _getLayoutTemplates() {
+        return [
+            {
+                id: 'ccm-forma1',
+                nome: 'CCM — Forma 1',
+                desc: 'CCM padrão sem separação entre barramentos',
+                segregacao: 'Forma 1',
+                config: {
+                    canaletaEsq: 0, canaletaDir: 0, larguraTrilhoDIN: 35, espacamentoLinhas: 10, comprimentoTrilho: 0, colunaCabosWidth: 200,
+                    linhas: [
+                        { id: 'protecoes', nome: 'Proteções', yCentroTrilho: 525, categorias: ['DISJUNTOR', 'DISJUNTOR MOTOR', 'SECCIONADORA', 'FUSÍVEL'], temTrilho: true },
+                        { id: 'acionamentos', nome: 'Acionamentos', yCentroTrilho: 1025, categorias: ['CONTATOR', 'INVERSOR', 'SOFT-STARTER', 'SOFT STARTER'], temTrilho: true },
+                        { id: 'comandos', nome: 'Comandos / Automação', yCentroTrilho: 1500, categorias: ['RELÉ', 'RELE', 'FONTE', 'PLC', 'MÓDULO', 'MODULO'], temTrilho: true },
+                        { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
+                    ],
+                    gapsTermicos: { 'DISJUNTOR': 10, 'DISJUNTOR MOTOR': 10, 'SECCIONADORA': 8, 'FUSÍVEL': 8, 'CONTATOR': 5, 'INVERSOR': 15, 'SOFT-STARTER': 10, 'SOFT STARTER': 10, 'RELÉ': 3, 'RELE': 3, 'FONTE': 8, 'PLC': 5, 'MÓDULO': 3, 'MODULO': 3, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 5 },
+                    doorLinhas: [
+                        { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
+                        { id: 'door_comando', nome: 'Comando', yCentro: 600 },
+                        { id: 'door_sinalizacao', nome: 'Sinalização', yCentro: 1200 }
+                    ]
+                }
+            },
+            {
+                id: 'ccm-forma2',
+                nome: 'CCM — Forma 2a/2b',
+                desc: 'CCM com placa fixa e zona de barramento (Y=300)',
+                segregacao: 'Forma 2a',
+                config: {
+                    canaletaEsq: 0, canaletaDir: 0, larguraTrilhoDIN: 35, espacamentoLinhas: 10, comprimentoTrilho: 0, colunaCabosWidth: 200,
+                    linhas: [
+                        { id: 'protecoes', nome: 'Proteções', yCentroTrilho: 525, categorias: ['DISJUNTOR', 'DISJUNTOR MOTOR', 'SECCIONADORA', 'FUSÍVEL'], temTrilho: true },
+                        { id: 'acionamentos', nome: 'Acionamentos', yCentroTrilho: 1025, categorias: ['CONTATOR', 'INVERSOR', 'SOFT-STARTER', 'SOFT STARTER'], temTrilho: true },
+                        { id: 'comandos', nome: 'Comandos / Automação', yCentroTrilho: 1500, categorias: ['RELÉ', 'RELE', 'FONTE', 'PLC', 'MÓDULO', 'MODULO'], temTrilho: true },
+                        { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
+                    ],
+                    gapsTermicos: { 'DISJUNTOR': 10, 'DISJUNTOR MOTOR': 10, 'SECCIONADORA': 8, 'FUSÍVEL': 8, 'CONTATOR': 5, 'INVERSOR': 15, 'SOFT-STARTER': 10, 'SOFT STARTER': 10, 'RELÉ': 3, 'RELE': 3, 'FONTE': 8, 'PLC': 5, 'MÓDULO': 3, 'MODULO': 3, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 5 },
+                    doorLinhas: [
+                        { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
+                        { id: 'door_comando', nome: 'Comando', yCentro: 600 },
+                        { id: 'door_sinalizacao', nome: 'Sinalização', yCentro: 1200 }
+                    ]
+                }
+            },
+            {
+                id: 'inversor',
+                nome: 'Inversor de Frequência (IF)',
+                desc: 'Painel com IF — gaps térmicos maiores para dissipação',
+                segregacao: null,
+                config: {
+                    canaletaEsq: 0, canaletaDir: 0, larguraTrilhoDIN: 35, espacamentoLinhas: 10, comprimentoTrilho: 0, colunaCabosWidth: 400,
+                    linhas: [
+                        { id: 'protecoes', nome: 'Proteções', yCentroTrilho: 400, categorias: ['DISJUNTOR', 'DISJUNTOR MOTOR', 'SECCIONADORA', 'FUSÍVEL'], temTrilho: true },
+                        { id: 'acionamentos', nome: 'Acionamentos', yCentroTrilho: 850, categorias: ['INVERSOR', 'CONTATOR', 'SOFT-STARTER', 'SOFT STARTER'], temTrilho: true },
+                        { id: 'comandos', nome: 'Comandos / Automação', yCentroTrilho: 1400, categorias: ['RELÉ', 'RELE', 'FONTE', 'PLC', 'MÓDULO', 'MODULO'], temTrilho: true },
+                        { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
+                    ],
+                    gapsTermicos: { 'DISJUNTOR': 15, 'DISJUNTOR MOTOR': 15, 'SECCIONADORA': 10, 'FUSÍVEL': 10, 'CONTATOR': 8, 'INVERSOR': 25, 'SOFT-STARTER': 15, 'SOFT STARTER': 15, 'RELÉ': 5, 'RELE': 5, 'FONTE': 10, 'PLC': 8, 'MÓDULO': 5, 'MODULO': 5, 'BORNE': 3, 'BORNE PORTA-FUSÍVEL': 3, 'Outros': 8 },
+                    doorLinhas: [
+                        { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
+                        { id: 'door_comando', nome: 'Comando', yCentro: 600 },
+                        { id: 'door_sinalizacao', nome: 'Sinalização', yCentro: 1200 }
+                    ]
+                }
+            },
+            {
+                id: 'softstarter',
+                nome: 'Soft-Starter (SS)',
+                desc: 'Painel com soft-starter — gaps intermediários',
+                segregacao: null,
+                config: {
+                    canaletaEsq: 0, canaletaDir: 0, larguraTrilhoDIN: 35, espacamentoLinhas: 10, comprimentoTrilho: 0, colunaCabosWidth: 200,
+                    linhas: [
+                        { id: 'protecoes', nome: 'Proteções', yCentroTrilho: 475, categorias: ['DISJUNTOR', 'DISJUNTOR MOTOR', 'SECCIONADORA', 'FUSÍVEL'], temTrilho: true },
+                        { id: 'acionamentos', nome: 'Acionamentos', yCentroTrilho: 950, categorias: ['SOFT-STARTER', 'SOFT STARTER', 'CONTATOR', 'INVERSOR'], temTrilho: true },
+                        { id: 'comandos', nome: 'Comandos / Automação', yCentroTrilho: 1450, categorias: ['RELÉ', 'RELE', 'FONTE', 'PLC', 'MÓDULO', 'MODULO'], temTrilho: true },
+                        { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
+                    ],
+                    gapsTermicos: { 'DISJUNTOR': 12, 'DISJUNTOR MOTOR': 12, 'SECCIONADORA': 8, 'FUSÍVEL': 8, 'CONTATOR': 8, 'INVERSOR': 18, 'SOFT-STARTER': 12, 'SOFT STARTER': 12, 'RELÉ': 5, 'RELE': 5, 'FONTE': 8, 'PLC': 5, 'MÓDULO': 3, 'MODULO': 3, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 5 },
+                    doorLinhas: [
+                        { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
+                        { id: 'door_comando', nome: 'Comando', yCentro: 600 },
+                        { id: 'door_sinalizacao', nome: 'Sinalização', yCentro: 1200 }
+                    ]
+                }
+            },
+            {
+                id: 'partida-direta',
+                nome: 'Partida Direta (PD/PDR)',
+                desc: 'CCM compacto com contactores — gaps menores',
+                segregacao: null,
+                config: {
+                    canaletaEsq: 0, canaletaDir: 0, larguraTrilhoDIN: 35, espacamentoLinhas: 10, comprimentoTrilho: 0, colunaCabosWidth: 200,
+                    linhas: [
+                        { id: 'protecoes', nome: 'Proteções', yCentroTrilho: 500, categorias: ['DISJUNTOR', 'DISJUNTOR MOTOR', 'SECCIONADORA', 'FUSÍVEL'], temTrilho: true },
+                        { id: 'acionamentos', nome: 'Acionamentos', yCentroTrilho: 950, categorias: ['CONTATOR', 'SOFT-STARTER', 'SOFT STARTER', 'INVERSOR'], temTrilho: true },
+                        { id: 'comandos', nome: 'Comandos / Automação', yCentroTrilho: 1400, categorias: ['RELÉ', 'RELE', 'FONTE', 'PLC', 'MÓDULO', 'MODULO'], temTrilho: true },
+                        { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1850, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
+                    ],
+                    gapsTermicos: { 'DISJUNTOR': 8, 'DISJUNTOR MOTOR': 8, 'SECCIONADORA': 5, 'FUSÍVEL': 5, 'CONTATOR': 3, 'INVERSOR': 12, 'SOFT-STARTER': 8, 'SOFT STARTER': 8, 'RELÉ': 2, 'RELE': 2, 'FONTE': 5, 'PLC': 3, 'MÓDULO': 2, 'MODULO': 2, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 3 },
+                    doorLinhas: [
+                        { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
+                        { id: 'door_comando', nome: 'Comando', yCentro: 600 },
+                        { id: 'door_sinalizacao', nome: 'Sinalização', yCentro: 1200 }
+                    ]
+                }
+            },
+            {
+                id: 'plc-automacao',
+                nome: 'PLC / Automação',
+                desc: 'Rack de automação — sem bornes, foco em módulos PLC',
+                segregacao: null,
+                config: {
+                    canaletaEsq: 0, canaletaDir: 0, larguraTrilhoDIN: 35, espacamentoLinhas: 10, comprimentoTrilho: 0, colunaCabosWidth: 200,
+                    linhas: [
+                        { id: 'alimentacao', nome: 'Alimentação', yCentroTrilho: 500, categorias: ['FONTE', 'DISJUNTOR', 'FUSÍVEL'], temTrilho: true },
+                        { id: 'plc', nome: 'PLC / Controladores', yCentroTrilho: 1000, categorias: ['PLC', 'MÓDULO', 'MODULO', 'CPU', 'ENTRADA', 'SAÍDA', 'SAIDA'], temTrilho: true },
+                        { id: 'comandos', nome: 'Comandos / Sinalização', yCentroTrilho: 1500, categorias: ['RELÉ', 'RELE', 'CONTATOR', 'LUMINOTECNICO'], temTrilho: true },
+                        { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
+                    ],
+                    gapsTermicos: { 'DISJUNTOR': 8, 'DISJUNTOR MOTOR': 8, 'SECCIONADORA': 5, 'FUSÍVEL': 5, 'CONTATOR': 5, 'INVERSOR': 15, 'SOFT-STARTER': 10, 'SOFT STARTER': 10, 'RELÉ': 3, 'RELE': 3, 'FONTE': 5, 'PLC': 3, 'MÓDULO': 2, 'MODULO': 2, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 3 },
+                    doorLinhas: [
+                        { id: 'door_ihm', nome: 'IHM', yCentro: 300 },
+                        { id: 'door_comando', nome: 'Comando', yCentro: 800 },
+                        { id: 'door_sinalizacao', nome: 'Sinalização', yCentro: 1400 }
+                    ]
+                }
+            }
+        ];
+    },
+
+    _applyLayoutTemplate(templateId) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        const templates = this._getLayoutTemplates();
+        const tmpl = templates.find(t => t.id === templateId);
+        if (!tmpl) return;
+        if (!confirm(`Aplicar template "${tmpl.nome}"?\n\nIsso substituirá as configurações de linhas e gaps do layout atual.`)) return;
+        if (!eq.layoutConfig) eq.layoutConfig = {};
+        Object.assign(eq.layoutConfig, JSON.parse(JSON.stringify(tmpl.config)));
+        if (eq.layoutConfig.cabinetAssignments) {
+            for (const cab of Object.values(eq.layoutConfig.cabinetAssignments)) {
+                if (!cab.layoutConfig) cab.layoutConfig = {};
+                cab.layoutConfig.linhas = JSON.parse(JSON.stringify(tmpl.config.linhas));
+                cab.layoutConfig.gapsTermicos = JSON.parse(JSON.stringify(tmpl.config.gapsTermicos));
+            }
+        }
+        try { store.setState({ activeTechnicalProposal: { ...data } }); } catch (e) { console.warn('[Layout] store error:', e); }
+        this._showLayoutConfigPanel();
+        if (typeof app?.toast === 'function') app.toast(`Template "${tmpl.nome}" aplicado com sucesso!`, 'success');
     },
 
     _getModelosCanaleta() {
