@@ -17007,10 +17007,9 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         try {
         const data = store.getState().activeTechnicalProposal;
         const eq = data?.equipments?.[this.activeEquipmentIndex];
-        if (!eq) { console.warn('[PDF] no eq'); return; }
+        if (!eq) return;
         const montagem = eq.technical?.montagem || 'Em Linha';
         const isB2B = montagem === 'Back to Back';
-        console.log('[PDF] export start', { montagem, isB2B, eqType: eq.type });
 
         const CANVAS_HEIGHT = 2000;
         const PADDING = 80;
@@ -17026,7 +17025,6 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             cv.width = cw;
             cv.height = CANVAS_HEIGHT;
             this._drawLayoutInternal(cv.getContext('2d'), cabinets, SCALE, FONT_MULT, PADDING);
-            console.log('[PDF] canvas created', { cw, cabinets: cabinets.length });
             return cv;
         };
 
@@ -17065,9 +17063,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const isAutomation = eq.type === 'PLC' || eq.type === 'REM';
         if (isAutomation) {
             const result = this._suggestAutomationLayout(eq);
-            console.log('[PDF] automation', { hasLoads: result.hasLoads, cabinets: result.cabinets?.length });
             if (!result.hasLoads || result.cabinets.length === 0) {
-                console.warn('[PDF Export] Export canceled: no BOM materials or no cabinets defined');
                 app.toast('Nenhum material com dimensões ou nenhum armário definido para exportar.', 'warning');
                 return;
             }
@@ -17078,7 +17074,6 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         } else if (isB2B) {
             const resultF = this.suggestLayout(eq, 'front');
             const resultT = this.suggestLayout(eq, 'rear');
-            console.log('[PDF] B2B', { fLoads: resultF.hasLoads, fCabs: resultF.cabinets?.length, tLoads: resultT.hasLoads, tCabs: resultT.cabinets?.length });
             if (resultF.hasLoads && resultF.cabinets.length > 0) {
                 const cvF = makeCanvas(resultF.cabinets);
                 const cvS = showSide && resultF.cabinets.length > 0
@@ -17093,9 +17088,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
             }
         } else {
             const result = this.suggestLayout(eq);
-            console.log('[PDF] standard', { hasLoads: result.hasLoads, cabinets: result.cabinets?.length });
             if (!result.hasLoads || result.cabinets.length === 0) {
-                console.warn('[PDF Export] Export canceled: no loads with typicals or no cabinets defined');
                 app.toast('Nenhuma carga com típico ou nenhum armário definido para exportar.', 'warning');
                 return;
             }
@@ -17104,8 +17097,6 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 ? makeSideCanvas(result.cabinets, eq.layoutConfig?.sideViewCabinetIndex) : null;
             imagesHtml = flexPage(cv, cvS);
         }
-
-        console.log('[PDF] imagesHtml length:', imagesHtml.length);
 
         const printFrame = document.createElement('iframe');
         printFrame.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
