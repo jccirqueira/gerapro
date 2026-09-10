@@ -5205,8 +5205,15 @@ const PropostaTecnicaModule = {
                     <select id="layout-template-select" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid #bae6fd;border-radius:4px;background:#fff;"
                         onchange="if(this.value)window.propostaTecnicaModule._applyLayoutTemplate(this.value);this.value='';">
                         <option value="">Selecione um template pré-definido...</option>
-                        ${this._getLayoutTemplates().map(t => `<option value="${t.id}">${t.nome} — ${t.desc}</option>`).join('')}
+                        ${this._getLayoutTemplates().map(t => {
+                            const active = eq.layoutConfig?._activeTemplateId === t.id;
+                            return `<option value="${t.id}" ${active ? 'selected' : ''}>${active ? '✓ ' : ''}${t.nome} — ${t.desc}</option>`;
+                        }).join('')}
                     </select>
+                    ${eq.layoutConfig?._activeTemplateId ? (() => {
+                        const tmpl = this._getLayoutTemplates().find(t => t.id === eq.layoutConfig._activeTemplateId);
+                        return tmpl ? `<span style="font-size:11px;color:#059669;background:#d1fae5;padding:2px 8px;border-radius:10px;white-space:nowrap;">✓ ${tmpl.nome}</span>` : '';
+                    })() : ''}
                 </div>
                 ${cabinetsHtml}
                 <div style="display:flex;gap:6px;margin-top:12px;">
@@ -7138,6 +7145,7 @@ const PropostaTecnicaModule = {
         if (!confirm(`Aplicar template "${tmpl.nome}"?\n\nIsso substituirá as configurações de linhas e gaps do layout atual.`)) return;
         if (!eq.layoutConfig) eq.layoutConfig = {};
         Object.assign(eq.layoutConfig, JSON.parse(JSON.stringify(tmpl.config)));
+        eq.layoutConfig._activeTemplateId = tmpl.id;
         if (eq.layoutConfig.cabinetAssignments) {
             for (const cab of Object.values(eq.layoutConfig.cabinetAssignments)) {
                 if (!cab.layoutConfig) cab.layoutConfig = {};
