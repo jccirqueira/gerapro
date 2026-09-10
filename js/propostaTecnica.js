@@ -8368,8 +8368,6 @@ const PropostaTecnicaModule = {
                 collectMatIds(faces.front?.loads);
                 collectMatIds(faces.rear?.loads);
             }
-                }
-            }
         }
 
         return arvore;
