@@ -24,6 +24,7 @@ const initialState = {
     orcamentos: [],
     loadLists: [],
     chapariaLists: [],
+    layoutTemplates: [],
     unidadesCliente: [],
     propostasTecnicas: [],
     propostasComerciais: [],
@@ -157,7 +158,7 @@ class Store {
             if (data.success && data.data) {
                 const sd = data.data;
                 console.log('[Load] Got data:', Object.keys(sd).map(k => `${k}:${Array.isArray(sd[k]) ? sd[k].length : '?'}`).join(', '));
-                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas',    'orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente']) {
+                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas',    'orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente']) {
                     if (Array.isArray(sd[key])) this.state[key] = sd[key];
                 }
                 if (sd.settings) this.state.settings = { ...this.state.settings, ...sd.settings };

@@ -3464,7 +3464,7 @@ const server = http.createServer(async (req, res) => {
 
         const entityMatch = pathname.match(/^\/api\/data\/(\w+)$/);
         const entityMatchWithId = pathname.match(/^\/api\/data\/(\w+)\/(.+)$/);
-        const validEntities = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmEmailTemplates','crmStages','crmWebhooks','crmSequencias','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente'];
+        const validEntities = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmEmailTemplates','crmStages','crmWebhooks','crmSequencias','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente'];
 
         if (entityMatch && req.method === 'POST') {
             const tokenUser = getTokenUser(req);

@@ -5204,15 +5204,27 @@ const PropostaTecnicaModule = {
                     <label style="font-size:12px;font-weight:600;color:#0369a1;white-space:nowrap;">📋 Template:</label>
                     <select id="layout-template-select" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid #bae6fd;border-radius:4px;background:#fff;"
                         onchange="if(this.value)window.propostaTecnicaModule._applyLayoutTemplate(this.value);this.value='';">
-                        <option value="">Selecione um template pré-definido...</option>
-                        ${this._getLayoutTemplates().map(t => {
-                            const active = eq.layoutConfig?._activeTemplateId === t.id;
-                            return `<option value="${t.id}" ${active ? 'selected' : ''}>${active ? '✓ ' : ''}${t.nome} — ${t.desc}</option>`;
-                        }).join('')}
+                        <option value="">Selecione um template...</option>
+                        <optgroup label="Pré-definidos">
+                            ${this._getLayoutTemplates().filter(t => !t._isCustom).map(t => {
+                                const active = eq.layoutConfig?._activeTemplateId === t.id;
+                                return `<option value="${t.id}" ${active ? 'selected' : ''}>${active ? '✓ ' : ''}${t.nome} — ${t.desc}</option>`;
+                            }).join('')}
+                        </optgroup>
+                        ${(store.getState?.().layoutTemplates || []).filter(t => t._isCustom).length > 0 ? `
+                        <optgroup label="Personalizados">
+                            ${this._getLayoutTemplates().filter(t => t._isCustom).map(t => {
+                                const active = eq.layoutConfig?._activeTemplateId === t.id;
+                                return `<option value="${t.id}" ${active ? 'selected' : ''}>${active ? '✓ ' : ''}${t.nome} — ${t.desc}</option>`;
+                            }).join('')}
+                        </optgroup>` : ''}
                     </select>
+                    <button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._saveLayoutTemplate()" style="font-size:10px;color:#059669;white-space:nowrap;" title="Salvar configuração atual como template">💾 Salvar</button>
                     ${eq.layoutConfig?._activeTemplateId ? (() => {
                         const tmpl = this._getLayoutTemplates().find(t => t.id === eq.layoutConfig._activeTemplateId);
-                        return tmpl ? `<span style="font-size:11px;color:#059669;background:#d1fae5;padding:2px 8px;border-radius:10px;white-space:nowrap;">✓ ${tmpl.nome}</span>` : '';
+                        if (!tmpl) return '';
+                        return `<span style="font-size:11px;color:#059669;background:#d1fae5;padding:2px 8px;border-radius:10px;white-space:nowrap;">✓ ${tmpl.nome}</span>
+                            ${tmpl._isCustom ? `<button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._deleteLayoutTemplate('${tmpl.id}')" style="font-size:10px;color:#ef4444;" title="Excluir template">🗑️</button>` : ''}`;
                     })() : ''}
                 </div>
                 ${(() => {
@@ -7031,7 +7043,7 @@ const PropostaTecnicaModule = {
     },
 
     _getLayoutTemplates() {
-        return [
+        const predefined = [
             {
                 id: 'ccm-forma1',
                 nome: 'CCM — Forma 1',
@@ -7267,6 +7279,8 @@ const PropostaTecnicaModule = {
                 }
             }
         ];
+        const custom = (store.getState?.().layoutTemplates || []).filter(t => t._isCustom);
+        return [...predefined, ...custom];
     },
 
     _applyLayoutTemplate(templateId) {
@@ -7386,6 +7400,56 @@ const PropostaTecnicaModule = {
         if (!eq?.layoutConfig?.componentRules) return;
         eq.layoutConfig.componentRules.splice(idx, 1);
         try { store.setState({ activeTechnicalProposal: { ...data } }); } catch (e) { console.warn('[Layout] store error:', e); }
+        this._showLayoutConfigPanel();
+    },
+
+    _saveLayoutTemplate() {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        const nome = prompt('Nome do template personalizado:');
+        if (!nome || !nome.trim()) return;
+        const desc = prompt('Descrição (opcional):') || '';
+        const seg = eq.technical?.segregacao || '';
+        const tipo = eq.technical?.tipoPartida || eq.loads?.[0]?.type || '';
+        const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        const template = {
+            id,
+            nome: nome.trim(),
+            desc: desc.trim() || `Personalizado — ${seg || 'Geral'}`,
+            segregacao: seg || null,
+            _isCustom: true,
+            config: {
+                canaletaEsq: eq.layoutConfig?.canaletaEsq ?? 0,
+                canaletaDir: eq.layoutConfig?.canaletaDir ?? 0,
+                larguraTrilhoDIN: eq.layoutConfig?.larguraTrilhoDIN ?? 35,
+                espacamentoLinhas: eq.layoutConfig?.espacamentoLinhas ?? 10,
+                comprimentoTrilho: eq.layoutConfig?.comprimentoTrilho ?? 0,
+                colunaCabosWidth: eq.layoutConfig?.colunaCabosWidth ?? 200,
+                linhas: JSON.parse(JSON.stringify(eq.layoutConfig?.linhas || this._getDefaultLayoutConfig().linhas)),
+                gapsTermicos: JSON.parse(JSON.stringify(eq.layoutConfig?.gapsTermicos || this._getDefaultLayoutConfig().gapsTermicos)),
+                componentRules: JSON.parse(JSON.stringify(eq.layoutConfig?.componentRules || [])),
+                doorLinhas: JSON.parse(JSON.stringify(eq.layoutConfig?.doorLinhas || this._getDefaultLayoutConfig().doorLinhas)),
+            }
+        };
+        const templates = [...(store.getState().layoutTemplates || []), template];
+        store.setState({ layoutTemplates: templates });
+        store._syncCreate?.('layoutTemplates', template);
+        eq.layoutConfig._activeTemplateId = id;
+        try { store.setState({ activeTechnicalProposal: { ...data } }); } catch (e) { console.warn('[Layout] store error:', e); }
+        this._showLayoutConfigPanel();
+        if (typeof app?.toast === 'function') app.toast(`Template "${nome}" salvo com sucesso!`, 'success');
+    },
+
+    _deleteLayoutTemplate(templateId) {
+        const templates = store.getState().layoutTemplates || [];
+        const tmpl = templates.find(t => t.id === templateId);
+        if (!tmpl) return;
+        if (!confirm(`Excluir template "${tmpl.nome}"?`)) return;
+        const updated = templates.filter(t => t.id !== templateId);
+        store.setState({ layoutTemplates: updated });
+        store._syncDelete?.('layoutTemplates', templateId);
+        if (typeof app?.toast === 'function') app.toast(`Template "${tmpl.nome}" excluído.`, 'success');
         this._showLayoutConfigPanel();
     },
 
