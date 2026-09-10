@@ -625,6 +625,9 @@ const PropostaTecnicaModule = {
 
             if (container && !container.classList.contains('hidden-module')) {
 
+                const sc = document.querySelector('#form-proposta-tecnica > div');
+                this._savedScrollTop = sc ? sc.scrollTop : null;
+
                 this.render();
 
             }
@@ -2616,6 +2619,14 @@ const PropostaTecnicaModule = {
         if (container) {
 
             container.innerHTML = html;
+
+            if (this._savedScrollTop != null) {
+                requestAnimationFrame(() => {
+                    const sc = document.querySelector('#form-proposta-tecnica > div');
+                    if (sc) sc.scrollTop = this._savedScrollTop;
+                    this._savedScrollTop = null;
+                });
+            }
 
             // Draw side view on initial render if checkbox is already checked
             if (activeTab === 'equipments' && activeSubTab === 'layout') {
@@ -8999,6 +9010,8 @@ const PropostaTecnicaModule = {
         if (!eq) return;
         const isAutomation = eq.type === 'PLC' || eq.type === 'REM';
         const montagem = eq.technical?.montagem || 'Em Linha';
+        const scrollContainer = document.querySelector('#form-proposta-tecnica > div');
+        const savedScroll = scrollContainer ? scrollContainer.scrollTop : null;
         if (isAutomation) {
             const result = this._suggestAutomationLayout(eq);
             const cabinets = result.cabinets || [];
@@ -9006,16 +9019,17 @@ const PropostaTecnicaModule = {
             const bomHtml = this._renderBOMAlocacao(arvore, cabinets, montagem);
             const bomBody = document.getElementById('bom_body_automacao');
             if (bomBody) bomBody.innerHTML = bomHtml;
-            return;
+        } else {
+            const isB2B = montagem === 'Back to Back';
+            const result = isB2B ? this.suggestLayout(eq, 'front') : this.suggestLayout(eq);
+            const cabinets = result.cabinets || [];
+            const arvore = this._geraArvoreMateriais(eq);
+            const bomHtml = this._renderBOMAlocacao(arvore, cabinets, montagem);
+            const bomBody = document.getElementById('bom_body') || document.getElementById('bom_body_empty');
+            if (bomBody) bomBody.innerHTML = bomHtml;
         }
-        const isB2B = montagem === 'Back to Back';
-        const result = isB2B ? this.suggestLayout(eq, 'front') : this.suggestLayout(eq);
-        const cabinets = result.cabinets || [];
-        const arvore = this._geraArvoreMateriais(eq);
-        const bomHtml = this._renderBOMAlocacao(arvore, cabinets, montagem);
-        const bomBody = document.getElementById('bom_body') || document.getElementById('bom_body_empty');
-        if (bomBody) {
-            bomBody.innerHTML = bomHtml;
+        if (scrollContainer && savedScroll != null) {
+            requestAnimationFrame(() => { scrollContainer.scrollTop = savedScroll; });
         }
     },
 
@@ -9695,6 +9709,7 @@ const PropostaTecnicaModule = {
         const idx = this.activeEquipmentIndex;
         const eqs = [...(data.equipments || [])];
         eqs[idx] = eq;
+        this._savedScrollTop = document.querySelector('#form-proposta-tecnica > div')?.scrollTop ?? null;
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) {}
         if (this.activeSubTab === 'layout') this.renderSubTab();
     },
