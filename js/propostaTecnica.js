@@ -4870,8 +4870,9 @@ const PropostaTecnicaModule = {
     _renderLinhasTable(linhas, dflt) {
         return linhas.map((l, i) => {
             const yCentro = l.yCentroTrilho ?? Math.round(((l.yInicio || 0) + (l.yFim || 0)) / 2);
-            return `<tr>
+            return `<tr draggable="true" data-linha-idx="${i}" style="cursor:grab;">
                 <td style="display:none;"><input type="hidden" class="lcfg_id" value="${l.id || ''}"></td>
+                <td style="text-align:center;color:#94a3b8;font-size:12px;cursor:grab;user-select:none;" title="Arrastar para reordenar">⠿</td>
                 <td><input type="text" class="form-control lcfg_nome" value="${l.nome}" style="width:120px;font-size:12px;"></td>
                 <td><input type="number" class="form-control lcfg_yCentro" value="${yCentro}" style="width:70px;font-size:12px;"></td>
                 <td style="text-align:center;"><input type="checkbox" class="lcfg_trilho" ${l.temTrilho !== false ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;"></td>
@@ -4919,6 +4920,89 @@ const PropostaTecnicaModule = {
                 <td style="text-align:center;"><button type="button" class="btn btn-xs btn-ghost" onclick="this.closest('tr').remove()" style="color:#ef4444;font-size:14px;padding:2px 4px;">✕</button></td>
             </tr>`;
         }).join('');
+    },
+
+    _renderLinhaPreview(linhas, cabHeight) {
+        const h = cabHeight || 2300;
+        const stripW = 30;
+        const stripH = 200;
+        const scale = stripH / h;
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+        let svg = `<svg width="${stripW}" height="${stripH}" style="display:block;">`;
+        svg += `<rect x="0" y="0" width="${stripW}" height="${stripH}" fill="#f8fafc" stroke="#e2e8f0" rx="2"/>`;
+        for (let i = 0; i < linhas.length; i++) {
+            const l = linhas[i];
+            const yc = l.yCentroTrilho ?? 500;
+            const bandH = Math.max(30, 80) * scale;
+            const bandY = (yc * scale) - bandH / 2;
+            const color = colors[i % colors.length];
+            svg += `<rect x="1" y="${Math.max(0, bandY)}" width="${stripW - 2}" height="${Math.min(bandH, stripH - Math.max(0, bandY))}" fill="${color}" opacity="0.3" rx="1"/>`;
+            svg += `<line x1="0" y1="${yc * scale}" x2="${stripW}" y2="${yc * scale}" stroke="${color}" stroke-width="1.5"/>`;
+            svg += `<text x="${stripW / 2}" y="${Math.max(8, Math.min(yc * scale + 3, stripH - 2))}" text-anchor="middle" font-size="7" fill="${color}" font-weight="bold">${i + 1}</text>`;
+        }
+        svg += '</svg>';
+        return svg;
+    },
+
+    _detectLinhaCollisions(linhas) {
+        const warnings = [];
+        for (let i = 0; i < linhas.length; i++) {
+            for (let j = i + 1; j < linhas.length; j++) {
+                const a = linhas[i], b = linhas[j];
+                const ya = a.yCentroTrilho ?? 500;
+                const yb = b.yCentroTrilho ?? 500;
+                const dist = Math.abs(ya - yb);
+                if (dist < 120) {
+                    warnings.push({ linhas: [a, b], dist, msg: `"${a.nome}" e "${b.nome}" estão muito próximas (${dist}mm). Materiais grandes podem se sobrepor.` });
+                }
+            }
+        }
+        return warnings;
+    },
+
+    _detectMaterialCollisions(rows) {
+        const collisions = [];
+        for (let i = 0; i < rows.length; i++) {
+            for (let j = i + 1; j < rows.length; j++) {
+                const rA = rows[i], rB = rows[j];
+                for (const itemA of rA.items || []) {
+                    for (const itemB of rB.items || []) {
+                        const topA = itemA.y, botA = itemA.y + itemA.h;
+                        const topB = itemB.y, botB = itemB.y + itemB.h;
+                        const leftA = itemA.x, rightA = itemA.x + itemA.w;
+                        const leftB = itemB.x, rightB = itemB.x + itemB.w;
+                        const vOverlap = topA < botB && topB < botA;
+                        const hOverlap = leftA < rightB && leftB < rightA;
+                        if (vOverlap && hOverlap) {
+                            collisions.push({ itemA, itemB, linhaA: rA.linha?.nome || '?', linhaB: rB.linha?.nome || '?' });
+                        }
+                    }
+                }
+            }
+        }
+        return collisions;
+    },
+
+    _detectZCollisions(items) {
+        const collisions = [];
+        const sorted = [...items].sort((a, b) => (a.z || 0) - (b.z || 0));
+        for (let i = 0; i < sorted.length; i++) {
+            for (let j = i + 1; j < sorted.length; j++) {
+                const a = sorted[i], b = sorted[j];
+                const zA = a.z || 0, zB = b.z || 0;
+                const dA = a.d || 20, dB = b.d || 20;
+                const endA = zA + dA, endB = zB + dB;
+                const zOverlap = zA < endB && zB < endA;
+                if (!zOverlap) break;
+                const topA = a.y || 0, botA = (a.y || 0) + (a.h || 40);
+                const topB = b.y || 0, botB = (b.y || 0) + (b.h || 40);
+                const vOverlap = topA < botB && topB < botA;
+                if (zOverlap && vOverlap) {
+                    collisions.push({ itemA: a, itemB: b });
+                }
+            }
+        }
+        return collisions;
     },
 
     _showLayoutConfigPanel() {
@@ -5046,10 +5130,24 @@ const PropostaTecnicaModule = {
                                 <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarLinhaLayout('${blockCabId}')" style="font-size:11px;">+ Adicionar Linha</button>
                             </div>
                         </div>
-                        <table class="table" style="width:100%;">
-                            <thead><tr><th style="font-size:10px;">Nome</th><th style="font-size:10px;">Y Centro</th><th style="font-size:10px;">Trilho</th><th style="font-size:10px;">Categorias</th><th style="width:24px;"></th></tr></thead>
-                            <tbody class="cab-linhas-tbody">${linhasHtml}</tbody>
-                        </table>
+                        <div style="display:flex;gap:10px;align-items:flex-start;">
+                            <div style="flex-shrink:0;padding-top:28px;" title="Preview das posições verticais">
+                                ${this._renderLinhaPreview(lc.linhas || dflt.linhas, cab.height || 2300)}
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <table class="table" style="width:100%;">
+                                    <thead><tr><th style="width:20px;"></th><th style="font-size:10px;">Nome</th><th style="font-size:10px;">Y Centro</th><th style="font-size:10px;">Trilho</th><th style="font-size:10px;">Categorias</th><th style="width:24px;"></th></tr></thead>
+                                    <tbody class="cab-linhas-tbody" data-cab-id="${blockCabId}">${linhasHtml}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                        ${(() => {
+                            const linhaWarns = this._detectLinhaCollisions(lc.linhas || dflt.linhas);
+                            if (linhaWarns.length === 0) return '';
+                            return `<div style="margin-top:6px;padding:6px 8px;background:#fef3c7;border:1px solid #fbbf24;border-radius:4px;font-size:11px;color:#92400e;">
+                                ${linhaWarns.map(w => `<div>⚠️ ${w.msg}</div>`).join('')}
+                            </div>`;
+                        })()}
 
                         <div style="margin-top:12px;">
                             <strong style="font-size:13px;">Gaps Térmicos</strong>
@@ -5132,6 +5230,68 @@ const PropostaTecnicaModule = {
                 </div>
             </div>`;
         document.body.appendChild(overlay);
+
+        // Setup drag-and-drop for linhas tables
+        overlay.querySelectorAll('.cab-linhas-tbody').forEach(tbody => {
+            let dragRow = null;
+            tbody.addEventListener('dragstart', e => {
+                dragRow = e.target.closest('tr');
+                if (dragRow) { dragRow.style.opacity = '0.4'; e.dataTransfer.effectAllowed = 'move'; }
+            });
+            tbody.addEventListener('dragend', e => {
+                if (dragRow) dragRow.style.opacity = '';
+                tbody.querySelectorAll('tr').forEach(r => r.style.borderTop = '');
+                dragRow = null;
+            });
+            tbody.addEventListener('dragover', e => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const target = e.target.closest('tr');
+                if (target && target !== dragRow) {
+                    tbody.querySelectorAll('tr').forEach(r => r.style.borderTop = '');
+                    target.style.borderTop = '2px solid #3b82f6';
+                }
+            });
+            tbody.addEventListener('drop', e => {
+                e.preventDefault();
+                const target = e.target.closest('tr');
+                if (target && dragRow && target !== dragRow) {
+                    const rows = [...tbody.querySelectorAll('tr')];
+                    const dragIdx = rows.indexOf(dragRow);
+                    const targetIdx = rows.indexOf(target);
+                    if (dragIdx < targetIdx) {
+                        tbody.insertBefore(dragRow, target.nextSibling);
+                    } else {
+                        tbody.insertBefore(dragRow, target);
+                    }
+                }
+                tbody.querySelectorAll('tr').forEach(r => r.style.borderTop = '');
+            });
+        });
+
+        // Setup live collision warnings for linhas Y Centro changes
+        overlay.querySelectorAll('.cab-linhas-tbody').forEach(tbody => {
+            const checkCollisions = () => {
+                const existing = tbody.parentElement.parentElement.querySelector('.linha-collision-warnings');
+                if (existing) existing.remove();
+                const rows = tbody.querySelectorAll('tr');
+                const linhas = [];
+                rows.forEach(row => {
+                    const nome = row.querySelector('.lcfg_nome')?.value || '';
+                    const yc = parseInt(row.querySelector('.lcfg_yCentro')?.value) || 500;
+                    linhas.push({ nome, yCentroTrilho: yc });
+                });
+                const warns = this._detectLinhaCollisions(linhas);
+                if (warns.length > 0) {
+                    const div = document.createElement('div');
+                    div.className = 'linha-collision-warnings';
+                    div.style.cssText = 'margin-top:6px;padding:6px 8px;background:#fef3c7;border:1px solid #fbbf24;border-radius:4px;font-size:11px;color:#92400e;';
+                    div.innerHTML = warns.map(w => `<div>⚠️ ${w.msg}</div>`).join('');
+                    tbody.parentElement.parentElement.appendChild(div);
+                }
+            };
+            tbody.addEventListener('change', checkCollisions);
+        });
     },
 
     _saveLayoutConfig() {
@@ -5141,6 +5301,20 @@ const PropostaTecnicaModule = {
 
         const overlay = document.getElementById('_layout_config_overlay');
         if (!overlay) return;
+
+        // Validate linha collisions before saving
+        let hasCollisions = false;
+        overlay.querySelectorAll('.cab-linhas-tbody').forEach(tbody => {
+            const rows = tbody.querySelectorAll('tr');
+            const linhas = [];
+            rows.forEach(row => {
+                const nome = row.querySelector('.lcfg_nome')?.value || '';
+                const yc = parseInt(row.querySelector('.lcfg_yCentro')?.value) || 500;
+                linhas.push({ nome, yCentroTrilho: yc });
+            });
+            if (this._detectLinhaCollisions(linhas).length > 0) hasCollisions = true;
+        });
+        if (hasCollisions && !confirm('Existem linhas muito próximas que podem causar sobreposição de materiais.\n\nDeseja salvar mesmo assim?')) return;
 
         const dflt = this._getDefaultLayoutConfig();
         if (!eq.layoutConfig) eq.layoutConfig = {};
@@ -5689,6 +5863,27 @@ const PropostaTecnicaModule = {
             ctx.stroke();
 
             currentZ += id + gap;
+        }
+
+        // Detect z-axis collisions and highlight
+        const allSideItems = [...itemsWithManualZ.map(e => e.item), ...sortedAuto];
+        const zCollisions = this._detectZCollisions(allSideItems);
+        if (zCollisions.length > 0) {
+            for (const col of zCollisions) {
+                for (const item of [col.itemA, col.itemB]) {
+                    const id = item.d || 20;
+                    const ih = item.h || 40;
+                    const z = item.z || 0;
+                    const ix = xOff + (effectiveDepth - z) * scale;
+                    const iy = padding + (item.y || 0) * scale;
+                    const iw = id * scale;
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([3, 2]);
+                    ctx.strokeRect(ix - 1, iy - 1, Math.max(iw, 4) + 2, Math.max(ih * scale, 4) + 2);
+                    ctx.setLineDash([]);
+                }
+            }
         }
 
         // Draw rear cabinet items (B2B) — mirrored
@@ -6537,6 +6732,13 @@ const PropostaTecnicaModule = {
 
                 // Component rows + trilhos
                 const rows = cab.rows || [];
+                const collisionSet = new Set();
+                if (cab._collisions) {
+                    for (const c of cab._collisions) {
+                        collisionSet.add(c.itemA);
+                        collisionSet.add(c.itemB);
+                    }
+                }
                 for (const row of rows) {
                     // DIN rail below row (draw FIRST, components cover it)
                     if (row.trilho) {
@@ -6568,6 +6770,15 @@ const PropostaTecnicaModule = {
                         ctx.strokeStyle = 'rgba(0,0,0,0.15)';
                         ctx.lineWidth = 0.5;
                         ctx.stroke();
+
+                        // Collision highlight
+                        if (collisionSet.has(item)) {
+                            ctx.strokeStyle = '#ef4444';
+                            ctx.lineWidth = 2;
+                            ctx.setLineDash([3, 2]);
+                            ctx.strokeRect(ix - 1, iy - 1, iw + 2, ih + 2);
+                            ctx.setLineDash([]);
+                        }
 
                         if (iw > 20 * fontMult && ih > 10 * fontMult) {
                             ctx.fillStyle = '#fff';
@@ -9849,6 +10060,17 @@ const PropostaTecnicaModule = {
                     warnings.push('Outros: largura insuficiente no trilho para itens não categorizados.');
                 }
             }
+        }
+
+        // Detect vertical collisions between materials on different linhas
+        const materialCollisions = this._detectMaterialCollisions(rows);
+        if (materialCollisions.length > 0) {
+            cab._collisions = materialCollisions;
+            for (const c of materialCollisions) {
+                warnings.push(`Conflito: "${c.itemA.desc}" (${c.linhaA}) e "${c.itemB.desc}" (${c.linhaB}) se sobrepõem.`);
+            }
+        } else {
+            cab._collisions = [];
         }
 
         cab.warning = warnings.join(' ');
