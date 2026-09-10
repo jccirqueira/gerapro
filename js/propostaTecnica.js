@@ -5227,7 +5227,7 @@ const PropostaTecnicaModule = {
                         <div style="max-height:200px;overflow-y:auto;">
                             ${rules.map((r, i) => {
                                 const matchLabel = r.match === 'category' ? `Categoria: ${r.value}` : r.match === 'materialId' ? `Material: ${(materiais.find(m=>m.id===r.value)?.descricao||r.value).slice(0,20)}` : `Padrão: ${r.value}`;
-                                const linhaLabel = lc.linhas?.find(l=>l.id===r.linhaId)?.nome || r.linhaId || '?';
+                                const linhaLabel = (eq.layoutConfig?.linhas || this._getDefaultLayoutConfig().linhas)?.find(l=>l.id===r.linhaId)?.nome || r.linhaId || '?';
                                 return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:11px;border-bottom:1px solid #f1f5f9;">
                                     <span style="color:#64748b;min-width:130px;">${matchLabel}</span>
                                     <span style="color:#94a3b8;">→</span>
