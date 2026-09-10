@@ -5215,6 +5215,32 @@ const PropostaTecnicaModule = {
                         return tmpl ? `<span style="font-size:11px;color:#059669;background:#d1fae5;padding:2px 8px;border-radius:10px;white-space:nowrap;">✓ ${tmpl.nome}</span>` : '';
                     })() : ''}
                 </div>
+                ${(() => {
+                    const rules = eq.layoutConfig?.componentRules || [];
+                    if (rules.length === 0) return '';
+                    const materiais = window.store?.getState?.().materiais || [];
+                    return `<div style="margin-bottom:14px;padding:10px 12px;background:#fafafa;border:1px solid #e2e8f0;border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:12px;">Regras de Posicionamento (${rules.length})</strong>
+                            <button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._addComponentRule()" style="font-size:10px;">+ Adicionar Regra</button>
+                        </div>
+                        <div style="max-height:200px;overflow-y:auto;">
+                            ${rules.map((r, i) => {
+                                const matchLabel = r.match === 'category' ? `Categoria: ${r.value}` : r.match === 'materialId' ? `Material: ${(materiais.find(m=>m.id===r.value)?.descricao||r.value).slice(0,20)}` : `Padrão: ${r.value}`;
+                                const linhaLabel = lc.linhas?.find(l=>l.id===r.linhaId)?.nome || r.linhaId || '?';
+                                return `<div style="display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:11px;border-bottom:1px solid #f1f5f9;">
+                                    <span style="color:#64748b;min-width:130px;">${matchLabel}</span>
+                                    <span style="color:#94a3b8;">→</span>
+                                    <span style="color:#1e293b;font-weight:500;">${linhaLabel}</span>
+                                    ${r.xOffset != null ? `<span style="color:#3b82f6;">X:${r.xOffset}</span>` : ''}
+                                    ${r.zOffset != null ? `<span style="color:#8b5cf6;">Z:${r.zOffset}</span>` : ''}
+                                    ${r.porta ? '<span style="color:#f59e0b;">Porta</span>' : ''}
+                                    <button class="btn btn-xs btn-ghost" onclick="window.propostaTecnicaModule._removeComponentRule(${i})" style="color:#ef4444;font-size:10px;margin-left:auto;">✕</button>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </div>`;
+                })()}
                 ${cabinetsHtml}
                 <div style="display:flex;gap:6px;margin-top:12px;">
                     <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:11px;">+ Adicionar Armário</button>
@@ -7020,6 +7046,24 @@ const PropostaTecnicaModule = {
                         { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
                     ],
                     gapsTermicos: { 'DISJUNTOR': 10, 'DISJUNTOR MOTOR': 10, 'SECCIONADORA': 8, 'FUSÍVEL': 8, 'CONTATOR': 5, 'INVERSOR': 15, 'SOFT-STARTER': 10, 'SOFT STARTER': 10, 'RELÉ': 3, 'RELE': 3, 'FONTE': 8, 'PLC': 5, 'MÓDULO': 3, 'MODULO': 3, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 5 },
+                    componentRules: [
+                        { match: 'category', value: 'DISJUNTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'DISJUNTOR MOTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SECCIONADORA', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FUSÍVEL', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'CONTATOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'INVERSOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT-STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELÉ', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FONTE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'PLC', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MÓDULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MODULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE PORTA-FUSÍVEL', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                    ],
                     doorLinhas: [
                         { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
                         { id: 'door_comando', nome: 'Comando', yCentro: 600 },
@@ -7041,6 +7085,24 @@ const PropostaTecnicaModule = {
                         { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
                     ],
                     gapsTermicos: { 'DISJUNTOR': 10, 'DISJUNTOR MOTOR': 10, 'SECCIONADORA': 8, 'FUSÍVEL': 8, 'CONTATOR': 5, 'INVERSOR': 15, 'SOFT-STARTER': 10, 'SOFT STARTER': 10, 'RELÉ': 3, 'RELE': 3, 'FONTE': 8, 'PLC': 5, 'MÓDULO': 3, 'MODULO': 3, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 5 },
+                    componentRules: [
+                        { match: 'category', value: 'DISJUNTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'DISJUNTOR MOTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SECCIONADORA', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FUSÍVEL', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'CONTATOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'INVERSOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT-STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELÉ', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FONTE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'PLC', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MÓDULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MODULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE PORTA-FUSÍVEL', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                    ],
                     doorLinhas: [
                         { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
                         { id: 'door_comando', nome: 'Comando', yCentro: 600 },
@@ -7062,6 +7124,24 @@ const PropostaTecnicaModule = {
                         { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
                     ],
                     gapsTermicos: { 'DISJUNTOR': 15, 'DISJUNTOR MOTOR': 15, 'SECCIONADORA': 10, 'FUSÍVEL': 10, 'CONTATOR': 8, 'INVERSOR': 25, 'SOFT-STARTER': 15, 'SOFT STARTER': 15, 'RELÉ': 5, 'RELE': 5, 'FONTE': 10, 'PLC': 8, 'MÓDULO': 5, 'MODULO': 5, 'BORNE': 3, 'BORNE PORTA-FUSÍVEL': 3, 'Outros': 8 },
+                    componentRules: [
+                        { match: 'category', value: 'DISJUNTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'DISJUNTOR MOTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SECCIONADORA', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FUSÍVEL', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'INVERSOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'CONTATOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT-STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELÉ', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FONTE', linhaId: 'comandos', xOffset: 50, zOffset: 0, porta: false },
+                        { match: 'category', value: 'PLC', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MÓDULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MODULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE PORTA-FUSÍVEL', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                    ],
                     doorLinhas: [
                         { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
                         { id: 'door_comando', nome: 'Comando', yCentro: 600 },
@@ -7083,6 +7163,24 @@ const PropostaTecnicaModule = {
                         { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
                     ],
                     gapsTermicos: { 'DISJUNTOR': 12, 'DISJUNTOR MOTOR': 12, 'SECCIONADORA': 8, 'FUSÍVEL': 8, 'CONTATOR': 8, 'INVERSOR': 18, 'SOFT-STARTER': 12, 'SOFT STARTER': 12, 'RELÉ': 5, 'RELE': 5, 'FONTE': 8, 'PLC': 5, 'MÓDULO': 3, 'MODULO': 3, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 5 },
+                    componentRules: [
+                        { match: 'category', value: 'DISJUNTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'DISJUNTOR MOTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SECCIONADORA', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FUSÍVEL', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT-STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'CONTATOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'INVERSOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELÉ', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FONTE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'PLC', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MÓDULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MODULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE PORTA-FUSÍVEL', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                    ],
                     doorLinhas: [
                         { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
                         { id: 'door_comando', nome: 'Comando', yCentro: 600 },
@@ -7104,6 +7202,24 @@ const PropostaTecnicaModule = {
                         { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1850, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
                     ],
                     gapsTermicos: { 'DISJUNTOR': 8, 'DISJUNTOR MOTOR': 8, 'SECCIONADORA': 5, 'FUSÍVEL': 5, 'CONTATOR': 3, 'INVERSOR': 12, 'SOFT-STARTER': 8, 'SOFT STARTER': 8, 'RELÉ': 2, 'RELE': 2, 'FONTE': 5, 'PLC': 3, 'MÓDULO': 2, 'MODULO': 2, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 3 },
+                    componentRules: [
+                        { match: 'category', value: 'DISJUNTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'DISJUNTOR MOTOR', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SECCIONADORA', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FUSÍVEL', linhaId: 'protecoes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'CONTATOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT-STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SOFT STARTER', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'INVERSOR', linhaId: 'acionamentos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELÉ', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FONTE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'PLC', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MÓDULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MODULO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE PORTA-FUSÍVEL', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                    ],
                     doorLinhas: [
                         { id: 'door_ihm', nome: 'IHM', yCentro: 200 },
                         { id: 'door_comando', nome: 'Comando', yCentro: 600 },
@@ -7125,6 +7241,24 @@ const PropostaTecnicaModule = {
                         { id: 'bornes', nome: 'Bornes / Sinal', yCentroTrilho: 1900, categorias: ['BORNE', 'BORNE PORTA-FUSÍVEL'], temTrilho: true },
                     ],
                     gapsTermicos: { 'DISJUNTOR': 8, 'DISJUNTOR MOTOR': 8, 'SECCIONADORA': 5, 'FUSÍVEL': 5, 'CONTATOR': 5, 'INVERSOR': 15, 'SOFT-STARTER': 10, 'SOFT STARTER': 10, 'RELÉ': 3, 'RELE': 3, 'FONTE': 5, 'PLC': 3, 'MÓDULO': 2, 'MODULO': 2, 'BORNE': 2, 'BORNE PORTA-FUSÍVEL': 2, 'Outros': 3 },
+                    componentRules: [
+                        { match: 'category', value: 'DISJUNTOR', linhaId: 'alimentacao', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FUSÍVEL', linhaId: 'alimentacao', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'FONTE', linhaId: 'alimentacao', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'PLC', linhaId: 'plc', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MÓDULO', linhaId: 'plc', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'MODULO', linhaId: 'plc', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'CPU', linhaId: 'plc', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'ENTRADA', linhaId: 'plc', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SAÍDA', linhaId: 'plc', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'SAIDA', linhaId: 'plc', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELÉ', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'RELE', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'CONTATOR', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'LUMINOTECNICO', linhaId: 'comandos', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                        { match: 'category', value: 'BORNE PORTA-FUSÍVEL', linhaId: 'bornes', xOffset: null, zOffset: 0, porta: false },
+                    ],
                     doorLinhas: [
                         { id: 'door_ihm', nome: 'IHM', yCentro: 300 },
                         { id: 'door_comando', nome: 'Comando', yCentro: 800 },
@@ -7142,20 +7276,117 @@ const PropostaTecnicaModule = {
         const templates = this._getLayoutTemplates();
         const tmpl = templates.find(t => t.id === templateId);
         if (!tmpl) return;
-        if (!confirm(`Aplicar template "${tmpl.nome}"?\n\nIsso substituirá as configurações de linhas e gaps do layout atual.`)) return;
+        if (!confirm(`Aplicar template "${tmpl.nome}"?\n\nIsso substituirá as configurações de linhas, gaps e regras de componentes do layout atual.`)) return;
         if (!eq.layoutConfig) eq.layoutConfig = {};
-        Object.assign(eq.layoutConfig, JSON.parse(JSON.stringify(tmpl.config)));
+        const cfgCopy = JSON.parse(JSON.stringify(tmpl.config));
+        eq.layoutConfig.linhas = cfgCopy.linhas;
+        eq.layoutConfig.gapsTermicos = cfgCopy.gapsTermicos;
+        eq.layoutConfig.doorLinhas = cfgCopy.doorLinhas;
+        eq.layoutConfig.canaletaEsq = cfgCopy.canaletaEsq;
+        eq.layoutConfig.canaletaDir = cfgCopy.canaletaDir;
+        eq.layoutConfig.larguraTrilhoDIN = cfgCopy.larguraTrilhoDIN;
+        eq.layoutConfig.espacamentoLinhas = cfgCopy.espacamentoLinhas;
+        eq.layoutConfig.colunaCabosWidth = cfgCopy.colunaCabosWidth;
+        eq.layoutConfig.componentRules = cfgCopy.componentRules || [];
         eq.layoutConfig._activeTemplateId = tmpl.id;
         if (eq.layoutConfig.cabinetAssignments) {
             for (const cab of Object.values(eq.layoutConfig.cabinetAssignments)) {
                 if (!cab.layoutConfig) cab.layoutConfig = {};
                 cab.layoutConfig.linhas = JSON.parse(JSON.stringify(tmpl.config.linhas));
                 cab.layoutConfig.gapsTermicos = JSON.parse(JSON.stringify(tmpl.config.gapsTermicos));
+                cab.layoutConfig.componentRules = JSON.parse(JSON.stringify(tmpl.config.componentRules || []));
             }
         }
+        this._applyComponentRules(eq);
         try { store.setState({ activeTechnicalProposal: { ...data } }); } catch (e) { console.warn('[Layout] store error:', e); }
         this._showLayoutConfigPanel();
         if (typeof app?.toast === 'function') app.toast(`Template "${tmpl.nome}" aplicado com sucesso!`, 'success');
+    },
+
+    _matchComponentRule(rule, material) {
+        if (!rule || !material) return false;
+        const cat = (material.categoria || '').toUpperCase();
+        const desc = material.descricao || material.desc || '';
+        const matId = material.id || material.materialId || '';
+        switch (rule.match) {
+            case 'category': return cat === (rule.value || '').toUpperCase();
+            case 'materialId': return matId === rule.value;
+            case 'pattern': try { return new RegExp(rule.value, 'i').test(desc); } catch { return false; }
+            default: return false;
+        }
+    },
+
+    _resolveComponentRule(componentRules, material) {
+        if (!componentRules || !material) return null;
+        for (const rule of componentRules) {
+            if (this._matchComponentRule(rule, material)) {
+                return { linhaId: rule.linhaId, xOffset: rule.xOffset ?? null, zOffset: rule.zOffset ?? null, porta: rule.porta || false, portaLinhaId: rule.portaLinhaId || null };
+            }
+        }
+        return null;
+    },
+
+    _applyComponentRules(eq) {
+        if (!eq?.layoutConfig?.componentRules) return;
+        const rules = eq.layoutConfig.componentRules;
+        const materiais = store.getState().materiais || [];
+        const ass = eq.layoutConfig.cabinetAssignments;
+        if (!ass) return;
+        for (const cab of Object.values(ass)) {
+            const targets = [cab, ...(cab.faces?.front ? [cab.faces.front] : []), ...(cab.faces?.rear ? [cab.faces.rear] : [])];
+            for (const target of targets) {
+                if (!target?.loads) continue;
+                for (const loadTag of Object.keys(target.loads)) {
+                    for (const [matId, entry] of Object.entries(target.loads[loadTag])) {
+                        const mat = materiais.find(m => m.id === matId);
+                        if (!mat) continue;
+                        const resolved = this._resolveComponentRule(rules, mat);
+                        if (resolved) {
+                            if (resolved.linhaId) entry.linhaId = resolved.linhaId;
+                            if (resolved.xOffset != null) entry.xOffset = resolved.xOffset;
+                            if (resolved.zOffset != null) entry.zOffset = resolved.zOffset;
+                            if (resolved.porta) entry.porta = true;
+                            if (resolved.portaLinhaId) entry.portaLinhaId = resolved.portaLinhaId;
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    _addComponentRule() {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        if (!eq.layoutConfig) eq.layoutConfig = {};
+        if (!eq.layoutConfig.componentRules) eq.layoutConfig.componentRules = [];
+        const linhas = eq.layoutConfig.linhas || this._getDefaultLayoutConfig().linhas;
+        const linhaOpts = linhas.map(l => `${l.id}:${l.nome}`).join(', ');
+        const input = prompt(
+            `Nova regra de posicionamento.\n\nTipos de match:\n- category:CATEGORIA (ex: category:INVERSOR)\n- materialId:ID (ex: materialId:mat-dj-32)\n- pattern:regex (ex: pattern:inversor.*150cv)\n\nLinhas disponíveis: ${linhaOpts}\n\nFormato: match|linhaId|xOffset|zOffset|porta\nExemplo: category:INVERSOR|acionamentos|null|0|false`
+        );
+        if (!input) return;
+        const parts = input.split('|');
+        if (parts.length < 3) { app.toast('Formato inválido. Use: match|linhaId|xOffset|zOffset|porta', 'error'); return; }
+        const [matchType, ...rest] = parts[0].split(':');
+        const matchValue = rest.join(':');
+        const linhaId = parts[1] || null;
+        const xOffset = parts[2] === 'null' || parts[2] === '' ? null : parseInt(parts[2]) || null;
+        const zOffset = parts[3] === 'null' || parts[3] === '' ? null : parseInt(parts[3]) || null;
+        const porta = parts[4] === 'true';
+        eq.layoutConfig.componentRules.push({ match: matchType, value: matchValue, linhaId, xOffset, zOffset, porta });
+        try { store.setState({ activeTechnicalProposal: { ...data } }); } catch (e) { console.warn('[Layout] store error:', e); }
+        this._showLayoutConfigPanel();
+        if (typeof app?.toast === 'function') app.toast('Regra adicionada!', 'success');
+    },
+
+    _removeComponentRule(idx) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq?.layoutConfig?.componentRules) return;
+        eq.layoutConfig.componentRules.splice(idx, 1);
+        try { store.setState({ activeTechnicalProposal: { ...data } }); } catch (e) { console.warn('[Layout] store error:', e); }
+        this._showLayoutConfigPanel();
     },
 
     _getModelosCanaleta() {
@@ -7907,6 +8138,19 @@ const PropostaTecnicaModule = {
         if (item && item._linhaId) {
             const found = linhas.find(l => l.id === item._linhaId);
             if (found) return found;
+        }
+
+        // Check componentRules from template
+        const rules = layoutConfig?.componentRules;
+        if (rules && item) {
+            const mat = store.getState().materiais?.find(m => m.id === item._matId);
+            if (mat) {
+                const resolved = this._resolveComponentRule(rules, mat);
+                if (resolved?.linhaId) {
+                    const found = linhas.find(l => l.id === resolved.linhaId);
+                    if (found) return found;
+                }
+            }
         }
 
         const matching = [];
