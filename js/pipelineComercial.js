@@ -549,7 +549,7 @@ const PipelineComercialModule = {
         const ptcFolder = item.origemId;
         if (ptcFolder) {
             const _tkUP551 = store.getState().auth?.token;
-            fetch(`http://${location.hostname}:8082/api/uprevision-ptc`, {
+            fetch(`/api/uprevision-ptc`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(_tkUP551 ? { 'Authorization': 'Bearer ' + _tkUP551 } : {}) },
                 body: JSON.stringify({ ptcFolder, revisionNum: novaRev })
@@ -566,7 +566,7 @@ const PipelineComercialModule = {
         // Escrever log no servidor (apenas para PTCs)
         if (ptcFolder && (item.origem === 'ptc' || item.origem === 'proposta_comercial')) {
             const token = store.getState().auth?.token;
-            fetch(`http://${location.hostname}:8082/api/pipeline-log-revision`, {
+            fetch(`/api/pipeline-log-revision`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
                 body: JSON.stringify({
@@ -608,7 +608,7 @@ const PipelineComercialModule = {
         const token = state.auth?.token;
         let logs = [];
         try {
-            const res = await fetch(`http://${location.hostname}:8082/api/pipeline-log-revisions?ptcFolder=${encodeURIComponent(ptcFolder)}`, {
+            const res = await fetch(`/api/pipeline-log-revisions?ptcFolder=${encodeURIComponent(ptcFolder)}`, {
                 headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             });
             const data = await res.json();
@@ -742,9 +742,10 @@ const PipelineComercialModule = {
         const ptcLabel = tipoLabelsPtc[item?.tipo] || 'PT';
         const ptcDisplay = item ? `${(window.app.formatProposalCode ? window.app.formatProposalCode(item.origemId) : item.origemId)}-${ptcLabel}` : '';
         try {
-            const res = await fetch(`http://${location.hostname}:8082/api/export-pipeline-log-xlsx`, {
+            const _tkPipeLog = store.getState().auth?.token;
+            const res = await fetch('/api/export-pipeline-log-xlsx', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(_tkPipeLog ? { 'Authorization': 'Bearer ' + _tkPipeLog } : {}) },
                 body: JSON.stringify({ logs, ptcDisplay, cliente: item?.cliente || 'cartao', tipo: item?.tipo })
             });
             if (!res.ok) { window.app.toast('Erro ao exportar XLSX.', 'error'); return; }
@@ -767,7 +768,7 @@ const PipelineComercialModule = {
         if (!item || !item.origemId) return [];
         const token = state.auth?.token;
         try {
-            const res = await fetch(`http://${location.hostname}:8082/api/pipeline-log-revisions?ptcFolder=${encodeURIComponent(item.origemId)}`, {
+            const res = await fetch(`/api/pipeline-log-revisions?ptcFolder=${encodeURIComponent(item.origemId)}`, {
                 headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
             });
             const data = await res.json();
@@ -783,7 +784,7 @@ const PipelineComercialModule = {
         const token = state.auth?.token;
         const usuario = state.auth?.user?.name || '';
         const ptcFolder = item.origemId;
-        fetch(`http://${location.hostname}:8082/api/pipeline-log-action`, {
+        fetch(`/api/pipeline-log-action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
             body: JSON.stringify({
@@ -1581,7 +1582,7 @@ const PipelineComercialModule = {
 
         for (const folder of folders) {
             try {
-                const res = await fetch(`http://${location.hostname}:8082/api/pipeline-log-revisions?ptcFolder=${encodeURIComponent(folder)}`, {
+                const res = await fetch(`/api/pipeline-log-revisions?ptcFolder=${encodeURIComponent(folder)}`, {
                     headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
                 });
                 const data = await res.json();

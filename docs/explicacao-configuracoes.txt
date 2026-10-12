@@ -1,0 +1,764 @@
+﻿╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    EXPLICAÇÃO SIMPLES — CONFIGURAÇÕES DO SISTEMA — GERAPRO            ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Configurações.   ║
+║   Ele mostra como configurar suas empresas, templates de documentos, usuários,   ║
+║   inteligência artificial, Telegram, aparência da tela de login e custos de      ║
+║   mão de obra no sistema.                                                        ║
+║   Se você precisa de ajuda sobre outros módulos, procure o help do sistema       ║
+║   (botão ❓ no canto superior) ou os outros arquivos de explicação na pasta      ║
+║   /docs.                                                                         ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE SÃO AS CONFIGURAÇÕES?                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que o GeraPro é um carro. As Configurações são o painel de instrumentos e os
+comandos que você usa para configurar o carro antes de dirigir:
+
+  • Quem é o dono do carro? (Dados da Empresa)
+  • Quantas empresas usam o sistema? (Empresas — cada uma com seus próprios dados)
+  • Qual o modelo do documento? (Modelos de Documentos — templates .docx)
+  • Quem pode dirigir? (Usuários e seus níveis de acesso)
+  • Quem são os vendedores? (cadastro de vendedores)
+  • O carro tem piloto automático? (Inteligência Artificial)
+  • Como receber notificações? (Telegram)
+  • Como enviar e-mails? (E-mail — SMTP ou SendGrid)
+  • Como personalizar o funil de vendas? (Funil CRM — estágios personalizáveis)
+  • Qual a cor e o estilo do painel? (Personalização da tela de login)
+  • Quanto custa a mão de obra do mecânico? (Custos de Mão de Obra)
+  • Como fazer backup do carro? (Segurança e Backup)
+
+Em resumo: as Configurações são a "central de controle" do sistema. Tudo que você
+configurar aqui vale para o GeraPro inteiro.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. A TELA PRINCIPAL                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em "Configurações" no menu lateral, abre uma página com várias
+seções organizadas em blocos. Você rola para baixo para ver todas:
+
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │                                                                             │
+   │  1. DADOS DA EMPRESA         ← nome, CNPJ, endereço, regime tributário     │
+   │  2. EMPRESAS (TEMPLATES)     ← cadastro de múltiplas empresas              │
+   │  3. MODELOS DE DOCUMENTOS    ← templates .docx por empresa                  │
+   │  4. USUÁRIOS                 ← gerenciar quem acessa o sistema              │
+   │  5. VENDEDORES               ← cadastro de vendedores                       │
+   │  6. INTELIGÊNCIA ARTIFICIAL  ← provedor de IA (Ollama / OpenAI)             │
+   │  7. TELEGRAM                 ← notificações no Telegram                    │
+   │  8. E-MAIL                   ← SMTP ou SendGrid para envio de e-mails      │
+   │  9. FUNIL CRM                ← estágios personalizáveis do funil           │
+   │ 10. PERSONALIZAÇÃO LOGIN     ← cores e logo da tela de login               │
+   │ 11. TABELA DE MÃO DE OBRA    ← taxas horárias por função                    │
+   │ 12. SEGURANÇA E BACKUP       ← backup, restore, resetar                     │
+  │                                                                             │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+📌 IMPORTANTE: As alterações em Dados da Empresa, Empresas, Vendedores e Mão
+   de Obra são salvas automaticamente na memória do sistema. Para IA,
+   Modelos de Documentos e Personalização do Login, você precisa clicar no
+   botão "Salvar" específico de cada seção.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. DADOS DA EMPRESA                                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esta é a seção mais importante das Configurações. Ela define quem é a sua empresa
+para o sistema.
+
+✅ Você PRECISA preencher corretamente para que as propostas, notas e
+   relatórios gerados pelo sistema tenham os dados certos.
+
+┌───────────────────────────┬─────────────────────────────────────────────────────┐
+│ CAMPO                     │ O QUE É                                            │
+├───────────────────────────┼─────────────────────────────────────────────────────┤
+│ Nome da Empresa           │ Razão social ou nome fantasia.                      │
+│                           │ Aparece em TODOS os documentos gerados.            │
+│                           │                                                     │
+│ CNPJ                      │ CNPJ da empresa (com pontuação).                    │
+│                           │                                                     │
+│ Endereço (logradouro)     │ Rua, avenida, etc.                                 │
+│                           │                                                     │
+│ Número                    │ Número do endereço.                                 │
+│                           │                                                     │
+│ CEP                       │ Código postal.                                      │
+│                           │                                                     │
+│ Cidade                    │ Cidade da sede.                                     │
+│                           │                                                     │
+│ UF                        │ Estado (SP, RJ, MG, etc.).                         │
+│                           │                                                     │
+│ E-mail                    │ E-mail de contato da empresa.                       │
+│                           │                                                     │
+│ Regime Tributário         │ ⭐ MUITO IMPORTANTE! Define como os impostos       │
+│                           │    serão calculados na Precificação.                │
+│                           │    Opções: Lucro Real / Lucro Presumido /           │
+│                           │    Simples Nacional.                                │
+│                           │                                                     │
+│ IPI Padrão (%)            │ Percentual de IPI que será usado como padrão        │
+│                           │ para novos equipamentos. Normalmente 9,75%.         │
+│                           │                                                     │
+│ Cor do Badge              │ Cor de fundo do badge da empresa no cabeçalho       │
+│                           │ do sistema (ao lado do nome).                       │
+└───────────────────────────┴─────────────────────────────────────────────────────┘
+
+💡 Dica: O Regime Tributário é CRÍTICO para a Precificação. Se sua empresa
+   for Simples Nacional, o sistema usa uma alíquota única (DAS) e os outros
+   impostos (ICMS, PIS/COFINS, IPI) são ignorados. Se for Lucro Real, todos
+   os impostos são calculados individualmente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. EMPRESAS (TEMPLATES)                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro permite cadastrar múltiplas empresas no sistema. Cada empresa tem
+seus próprios templates de documentos (.docx), dados cadastrais e usuários
+isolados — ou seja, um usuário de uma empresa não vê dados de outra.
+
+┌───────────────────────────┬─────────────────────────────────────────────────────┐
+│ CAMPO / AÇÃO              │ O QUE É                                            │
+├───────────────────────────┼─────────────────────────────────────────────────────┤
+│ Nome da Empresa           │ Razão social ou nome fantasia.                      │
+│                           │                                                     │
+│ CNPJ                      │ CNPJ da empresa (com pontuação).                    │
+│                           │                                                     │
+│ Sigla                     │ Abreviação (ex: EMP1, WEG, ABC). Aparece no         │
+│                           │ badge do cabeçalho do sistema.                      │
+│                           │                                                     │
+│ Plano                     │ Plano de assinatura ou classificação interna.       │
+│                           │                                                     │
+│ Ações (✏️)               │ Editar os dados da empresa.                         │
+│                           │                                                     │
+│ Ações (🗑️)              │ Excluir a empresa do sistema.                       │
+└───────────────────────────┴─────────────────────────────────────────────────────┘
+
+✅ Clique em "Adicionar" para incluir uma nova empresa.
+✅ A tabela mostra todas as empresas cadastradas com Nome, CNPJ, Sigla e Plano.
+✅ A empresa ativa aparece no cabeçalho com a sigla e uma cor configurável.
+✅ Cada empresa pode ter templates, usuários e dados próprios e isolados.
+
+📌 IMPORTANTE: Ao logar, cada usuário enxerga apenas os dados da empresa à
+   qual ele está vinculado. Para trocar de empresa, é necessário logar com
+   um usuário de outra empresa.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. MODELOS DE DOCUMENTOS (TEMPLATES)                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Aqui você define quais arquivos .docx o sistema vai usar como modelo (template)
+na hora de exportar as propostas. Cada empresa pode ter seus próprios templates.
+
+┌───────────────────────────┬─────────────────────────────────────────────────────┐
+│ CAMPO                     │ O QUE É                                            │
+├───────────────────────────┼─────────────────────────────────────────────────────┤
+│ Proposta Técnica          │ Template usado ao exportar uma Proposta Técnica.    │
+│                           │                                                     │
+│ Proposta Comercial        │ Template usado ao exportar uma Proposta Comercial.  │
+│                           │                                                     │
+│ Proposta Completa         │ Template usado ao exportar a Proposta Completa      │
+│                           │ (Técnica + Comercial).                              │
+└───────────────────────────┴─────────────────────────────────────────────────────┘
+
+✅ Faça upload dos arquivos .docx clicando em "Escolher arquivo" ao lado de
+   cada campo e depois em "Enviar".
+✅ Se não houver template configurado, o sistema usa um template padrão
+   (a última versão enviada para a empresa).
+✅ Os templates ficam armazenados na pasta templates/{id_da_empresa}/ no
+   servidor.
+
+📌 Dica: Prepare os modelos .docx com marcadores como {{NOME_CLIENTE}},
+   {{CIDADE}}, {{DATA}}, etc. O sistema substitui automaticamente pelos
+   valores da proposta.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. INTELIGÊNCIA ARTIFICIAL                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro usa Inteligência Artificial (IA) para ajudar na importação de
+documentos técnicos (como catálogos da WEG, Siemens, etc.). Você pode
+escolher qual "cérebro" o sistema vai usar.
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ CAMPO                 │ O QUE É                                                │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Provedor              │ Qual serviço de IA usar:                                │
+│                       │ • Ollama (gratuito, roda no seu computador)             │
+│                       │ • OpenAI (pago, usa a nuvem — precisa de chave API)    │
+│                       │                                                         │
+│ Chave da API          │ Só para OpenAI. É uma senha que você compra no          │
+│                       │ site da OpenAI para usar o ChatGPT.                     │
+│                       │                                                         │
+│ Modelo (OpenAI)       │ Qual versão do ChatGPT usar:                            │
+│                       │ GPT-4o mini (rápido e barato) / GPT-4o (equilibrado)    │
+│                       │ / GPT-4.1 (mais novo) / GPT-3.5 (antigo)               │
+│                       │                                                         │
+│ Modelo (Ollama)       │ Qual modelo baixado no seu Ollama:                      │
+│                       │ qwen2.5 (14b/7b/32b) / llama3.1 / mistral / deepseek   │
+│                       │                                                         │
+│ URL do Ollama         │ Endereço do servidor Ollama.                            │
+│                       │ Padrão: http://localhost:11434                          │
+│                       │ Só mexa se o Ollama estiver em outra máquina.           │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+✅ Botão "Testar Conexão": clique para verificar se a IA está funcionando.
+   Se der erro, confira a URL do Ollama ou a chave da OpenAI.
+
+✅ Botão "Salvar": não esqueça de salvar depois de alterar!
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. USUÁRIOS                                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Aqui você gerencia quem pode acessar o GeraPro. Clique em "Gerenciar Usuários"
+para abrir uma janela com a lista de pessoas cadastradas.
+
+NÍVEIS DE ACESSO (cada um pode fazer coisas diferentes):
+
+┌──────────────────┬──────────────────────────────────────────────────────────────┐
+│ NÍVEL            │ O QUE PODE FAZER                                           │
+├──────────────────┼──────────────────────────────────────────────────────────────┤
+│ Admin            │ TUDO. Pode criar/editar/excluir usuários, ver todos os      │
+│                  │ módulos, alterar configurações. É o "dono" do sistema.      │
+│                  │                                                              │
+│ Engenheiro       │ Pode criar Propostas Técnicas, Precificação, Importação.    │
+│                  │ Mas NÃO pode gerenciar usuários nem ver Configurações.            │
+│                  │                                                              │
+│ Vendedor         │ Pode ver Pipeline, criar Propostas Comerciais, emitir       │
+│                  │ relatórios. Mas NÃO mexe em engenharia.                      │
+│                  │                                                              │
+│ Visualizador     │ Só pode VER os dados. Não pode criar, editar nem excluir    │
+│                  │ nada. É o "visitante" do sistema.                            │
+└──────────────────┴──────────────────────────────────────────────────────────────┘
+
+📌 Dentro da janela de gerenciamento:
+   • A tabela mostra: Nome, E-mail, Nível, Status (Ativo/Inativo)
+   • Botão "Adicionar Usuário": cria um novo
+   • Ícone ✏️: editar dados do usuário
+   • Ícone 🗑️: desativar usuário (ele não é excluído, só desativado)
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. VENDEDORES                                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Aqui você cadastra os vendedores da sua empresa. Eles aparecem depois no
+Pipeline Comercial e nas Propostas.
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ CAMPO                 │ O QUE É                                                │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Nome                  │ Nome do vendedor.                                       │
+│                       │                                                         │
+│ E-mail                │ E-mail de contato.                                      │
+│                       │                                                         │
+│ Telefone              │ Telefone ou WhatsApp.                                   │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+✅ Clique em "Adicionar" para incluir um novo vendedor.
+✅ Aparece uma tabela logo abaixo com todos os vendedores cadastrados.
+✅ Você pode excluir um vendedor clicando no ícone de lixeira.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. TELEGRAM (Notificações no Bot)                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro pode enviar mensagens no Telegram sempre que um cartão do Pipeline
+Comercial é criado, editado, movido entre colunas ou excluído. Assim você fica
+sabendo em tempo real, mesmo fora do sistema.
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ CAMPO                 │ O QUE É                                                │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Token do Bot          │ Token do seu bot do Telegram, criado pelo @BotFather.   │
+│                       │ É a "senha" que autoriza o GeraPro a enviar mensagens.  │
+│                       │                                                         │
+│ Chat ID               │ Identificador único de cada usuário no Telegram.        │
+│                       │ Deve ser preenchido para cada Admin ou Engenheiro       │
+│                       │ que quiser receber notificações.                        │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+✅ Clique em "Salvar Configurações do Telegram" para guardar o token e os Chat IDs.
+✅ Use "Testar" para enviar uma mensagem de teste e confirmar que está funcionando.
+✅ Quem recebe: apenas usuários com perfil Admin ou Engenheiro que tenham Chat ID
+   preenchido. Vendedores e Visualizadores não recebem notificações.
+✅ As notificações são enviadas para criação, edição, movimentação e exclusão de
+   cartões no Pipeline Comercial.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 10. E-MAIL (Envio de E-mails)                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro pode enviar e-mails diretamente pelo CRM usando dois provedores:
+SMTP (servidor de e-mail tradicional) ou SendGrid (API na nuvem).
+
+Escolha o provedor e preencha os campos correspondentes.
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ CAMPO                 │ O QUE É                                                │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Provedor              │ SMTP (Servidor de E-mail) ou SendGrid (API)            │
+│                       │                                                         │
+│ Servidor SMTP         │ Endereço do servidor SMTP (ex: smtp.gmail.com).        │
+│ (só SMTP)             │ Só aparece se o provedor for SMTP.                     │
+│                       │                                                         │
+│ Porta (só SMTP)       │ Porta do servidor (587 para TLS, 465 para SSL).       │
+│                       │                                                         │
+│ SSL/TLS (só SMTP)     │ Marque se usar porta 465.                              │
+│                       │                                                         │
+│ Usuário (só SMTP)     │ Seu e-mail ou usuário do servidor SMTP.                │
+│                       │                                                         │
+│ Senha (só SMTP)       │ Senha do e-mail. É criptografada ao salvar.            │
+│                       │                                                         │
+│ API Key (só SendGrid) │ Chave secreta da API do SendGrid.                      │
+│                       │ É criptografada ao salvar no servidor.                  │
+│                       │                                                         │
+│ Nome do Remetente     │ Nome que aparece como remetente (ex: "GeraPro CRM").  │
+│                       │                                                         │
+│ E-mail do Remetente   │ E-mail que aparece como remetente. Obrigatório.        │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+✅ Botão "Salvar": guarda as configurações.
+✅ Botão "Testar": envia um e-mail de teste para você mesmo confirmar que
+   está funcionando.
+✅ Os campos SMTP e SendGrid se alternam conforme o provedor selecionado
+   (você só vê os campos do provedor escolhido).
+✅ A senha SMTP e a API Key do SendGrid são criptografadas antes de salvar
+   no banco de dados (ninguém consegue ler depois de salvas).
+
+💡 Dica: Se você não tem um servidor SMTP próprio, pode usar o Gmail
+   (smtp.gmail.com, porta 587) ou criar uma conta grátis no SendGrid.
+
+⚠️ Importante: O e-mail do remetente precisa ser um e-mail real que aceite
+   envio. Se usar SMTP do Gmail, você precisa ativar "Senha de App" ou
+   "Acesso a apps menos seguros".
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 11. FUNIL CRM (Estágios do Funil de Vendas)                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O CRM do GeraPro permite que você personalize completamente os estágios do
+funil de vendas. Você pode criar seus próprios estágios, renomear os existentes,
+reordenar, mudar cores e definir regras de negócio.
+
+┌───────────────────────────┬─────────────────────────────────────────────────────┐
+│ CAMPO / AÇÃO              │ O QUE É                                            │
+├───────────────────────────┼─────────────────────────────────────────────────────┤
+│ Nome do Estágio           │ O nome que aparece no Kanban e na Lista.            │
+│                           │                                                     │
+│ ID do Estágio             │ Identificador interno (não precisa mudar).         │
+│                           │                                                     │
+│ Cor                       │ Cor do cartão no Kanban.                            │
+│                           │                                                     │
+│ Ícone                     │ Ícone que aparece no cartão (opcional).             │
+│                           │                                                     │
+│ Ordem                     │ Posição no funil (definida ao arrastar).            │
+│                           │                                                     │
+│ Padrão                    │ Se marcado, leads novos vão para este estágio.      │
+│                           │ Apenas UM estágio pode ser padrão.                  │
+│                           │                                                     │
+│ Terminal                  │ Bloqueia arraste e interações. Usado para           │
+│                           │ "Virou Proposta" e "Desqualificado".                │
+│                           │                                                     │
+│ Permite Proposta          │ Exibe o botão "Solicitar Proposta" neste estágio.   │
+│                           │                                                     │
+│ Registra Qualificação     │ Preenche automaticamente a data de qualificação.    │
+│                           │                                                     │
+│ Registra Conversão        │ Preenche automaticamente a data de conversão.       │
+│                           │                                                     │
+│ É Perda                   │ Marca como perda — abre modal de motivo ao entrar.  │
+│                           │                                                     │
+│ Motivos de Perda          │ Lista de motivos que aparece ao desqualificar.      │
+│                           │ Ex: "sem orçamento", "concorrente", "outro".       │
+└───────────────────────────┴─────────────────────────────────────────────────────┘
+
+✅ Para adicionar um novo estágio, clique em "Adicionar Estágio".
+✅ Para renomear ou configurar, clique no ícone de lápis ✏️.
+✅ Para reordenar, arraste os estágios pela alça de arrasto (⠿).
+✅ Para excluir, clique na lixeira 🗑️ (só permite se não houver leads no estágio).
+✅ Clique em "Salvar Todas as Alterações" para persistir.
+✅ Clique em "Restaurar Padrões" para voltar aos 8 estágios originais.
+
+📌 Os 8 estágios padrão são: Novo, Tentando Contato, Contato Realizado,
+   Qualificado, Agendado, Visita Realizada, Virou Proposta, Desqualificado.
+   Você pode começar com eles e adaptar conforme sua necessidade.
+
+📌 Se você excluir um estágio que tem leads, o sistema impede a exclusão.
+   Primeiro mova os leads para outro estágio.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 12. PERSONALIZAÇÃO DA TELA DE LOGIN                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Aqui você personaliza a aparência da tela de login do GeraPro — aquela tela
+que aparece quando você abre o sistema pela primeira vez.
+
+┌───────────────────────────┬─────────────────────────────────────────────────────┐
+│ CAMPO                     │ O QUE É                                            │
+├───────────────────────────┼─────────────────────────────────────────────────────┤
+│ Logo                      │ Imagem da sua empresa (logo). Aparece no centro     │
+│                           │ da tela de login.                                   │
+│                           │                                                     │
+│ Nome da Empresa           │ Texto que aparece abaixo do logo.                   │
+│                           │                                                     │
+│ Subtítulo                 │ Texto pequeno abaixo do nome (ex: "Soluções em      │
+│                           │ Energia Elétrica").                                │
+│                           │                                                     │
+│ Cor do Título             │ Cor do texto do nome da empresa.                    │
+│                           │                                                     │
+│ Tipo de Fundo             │ Como será o fundo da tela:                          │
+│                           │ • Gradiente (duas cores que se misturam)            │
+│                           │ • Cor sólida (uma cor única)                        │
+│                           │ • Imagem (uma foto de fundo)                        │
+│                           │                                                     │
+│ Cor Fundo / Gradiente 1/2 │ Cores usadas no fundo.                              │
+│                           │                                                     │
+│ Imagem de Fundo           │ Foto enviada por você para usar como fundo.         │
+│                           │                                                     │
+│ Cor do Cartão             │ Cor do retângulo branco onde fica o formulário      │
+│                           │ de login.                                           │
+│                           │                                                     │
+│ Cor da Borda              │ Cor da borda do cartão de login.                    │
+│                           │                                                     │
+│ Cor do Texto              │ Cor dos textos dentro do cartão.                    │
+│                           │                                                     │
+│ Cor do Input              │ Cor de fundo dos campos de digitação.               │
+│                           │                                                     │
+│ Cor do Botão Primário     │ Cor do botão "Entrar".                              │
+└───────────────────────────┴─────────────────────────────────────────────────────┘
+
+✅ Clique em "Salvar Personalização" para aplicar.
+✅ A tela de login muda na hora!
+✅ Você também pode clicar em "Restaurar Padrão" para voltar ao visual original.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 13. TABELA DE CUSTOS DE MÃO DE OBRA                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esta seção define quanto custa CADA HORA de trabalho de cada profissional
+na sua empresa. Esses valores são usados na Proposta Técnica para calcular
+automaticamente o custo de mão de obra dos equipamentos.
+
+A tabela já vem preenchida com cerca de 24 funções típicas organizadas
+em 7 grupos. Exemplos:
+
+┌───────────────────────────────┬─────────────────────────────────────────────────┐
+│ GRUPO                        │ FUNÇÕES                                         │
+├───────────────────────────────┼─────────────────────────────────────────────────┤
+│ Montagem Mecânica            │ Montador Mecânico, Ajudante Mecânico             │
+│                               │                                                 │
+│ Montagem Elétrica            │ Eletricista, Ajudante Eletricista                │
+│                               │                                                 │
+│ Solda                         │ Soldador, Ajudante de Solda                     │
+│                               │                                                 │
+│ Caldeiraria                   │ Caldeireiro, Ajudante Caldeireiro               │
+│                               │                                                 │
+│ Pintura                       │ Pintor, Ajudante de Pintura                     │
+│                               │                                                 │
+│ Engenharia                    │ Engenheiro Sênior, Pleno, Junior, Projetista    │
+│                               │                                                 │
+│ Administrativo                │ Encarregado, Técnico Qualidade, Almoxarife,     │
+│                               │ Auxiliar Administrativo                         │
+└───────────────────────────────┴─────────────────────────────────────────────────┘
+
+✅ Para cada função, você digita o valor da HORA de trabalho (R$).
+✅ Se você não preencher, o sistema usa os valores padrão que já vêm
+   programados.
+✅ Esses valores são usados quando a Proposta Técnica calcula a mão de obra
+   de cada equipamento.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 14. SEGURANÇA E BACKUP                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esta seção tem quatro botões importantes:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ BOTÃO                │ O QUE FAZ                                              │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Baixar Backup JSON   │ 📥 Faz o download de um arquivo com TODOS os dados      │
+│                      │ do sistema (materiais, propostas, clientes, etc.).      │
+│                      │ Use isso para guardar uma cópia de segurança.           │
+│                      │                                                          │
+│ Restaurar Backup     │ 📤 Escolhe um arquivo de backup (JSON) e restaura       │
+│                      │ todos os dados. Use se você perdeu os dados ou quer     │
+│                      │ voltar a uma versão anterior.                            │
+│                      │                                                          │
+│ Resetar Fábrica      │ ⚠️ APAGA TUDO e volta o sistema ao estado original.   │
+│                      │ Cuidado! É como formatar o computador. Faça backup      │
+│                      │ antes se tiver dados importantes.                       │
+│                      │                                                          │
+│ Carregar Dados de    │ 🧪 Insere dados de exemplo no sistema (clientes,       │
+│ Exemplo              │ materiais, propostas) para você testar e aprender.      │
+│                      │ Não apaga seus dados — só adiciona os exemplos.         │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+💡 Comece fazendo um backup SEMPRE que for testar algo novo. Se algo der
+   errado, você restaura e está tudo de volta ao normal.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 15. COMO AS CONFIGURAÇÕES AFETAM O RESTO DO SISTEMA                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O que você configura nas Configurações não fica só ali — ele impacta outros
+módulos do sistema. Veja como:
+
+┌────────────────────────────┬──────────────────┬────────────────────────────────┐
+│ O QUE VOCÊ AJUSTA          │ ONDE AFETA       │ COMO AFECTA                  │
+├────────────────────────────┼──────────────────┼────────────────────────────────┤
+│ Regime Tributário          │ Precificação     │ Se for Simples Nacional,       │
+│ (Lucro Real / Simples)     │                  │ os impostos viram uma alíquota │
+│                            │                  │ única (DAS). Se for Lucro      │
+│                            │                  │ Real, cada imposto é calculado │
+│                            │                  │ separadamente.                 │
+│                            │                  │                                │
+│ Custos de Mão de Obra      │ Proposta Técnica │ As taxas horárias são usadas   │
+│ (R$/hora)                  │                  │ para calcular automaticamente  │
+│                            │                  │ o custo de montagem dos        │
+│                            │                  │ equipamentos.                    │
+│                            │                  │                                │
+│ Vendedores cadastrados     │ Pipeline         │ Os vendedores aparecem como    │
+│                            │ Comercial        │ opção nos cards do pipeline.   │
+│                            │                  │                                │
+│ Nome / CNPJ da Empresa     │ Proposta Técnica │ Aparecem no cabeçalho e        │
+│                            │ e Comercial      │ rodapé de todos os documentos  │
+│                            │                  │ gerados (.docx, relatórios).   │
+│                            │                  │                                │
+│ Empresas (Templates)       │ Todo o sistema   │ Isola dados, templates e       │
+│                            │                  │ usuários entre empresas.       │
+│                            │                  │ Cada empresa é independente.   │
+│                            │                  │                                │
+│ Modelos de Documentos      │ Exportação       │ Define qual arquivo .docx      │
+│ (.docx)                    │ (DOCX)           │ será usado como template na    │
+│                            │                  │ exportação das propostas.      │
+│                            │                  │                                │
+│ Inteligência Artificial    │ Importação       │ Define qual "cérebro" vai      │
+│ (Ollama / OpenAI)          │                  │ processar os catálogos         │
+│                            │                  │ técnicos durante a importação. │
+│                            │                  │                                │
+│ E-mail                      │ CRM              │ Permite enviar e-mails pelo    │
+│ (SMTP / SendGrid)          │                  │ CRM com rastreamento de        │
+│                            │                  │ abertura (pixel tracking).     │
+│                            │                  │                                │
+│ Funil CRM                  │ CRM              │ Personaliza os estágios do     │
+│ (estágios personalizáveis) │                  │ Kanban, cores, ícones e        │
+│                            │                  │ regras de negócio do funil.    │
+│                            │                  │                                │
+│ Personalização do Login    │ Tela de Login    │ Altera as cores, logo e fundo │
+│                            │                  │ da tela de entrada do sistema. │
+│                            │                  │                                │
+│ Telegram (Token + Chat ID) │ Pipeline         │ Notifica Admins e Engenheiros  │
+│                            │ Comercial        │ sobre criação, edição,         │
+│                            │                  │ movimentação e exclusão de     │
+│                            │                  │ cartões no Pipeline.          │
+└────────────────────────────┴──────────────────┴────────────────────────────────┘
+
+📌 Por isso é tão importante configurar as Configurações corretamente desde o
+   início — um erro aqui pode causar problemas em cadeia no sistema.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 16. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Admin                 │ Nível de acesso mais alto. O usuário admin pode fazer   │
+│                       │ tudo no sistema.                                        │
+│                       │                                                         │
+│ Regime Tributário     │ Forma como a empresa é tributada pelo governo.          │
+│                       │ Lucro Real: impostos calculados individualmente.        │
+│                       │ Simples Nacional: alíquota única (DAS).                 │
+│                       │ Lucro Presumido: meio-termo entre os dois.              │
+│                       │                                                         │
+│ DAS                   │ Documento de Arrecadação do Simples Nacional —          │
+│                       │ guia única que substitui todos os impostos.              │
+│                       │                                                         │
+│ IPI                   │ Imposto sobre Produtos Industrializados. Percentual      │
+│                       │ padrão configurado nas Configurações (normalmente 9,75%).     │
+│                       │                                                         │
+│ Ollama                │ Programa gratuito que roda IA no seu próprio            │
+│                       │ computador, sem precisar de internet.                   │
+│                       │                                                         │
+│ OpenAI                │ Empresa que criou o ChatGPT. Serviço pago na nuvem.    │
+│                       │                                                         │
+│ Chave API (API Key)   │ Senha secreta que permite o sistema se conectar a       │
+│                       │ um serviço externo (como a OpenAI).                     │
+│                       │                                                         │
+│ Provider / Provedor   │ O serviço de IA que o sistema usa: Ollama ou OpenAI.   │
+│                       │                                                         │
+│ Visualizador          │ Nível de acesso mais baixo. O usuário só pode          │
+│                       │ consultar dados, sem editar nada.                       │
+│                       │                                                         │
+│ Backup                │ Cópia de segurança dos dados.                           │
+│                       │                                                         │
+│ Resetar Fábrica       │ Apagar todos os dados e voltar o sistema ao estado      │
+│                       │ original de fábrica.                                    │
+│                       │                                                         │
+│ Labor Rate            │ Taxa horária de mão de obra (R$/hora).                  │
+│                       │                                                         │
+│ Vendor Defaults       │ Relação entre fabricantes e vendedores padrão que é      │
+│                       │ aplicada automaticamente ao criar uma nova proposta.    │
+│                       │ Configurada internamente pela Proposta Técnica.         │
+│                       │                                                         │
+│ Login Theme           │ Conjunto de cores, imagens e estilos da tela de login.  │
+│                       │                                                         │
+│ Template              │ Arquivo modelo (.docx) usado como base na exportação      │
+│                       │ de propostas. Cada empresa pode ter seus próprios       │
+│                       │ templates.                                               │
+│                       │                                                         │
+│ Sigla                 │ Abreviação curta do nome da empresa (ex: EMP1, ABC).    │
+│                       │ Aparece no badge do cabeçalho do sistema.                │
+│                       │                                                         │
+│ Gradiente             │ Efeito visual que mistura duas cores de forma suave.    │
+│                       │                                                         │
+│ Telegram Bot          │ Robô que envia notificações do GeraPro no Telegram.     │
+│                       │ Criado pelo @BotFather.                                 │
+│                       │                                                         │
+│ Chat ID              │ Identificador único da conversa com o Bot no Telegram.      │
+│                       │ Cada usuário tem um Chat ID diferente.                     │
+│                       │                                                             │
+│ SMTP                  │ Protocolo usado para enviar e-mails. Você precisa de um    │
+│                       │ servidor SMTP (ex: smtp.gmail.com) e uma conta de e-mail.  │
+│                       │                                                             │
+│ SendGrid              │ Serviço de entrega de e-mails por API (nuvem).             │
+│                       │ Mais confiável que SMTP para grandes volumes.              │
+│                       │                                                             │
+│ API Key (E-mail)      │ Senha secreta do SendGrid que autoriza o envio.            │
+│                       │ É criptografada ao salvar no sistema (ninguém vê).         │
+│                       │                                                             │
+│ Estágio do Funil      │ Cada coluna do Kanban do CRM. Representa uma etapa        │
+│                       │ do processo de vendas. Pode ser personalizado.             │
+│                       │                                                             │
+│ Terminal (Estágio)    │ Estágio que bloqueia arraste e novas interações.          │
+│                       │ Ex: "Virou Proposta" e "Desqualificado".                   │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 15. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "Mudei o Regime Tributário mas a Precificação não mudou"            │
+│  SOLUÇÃO:  Feche a Precificação e abra novamente. O regime é lido apenas        │
+│            quando o módulo é aberto.                                             │
+│                                                                                 │
+│  PROBLEMA: "A IA não está funcionando na importação"                           │
+│  SOLUÇÃO:  Vá em Configurações > IA e clique em "Testar Conexão". Se falhar:          │
+│            • Para Ollama: confirme que o programa Ollama está rodando no PC     │
+│            • Para OpenAI: verifique se a chave da API está correta e com saldo  │
+│                                                                                 │
+│  PROBLEMA: "O custo de mão de obra está zerado na Proposta Técnica"            │
+│  SOLUÇÃO:  Vá em Configurações > Tabela de Custos e preencha os valores das          │
+│            funções que você usa. Ou use os valores padrão que já vêm no sistema.│
+│                                                                                 │
+│  PROBLEMA: "O nome da empresa aparece errado nos documentos"                   │
+│  SOLUÇÃO:  Corrija em Configurações > Dados da Empresa e salve. Depois recarregue     │
+│            a página para garantir que os documentos usem o novo nome.           │
+│                                                                                 │
+│  PROBLEMA: "Um funcionário saiu da empresa, como bloquear o acesso?"           │
+│  SOLUÇÃO:  Vá em Configurações > Usuários, clique em "Gerenciar Usuários",            │
+│            encontre o usuário e clique em 🗑️ (desativar). A pessoa para de     │
+│            ter acesso imediatamente.                                             │
+│                                                                                 │
+│  PROBLEMA: "Perdi os dados do sistema!"                                        │
+│  SOLUÇÃO:  Se você fez backup pelo botão "Baixar Backup JSON", vá em            │
+│            Configurações > Segurança > "Restaurar Backup" e selecione o arquivo.      │
+│            Se não fez backup, infelizmente não há como recuperar.               │
+│                                                                                 │
+│  PROBLEMA: "A tela de login não mudou depois de salvar"                        │
+│  SOLUÇÃO:  Saia do sistema (clique no nome do usuário > Sair) e entre          │
+│            novamente. A tela de login atualizada vai aparecer.                   │
+│                                                                                 │
+│  PROBLEMA: "Não consigo acessar as Configurações"                                    │
+│  SOLUÇÃO:  Confirme que seu nível de acesso é "Admin". Apenas administradores  │
+│            podem ver e editar configurações.                                     │
+│                                                                                 │
+│  PROBLEMA: "Cliquei em Testar no Telegram mas não recebi a mensagem"           │
+│  SOLUÇÃO:  Verifique: (1) o Token do Bot está correto, (2) o Chat ID do        │
+│            usuário foi preenchido, (3) o usuário já iniciou conversa com o     │
+│            bot no Telegram (envie /start para o bot).                          │
+│                                                                                 │
+│  PROBLEMA: "O template .docx não aparece na lista de seleção"                  │
+│  SOLUÇÃO:  Vá em Configurações > Modelos de Documentos e faça upload do arquivo      │
+│            .docx. Certifique-se de estar logado na empresa correta, pois       │
+│            cada empresa tem seus próprios templates.                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   As Configurações são a BASE de todo o sistema. Uma empresa bem configurada          ║
+║   desde o início evita retrabalho, erros em documentos e problemas fiscais.     ║
+║                                                                                  ║
+║   ⭐ As configurações MAIS IMPORTANTES são:                                      ║
+║      1. Regime Tributário (impacta TODA a Precificação)                         ║
+║      2. Custos de Mão de Obra (impacta o custo real dos equipamentos)           ║
+║      3. Nome e CNPJ da Empresa (aparece em todos os documentos)                 ║
+║      4. Empresas (cada empresa com dados e templates próprios)                  ║
+║      5. Telegram (notificações em tempo real no celular)                        ║
+║                                                                                  ║
+║   🔒 Apenas usuários ADMIN podem acessar esta tela. Se você não é admin,        ║
+║      peça para um administrador fazer as alterações para você.                   ║
+║                                                                                  ║
+║   💾 Faça backup regularmente! Você nunca sabe quando vai precisar.              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

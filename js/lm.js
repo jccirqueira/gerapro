@@ -219,9 +219,10 @@ const LMModule = {
 
         try {
             const ptcNumber = store.getState().activePtc?.folder || 'LM';
+            const _tkLM = store.getState().auth?.token;
             const response = await fetch('/api/export-lm', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(_tkLM ? { 'Authorization': 'Bearer ' + _tkLM } : {}) },
                 body: JSON.stringify({ 
                     items: this.currentGroupedData,
                     ptcNumber: ptcNumber

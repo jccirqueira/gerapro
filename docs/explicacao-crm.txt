@@ -1,0 +1,631 @@
+?╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    EXPLICAÇÃO SIMPLES — CRM NO GERAPRO                                           ║
+║                                                                                  ║
+║        (para quem n├úo é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ╩²  IMPORTANTE: Este documento explica o módulo de CRM (Gest├úo de Leads).    ║
+║   Ele N├O explica como criar Propostas Técnicas ou Comerciais.                   ║
+║   Se você precisa disso, procure o help do sistema (bot├úo ❓ no canto superior). ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É O CRM?                                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você trabalha com vendas. Você conhece uma pessoa numa feira, troca
+cartão, manda um e-mail, depois outro, agenda uma visita, e um dia ela vira cliente.
+
+Agora imagine que você tem 50 contatos assim ao mesmo tempo. Como lembrar de cada
+um? Qual o próximo passo? Quem est├í atrasado? Quem est├í quente?
+
+O CRM (Customer Relationship Management) do GeraPro resolve isso. Ele organiza
+todos os seus contatos comerciais (chamados de LEADS) em um funil de vendas,
+do primeiro contato até virar proposta.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde o CRM se encaixa no fluxo de trabalho?                                   │
+│                                                                                 │
+│  1. Você cadastra um LEAD (cliente em potencial) no CRM                        │
+│  2. Você acompanha o lead pelo funil: novo → tentando contato → contato        │
+│     realizado → qualificado → agendado visita → visita realizada               │
+│  3. Quando o lead est├í pronto, você clica em "Solicitar Proposta"             │
+│  4. O lead vira uma PROPOSTA na Gest├úo de Propostas (status "virou_proposta") │
+│  5. A Gest├úo de Propostas assume daqui pra frente                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. OS STATUS DO FUNIL (de onde vem e para onde vai)                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada lead passa por estes est├ígios. Você move ele arrastando no Kanban ou
+selecionando o status na lista.
+
+┌─────────────────────┬──────────────────────────────────────────────────────────┐
+│ STATUS              │ O QUE SIGNIFICA                                          │
+├─────────────────────┼──────────────────────────────────────────────────────────┤
+│ Novo                │ Acabou de entrar. Primeiro contato foi feito, mas sem    │
+│                     │ resposta ainda.                                          │
+│                     │                                                          │
+│ Tentando Contato    │ Você j├í tentou ligar/e-mail mas ainda n├úo conseguiu     │
+│                     │ falar com a pessoa certa.                                │
+│                     │                                                          │
+│ Contato Realizado   │ Conseguiu falar! A pessoa demonstrou interesse.          │
+│                     │                                                          │
+│ Qualificado         │ Passou por uma triagem: tem necessidade, orçamento e     │
+│                     │ urgência. ├ë um lead "de verdade".                        │
+│                     │                                                          │
+│ Agendado Visita     │ Vocês marcaram uma reuni├úo ou visita técnica.           │
+│                     │                                                          │
+│ Visita Realizada    │ A visita aconteceu. O cliente viu o que você oferece.    │
+│                     │                                                          │
+│ Virou Proposta      │ ❗ O lead foi convertido em proposta.                     │
+│                     │ A Gest├úo de Propostas assume daqui.                     │
+│                     │                                                          │
+│ Desqualificado      │ O lead n├úo é vi├ível (n├úo tem orçamento, n├úo tem       │
+│                     │ necessidade, etc.). Motivo é registrado.                 │
+└─────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 Para "Virou Proposta" e "Desqualificado", é obrigatório preencher o motivo.
+
+📌 Os estágios do funil são totalmente personalizáveis em Configurações > Funil CRM.
+   Você pode adicionar, renomear, reordenar, mudar cores e definir regras de negócio
+   (como quais estágios permitem solicitar proposta ou são terminais).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. VISÃO KANBAN (O Quadro de Tarefas)                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba "Kanban" mostra um quadro com colunas para cada status. Cada lead é um
+cart├úo que você arrasta de uma coluna para outra.
+
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   NOVO      │  │TENTANDO CONT│  │CONTATO REAL │  │QUALIFICADO  │
+│             │  │             │  │             │  │             │
+│ [Lead A]    │→│ [Lead A]    │→│ [Lead A]    │→│ [Lead A]    │
+│ [Lead B]    │  │             │  │             │  │             │
+└─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘
+
+Como usar:
+  • Arraste um cart├úo para mudar o status
+  • Clique no cart├úo para abrir o lead (vis├úo 360░)
+  • Filtre por vendedor no topo
+  • O score aparece no canto inferior de cada cart├úo
+
+├ë a forma mais visual de gerenciar seu funil de vendas.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. VISÃO LISTA (A Tabela)                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba "Lista" mostra todos os leads em uma tabela, igual a uma planilha. Cada
+linha é um lead, cada coluna é uma informaç├úo.
+
+Colunas disponíveis:
+  • Nome, Empresa, Status, Vendedor, Telefone, E-mail
+  • Score, Prioridade, Valor Estimado, Origem
+  • ├Ültimo Contato, Próximo Follow-up, Data de Criaç├úo
+
+Você pode:
+  • Ordenar clicando no cabeçalho das colunas
+  • Filtrar por texto (busca geral)
+  • Filtrar por data (campo + data inicial + data final)
+  • Exportar para CSV ou XLSX com os bot├úos acima da tabela
+  • Clicar em um lead para abrir a vis├úo 360░
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. VISÃO 360░ DO LEAD (A Janela Completa)                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Ao clicar em um lead (no Kanban ou na Lista), abre uma janela com 7 abas:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ABA 1 — DADOS                                                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Nome, empresa, cargo, segmento, e-mail, telefone, celular, whatsapp,           │
+│ cidade, estado, CNPJ.                                                           │
+│                                                                                 │
+│ Campos de venda: vendedor respons├ível, interesse, valor estimado,              │
+│ orçamento informado, prazo de interesse, origem, mídia específica.              │
+│                                                                                 │
+│ Campos de controle: status, score, prioridade, tags, observaç├Áes.              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ABA 2 — INTERAÇ├þES                                                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Histórico de tudo que você fez com esse lead:                                   │
+│   • E-mails enviados                                                           │
+│   • Ligaç├Áes telefônicas                                                       │
+│   • Reuni├Áes                                                                   │
+│   • Visitas técnicas                                                            │
+│                                                                                 │
+│ Bot├úo "+ Nova Interaç├úo" para registrar: tipo, descriç├úo, data/hora,         │
+│ duraç├úo, contato, resultado, próximo passo, próxima data.                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ABA 3 — TAREFAS                                                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Compromissos pendentes e concluídos para esse lead.                             │
+│                                                                                 │
+│ Bot├úo "+ Nova Tarefa": título, tipo (follow-up, ligaç├úo, reuni├úo, proposta,   │
+│ visita), prioridade, respons├ivel, data de vencimento, descriç├úo.              │
+│                                                                                 │
+│ Você pode marcar como concluída ✔ ou excluir ✗.                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ABA 4 — PROPOSTAS                                                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Lista as propostas geradas a partir deste lead na Gest├úo de Propostas.         │
+│ Se o lead ainda n├úo virou proposta, essa aba fica vazia.                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ABA 5 — SCORE                                                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Mostra a pontuaç├úo do lead (0 a 100) com detalhamento:                         │
+│   • Score Autom├ítica (calculado pelo sistema baseado em:                       │
+│     - Tempo desde o ├║ltimo contato                                              │
+│     - N├║mero de interaç├Áes                                                     │
+│     - Valor estimado                                                            │
+│     - Origem do lead)                                                           │
+│   • Score Manual (você pode ajustar)                                            │
+│   • Score Final (média entre os dois)                                           │
+│                                                                                 │
+│ ├ë possível ajustar manualmente o score quando necessário.                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ABA 6 — AÇ├þES                                                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Aç├Áes r├ípidas disponíveis para este lead:                                     │
+│   • Solicitar Proposta → Cria uma proposta na Gest├úo de Propostas             │
+│   • Desqualificar Lead → Move para "desqualificado" com motivo                 │
+│   • Excluir Lead → Remove permanentemente                                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ABA 7 — E-MAIL                                                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Envio de e-mails diretamente pelo CRM, sem precisar abrir o Outlook/Gmail.      │
+│                                                                                 │
+│ • Digite para quem enviar (um ou mais destinat├írios separados por vírgula)     │
+│ • Adicione Cc se necessário                                                    │
+│ • Escreva o assunto e o corpo do e-mail                                        │
+│ • Selecione um template salvo (ou escreva livremente)                          │
+│ • Anexe arquivos se precisar                                                   │
+│ • Use placeholders como {{nome}}, {{empresa}}, {{cargo}} que s├úo               │
+│   automaticamente substituídos pelos dados do lead                              │
+│ • Clique em "Enviar"                                                            │
+│                                                                                 │
+│ Abaixo do formul├írio de envio, fica o Histórico de E-mails:                    │
+│   • Mostra todos os e-mails j├í enviados para este lead                         │
+│   • Para cada e-mail: assunto, destinat├írio, data/hora, status (enviado/falha)│
+│   • Rastreamento de abertura: se o lead j├í abriu o e-mail, aparece             │
+│     "Aberto em 25/06/2026 14:30" com um ícone de olho verde                     │
+│   • Se o lead ainda n├úo abriu, aparece "N├úo aberto" em cinza                  │
+│   • E-mails com falha mostram o erro em vermelho                                │
+│   • Clique em "Ver prévia" para ver os primeiros caracteres do corpo           │
+│                                                                                 │
+│ ⚠️ O rastreamento de abertura funciona apenas se o destinat├írio permitir       │
+│    imagens no cliente de e-mail. Em servidores locais (localhost), o tracking   │
+│    n├úo funciona para e-mails enviados para fora da sua máquina.                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. SCORE DO LEAD (Pontuaç├úo Autom├ítica + Manual)                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada lead recebe uma nota de 0 a 100 chamada SCORE. Ela indica o quanto aquele
+lead est├í "quente" (próximo de fechar).
+
+O score é calculado assim:
+
+┌─────────────────────┬──────────────────────────────────────────────────────────┐
+│ FATOR               │ PESO                                                     │
+├─────────────────────┼──────────────────────────────────────────────────────────┤
+│ Interaç├Áes          │ Até 30 pontos: mais interaç├Áes = maior score            │
+│ rec├¬ncias           │ Cada interaç├úo nos ├║ltimos 30 dias soma pontos          │
+│                     │                                                          │
+│ Tempo sem           │ Até 25 pontos: quanto mais recente o contato,            │
+│ contato             │ maior a pontuaç├úo                                         │
+│                     │                                                          │
+│ Valor estimado      │ Até 25 pontos: leads com maior valor potencial           │
+│                     │ recebem mais pontos                                       │
+│                     │                                                          │
+│ Origem              │ Até 20 pontos: algumas origens valem mais                │
+│                     │ (ex: indicaç├úo vale mais que site)                       │
+│                     │                                                          │
+│ Ajuste manual       │ Você pode aumentar ou diminuir o score manualmente       │
+│                     │ na aba Score da vis├úo 360░. O score final é a média      │
+│                     │ entre o score autom├ítico e o manual.                     │
+└─────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 No Kanban, o score aparece no canto inferior de cada cart├úo.
+   Leads com score > 70 aparecem com destaque verde (quente).
+   Leads com score < 30 aparecem em cinza (frio).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. COMO ENVIAR UM LEAD PARA A GEST├O DE PROPOSTAS (HANOFF)                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando o VENDEDOR avalia que o lead est├í pronto para receber uma proposta,
+ele usa a funç├úo "Solicitar Proposta" na aba Aç├Áes da vis├úo 360░.
+
+O que acontece internamente:
+
+1. O status do lead muda para "virou_proposta"
+2. Um item é criado automaticamente na Gest├úo de Propostas
+3. O ENGENHEIRO (ou respons├ível por propostas) v├í encontrar esse lead
+   l├í na Gest├úo de Propostas, com status "prospect"
+4. O vendedor N├O mexe na Gest├úo de Propostas (ele só opera no CRM)
+5. O engenheiro N├O mexe no CRM (ele só opera na Gest├úo de Propostas)
+
+├ë uma divis├úo clara:
+  🧑‍💼 VENDEDOR   → CRM (até "virou_proposta")
+  👷 ENGENHEIRO → Gest├úo de Propostas (de "prospect" em diante)
+
+📌 O CRM nunca mexe nos status "proposta_enviada", "ganho" ou "perdido" —
+   esses s├úo de responsabilidade exclusiva da Gest├úo de Propostas.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. RELATÓRIOS                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba "Relatórios" mostra um resumo gr├ífico do desempenho comercial:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CARD 1 — LEADS POR STATUS                                                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  Barras horizontais mostrando quantos leads est├úo em cada est├ígio do funil.   │
+│  Ex: Novo (12)  ████████████                                                    │
+│      Qualificado (5)  █████                                                     │
+│      Virou Proposta (3)  ███                                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CARD 2 — LEADS POR VENDEDOR                                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  Tabela com cada vendedor e:                                                    │
+│    • Total de leads                                                             │
+│    • Leads qualificados                                                         │
+│    • Leads que viraram proposta                                                 │
+│    • Taxa de convers├úo                                                         │
+│    • ├Ültima atividade                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CARD 3 — FUNIL DE VENDAS                                                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│  Gr├ífico de barras (funil invertido) mostrando a queda em cada est├ígio.       │
+│  ├ë normal ter muitos leads no topo e poucos no fundo — o funil afunila.        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 No canto superior direito do Relatório, tem um bot├úo de IMPRIMIR para
+   gerar uma vers├úo para papel.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. EXPORTANDO DADOS (CSV e XLSX)                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Na aba "Lista", acima da tabela, existem dois bot├Áes:
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ BOT├O                 │ O QUE FAZ                                               │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ 📄 Exportar CSV       │ Baixa um arquivo .csv com todos os leads filtrados.    │
+│                       │ Compatível com Excel, Google Sheets, LibreOffice.      │
+│                       │                                                         │
+│ 📊 Exportar XLSX      │ Baixa um arquivo .xlsx com todos os leads filtrados.   │
+│                       │ Formato nativo do Excel (abre direto).                 │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+Os dois exportam APENAS os leads que est├úo aparecendo na lista no momento
+(ou seja, respeitam os filtros aplicados).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. TAREFAS (A Aba Separada)                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A quarta aba do CRM é "Tarefas". Ela mostra TODAS as tarefas de TODOS os leads
+em um s├│ lugar.
+
+├ë dividida em duas colunas:
+  ┌─────────────────┐  ┌──────────────────┐
+  │  PENDENTES       │  │  CONCLUÍDAS      │
+  │                  │  │                  │
+  │ [ ] Ligar p/     │  │ [✔] Enviar      │
+  │     Jo├úo (hoje) │  │     orçamento    │
+  │ [ ] Agendar      │  │ [✔] Reuni├úo     │
+  │     visita       │  │     com Carlos   │
+  └─────────────────┘  └──────────────────┘
+
+Cada cart├úo mostra:
+  • Título
+  • Lead relacionado (com link para abrir)
+  • Data de vencimento (em vermelho se atrasada)
+  • Prioridade
+  • Tipo (ligaç├úo, reuni├úo, follow-up, etc.)
+  • Bot├úo "Concluir" e "Excluir"
+
+📌 As tarefas também aparecem na aba "Tarefas" dentro da vis├úo 360░ de cada lead.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. PASSO A PASSO NA TELA                                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Vamos simular o uso completo:
+
+ETAPA 1 — CRIAR UM LEAD
+  • V├í at├é o CRM no menu lateral.
+  • Clique em "Novo Lead" no cabeçalho azul.
+  • Preencha: nome (obrigatório), empresa, telefone, e-mail, vendedor, etc.
+  • Clique em "Salvar". O lead aparece no Kanban com status "Novo".
+
+ETAPA 2 — REGISTRAR UMA INTERAÇ├O
+  • Clique no lead para abrir a vis├úo 360░.
+  • V├í na aba "Interaç├Áes".
+  • Clique em "+ Nova Interaç├úo".
+  • Selecione o tipo (ligaç├úo, e-mail, reuni├úo, visita) e descreva.
+  • Informe o resultado e o próximo passo.
+  • Salve.
+
+ETAPA 3 — AVANÇAR NO FUNIL
+  • No Kanban, arraste o lead para "Tentando Contato" ou "Contato Realizado".
+  • Ou use a aba "Dados" da vis├úo 360░ para mudar o status manualmente.
+
+ETAPA 4 — CRIAR UMA TAREFA
+  • Na vis├úo 360░, aba "Tarefas", clique em "+ Nova Tarefa".
+  • Defina título, tipo, prioridade e data de vencimento.
+  • Quando realizada, clique em "Concluir".
+
+ETAPA 5 — ANALISAR SCORE
+  • Na vis├úo 360░, aba "Score", veja a pontuaç├úo autom├ítica.
+  • Se necessário, ajuste manualmente.
+  • O score final é a média entre os dois.
+
+ETAPA 6 — GERAR PROPOSTA
+  • Quando o lead estiver pronto (qualificado, visita realizada), v├í na aba "Aç├Áes".
+  • Clique em "Solicitar Proposta".
+  • Confirme. O lead muda para "Virou Proposta".
+  • A Gest├úo de Propostas assume daqui para frente.
+
+ETAPA 7 — ENVIAR E-MAIL
+  • Na vis├úo 360░, aba "E-mail", digite o destinat├írio, assunto e corpo.
+  • Voc├¬ pode usar um template ou escrever manualmente.
+  • Placeholders como {{nome}} s├úo substituídos automaticamente.
+  • Clique em "Enviar". O e-mail é registrado no Histórico automaticamente.
+  • Após enviar, veja no hist├│rico se o lead j├í abriu o e-mail (ícone de olho).
+
+ETAPA 8 — VER RELATÓRIOS
+  • Na aba "Relatórios", veja o desempenho geral.
+  • Use o bot├úo "Imprimir" se precisar de uma vers├úo f├ísica.
+
+ETAPA 9 — EXPORTAR LISTA
+  • Na aba "Lista", aplique os filtros desejados.
+  • Clique em "Exportar CSV" ou "Exportar XLSX".
+  • O arquivo é baixado automaticamente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  Registre TODAS as interaç├Áes com o lead. Isso cria um histórico valioso
+    e alimenta o score autom├ítico.
+
+✅  O score manual é uma ferramenta poderosa. Se você sabe que um lead est├í
+    mais quente do que o sistema calculou, aumente o score manualmente.
+
+✅  Use a aba "Tarefas" (separada) para ver o que precisa ser feito HOJE em
+    todos os leads. Foco no que est├í atrasado (datas em vermelho).
+
+✅  O Kanban é ótimo para vis├úo geral. A Lista é melhor para análise
+    detalhada (planilha). Alterne entre elas conforme necessidade.
+
+✅  A data de ├║ltimo contato e o próximo follow-up são campos importantes.
+    Mantenha-os atualizados para n├úo perder leads.
+
+✅  Ao exportar, lembre-se que os filtros s├úo aplicados. Se quiser TODOS
+    os leads, limpe os filtros antes de exportar.
+
+⚠️  Ao clicar em "Solicitar Proposta", o lead sai do CRM. Voc├¬ n├úo consegue
+    mais arrast├í-lo no Kanban. O status passa a ser gerenciado pela Gest├úo
+    de Propostas.
+
+⚠️  Leads desqualificados n├úo aparecem no Kanban (s├úo arquivados). Voc├¬
+    pode v├¬-los na Lista com filtro.
+
+✅  Use templates de e-mail para padronizar a comunicaç├úo com os leads.
+    Crie templates em Configuraç├Áes > Gerenciar Templates de E-mail.
+
+✅  O rastreamento de abertura mostra se o lead realmente leu seu e-mail.
+    Leads que abriram e-mails recentes t├¬m prioridade no atendimento.
+
+✅  Verifique o Hist├│rico de E-mails (aba E-mail) antes de enviar um novo
+    e-mail para evitar duplicidade.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. GLOSS├üRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ CRM                   │ Customer Relationship Management — gest├úo do           │
+│                       │ relacionamento com o cliente.                           │
+│                       │                                                         │
+│ Lead                  │ Um contato comercial que AINDA N├O é cliente.           │
+│                       │ Pode ser uma pessoa ou empresa.                         │
+│                       │                                                         │
+│ Funil de Vendas       │ O caminho que o lead percorre até virar cliente.        │
+│                       │ Vai afunilando: muitos entram, poucos saem cliente.     │
+│                       │                                                         │
+│ Kanban                │ Quadro visual com colunas de status. Você arrasta       │
+│                       │ os cart├Áes entre as colunas.                            │
+│                       │                                                         │
+│ Score                 │ Pontuaç├úo de 0 a 100 que indica o "calor" do lead.     │
+│                       │ Quanto maior, mais perto de fechar.                     │
+│                       │                                                         │
+│ Interaç├úo             │ Qualquer contato com o lead: ligaç├úo, e-mail,          │
+│                       │ reuni├úo, visita, WhatsApp.                              │
+│                       │                                                         │
+│ Follow-up            │ Acompanhamento — uma aç├úo programada para manter        │
+│                       │ contato com o lead.                                     │
+│                       │                                                         │
+│ Handoff              │ Passagem do lead do CRM para a Gest├úo de Propostas.    │
+│                       │ Ocorre quando o vendedor clica "Solicitar Proposta".   │
+│                       │                                                         │
+│ Qualificaç├úo          │ Processo de avaliar se o lead tem: necessidade,        │
+│                       │ orçamento, autoridade e urgência.                       │
+│                       │                                                         │
+│ Origem               │ De onde o lead veio: site, indicaç├úo, feira,            │
+│                       │ ligaç├úo espont├ónea, etc.                               │
+│                       │                                                         │
+│ Tag                   │ Etiqueta para categorizar leads. Ex: "grande conta",   │
+│                       │ "urgente", "regi├úo norte".                              │
+│                       │                                                          │
+│ Prioridade            │ Alta, Média ou Baixa. Ajuda a decidir o que            │
+│                       │ atender primeiro.                                       │
+│                       │                                                          │
+│ Tracking de E-mail    │ Sistema que detecta quando o lead abre o e-mail         │
+│                       │ recebido. Usa uma imagem invisível (pixel) que é        │
+│                       │ carregada ao abrir a mensagem.                          │
+│                       │                                                          │
+│ Log de E-mails        │ Hist├│rico completo de todos os e-mails enviados        │
+│                       │ para o lead, incluindo data, assunto, status e          │
+│                       │ se foi aberto ou n├úo.                                   │
+│                       │                                                          │
+│ Pixel Tracking        │ Imagem 1x1 transparente inserida no e-mail.             │
+│                       │ Quando o destinat├írio abre, o servidor é notificado.   │
+│                       │                                                          │
+│ Placeholder           │ Palavra entre chaves duplas como {{nome}} que é         │
+│                       │ substituída automaticamente pelos dados do lead         │
+│                       │ ao enviar o e-mail.                                     │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  14. PROBLEMAS COMUNS E SOLUÇ├þES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "Criei um lead mas ele n├úo aparece no Kanban"                       │
+│  SOLU├çO:  O Kanban mostra apenas leads com status "novo" at├® "visita          │
+│            realizada". Leads "virou_proposta" e "desqualificado" s├úo ocultos.  │
+│            Use a aba "Lista" para v├¬-los.                                      │
+│                                                                                 │
+│  PROBLEMA: "N├úo consigo arrastar o lead no Kanban"                             │
+│  SOLU├çO:  Verifique se o lead n├úo est├í com status "virou_proposta" ou        │
+│            "desqualificado". Esses status n├úo permitem arraste.                │
+│                                                                                 │
+│  PROBLEMA: "O score autom├ítico n├úo est├í mudando"                             │
+│  SOLU├çO:  O score ├® recalculado a cada interaç├úo registrada. Registre        │
+│            mais interaç├Áes para ver o score subir.                             │
+│                                                                                 │
+│  PROBLEMA: "N├úo encontro o bot├úo Solicitar Proposta"                          │
+│  SOLU├çO:  Abra o lead (vis├úo 360░), v├í na aba "Aç├Áes". O bot├úo est├í l├í.  │
+│                                                                                 │
+│  PROBLEMA: "Meu lead virou proposta mas n├úo aparece na Gest├úo de              │
+│            Propostas"                                                           │
+│  SOLU├çO:  Pode levar alguns segundos. Recarregue a p├ágina. Se persistir,      │
+│            verifique se n├úo houve erro no console (F12).                       │
+│                                                                                 │
+│  PROBLEMA: "Exportei CSV mas os acentos ficaram errados"                       │
+│  SOLU├çO:  Ao abrir no Excel, escolha "Importar" e selecione UTF-8.            │
+│            Ou abra primeiro no Bloco de Notas e salve como UTF-8.               │
+│                                                                                 │
+│  PROBLEMA: "Esqueci de registrar uma interaç├úo"                                │
+│  SOLU├çO:  Sem problemas. Abra o lead, aba "Interaç├Áes", clique em             │
+│            "+ Nova Interaç├úo" e registre com a data correta (pode ser          │
+│            retroativa).                                                         │
+│                                                                                 │
+│  PROBLEMA: "N├úo consigo excluir um lead"                                       │
+│  SOLU├çO:  Abra o lead, v├í na aba "Aç├Áes", clique em "Excluir Lead".         │
+│            A exclus├úo ├® permanente.                                           │
+│                                                                                 │
+│  PROBLEMA: "N├úo consigo enviar e-mail pelo CRM"                               │
+│  SOLU├çO:  V├í em Configuraç├Áes > E-mail e configure um provedor              │
+│            (SMTP ou SendGrid). Veja se os dados est├úo corretos e clique        │
+│            em "Testar" antes de enviar.                                         │
+│                                                                                 │
+│  PROBLEMA: "O hist├│rico de e-mails mostra 'falha'"                            │
+│  SOLU├çO:  Passe o mouse ou expanda para ver o erro. Pode ser senha           │
+│            incorreta, servidor SMTP fora do ar, ou API Key do SendGrid         │
+│            inv├ílida. Corrija em Configuraç├Áes > E-mail.                       │
+│                                                                                 │
+│  PROBLEMA: "O tracking de abertura n├úo funciona"                              │
+│  SOLU├çO:  Para e-mails externos, o servidor precisa estar acessível           │
+│            (endereço IP p├║blico ou domínio). Em localhost, o tracking         │
+│            funciona apenas se testar abrindo o link do pixel diretamente       │
+│            no navegador.                                                        │
+│                                                                                 │
+│  PROBLEMA: "Os placeholders como {{nome}} n├úo foram substituídos"             │
+│  SOLU├çO:  Os placeholders s├úo substituídos apenas no momento do envio.      │
+│            Verifique se o lead tem o campo correspondente preenchido           │
+│            (ex: {{nome}} precisa ter o campo Nome preenchido).                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   O CRM ├® a ponta inicial do seu processo comercial. ├ë onde voc├¬ captura,      ║
+║   acompanha e qualifica leads até eles estarem prontos para virar proposta.     ║
+║                                                                                  ║
+║   Um lead bem cuidado no CRM = uma proposta mais f├ícil de fechar depois.        ║
+║                                                                                  ║
+║   🧑‍💼 VENDEDOR → CRM                                                             ║
+║   👷 ENGENHEIRO → Gest├úo de Propostas                                           ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

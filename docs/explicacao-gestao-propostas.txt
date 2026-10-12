@@ -1,0 +1,710 @@
+﻿╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — Gestão de Propostas NO GERAPRO                           ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Gestão de Propostas,        ║
+║   que é o "quadro de vendas" do GeraPro. Ele mostra como acompanhar suas        ║
+║   oportunidades do primeiro contato até o fechamento.                          ║
+║   Ele NÃO explica como criar Propostas Técnicas, Propostas Comerciais ou        ║
+║   Orçamentos. Se você precisa disso, procure o help do sistema (botão ❓).      ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É O Gestão de Propostas?                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você é um vendedor. Você tem vários clientes em diferentes momentos
+do processo de venda:
+
+  • Alguns você acabou de conhecer (primeiro contato)
+  • Outros já receberam a proposta e estão analisando
+  • Alguns já disseram "sim" (fechado)
+  • Infelizmente, alguns disseram "não" (perdido)
+
+O Gestão de Propostas é um QUADRO VISUAL (tipo Kanban) que mostra todos os seus
+negócios organizados por etapa. Cada negócio vira um CARTÃO que você move de
+uma coluna para outra conforme ele avança.
+
+É como ter um quadro magnético na parede com post-its coloridos — mas dentro do
+computador e muito mais inteligente.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde o Pipeline se encaixa no fluxo de trabalho?                             │
+│                                                                                 │
+│  1. Você cria um Orçamento OU uma Proposta Técnica (PTC)                      │
+│  2. Automaticamente, um cartão aparece no Pipeline em "Aguardando Início"      │
+│  3. Você move o cartão para "Em Elaboração" quando começa a preparar a        │
+│     proposta                                                                   │
+│  4. Quando envia a proposta ao cliente, move para "Proposta Enviada"          │
+│  5. Se o cliente pede ajustes, vai para "Negociação"                          │
+│  6. ❗ Fechou? Vai para "Fechado". Perdeu? Vai para "Perdido"                │
+│  7. Durante todo o caminho, você registra interações (ligações, e-mails)      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. AS 6 COLUNAS (ETAPAS DA VENDA)                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Pipeline tem 6 colunas fixas. Você NÃO pode criar ou remover colunas — elas
+representam o ciclo de vida padrão de uma venda.
+
+┌──────────────────────┬──────┬──────────────────────────────────────────────────┐
+│ COLUNA               │ COR  │ O QUE SIGNIFICA                                  │
+├──────────────────────┼──────┼──────────────────────────────────────────────────┤
+│ Aguardando Início    │ Roxa │ O cartão acabou de ser criado. Ainda não          │
+│ (prospect)           │      │ começamos a trabalhar na proposta.                │
+│                      │      │                                                    │
+│ Em Elaboração        │ ❕   │ A Proposta Técnica está sendo preparada.          │
+│ (elaboracao)         │ Laranja │ O engenheiro está dimensionando equipamentos. │
+│                      │      │                                                    │
+│ Proposta Enviada     │ Azul │ A proposta foi enviada para o cliente.           │
+│ (enviado)            │      │ Estamos aguardando o retorno.                    │
+│                      │      │                                                    │
+│ Negociação           │ ❕   │ O cliente pediu ajustes, descontos ou condições   │
+│ (negociacao)         │  Amarela │ especiais. Estamos negociando.               │
+│                      │      │                                                    │
+│ Fechado              │ ✅   │ O cliente ACEITOU a proposta. Venda concluída!    │
+│ (fechado)            │ Verde │                                                   │
+│                      │      │                                                    │
+│ Perdido              │ ❌   │ O cliente RECUSOU ou escolheu outro fornecedor.   │
+│ (perdido)            │ Vermelho │ A oportunidade foi perdida.                   │
+└──────────────────────┴──────┴──────────────────────────────────────────────────┘
+
+📌 REGRA IMPORTANTE: Você só pode AVANÇAR o cartão (nunca voltar). Se um cartão
+   está em "Proposta Enviada", você não pode arrastá-lo de volta para "Em
+   Elaboração". Isso evita que o histórico seja bagunçado.
+
+   Exceção: quando você "Sobe uma Revisão", o cartão volta para "Aguardando
+   Início" (explicado na seção 9).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. COMO OS CARTÕES APARECEM NO PIPELINE?                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Os cartões NÃO são criados manualmente. Eles aparecem automaticamente quando:
+
+┌──────────────────────────┬──────────────────────────────────────────────────────┐
+│ QUANDO                    │ O QUE ACONTECE                                      │
+├──────────────────────────┼──────────────────────────────────────────────────────┤
+│ Você cria uma            │ O sistema cria um cartão no Pipeline com status     │
+│ Proposta Técnica         │ "Aguardando Início". O tipo aparece como "PTC".     │
+│                          │                                                       │
+│ Você cria um Orçamento   │ O sistema cria um cartão no Pipeline. A origem      │
+│                          │ aparece como "Orçamento".                            │
+│                          │                                                       │
+│ Você salva a             │ Se a Proposta Técnica já existia, o cartão é        │
+│ Proposta Comercial       │ atualizado com o valor e o tipo muda para "PTC".    │
+│                          │                                                       │
+│ Você cria PTC separada   │ São criados DOIS cartões: um para PT e um para PC. │
+│ (PT + PC em 2 arquivos) │                                                       │
+└──────────────────────────┴──────────────────────────────────────────────────────┘
+
+💡 Resumo: Não precisa sair cadastrando cliente no Pipeline. Basta criar a
+   Proposta Técnica ou o Orçamento que o cartão aparece sozinho.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. VISÃO GERAL DA TELA                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você abre o Gestão de Propostas (menu lateral), a tela tem duas partes:
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║  PARTE 1 — MÉTRICAS (cards no topo)                                            ║
+║                                                                                  ║
+║  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        ║
+║  │  12          │  │  R$ 850.000  │  │  25%         │  │  R$ 70.000   │        ║
+║  │ Itens Ativos │  │ Valor em     │  │ Taxa de      │  │ Ticket Médio │        ║
+║  │              │  │ Pipeline     │  │ Conversão    │  │              │        ║
+║  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘        ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ MÉTRICA              │ O QUE SIGNIFICA                                          │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Itens Ativos         │ Quantos negócios estão em andamento (não perdidos).      │
+│                      │                                                          │
+│ Valor em Pipeline    │ SOMA dos valores de todos os negócios ativos.            │
+│                      │ É o "potencial" de vendas.                               │
+│                      │                                                          │
+│ Taxa de Conversão    │ Percentual de negócios que foram fechados em relação     │
+│                      │ ao total. Ex: se você teve 20 negócios e fechou 5,       │
+│                      │ a taxa é 25%. Quanto maior, melhor.                      │
+│                      │                                                          │
+│ Ticket Médio         │ Valor médio dos negócios fechados.                       │
+│                      │ Ex: se você fechou R$ 350.000 em 5 negócios,             │
+│                      │ o ticket médio é R$ 70.000.                              │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║  PARTE 2 — AS 6 COLUNAS (quadro Kanban)                                        ║
+║                                                                                  ║
+║  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────┐ ║
+║  │Aguardando│  │    Em    │  │ Proposta │  │Negociação│  │ Fechado  │  │Perdido│ ║
+║  │  Início  │  │Elaboração│  │ Enviada  │  │          │  │   ✅     │  │  ❌   │ ║
+║  │          │  │          │  │          │  │          │  │          │  │       │ ║
+║  │  ┌───┐   │  │  ┌───┐   │  │  ┌───┐   │  │  ┌───┐   │  │  ┌───┐   │  │       │ ║
+║  │  │ 📋│   │  │  │ 📋│   │  │  │ 📋│   │  │  │ 📋│   │  │  │ 📋│   │  │       │ ║
+║  │  └───┘   │  │  └───┘   │  │  └───┘   │  │  └───┘   │  │  └───┘   │  │       │ ║
+║  │  ┌───┐   │  │  ┌───┐   │  │          │  │          │  │          │  │       │ ║
+║  │  │ 📋│   │  │  │ 📋│   │  │          │  │          │  │          │  │       │ ║
+║  │  └───┘   │  │  └───┘   │  │          │  │          │  │          │  │       │ ║
+║  │          │  │          │  │          │  │          │  │          │  │       │ ║
+║  │ Total:   │  │ Total:   │  │ Total:   │  │ Total:   │  │ Total:   │  │       │ ║
+║  │ R$ 0     │  │ R$ 350K  │  │ R$ 200K  │  │ R$ 300K  │  │ R$ 350K  │  │       │ ║
+║  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────┘ ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+💡 Você pode RECOLHER uma coluna clicando no ícone dela, para ter mais espaço
+   visual. O total em R$ aparece no rodapé de cada coluna.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. O CARTÃO DO PIPELINE (o que cada informação significa)                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada cartão no quadro representa um negócio. Dentro dele você vê:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  ┌────────────────────────────────────────────────────────────────────────┐    │
+│  │  PTC-2025-001_PTC       PTC                           (código + tipo)  │    │
+│  │  ─────────────────────────────────────────────────────────────────────  │    │
+│  │  Usina São Francisco                                   (cliente)        │    │
+│  │  CCM-BT e QGF                                          (projeto)        │    │
+│  │  Vend.: José Cirqueira                                  (vendedor)       │    │
+│  │  Eng. Resp.: Carlos Silva                               (engenheiro)     │    │
+│  │  Data Abertura: 10/03/2026                              (criação)        │    │
+│  │  Data Entrega: 30/06/2026                               (entrega)        │    │
+│  │                                                ● (bolinha colorida)     │    │
+│  │  [Subir Revisão]          R$ 450.000    (ações + valor)                │    │
+│  └────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A BOLINHA COLORIDA no canto direito indica o tempo sem contato com o cliente:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ BOLINHA              │ SIGNIFICADO                                              │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ 🟢 Verde             │ Contato recente (até 3 dias)                             │
+│ 🟡 Amarela           │ De 4 a 7 dias sem contato                               │
+│ 🔴 Vermelha          │ Mais de 7 dias sem contato — precisa ligar!              │
+│ ⚫ Cinza              │ Nenhum contato registrado ainda                          │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 A bolinha é um ALERTA VISUAL. Se ela está vermelha, significa que o cliente
+   pode estar esfriando. Hora de registrar uma interação!
+
+Também aparecem badges especiais no cartão:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ BADGE                │ SIGNIFICADO                                              │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ PT                   │ Proposta Técnica (só engenharia)                         │
+│ PC                   │ Proposta Comercial (só precificação)                     │
+│ PTC                  │ Proposta Completa (engenharia + comercial)                │
+│ Consolidada          │ Proposta já foi aprovada tecnicamente e está em          │
+│                      │ negociação comercial.                                    │
+│ 🔔 Vencido           │ O prazo do próximo follow-up já passou.                  │
+│ 🔔 Data              │ Há um follow-up agendado para esta data.                 │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. INTERAÇÕES (HISTÓRICO DE CONTATO)                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em um cartão, abre um modal com DETALHES. Uma das seções
+mais importantes é "Registrar Interação".
+
+As interações são o HISTÓRICO de tudo que você fez com aquele cliente:
+
+  • 📞 Ligação — Você ligou para o cliente
+  • ✉️  E-mail — Você enviou um e-mail
+  • 🤝 Reunião — Você se encontrou presencialmente ou por videoconferência
+  • 💬 WhatsApp — Você conversou pelo WhatsApp
+  • 📝 Outro — Qualquer outro tipo de contato
+
+PARA CADA INTERAÇÃO, você registra:
+
+  1. O TIPO (ligação, e-mail, reunião, WhatsApp, outro)
+  2. A DATA (quando aconteceu)
+  3. A DESCRIÇÃO (do que falaram, o que ficou combinado)
+  4. O PRÓXIMO FOLLOW-UP (quando você vai entrar em contato de novo)
+
+✅ A bolinha colorida do cartão é atualizada automaticamente com base na data
+   da última interação.
+
+✅ Se você marcar um follow-up, o cartão mostra a data agendada.
+
+✅ O histórico completo fica salvo e pode ser visto a qualquer momento.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. COMO MOVER CARTÕES ENTRE COLUNAS                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Existem duas formas de mover um cartão:
+
+─── FORMA 1: ARRASTAR (DRAG & DROP) ─────────────────────────────────────────────
+
+  • Clique e segure o cartão com o mouse.
+  • Arraste para a coluna desejada.
+  • Solte.
+
+  🔒 Só funciona para usuários com permissão (não funciona para vendedores).
+  🔒 Só pode AVANÇAR o cartão (nunca voltar para uma coluna anterior).
+
+─── FORMA 2: SUBIR REVISÃO (ação mais complexa) ─────────────────────────────────
+
+  Explicado na seção 9.
+
+🔒 REGRA IMPORTANTE DE AVANÇO:
+
+  Se um cartão estiver "Fechado" ou "Perdido", ele NÃO pode ser reaberto.
+  O GeraPro bloqueia a edição da proposta e mostra uma mensagem de aviso.
+  Se precisar reabrir, é necessário criar uma CÓPIA da proposta via
+  "Salvar como Novo(a)".
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. EDITAR UM CARTÃO                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Ao abrir um cartão, você pode clicar em "Editar" para alterar:
+
+  ┌────────────────────┬──────────────────────────────────────────────────────────┐
+  │ CAMPO              │ O QUE É                                                  │
+  ├────────────────────┼──────────────────────────────────────────────────────────┤
+  │ Cliente            │ Nome do cliente (razão social).                          │
+  │ Projeto            │ Nome do projeto ou obra.                                 │
+  │ Valor Estimado     │ Valor da proposta em reais.                              │
+  │ Vendedor           │ Nome do vendedor responsável.                            │
+  │ Observações        │ Anotações internas (não aparecem na proposta).           │
+  │ Eng. Responsável   │ Engenheiro que está elaborando a proposta.               │
+  │ Data Entrega       │ Data prevista para entrega dos equipamentos.             │
+  │ Último Contato     │ Data do último contato com o cliente.                    │
+  │ Próx. Follow-up    │ Data agendada para o próximo contato.                    │
+  └────────────────────┴──────────────────────────────────────────────────────────┘
+
+💡 A edição manual é útil quando o cartão veio de um Orçamento (que não tem
+   todos esses campos) ou quando você quer complementar informações que o
+   sistema não pegou automaticamente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. SUBIR REVISÃO                                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+"Subir Revisão" é uma ação que você faz quando a proposta passou por uma etapa
+e precisa ser atualizada para uma nova versão. É como dizer: "essa versão está
+pronta, vamos para a próxima fase."
+
+O QUE ACONTECE QUANDO VOCÊ SOBE UMA REVISÃO:
+
+  1. O número da revisão aumenta (Rev00 → Rev01 → Rev02...)
+  2. O cartão VOLTA para "Aguardando Início" — porque a nova revisão
+     precisa ser trabalhada novamente
+  3. O engenheiro responsável é LIMPO — você precisa atribuir um novo
+     engenheiro (ou o mesmo) para a nova revisão
+  4. Opcional: você pode marcar como "Consolidada"
+
+─── O QUE É "CONSOLIDADA"? ─────────────────────────────────────────────────────
+
+  Uma proposta "Consolidada" significa que a parte técnica já foi aprovada pelo
+  cliente e agora a negociação é só comercial (preço, condições).
+
+  Se você marca "Consolidada" ao subir revisão:
+    • O cartão vai para "Negociação" em vez de "Aguardando Início"
+    • Aparece o badge "Consolidada" no cartão
+
+─── QUANDO USAR? ────────────────────────────────────────────────────────────────
+
+  • Cliente aprovou o escopo técnico → suba revisão marcando "Consolidada"
+   • Cliente pediu alterações no escopo → suba revisão SEM marcar consolidada
+   • Você precisa emitir uma nova versão da proposta → suba revisão
+
+─── O QUE ACONTECE NO SERVIDOR? ───────────────────────────────────────────────
+
+  Quando você clica em "Subir Revisão", o GeraPro no servidor:
+
+  1. Cria uma nova pasta de revisão (Rev01, Rev02, Rev03...)
+  2. Copia os arquivos da revisão anterior para a nova pasta
+     (PropostaTecnica.json, PropostaComercial.json, Precificacao.json, etc.)
+  3. Cria um arquivo de log da revisão em "Log das Revisões/R01_*.json"
+  4. Atualiza o cartão no Pipeline com o novo número de revisão
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. ENGENHEIRO RESPONSÁVEL                                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando um cartão está em "Aguardando Início", você precisa ATRIBUIR um
+engenheiro responsável para elaborar a proposta.
+
+No canto do cartão aparece um botão:
+  • 🔴 "Eng. Resp.??" (vermelho) — Nenhum engenheiro atribuído
+  • 🟣 "Eng. Resp. OK" (roxo) — Já tem engenheiro
+
+Ao clicar, uma lista de engenheiros cadastrados aparece. Escolha um.
+
+💡 O engenheiro responsável é LIMPO quando você sobe uma revisão, porque a
+   nova revisão pode ser feita por outro engenheiro.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. EXPORTAR PIPELINE                                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Pipeline pode ser exportado em dois formatos:
+
+─── CSV (📥) — Botão "Exportar" no topo da tela ─────────────────────────────
+
+  • UM RESUMO no começo do arquivo, mostrando quantos itens e o valor total
+    em cada coluna
+  • A LISTA COMPLETA de todos os cartões com: Cliente, Projeto, Valor, Status,
+    Origem, Datas, Observações
+
+  Abre no Excel, Google Planilhas ou qualquer editor de texto.
+
+─── XLSX (📊) — Botão no modal de detalhes do cartão ────────────────────────
+
+  Gera uma planilha formatada com o histórico completo de ações da PTC:
+  criação, edição, movimentação, exclusão, interações e revisões.
+
+  Disponível apenas para cartões que possuem PTC física no servidor.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. LIMPEZA EM MASSA                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Com o tempo, o Pipeline acumula cartões perdidos e antigos. O botão "Limpar
+Antigos" (🗑️) ajuda a organizar. Você escolhe os critérios:
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │                                                                              │
+  │  ☑ Status "Perdido" — Remove todos os cartões que estão como Perdido.       │
+  │                                                                              │
+  │  ☑ Sem contato há mais de [90] dias — Remove cartões abandonados.          │
+  │                                                                              │
+  │  ☑ Criado há mais de [180] dias — Remove cartões muito antigos.            │
+  │                                                                              │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+💡 Use a Limpeza em Massa periodicamente (ex: uma vez por mês) para manter
+   o Pipeline organizado.
+
+⚠️ Cartões vindos de ORÇAMENTOS não são removidos pela Limpeza em Massa,
+   apenas cartões de PTC.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. SINCRONIZAR                                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O botão "Sincronizar" (🔄) verifica se as pastas das PTCs ainda existem no
+servidor. Se uma pasta foi deletada manualmente, o cartão correspondente é
+removido do Pipeline.
+
+💡 Use quando você excluiu PTCs diretamente pelo disco e quer limpar os
+   cartões órfãos.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  14. PERMISSÕES DE USUÁRIO                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Pipeline se comporta diferente conforme o nível do usuário:
+
+┌───────────────────┬─────────────────────────────────────────────────────────────┐
+│ NÍVEL             │ O QUE PODE FAZER                                           │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ Vendedor          │ • Ver APENAS os cartões onde ele é o vendedor              │
+│                   │ • Não pode arrastar cartões entre colunas                 │
+│                   │ • Pode registrar interações                                │
+│                   │ • Não vê os botões Limpar/Sincronizar                      │
+│                   │                                                             │
+│ Admin /           │ • Vê TODOS os cartões de todos os vendedores               │
+│ Gerente           │ • Pode arrastar cartões                                   │
+│                   │ • Pode editar, excluir, subir revisão                     │
+│                   │ • Vê os botões Limpar/Sincronizar/Exportar                │
+│                   │ • Pode atribuir engenheiro responsável                    │
+│                   │ • Pode fazer limpeza em massa                             │
+└───────────────────┴─────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  15. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Pipeline              │ Conjunto de negócios em andamento, organizados por      │
+│                       │ etapa da venda.                                         │
+│                       │                                                         │
+│ Kanban                │ Método visual de organização com colunas e cartões.     │
+│                       │ Originalmente criado pela Toyota.                       │
+│                       │                                                         │
+│ Cartão                │ Cada negócio/oportunidade no Pipeline.                  │
+│                       │                                                         │
+│ Etapa / Coluna        │ Cada fase do processo de venda.                         │
+│                       │ Ex: "Aguardando Início", "Em Elaboração"...             │
+│                       │                                                         │
+│ Arrastar (Drag &      │ Mover um cartão com o mouse de uma coluna para outra.   │
+│ Drop)                 │                                                         │
+│                       │                                                         │
+│ Status                │ A etapa atual do cartão. Ex: "enviado", "fechado".      │
+│                       │                                                         │
+│ Interação             │ Registro de contato com o cliente                       │
+│                       │ (ligação, e-mail, reunião, WhatsApp).                   │
+│                       │                                                         │
+│ Follow-up             │ Ação de acompanhamento agendada.                        │
+│                       │ Ex: "Ligar na sexta para saber se recebeu a proposta".  │
+│                       │                                                         │
+│ Subir Revisão         │ Avançar a proposta para uma nova versão.                │
+│                       │ O número da revisão aumenta (ex: Rev00 → Rev01).        │
+│                       │                                                         │
+│ Consolidada           │ Proposta cuja parte técnica já foi aprovada.            │
+│                       │ O cartão vai para "Negociação".                         │
+│                       │                                                         │
+│ Engenheiro            │ Profissional responsável por elaborar a proposta        │
+│ Responsável           │ técnica.                                                │
+│                       │                                                         │
+│ Taxa de Conversão     │ Percentual de negócios que resultaram em fechamento.    │
+│                       │                                                         │
+│ Ticket Médio          │ Valor médio dos negócios fechados.                      │
+│                       │                                                         │
+│ Pipeline Value        │ Soma dos valores de todos os negócios ativos.           │
+│ (Valor em Pipeline)   │                                                         │
+│                       │                                                         │
+│ Órfão                 │ Cartão cuja pasta da PTC foi deletada do servidor.      │
+│                       │                                                         │
+│ PTC                   │ Proposta Técnica Comercial (completa).                  │
+│                       │                                                         │
+│ PT                    │ Proposta Técnica (só engenharia).                       │
+│                       │                                                         │
+│ PC                    │ Proposta Comercial (só precificação/faturamento).       │
+│                       │                                                         │
+│ Log de Ação (ACT)     │ Arquivo .json no servidor que registra cada ação        │
+│                       │ realizada em um cartão do Pipeline.                     │
+│                       │                                                         │
+│ Pasta de Revisão      │ Pasta no servidor com os arquivos de uma versão         │
+│ (Rev00, Rev01...)     │ específica da proposta.                                 │
+│                       │                                                         │
+│ Telegram Bot          │ Robô que envia notificações do GeraPro no Telegram.     │
+│                       │ Criado pelo @BotFather.                                 │
+│                       │                                                         │
+│ Chat ID               │ Identificador único da conversa com o Bot no Telegram.  │
+│                       │ Cada usuário tem um Chat ID diferente.                  │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  16. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "O Pipeline está vazio e eu já criei PTCs"                         │
+│  SOLUÇÃO:  Verifique o nível do seu usuário. Se for "vendedor", você só vê    │
+│            os cartões onde você é o vendedor. Peça ao admin para verificar     │
+│            se o vendedor está correto na PTC.                                  │
+│                                                                                 │
+│  PROBLEMA: "Não consigo arrastar o cartão para outra coluna"                  │
+│  SOLUÇÃO:  (a) Se você é vendedor, não pode arrastar — é proposital.          │
+│            (b) Só pode AVANÇAR o cartão, nunca voltar.                        │
+│            (c) Se o cartão está Fechado ou Perdido, está bloqueado.            │
+│                                                                                 │
+│  PROBLEMA: "O cartão sumiu depois que movi para Perdido"                      │
+│  SOLUÇÃO:  Ele não sumiu — está na coluna "Perdido". Role a tela para a       │
+│            direita ou use o recolhimento de colunas para ver todas.            │
+│                                                                                 │
+│  PROBLEMA: "Criei um Orçamento, mas não apareceu no Pipeline"                │
+│  SOLUÇÃO:  Pode levar alguns segundos para sincronizar. Feche e abra o        │
+│            Pipeline. Se ainda não aparecer, clique em "Sincronizar".           │
+│                                                                                 │
+│  PROBLEMA: "Quero editar um cartão mas o botão Editar não aparece"            │
+│  SOLUÇÃO:  Se você é vendedor, não pode editar. Se o cartão veio de um        │
+│            Orçamento, a edição não está disponível porque as informações      │
+│            vêm do orçamento original.                                          │
+│                                                                                 │
+│  PROBLEMA: "O cartão está como Fechado mas preciso reabrir"                   │
+│  SOLUÇÃO:  Não é possível reabrir. O sistema bloqueia edição. Crie uma cópia  │
+│            da proposta usando "Salvar como Novo(a)" na Proposta Técnica.       │
+│                                                                                 │
+│  PROBLEMA: "Tem muitos cartões perdidos, quero limpar"                        │
+│  SOLUÇÃO:  Use o botão "Limpar Antigos" no topo da tela. Selecione            │
+│            "Status Perdido" e confirme.                                        │
+│                                                                                 │
+│  PROBLEMA: "As informações do cartão estão desatualizadas"                    │
+│  SOLUÇÃO:  Edite o cartão manualmente (botão "Editar" no modal de detalhes).  │
+│            Ou salve novamente a Proposta Comercial para atualizar o valor.     │
+│                                                                                 │
+│  PROBLEMA: "O valor do cartão está zerado"                                    │
+│  SOLUÇÃO:  O valor só é preenchido quando a Proposta Comercial é salva.       │
+│            Se você só criou a Proposta Técnica, o valor fica R$ 0,00.         │
+│            É normal — a PT não tem valores financeiros.                       │
+│                                                                                 │
+│  PROBLEMA: "A bolinha está vermelha mas eu liguei ontem"                      │
+│  SOLUÇÃO:  A bolinha olha a data da ÚLTIMA INTERAÇÃO registrada. Se você     │
+│            ligou mas não registrou a interação no cartão, o sistema não sabe.  │
+│            Registre a ligação no modal de detalhes para a bolinha ficar verde. │
+│                                                                                 │
+│  PROBLEMA: "Não consigo ver a coluna Perdido"                                 │
+│  SOLUÇÃO:  As colunas têm rolagem horizontal. Role para a direita usando a    │
+│            barra de rolagem na parte inferior do quadro Kanban.               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  17. LOGS DAS AÇÕES (HISTÓRICO COMPLETO)                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Toda ação importante em um cartão do Pipeline é registrada em um arquivo de log
+no servidor, dentro da pasta "Log das Revisões" da PTC. Isso cria um histórico
+completo e auditável de tudo que aconteceu com aquele negócio.
+
+─── QUAIS AÇÕES SÃO REGISTRADAS? ───────────────────────────────────────────────
+
+  • 🆕 Criação       — "Nova PT Criada" / "Nova PC Criada"
+  • ✏️ Edição         — "Campos editados: cliente, valor, observações"
+  • 🔀 Movimentação  — "Proposta movida de Em Elaboração para Proposta Enviada"
+  • 🗑️ Exclusão      — "Cartão 'Usina São Francisco' excluído"
+  • 👤 Atribuição    — "Engenheiro responsável: Carlos Silva"
+  • 💬 Interação     — "Interação (ligação): Cliente pediu desconto"
+
+─── ONDE FICAM OS ARQUIVOS? ────────────────────────────────────────────────────
+
+  PTCs físicas:    /data/PTCs/26061101-PT/Log das Revisões/ACT_*.json
+  PTCs separadas:  /data/PTCs/26061101-PT_REV01/Log das Revisões/ACT_*.json
+
+─── EXPORTAR LOG COMO XLSX ─────────────────────────────────────────────────────
+
+  No modal de detalhes do cartão, há um botão 📊 Exportar XLSX que gera uma
+  planilha formatada com todo o histórico de ações daquela PTC.
+
+─── PARA QUE SERVEM? ────────────────────────────────────────────────────────────
+
+  • Auditoria: saber exatamente quem fez o quê e quando
+  • Histórico: recuperar versões anteriores de decisões
+  • Rastreabilidade: entender por que um cartão mudou de status
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  18. NOTIFICAÇÕES NO TELEGRAM                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro pode enviar mensagens no Telegram sempre que algo acontece no Pipeline
+Comercial, para que você fique sabendo em tempo real mesmo fora do sistema.
+
+─── EVENTOS QUE DISPARAM NOTIFICAÇÃO ───────────────────────────────────────────
+
+  • 🆕 Criação       — Um novo cartão aparece no Pipeline
+  • ✏️ Edição         — Campos de um cartão são alterados
+  • 🔀 Movimentação  — O cartão é movido de uma coluna para outra
+  • 🗑️ Exclusão      — Um cartão é removido do Pipeline
+
+─── QUEM RECEBE AS NOTIFICAÇÕES? ───────────────────────────────────────────────
+
+  Apenas usuários com perfil Admin ou Engenheiro que tenham configurado o
+  Chat ID do Telegram. Vendedores não recebem notificações.
+
+─── COMO CONFIGURAR? ───────────────────────────────────────────────────────────
+
+  1. Vá em Configurações → seção "Telegram"
+  2. Informe o Token do Bot (criado pelo @BotFather no Telegram)
+  3. Para cada usuário Admin/Engenheiro, preencha o Chat ID
+  4. Clique em "Salvar Configurações do Telegram"
+  5. Use o botão "Testar" para verificar se está funcionando
+
+─── EXEMPLO DE MENSAGEM ────────────────────────────────────────────────────────
+
+  🆕 *GeraPro — Pipeline*
+  *PTC:* 26061101-PT
+  *Cliente:* Usina São Francisco
+  *Projeto:* CCM-BT e QGF
+  *Ação:* Nova PT Criada
+  *Responsável:* João
+  *Vendedor:* Maria
+
+💡 O Telegram é um canal EXTRA de notificação. O sistema continua funcionando
+   normalmente dentro do GeraPro — as mensagens são apenas um aviso adicional.
+   As notificações são enviadas apenas para os perfis Admin e Engenheiro.
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   O Gestão de Propostas é o RAIO-X das suas vendas. Ele mostra:                   ║
+║                                                                                  ║
+║   • Quantos negócios estão em andamento                                          ║
+║   • Quanto dinheiro está "na mesa"                                               ║
+║   • Quanto você já fechou                                                        ║
+║   • Quais clientes estão "esfriando" (bolinha vermelha)                          ║
+║                                                                                  ║
+║   Use o Pipeline TODOS OS DIAS para saber o que precisa fazer:                   ║
+║   • Cartão parado há muito tempo? → Registre uma interação                       ║
+║   • Cliente pediu alteração? → Suba uma revisão                                  ║
+║   • Proposta enviada? → Arraste para "Proposta Enviada"                          ║
+║   • Fechou? → Arraste para "Fechado" e comemore!                                ║
+║                                                                                  ║
+║   "O Pipeline não é um relatório — é uma ferramenta de trabalho."               ║
+║   "Um Pipeline organizado é a diferença entre um vendedor que sabe              ║
+║    o que está fazendo e um que está perdido."                                    ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

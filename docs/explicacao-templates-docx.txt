@@ -1,0 +1,380 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — TEMPLATES .DOCX NO GERAPRO                              ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o que são os templates .docx,          ║
+║   como fazer upload, como configurar qual template usar em cada tipo de         ║
+║   proposta, e como o sistema encontra o arquivo certo na hora de gerar o        ║
+║   documento Word.                                                                ║
+║                                                                                  ║
+║   Ele NÃO explica como criar uma Proposta Técnica ou Comercial. Se você         ║
+║   precisa disso, procure o help do sistema (botão ❓ no canto superior).         ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É UM TEMPLATE .DOCX?                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em "Exportar Word" em uma Proposta Técnica ou Comercial, o
+GeraPro gera um arquivo .docx automaticamente — com logotipo, tabelas, marcas
+d'água, capa, etc.
+
+Esse arquivo gerado é baseado em um MODELO (template). O template é um arquivo
+.docx comum, que você mesmo pode criar no Microsoft Word ou LibreOffice, com a
+estrutura e aparência que você quiser.
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ✅  O template define o VISUAL do documento (cores, fontes, margens,         ║
+║   logotipo, capa). O GeraPro preenche o CONTEÚDO (dados da proposta,           ║
+║   equipamentos, preços, etc.) dentro desse visual.                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. QUAIS SÃO OS TRÊS TEMPLATES?                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro usa três templates, um para cada tipo de proposta:
+
+┌──────────────────────┬────────────────────┬──────────────────────────────────────┐
+│ TIPO DE PROPOSTA     │ ARQUIVO PADRÃO     │ QUANDO É USADO                       │
+├──────────────────────┼────────────────────┼──────────────────────────────────────┤
+│ Técnica              │ TEMPLATE_TEC.docx  │ Proposta Técnica (Exportar Word na   │
+│                      │                    │ tela de Proposta Técnica)            │
+│                      │                    │                                      │
+│ Comercial            │ TEMPLATE_COM.docx  │ Proposta Comercial (Exportar Word na │
+│                      │                    │ tela de Proposta Comercial)          │
+│                      │                    │                                      │
+│ Completa             │ TEMPLATE_TEC_COM   │ Proposta Completa (exportação        │
+│                      │ .docx              │ combinada Técnica + Comercial)       │
+└──────────────────────┴────────────────────┴──────────────────────────────────────┘
+
+Os nomes acima são os PADRÃO. Você pode ter arquivos com nomes diferentes —
+basta configurar no sistema qual arquivo usar (veja seção 5).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. COMO SÃO ARMAZENADOS OS TEMPLATES?                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Os templates ficam guardados na pasta do sistema, separados por EMPRESA:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  📁 templates/                                                                  │
+│  └── 📁 NOME-DA-EMPRESA/  (ex: default, ou o ID da empresa)                    │
+│      ├── 📄 TEMPLATE_TEC.docx                                                  │
+│      ├── 📄 TEMPLATE_COM.docx                                                   │
+│      └── 📄 TEMPLATE_TEC_COM.docx                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅ Cada empresa tem sua própria pasta de templates. Se você tem mais de uma
+   empresa cadastrada no sistema, cada uma pode ter templates diferentes.
+
+✅ Os templates são carregados automaticamente ao entrar no sistema — você
+   não precisa se preocupar com pastas ou caminhos de arquivo.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. COMO FAZER UPLOAD DE UM NOVO TEMPLATE?                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+ETAPA 1 — ACESSAR CONFIGURAÇÕES
+
+  • No menu lateral esquerdo, vá até "Configurações" (ícone de engrenagem ⚙️).
+  • Role até a seção "Templates (.docx)".
+
+ETAPA 2 — ESCOLHER O TIPO
+
+  Você vê três campos, um para cada tipo de proposta:
+
+  ┌───────────────────────────────────────────────────────────────────────────────┐
+  │                                                                               │
+  │  📂 Template Proposta Técnica  [ TEMPLATE_TEC.docx ▼ ]  [ 📤 Upload ]  [ 🗑️ ] │
+  │                                                                               │
+  │  📂 Template Proposta Comercial [ TEMPLATE_COM.docx ▼ ]  [ 📤 Upload ]  [ 🗑️ ]│
+  │                                                                               │
+  │  📂 Template Proposta Completa  [ TEMPLATE_TEC_COM.docx ▼ ] [ 📤 Upload ][🗑️]│
+  │                                                                               │
+  └───────────────────────────────────────────────────────────────────────────────┘
+
+  • O select (▼) mostra os arquivos .docx disponíveis na pasta da sua empresa.
+  • O botão 📤 Upload permite enviar um novo arquivo do seu computador.
+  • O botão 🗑️ apaga o template selecionado (cuidado!)
+
+ETAPA 3 — FAZER UPLOAD
+
+  1. Clique em 📤 Upload ao lado do tipo de template que você quer enviar.
+  2. Selecione o arquivo .docx no seu computador.
+  3. O sistema faz o upload automaticamente e o arquivo aparece no select.
+  4. Agora selecione o arquivo novo no dropdown para usá-lo.
+
+✅ O upload só aceita arquivos com extensão .docx. Arquivos .doc (Word antigo)
+   não funcionam — você precisa salvar como .docx primeiro.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. COMO CONFIGURAR QUAL TEMPLATE USAR?                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Depois de fazer upload do template, você precisa dizer ao sistema qual arquivo
+usar para cada tipo de proposta. Isso é feito nos mesmos selects da seção 4:
+
+  1. No campo "Template Proposta Técnica", abra o select (▼).
+  2. Escolha o nome do arquivo que você enviou.
+  3. Faça o mesmo para "Template Proposta Comercial" e "Template Proposta
+     Completa".
+  4. Clique em "Salvar Configurações" no final da página.
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   📌 Se você não selecionar nenhum arquivo, o sistema usa o nome padrão:        ║
+║   TEMPLATE_TEC.docx, TEMPLATE_COM.docx e TEMPLATE_TEC_COM.docx.                ║
+║   Certifique-se de que existam arquivos com esses nomes na pasta da sua        ║
+║   empresa (ou faça upload com esses nomes).                                     ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. COMO O SISTEMA ENCONTRA O TEMPLATE NA HORA DE EXPORTAR?                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em "Exportar Word" em uma proposta, o sistema segue esta
+ordem para descobrir qual arquivo usar:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│   1º  Olha nas CONFIGURAÇÕES DA EMPRESA no banco de dados                      │
+│       (o que foi salvo no passo 5)                                              │
+│       ↓                                                                         │
+│   2º  Se não tiver configurado, usa o VALOR PADRÃO                             │
+│       (TEMPLATE_TEC.docx / TEMPLATE_COM.docx / TEMPLATE_TEC_COM.docx)          │
+│       ↓                                                                         │
+│   3º  Procura o arquivo na pasta: templates/NOME-DA-EMPRESA/                   │
+│       ↓                                                                         │
+│   4º  Se o arquivo não existir, mostra ERRO:                                    │
+│       "Template XXXXX.docx não encontrado."                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅ Resumo: você configura uma vez nos selects e o sistema lembra. Toda vez
+   que exportar, ele usa o mesmo template — a menos que você troque.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. CRIANDO SEU PRÓPRIO TEMPLATE — O QUE VOCÊ PRECISA SABER                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Você pode criar ou editar um template no Microsoft Word ou LibreOffice.
+
+O template é um arquivo .docx COMUM. A diferença é que ele contém MARCADORES
+especiais (tags) nos lugares onde o GeraPro deve inserir os dados.
+
+Exemplos de tags que o sistema procura no documento:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ TAG NO DOCUMENTO     │ O QUE O GERAPRO SUBSTITUI                                │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ {cliente}            │ Nome do cliente                                          │
+│ {projeto}            │ Título/Nome do projeto                                   │
+│ {codigo}             │ Código da proposta (ex: PT-001, PC-001)                  │
+│ {data}               │ Data de emissão                                          │
+│ {vendedor}           │ Nome do vendedor                                         │
+│ {revisao}            │ Número da revisão                                        │
+│ {tabela_equipamentos}│ Tabela com todos os equipamentos da proposta             │
+│ {tabela_precos}      │ Tabela com preços                                        │
+│ {logo_cliente}       │ Logotipo do cliente (se houver)                          │
+│ {marca_dagua}        │ Marca d'água (ex: "RASCUNHO", "APROVADO")               │
+│ {valores}            │ Tabela de valores totais                                 │
+│ {infraestrutura}     │ Tabela de infraestrutura (se houver)                     │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 DICA: O jeito mais fácil de criar um template é PEGAR UM EXISTENTE e
+   editar. Faça o download de um template que já funciona, abra no Word,
+   ajuste cores, fontes, logotipo, e faça upload como um template novo.
+
+📌 IMPORTANTE: As tags devem estar escritas EXATAMENTE como acima, incluindo
+   as chaves {}. Se você digitar "{Cliente}" em vez de "{cliente}", o sistema
+   não vai reconhecer e vai deixar o texto como está no documento final.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. LOGOTIPO E MARCA D'ÁGUA                                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro insere automaticamente o logotipo e a marca d'água no documento
+gerado. Você NÃO precisa colocar logotipo dentro do template.
+
+• O logotipo usado é o que está configurado em Configurações > Dados da Empresa
+  (campo "Logo (URL ou base64)").
+
+• A marca d'água é gerada automaticamente com base no status da proposta:
+  ┌──────────────┬──────────────────────────────────────────┐
+  │ STATUS       │ MARCA D'ÁGUA                             │
+  ├──────────────┼──────────────────────────────────────────┤
+  │ Rascunho     │ "RASCUNHO" (em cinza claro)              │
+  │ Enviada      │ "PROPOSTA" (versão limpa, sem marca)     │
+  │ Aprovada     │ "APROVADO" + carimbo verde               │
+  │ Cancelada    │ "CANCELADO" (em vermelho, diagonal)      │
+  └──────────────┴──────────────────────────────────────────┘
+
+✅ Para que a marca d'água funcione, o template DEVE conter a tag {marca_dagua}
+   no local onde ela deve aparecer (normalmente no centro de cada página, ou
+   apenas na primeira página, dependendo de como você configurar).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. E SE EU TIVER MAIS DE UMA EMPRESA?                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro suporta múltiplas empresas. Cada empresa tem sua própria pasta de
+templates. Isso significa que:
+
+✅ A Empresa A pode usar templates com o logotipo e cores da Empresa A.
+✅ A Empresa B pode usar templates completamente diferentes.
+✅ O upload e a configuração são feitos separadamente para cada empresa.
+
+Você só vê os templates da empresa que está logado no momento. Se precisar
+configurar templates de outra empresa, faça login como um usuário daquela
+empresa.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. PROBLEMAS COMUNS E SOLUÇÕES                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ PROBLEMA: "Template XXXXX.docx não encontrado."                                │
+│                                                                                 │
+│ CAUSA: O arquivo não existe na pasta de templates da sua empresa.              │
+│                                                                                 │
+│ SOLUÇÃO:                                                                        │
+│   1. Vá em Configurações e veja a seção Templates                               │
+│   2. Verifique se o arquivo aparece no select                                   │
+│   3. Se não aparecer, faça upload do arquivo                                    │
+│   4. Depois de enviar, selecione o arquivo no select e clique em Salvar        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ PROBLEMA: O documento gerado está com formatação estranha, tabelas              │
+│ desalinhadas, ou texto cortado.                                                 │
+│                                                                                 │
+│ CAUSA: O template pode ter sido danificado, ou ter elementos que o sistema     │
+│ não consegue processar (imagens muito grandes, fontes não instaladas, etc.).   │
+│                                                                                 │
+│ SOLUÇÃO:                                                                        │
+│   1. Abra o template no Word                                                    │
+│   2. Remova elementos desnecessários (imagens decorativas, formas complexas)   │
+│   3. Salve como .docx (não .doc)                                               │
+│   4. Faça upload novamente                                                     │
+│   5. Teste exportando uma proposta simples                                     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ PROBLEMA: A marca d'água não aparece no documento gerado.                      │
+│                                                                                 │
+│ CAUSA: A tag {marca_dagua} não está presente no template, ou está escrita      │
+│ com formatação diferente (ex: {MARCA_DAGUA} em vez de {marca_dagua}).          │
+│                                                                                 │
+│ SOLUÇÃO: Edite o template e insira a tag {marca_dagua} exatamente assim,       │
+│ com letras minúsculas e chaves {}.                                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ PROBLEMA: Upload não funciona — "Apenas arquivos .docx são permitidos."       │
+│                                                                                 │
+│ CAUSA: Você tentou enviar um arquivo .doc (Word 97-2003) ou outro formato.    │
+│                                                                                 │
+│ SOLUÇÃO: Abra o arquivo no Word e selecione "Salvar como" > Formato:           │
+│ "Documento do Word (.docx)". Depois tente o upload novamente.                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ PROBLEMA: O logotipo da empresa não aparece no documento.                      │
+│                                                                                 │
+│ CAUSA POSSÍVEL 1: O logotipo não foi configurado em Configurações > Dados      │
+│ da Empresa.                                                                     │
+│                                                                                 │
+│ CAUSA POSSÍVEL 2: A tag {logo_cliente} ou {logo_empresa} não está no template.│
+│                                                                                 │
+│ SOLUÇÃO:                                                                        │
+│   1. Verifique se o logotipo está configurado (campo "Logo")                   │
+│   2. Verifique se o template contém a tag correta                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ .docx                 │ Formato de arquivo do Microsoft Word (documento         │
+│                       │ baseado em XML). É o formato que o GeraPro usa para    │
+│                       │ gerar e ler os templates.                               │
+│                       │                                                         │
+│ Template              │ Arquivo modelo que define a aparência do documento.     │
+│                       │ O GeraPro usa o template como "molde" e insere os       │
+│                       │ dados da proposta dentro dele.                          │
+│                       │                                                         │
+│ Tag / Marcador        │ Texto especial entre chaves { } que o sistema          │
+│                       │ substitui pelo dado real. Ex: {cliente} vira o nome    │
+│                       │ do cliente no documento final.                          │
+│                       │                                                         │
+│ Upload                │ Ação de enviar um arquivo do seu computador para o      │
+│                       │ servidor do GeraPro.                                    │
+│                       │                                                         │
+│ Marca d'água          │ Texto ou imagem sobreposta no documento, geralmente    │
+│                       │ transparente, indicando o status (RASCUNHO, APROVADO). │
+│                       │                                                         │
+│ Logotipo / Logo       │ Imagem da empresa (ou cliente) que aparece no          │
+│                       │ cabeçalho ou capa do documento.                         │
+│                       │                                                         │
+│ Proposta Técnica      │ Documento com a descrição técnica dos equipamentos,    │
+│                       │ quantidades, especificações e preços.                   │
+│                       │                                                         │
+│ Proposta Comercial    │ Documento com as condições comerciais, prazos,          │
+│                       │ formas de pagamento, e valores finais.                  │
+│                       │                                                         │
+│ Proposta Completa     │ Documento único que combina a Proposta Técnica e a     │
+│                       │ Comercial em um só arquivo.                             │
+│                       │                                                         │
+│ Pasta da Empresa      │ Subpasta dentro de templates/ que contém os arquivos   │
+│                       │ .docx de uma empresa específica. Cada empresa tem a     │
+│                       │ sua própria pasta.                                      │
+└───────────────────────┴─────────────────────────────────────────────────────────┘

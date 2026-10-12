@@ -1430,8 +1430,8 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const pipelinePtc = proposta.ptc_folder || (window.app.currentPtc && window.app.currentPtc.folder);
         if (pipelinePtc && window.app._ensurePipelineItemForPtc) {
             const valorTotal = (proposta.itens || []).reduce((s, item) => {
-                const q = parseFloat(item.qtd) || 0;
-                const p = parseFloat(item.price) || 0;
+                const q = window.app.parseCurrency(item.qtd);
+                const p = window.app.parseCurrency(item.price);
                 return s + (q * p);
             }, 0);
             const ok = window.app._ensurePipelineItemForPtc(pipelinePtc, proposta.cliente, proposta.projeto, valorTotal);

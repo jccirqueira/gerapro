@@ -1,15 +1,43 @@
+# ─── Dependências ───
 node_modules/
+
+# ─── Dados de execução (bancos, uploads, backups do sistema) ───
 data/
-docs/
-*.db
-*.sqlite
+
+# ─── Documentos ───
+# Guias, changelogs e notas (.md/.txt) SÃO versionados;
+# planilhas/HTML de cliente ficam fora do repositório.
+docs/*
+!docs/*.md
+!docs/*.txt
+
+# ─── Segredos e ambiente ───
 .env
 *.log
-teste_gerado.qet
+
+# ─── Bancos de dados (qualquer pasta) ───
+*.db
+*.sqlite
+
+# ─── Lixo de sistema / Office ───
 .DS_Store
 Thumbs.db
-16-07/
-21-07/
-22-07/
-24-07/
+~$*
+~WRL*
+
+# ─── Arquivo morto: cópias antigas, lixos e notas movidos para cá ───
+# (recuperável manualmente; não versionar)
+_archive/
+
+# ─── Dados de cliente avulsos (não versionar) ───
+xx/
+
+# ─── Pastas de notas por data criadas no fluxo de trabalho (ex.: 14-07/) ───
+# histórico movido para _archive/dev-notes/
+[0-9][0-9]-[0-9][0-9]/
+
+# ─── Saídas geradas ───
+teste_gerado.qet
+
+# ─── Ambiente de desenvolvimento (OpenCode) ───
 .opencode/

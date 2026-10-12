@@ -2288,7 +2288,7 @@ const CRM = {
         try {
             await Promise.all(readerPromises);
             const token = store.getState().auth?.token;
-            const res = await fetch(`http://${location.hostname}:8082/api/send-email`, {
+            const res = await fetch(`/api/send-email`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ to, cc, assunto, corpo, lead_id: leadId, attachments })
@@ -2321,7 +2321,7 @@ const CRM = {
         if (!container) return;
         try {
             const token = store.getState().auth?.token;
-            const res = await fetch(`http://${location.hostname}:8082/api/email-log?lead_id=${encodeURIComponent(leadId)}&limit=20`, {
+            const res = await fetch(`/api/email-log?lead_id=${encodeURIComponent(leadId)}&limit=20`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -2617,7 +2617,7 @@ const CRM = {
                 try {
                     const base64 = reader.result.split(',')[1];
                     const token = store.getState().auth?.token;
-                    const res = await fetch(`http://${location.hostname}:8082/api/crm/upload-anexo`, {
+                    const res = await fetch(`/api/crm/upload-anexo`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ nome_arquivo: file.name, fileData: base64, tipo_arquivo: file.type })

@@ -1,0 +1,1274 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — PROPOSTA TÉCNICA NO GERAPRO                             ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Proposta Técnica, que     ║
+║   é onde você descreve tecnicamente os equipamentos que está fornecendo.        ║
+║   Ele NÃO explica Precificação (cálculo de preços), Típicos de Partida          ║
+║   (modelos de partida de motor) ou Pipeline Comercial.                          ║
+║   Se você precisa disso, consulte os outros arquivos de explicação na pasta    ║
+║   docs/ ou use o help do sistema (botão ❓).                                     ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É A PROPOSTA TÉCNICA?                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você vai contratar uma construtora para fazer uma casa. Antes de
+discutir preço, você precisa de uma PLANTA — um documento que mostra:
+
+  • Quantos cômodos a casa vai ter
+  • O tamanho de cada cômodo
+  • Que materiais vão ser usados (tijolo, concreto, telha)
+  • Onde ficam as instalações elétricas e hidráulicas
+
+A Proposta Técnica no GeraPro é exatamente isso: a "planta" do fornecimento
+elétrico. Ela descreve:
+
+  • Quais painéis elétricos estão sendo fornecidos (CCM, QGBT, Cubículos MT...)
+  • As especificações técnicas de cada um (tensão, corrente, dimensões)
+  • Os motores e cargas que cada painel vai alimentar
+  • A lista completa de materiais (disjuntores, cabos, contatores)
+  • O escopo do fornecimento (o que está incluso e o que não está)
+  • Os fabricantes preferenciais de cada componente
+  • As revisões e versões do documento
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ✅  Proposta Técnica = Documento técnico (o "o quê" vai ser fornecido).       ║
+║   ✅  Proposta Comercial = Preços e condições (o "quanto" vai custar).         ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde a Proposta Técnica se encaixa no fluxo de trabalho?                     │
+│                                                                                 │
+│  1. Você cria uma PTC (Proposta Técnico-Comercial) — é a pasta do projeto     │
+│  2. ❗ Você ABRE a Proposta Técnica — descreve os equipamentos                │
+│  3. Cria os equipamentos (painéis) e suas cargas (motores)                     │
+│  4. Associa Típicos de Partida a cada carga                                   │
+│  5. O sistema monta a Lista de Materiais automaticamente                      │
+│  6. Configura escopo, exclusões, lista de fornecedores                        │
+│  7. ❗ Depois vai para a Precificação (definir preços)                        │
+│  8. Depois para a Proposta Comercial (condições de pagamento)                 │
+│  9. Exporta o documento em Word para entregar ao cliente                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. TIPOS DE EQUIPAMENTOS QUE VOCÊ PODE CADASTRAR                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Na Proposta Técnica, cada equipamento é um tipo específico de painel ou sistema.
+Os tipos disponíveis são:
+
+┌────────────────────────┬──────────────────────────────────────────────────────┐
+│ TIPO                   │ O QUE É                                               │
+├────────────────────────┼──────────────────────────────────────────────────────┤
+│ CCM-BT                 │ Centro de Controle de Motores — Baixa Tensão.        │
+│                        │ O mais comum: distribui energia para vários motores. │
+│                        │                                                       │
+│ QGBT                   │ Quadro Geral de Baixa Tensão — a "entrada" do        │
+│                        │ sistema elétrico. Distribui para os demais quadros.  │
+│                        │                                                       │
+│ CUB-MT                 │ Cubículo de Média Tensão (13,8KV, 34,5KV...).       │
+│                        │ Para indústrias que recebem energia em MT.           │
+│                        │ Tem sua própria tabela de "Cubículos" no lugar       │
+│                        │ de cargas comuns. Tipos disponíveis: CE (Entrada),  │
+│                        │ CS (Seccionamento), CM (Medição), CP (Proteção),    │
+│                        │ CT (Transformação), CPS (Proteção Contra Surtos),   │
+│                        │ CAN (Aterramento de Neutro).                         │
+│                        │ Normas padrão: NBR IEC 62271, NR-10, NR-12.         │
+│                        │ Tensão padrão: 13,8kV / Isolamento: 15kV /          │
+│                        │ ICC: 16kA/1s / IP: IP-4X.                           │
+│                        │                                                       │
+│ QTA                    │ Quadro de Transferência Automática — chaveia entre   │
+│                        │ rede normal e gerador.                                │
+│                        │                                                       │
+│ QDL                    │ Quadro de Distribuição de Iluminação.                │
+│                        │                                                       │
+│ QDF                    │ Quadro de Distribuição de Força.                     │
+│                        │                                                       │
+│ PNC                    │ Painel de Controle — para comando e supervisão.      │
+│                        │                                                       │
+│ BC                     │ Banco de Capacitores — correção de fator de potência.│
+│                        │                                                       │
+│ PLC                    │ Painel de Automação (CLP) — o "cérebro" da fábrica.  │
+│                        │ Tem lista de I/O (entradas e saídas).                │
+│                        │                                                       │
+│ REM                    │ Remota de Automação — expande as I/O do PLC.         │
+│                        │                                                       │
+│ TR-MT                  │ Transformador de Média Tensão.                       │
+│                        │                                                       │
+│ SEU                    │ Subestação Elétrica Unitária — agrupa transformador  │
+│                        │ + painéis em uma única subestação.                   │
+│                        │                                                       │
+│ ELETROCENTRO           │ Sala Elétrica Modular — uma "salinha" pré-fabricada │
+│                        │ que abriga os painéis.                               │
+└────────────────────────┴──────────────────────────────────────────────────────┘
+
+📌 Cada tipo de equipamento tem campos e sub-abas diferentes. Por exemplo:
+   PLC tem aba "Lista de I/O", CCM-BT tem aba "Cargas" e "Barramentos",
+   SEU não tem cargas próprias (agrupa outros equipamentos).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. A TELA PRINCIPAL                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em "Proposta Técnica" no menu lateral, você vê:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  🔍 [Buscar..._____________________________]                                    │
+│                                                                                 │
+│  ┌──────────────────┬─────────────┬──────────┬────────────────────────────────┐ │
+│  │ Proposta          │ Cliente     │ Revisão  │ Ações                         │ │
+│  ├──────────────────┼─────────────┼──────────┼────────────────────────────────┤ │
+│  │ Usina São Paulo  │ Usina SP    │ Rev 01   │ [📝] [❌]                     │ │
+│  │ CCM-BT e QGF     │             │          │                                │ │
+│  └──────────────────┴─────────────┴──────────┴────────────────────────────────┘ │
+│                                                                                 │
+│  [➕ NOVA PROPOSTA TÉCNICA]                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+💡 Se você já tem uma PTC aberta (no topo da tela), o sistema CARREGA
+   automaticamente a Proposta Técnica dessa PTC ao entrar no módulo.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. A TELA DO FORMULÁRIO (VISÃO GERAL)                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você cria ou edita uma Proposta Técnica, abre uma tela cheia com:
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║  CABEÇALHO (barra escura)                                                       ║
+║  ──────────────────────────────────────────────────────────────────────         ║
+║  Proposta Técnica | Usina São Paulo                     [Importar] [Voltar]    ║
+║                                                                                  ║
+║  ABAS DE NAVEGAÇÃO                                                              ║
+║  ┌──────────┬──────────────┬─────────────┬────────┬────────────┬──────────┐    ║
+║  │ DADOS    │ EQUIPAMENTOS │ INFRA-      │ ESCOPO │ VENDOR     │ EXCLUSÕES│    ║
+║  │ GERAIS   │              │ ESTRUTURA   │        │ LIST       │          │    ║
+║  └──────────┴──────────────┴─────────────┴────────┴────────────┴──────────┘    ║
+║  ┌──────────┬────────┐                                                        ║
+║  │ REVISÕES │ASSINA- │                                                        ║
+║  │          │TURAS   │                                                        ║
+║  └──────────┴────────┘                                                        ║
+║                                                                                  ║
+║  ┌──────────────────────────────────────────────────────────────────────────┐   ║
+║  │  CONTEÚDO DA ABA ATIVA                                                    │   ║
+║  │                                                                           │   ║
+║  │  (cada aba tem seus campos específicos — explicados nas próximas seções) │   ║
+║  │                                                                           │   ║
+║  └──────────────────────────────────────────────────────────────────────────┘   ║
+║                                                                                  ║
+║  RODAPÉ                                                                         ║
+║  ──────────────────────────────────────────────────────────────────────         ║
+║  [📄 Exportar Word]  [❌ Cancelar]  [💾 Salvar]  [📋 Salvar como Novo]          ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. ABA: DADOS GERAIS                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A primeira aba contém as informações básicas da proposta:
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ CAMPO                 │ O QUE É                                                 │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Cliente               │ Selecionado da lista de clientes cadastrados.           │
+│ Código                │ Gerado automaticamente (ex: PTC-2025-001_PT_Rev00).    │
+│ Data de Emissão       │ Data atual (pode alterar).                              │
+│ A/C                   │ "Aos cuidados de" — contato no cliente.                 │
+│ E-mail                │ E-mail do contato.                                      │
+│ Telefone              │ Telefone do contato.                                    │
+│ Projeto               │ Nome do projeto/obra.                                  │
+│ Referência            │ Informação complementar (ex: número da licitação).      │
+│ Objeto                │ Descrição do objeto do fornecimento.                    │
+│                       │ Padrão: "FORNECIMENTO DE PAINÉIS ELÉTRICOS".           │
+│ Cidade / UF           │ Local de entrega dos equipamentos.                     │
+│ Engenheiro Resp.      │ Engenheiro responsável pela elaboração.                │
+│ Vendedor              │ Vendedor responsável.                                  │
+│ Logos                 │ Upload da logo da empresa, do cliente e marca d'água   │
+│                       │ (aparecem no Word).                                    │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+💡 Quando você seleciona um cliente, o sistema carrega os contatos cadastrados.
+   Escolher um contato preenche e-mail e telefone automaticamente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. ABA: EQUIPAMENTOS — VISÃO GERAL                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba de Equipamentos é a MAIS IMPORTANTE e a MAIS COMPLEXA. Ela tem dois lados:
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║  ┌─────────────────────────────────┬──────────────────────────────────────────┐ ║
+║  │ SIDEBAR (260px)                │ PAINEL PRINCIPAL                         │ ║
+║  │                                 │                                          │ ║
+║  │ Equipamentos                    │ Sub-abas:                               │ ║
+║  │ ─────────────────────────       │ ┌─────┬─────┬─────┬──────┬──────┬────┐ │ ║
+║  │ [+ Novo Equipamento]           │ │Técn.│Normas│Cargas│Env. │Barr. │MO │ │ ║
+║  │                                 │ │ ─── │ ──── │ ──── │ ─── │ ──── │── │ │ ║
+║  │  ▼ SEU-01 (Subestação)         │ │     │      │      │     │      │   │ │ ║
+║  │    TR-MT-01                    │ └─────┴──────┴──────┴──────┴──────┴────┘ │ ║
+║  │    CCM-BT-01 (componente)      │                                          │ ║
+║  │                                 │ Conteúdo da sub-aba ativa               │ ║
+║  │  CCM-BT-02                     │                                          │ ║
+║  │  QGBT-01                       │                                          │ ║
+║  │                                 │                                          │ ║
+║  │ [🔧 Estimar Mão de Obra]       │                                          │ ║
+║  │ [📦 Adicionar SEU]             │                                          │ ║
+║  │                                 │                                          │ ║
+║  └─────────────────────────────────┴──────────────────────────────────────────┘ ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+─── SIDEBAR ───────────────────────────────────────────────────────────────────────
+
+  • Lista todos os equipamentos da proposta em ordem.
+  • Você pode ARRASTAR para reordenar.
+  • SEUs aparecem como pastas expansíveis com seus componentes dentro.
+  • Clique em um equipamento para selecionar e ver suas sub-abas.
+  • Botões: "Novo Equipamento", "Estimar Mão de Obra", "Adicionar SEU".
+
+──AS SUB-ABAS (variam conforme o tipo de equipamento) ──────────────────────────
+
+  Para a maioria dos tipos (CCM-BT, QGBT, QTA, BC, PNC, QDL, QDF):
+
+    • FICHA TÉCNICA — Tensão, ICC, IP, dimensões, pintura, normas de ensaio, etc.
+    • NORMAS — Normas técnicas aplicáveis (NBR IEC 61439, NR-10, etc.)
+    • CARGAS — Motores, alimentadores e cubículos ligados ao painel
+    • INVÓLUCROS — Tipo de gabinete, material, cor, acesso, quantidade de armários
+    • BARRAMENTOS — Barramento principal, derivação e terra (material, corrente)
+    • DESVIOS TÉCNICOS — Itens que fogem ao padrão com justificativa
+    • MÃO DE OBRA — Estimativa de horas de montagem
+    • DESPESAS — Custos adicionais por equipamento
+    • CÁLCULOS ELÉTRICOS — Potência total, corrente nominal, disjuntor sugerido
+    • CÁLCULOS MECÂNICOS — Dimensões totais, peso do barramento de cobre
+    • LAYOUT SUGERIDO — Arranjo físico dos cubículos com canvas visual
+
+  Para PLC / REM:
+
+    • FICHA TÉCNICA — Especificações do painel de automação
+    • NORMAS — Normas aplicáveis
+    • LISTA DE I/O — Racks, slots e canais de entrada/saída
+    • BOM (Lista de Materiais) — Materiais do painel de automação
+    • DESVIOS TÉCNICOS — Itens fora do padrão com justificativa
+    • MÃO DE OBRA
+    • DESPESAS
+
+  Para TR-MT (Transformador):
+
+    • FICHA TÉCNICA — Potência, tensões primária/secundária, etc.
+    • MATERIAIS — Materiais específicos do transformador
+    • NORMAS
+    • DESVIOS
+    • DESPESAS
+
+  Para SEU (Subestação):
+
+    • FICHA TÉCNICA — Tensão primária
+    • DESVIOS
+    • DESPESAS
+
+  Para ELETROCENTRO:
+
+    • FICHA TÉCNICA — Dimensões da sala, módulos, peso, capacidade
+    • ELETROCENTRO — Escopo específico da sala elétrica (matriz de responsabilidades)
+    • MATERIAIS
+    • NORMAS
+    • DESVIOS
+    • MÃO DE OBRA
+    • DESPESAS
+    • CÁLCULOS MECÂNICOS
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. SUB-ABA: CARGAS (LOADS) E TÍPICOS                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+As CARGAS representam os motores ou alimentadores que o painel vai atender.
+
+Exemplo: Um CCM-BT pode ter estas cargas:
+  • M-01: Bomba de Água 50CV (com Inversor)
+  • M-02: Exaustor 30CV (com Soft-Starter)
+  • M-03: Correia Transportadora 10CV (Partida Direta)
+  • C-01: Alimentador 100A (sem motor)
+
+─── CAMPOS DE CADA CARGA ─────────────────────────────────────────────────────────
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ CAMPO                 │ O QUE É                                                 │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ TAG                   │ Identificação da carga (ex: M-01, C-01).               │
+│ Descrição             │ O que é (ex: "Bomba de Água 01").                      │
+│ Potência (CV)         │ Potência do motor em Cavalos-Vapor.                    │
+│ Tensão (V)            │ Tensão de alimentação do motor.                        │
+│ Corrente (A)          | ⛔ Auto — calculada pela fórmula (potência × FP, etc.) │
+│ Regime                │ S1 (contínuo), S2 (curta duração) ou S3 (intermitente).│
+│ Tipo                  │ Tipo de partida: IF (Inversor), SS (Soft-Starter),      │
+│                       │ PD (Partida Direta), ET (Estrela-Triângulo),            │
+│                       │ AL (Alimentador)...                                     │
+│ Típico                │ 🎯 **Campo mais importante**: seleciona o Típico       │
+│                       │ de Partida que contém a lista de materiais.            │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+──COMO FUNCIONA O TÍPICO ──────────────────────────────────────────────────────
+
+  Ao selecionar um Típico:
+  1. O sistema FILTRA os típicos compatíveis (mesma potência, tensão e tipo)
+  2. Ao escolher, os parâmetros elétricos são preenchidos automaticamente
+  3. A Lista de Materiais da carga é carregada a partir do típico
+  4. O custo da carga é calculado (soma dos materiais)
+
+─── AÇÕES DISPONÍVEIS ────────────────────────────────────────────────────────────
+
+  • ➕ Adicionar carga
+  • 📋 Duplicar carga
+  • 📄 Importar cargas do Excel
+  • 💾 Salvar lista como modelo
+  • 📂 Carregar lista de um modelo salvo
+  • 🗑️ Limpar todas as cargas
+
+─── PARA CUB-MT ──────────────────────────────────────────────────────────────────
+
+  Em vez de Típicos de Partida, os Cubículos MT usam "cubiculos" — que são
+  os modelos de cubículo de média tensão (entrada, saída, medição, etc.).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. LISTA DE MATERIAIS (LM) — VISÃO CONSOLIDADA                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A LM é uma VISÃO CONSOLIDADA de TODOS os materiais de TODAS as cargas.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  🔍 [Buscar material...___________________________]                            │
+│                                                                                 │
+│  ┌──────────────────────────────────────────────────────────────────────────┐   │
+│  │ ⚡ Carga: M-01 — Bomba de Água (50CV) — Inversor                        │   │
+│  │ ┌─────┬──────────────────────┬──────────┬──────────┬──────┬──────┬─────┐ │   │
+│  │ │QTD  │ DESCRIÇÃO            │ MODELO   │ FABRIC.  │ ICMS │ IPI  │CUSTO│ │   │
+│  │ ├─────┼──────────────────────┼──────────┼──────────┼──────┼──────┼─────┤ │   │
+│  │ │ 1   │ Disjuntor Motor      │ DMW-5A   │ WEG      │ 18%  │ 0%   │ 145 │ │   │
+│  │ │ 1   │ Inversor Siemens     │ G120-55  │ Siemens  │ 12%  │ 9,75%│3.200│ │   │
+│  │ │ 1   │ Contator             │ CW18-11  │ WEG      │ 18%  │ 0%   │ 280 │ │   │
+│  │ │ 10m │ Cabo 10mm²           │ 10mm²    │ Sinox    │ 18%  │ 0%   │ 400 │ │   │
+│  │ │     │                     │          │          │      │      │     │ │   │
+│  │ │     │                     │          │ Subtotal │      │      │4.025│ │   │
+│  │ └─────┴──────────────────────┴──────────┴──────────┴──────┴──────┴─────┘ │   │
+│  │                                                                           │   │
+│  │ ⚡ Carga: M-02 — Exaustor (30CV) — Soft-Starter                          │   │
+│  │ ┌─────┬──────────────────────┬──────────┬──────────┬──────┬──────┬─────┐ │   │
+│  │ │ 1   │ Soft-Starter WEG     │ SSW07-30 │ WEG      │ 18%  │ 0%   │1.800│ │   │
+│  │ │ 1   │ Disjuntor Motor      │ DMW-30   │ WEG      │ 18%  │ 0%   │ 320 │ │   │
+│  │ │ ... │                      │          │          │      │      │     │ │   │
+│  │ └─────┴──────────────────────┴──────────┴──────────┴──────┴──────┴─────┘ │   │
+│  │                                                                           │   │
+│  │  📊 TOTAL GERAL: R$ 12.450,00                                            │   │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                 │
+│  [📥 Exportar Excel c/ Preços]  [📥 Exportar Excel s/ Preços]  [➕ Incluir Item]│
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+💡 Você pode alternar entre a visão de EDIÇÃO (tabela de cargas) e a visão de LM
+   (materiais) usando os botões no topo da sub-aba.
+
+💡 O botão "➕ Incluir Item" permite adicionar materiais EXTRAS que não estavam
+   no típico original (ex: um disjuntor geral do painel, bornes, canaletas).
+
+💡 A exportação para Excel é útil para enviar ao setor de COMPRAS.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. SUB-ABA: FICHA TÉCNICA                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A Ficha Técnica é a primeira sub-aba de cada equipamento. Ela reúne as
+especificações técnicas do painel. Os campos variam conforme o tipo.
+
+─── CAMPOS COMUNS (presentes na maioria dos tipos) ───────────────────────────
+
+┌──────────────────────────┬──────────────────────────────────────────────────┐
+│ CAMPO                    │ O QUE É                                          │
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ Tensão Nominal (V)       │ Tensão de alimentação do painel.                  │
+│ Tensão de Comando (V)    │ Tensão do circuito de comando (ex: 220V CA).     │
+│ Sistema Elétrico         │ Ex: 127/220V, 220/380V, 254/440V, 380/660V.     │
+│ Corrente Nominal (A)     │ Corrente nominal do barramento principal.        │
+│ Frequência (Hz)          │ 50Hz ou 60Hz.                                    │
+│ ICC (kA)                 │ Corrente de curto-circuito suportável.          │
+│ IP (Proteção)            │ Grau de proteção do invólucro (ex: IP-54).      │
+│ Segregação Interna       │ Forma de separação: 1, 2a, 2b, 3a, 3b, 4a, 4b. │
+│ Execução                 │ Fixa, extraível, deslizante.                     │
+│ Tipo de Instalação       │ Abrigada ou ao tempo.                            │
+│ Cor / Pintura            │ Cor RAL (ex: RAL 7032) e camada de pintura.     │
+│ Entrada de Cabos         │ Inferior, superior, tipo de prensa-cabo.        │
+│ Acesso                   │ Frontal e/ou traseiro para manutenção.          │
+│ Dimensões (L×A×P mm)    │ Largura, altura e profundidade do painel.       │
+│ Peso (kg)                │ Peso estimado do painel.                        │
+└──────────────────────────┴──────────────────────────────────────────────────┘
+
+─── CAMPOS ESPECÍFICOS POR TIPO ─────────────────────────────────────────────
+
+  • CUB-MT: tensão nominal (13,8kV), isolamento (15kV), ICC (16kA/1s),
+    IAC (AFLR), perda de arco (LSC-2B), IP (IP-4X)
+  • TR-MT: potência (kVA), tensão primária (ex: 13,8kV), tensão secundária
+    (ex: 380V), grupo de ligação, impedância (%), nível de isolamento
+  • SEU: tensão primária, tipo de subestação
+  • ELETROCENTRO: dimensões da sala (L×C×A), número de módulos, pé direito,
+    peso por metro quadrado, capacidade de ventilação
+  • PLC/REM: processador, memória, protocolo de comunicação, fonte,
+    interface de rede
+
+💡 A Ficha Técnica é o que o cliente lê no documento Word. Preencha com
+   cuidado para transmitir profissionalismo.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. SUB-ABA: INVÓLUCROS                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A sub-aba "Invólucros" define o gabinete físico do painel: tipo, material,
+dimensões e quantidade de armários.
+
+┌──────────────────────────┬──────────────────────────────────────────────────┐
+│ CAMPO                    │ O QUE É                                          │
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ Tipo de Invólucro        │ Autoportante, sobrepor, de piso, mural, armário. │
+│ Material                 │ Aço carbono, aço inox, alumínio, poliéster.      │
+│ Cor                      │ Cor RAL do gabinete.                            │
+│ Quantidade de Armários   │ Número de corpos do painel.                     │
+│ Dimensões (L×A×P mm)    │ Dimensões externas de cada armário.             │
+│ Formato                  │ Montagem lado a lado, costas com costas.         │
+└──────────────────────────┴──────────────────────────────────────────────────┘
+
+💡 Para painéis com múltiplos armários, você pode configurar cada armário
+   individualmente (largura, altura, profundidade, tipo de porta).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. SUB-ABA: BARRAMENTOS                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Os barramentos são as barras de cobre (ou alumínio) que distribuem energia
+dentro do painel.
+
+┌──────────────────────────┬──────────────────────────────────────────────────┐
+│ CAMPO                    │ O QUE É                                          │
+├──────────────────────────┼──────────────────────────────────────────────────┤
+│ Material                 │ Cobre ou Alumínio.                               │
+│ Corrente Nominal (A)     │ Corrente para a qual o barramento foi projetado. │
+│ ICC Suportado (kA)       │ Corrente de curto-circuito suportada.           │
+│ Barras por Fase          │ Quantidade de barras em paralelo por fase.       │
+│ Dimensões da Barra (mm)  │ Espessura × largura (ex: 10×50mm).              │
+│ Tratamento Superficial   │ Nu, estanhado, prateado, niquelado.              │
+│ Barramento de Terra      │ Dimensão e material do barramento de terra.      │
+└──────────────────────────┴──────────────────────────────────────────────────┘
+
+💡 O sistema calcula a corrente do barramento com base na soma das correntes
+   de todas as cargas do painel. O valor sugerido aparece nos Cálculos Elétricos.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. SUB-ABA: DESVIOS TÉCNICOS                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Desvios Técnicos são itens do fornecimento que FOGEM AO PADRÃO especificado na
+proposta. Por exemplo:
+
+  • "Painel com altura de 2200mm em vez de 2000mm (dimensão padrão)"
+  • "Barramento de cobre estanhado em vez de nu"
+  • "Cor RAL 5005 em vez de RAL 7032"
+
+Cada desvio tem:
+  • **Descrição** — O que foge ao padrão
+  • **Justificativa** — Por que o desvio é necessário
+
+📌 Os desvios aparecem no documento Word exportado para justificar as
+   diferenças ao cliente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. SUB-ABA: DESPESAS                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Despesas são custos adicionais específicos de cada equipamento que não fazem
+parte dos materiais das cargas. Exemplos:
+
+  • Taxa de frete para o painel
+  • Comissão de engenharia para projeto especial
+  • Custos de ensaios de tipo (teste de arco interno, elevação de temperatura)
+
+Cada despesa tem: **tipo**, **descrição**, **valor** e **critério de rateio**.
+
+💡 As despesas são transportadas para a Precificação e aparecem no custo
+   final do equipamento.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  14. SUB-ABA: LAYOUT SUGERIDO                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Disponível para painéis com segregação interna (Forma 1, 2a ou 2b). Gera uma
+sugestão visual da distribuição dos cubículos no painel.
+
+─── O QUE FAZ ─────────────────────────────────────────────────────────────────
+
+  1. Calcula quantos armários são necessários com base nas cargas e dimensões
+  2. Mostra um CANVAS VISUAL com a vista frontal dos armários
+  3. Exibe a largura calculada vs. largura instalada
+  4. Permite EXPORTAR o layout como PDF
+
+📌 O layout é ORIENTATIVO — a distribuição final depende do fabricante do
+   painel. Use como referência para o projeto executivo.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  15. SUB-ABA: CÁLCULOS ELÉTRICOS                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A sub-aba "Cálculos Elétricos" resume os parâmetros elétricos do painel com
+base nas cargas configuradas.
+
+─── O QUE MOSTRA ───────────────────────────────────────────────────────────────
+
+  • **Potência Total (CV)** — Soma das potências de todos os motores
+  • **Corrente Total (A)** — Soma das correntes de todas as cargas
+  • **Corrente Nominal (A)** — Arredondada para o valor comercial padrão
+    (100A, 200A, 400A, 630A, 800A, 1000A, 1600A, 2500A, 4000A, 6300A)
+  • **Disjuntor Sugerido** — Corrente + ICC, ex: "Disj. 400A / 50kA — 3 polos"
+
+📌 Os valores são atualizados automaticamente quando você altera as cargas.
+   Use como referência para dimensionar o barramento e a proteção geral.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  16. SUB-ABA: CÁLCULOS MECÂNICOS                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A sub-aba "Cálculos Mecânicos" calcula as dimensões e peso estimado do painel.
+
+─── O QUE MOSTRA ───────────────────────────────────────────────────────────────
+
+  • **Dimensões Totais (L×A×P mm)** — Soma das dimensões de todos os armários
+  • **Peso do Barramento de Cobre (kg)** — Estimado com base na corrente total
+
+📌 Os cálculos são automáticos e refletem a configuração atual dos invólucros.
+   Útil para planejamento de transporte e instalação.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  17. ABA: INFRAESTRUTURA                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba Infraestrutura abrange tudo que está FORA dos painéis elétricos mas
+dentro do escopo do projeto: obras civis, cabos, aterramento, serviços
+técnicos e custos unitários.
+
+─── DISCIPLINAS ─────────────────────────────────────────────────────────────────
+
+┌────────────────────────┬──────────────────────────────────────────────────────┐
+│ DISCIPLINA             │ O QUE INCLUI                                         │
+├────────────────────────┼──────────────────────────────────────────────────────┤
+│ 🏗️ Obra Civil         │ Fundações, bases de concreto, canaletas,             │
+│                        │ pisos técnicos, salas elétricas.                     │
+│                        │                                                      │
+│ ⚡ Infraestrutura      │ Cabos de força e controle, eletrodutos, leitos,      │
+│   Elétrica             │ bandejas, terminais, conectores.                     │
+│                        │                                                      │
+│ 🔒 SPDA / Aterramento  │ Para-raios, malha de terra, sistema de              │
+│                        │ aterramento, conexões.                               │
+│                        │                                                      │
+│ 🔧 Infraestrutura      │ Ventilação, pressurização, HVAC, exaustão,           │
+│   Mecânica             │ dutos de ar.                                         │
+│                        │                                                      │
+│ 🌐 Cabeamento          │ Rede lógica, fibra óptica, patch panels,             │
+│   Estruturado          │ racks, switches.                                     │
+│                        │                                                      │
+│ 🔩 Serviços Técnicos   │ Montagem eletromecânica, comissionamento,            │
+│                        │ supervisão técnica, testes, ART/TRT,                 │
+│                        │ gerenciamento de obra.                               │
+│                        │                                                      │
+│ 💲 Custos Unitários    │ Tabela de referência com custos por                  │
+│                        │ unidade (m², m³, kg, un.) e aplicação de BDI.       │
+└────────────────────────┴──────────────────────────────────────────────────────┘
+
+─── COMO FUNCIONA ──────────────────────────────────────────────────────────────
+
+Cada disciplina tem uma tabela editável onde você adiciona itens com:
+
+  • **Código** e **Descrição** — Identificação do item
+  • **Quantidade** e **Unidade** — Ex: 50 m, 10 un, 200 kg
+  • **Custo Unitário (R$)** — Custo direto do material/serviço
+  • **Horas de Instalação** e **Valor Hora** — Mão de obra associada
+  • **Dificuldade** — Normal (1,0x) / Elevado (1,5x) / Crítico (2,5x)
+  • **Desconto (%)** — Desconto comercial sobre o item
+  • **Markup (%)** — Margem sobre o item
+
+─── ATIVIDADES PRÉ-DEFINIDAS ─────────────────────────────────────────────────
+
+Cada disciplina já vem com dezenas de atividades pré-cadastradas. Exemplos
+da disciplina Infra Elétrica:
+
+  • Cabo de cobre 10mm² — por metro
+  • Cabo de cobre 35mm² — por metro
+  • Cabo de cobre 120mm² — por metro
+  • Cabo de controle 1,5mm² — por metro
+  • Eletroduto de aço 1" — por metro
+  • Eletroduto de aço 2" — por metro
+  • Leito para cabos 300mm — por metro
+  • Leito para cabos 600mm — por metro
+  • Montagem de eletrodutos — por metro
+
+─── RECURSOS ADICIONAIS ───────────────────────────────────────────────────────
+
+  • **Catálogo de Materiais** — Busca e insere materiais do catálogo
+  • **Reajuste em Massa** — Percentual de aumento/redução em todos os itens
+  • **Subtotal Automático** — Custo direto e preço final em tempo real
+  • **Exportar CSV / XLSX** — Planilha com todos os itens
+  • **Resumo Consolidado** — Visão geral para impressão
+
+📌 Os custos da Infraestrutura vão para a Precificação como
+   "Custos de Infraestrutura" no cálculo final.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  18. ABA: ESCOPO                                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Escopo define o que ESTÁ INCLUSO no fornecimento e de quem é a responsabilidade.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  📋 ESCOPO DE FORNECIMENTO                                                     │
+│  ───────────────────────────────────────────                                    │
+│                                                                                 │
+│  ☑ ITENS AUTO-GERADOS (dos equipamentos):                                     │
+│  ┌──────────┬──────────────────────────────────────────────┬───────┬──────────┐ │
+│  │ RESP.    │ ITEM                                         │ PTC   │ CLIENTE  │ │
+│  ├──────────┼──────────────────────────────────────────────┼───────┼──────────┤ │
+│  │ ✅ PTC   │ Fornecimento de CCM-BT-01                    │ ☑     │ ☐       │ │
+│  │ ✅ PTC   │ Fornecimento de QGBT-01                      │ ☑     │ ☐       │ │
+│  │          │ Subestação SEU-01 — 2 equipamento(s)         │       │          │ │
+│  │ ✅ PTC   │   Fornecimento de TR-MT-01                   │ ☑     │ ☐       │ │
+│  │ ✅ PTC   │   Fornecimento de CCM-BT-02                  │ ☑     │ ☐       │ │
+│  └──────────┴──────────────────────────────────────────────┴───────┴──────────┘ │
+│                                                                                 │
+│  ➕ ITENS MANUAIS:                                                              │
+│  ┌──────────┬──────────────────────────────────────────────┬───────┬──────────┐ │
+│  │ ✅ PTC   │ Projeto executivo de engenharia             │ ☑     │ ☐       │ │
+│  │ ☐ AMBOS  │ Montagem elétrica                           │ ☑     │ ☑       │ │
+│  │ ☐ CLIENTE│ Fundação e bases de concreto                 │ ☐     │ ☑       │ │
+│  └──────────┴──────────────────────────────────────────────┴───────┴──────────┘ │
+│                                                                                 │
+│  [🔄 Sincronizar do Equipamento]  [➕ Adicionar Item]                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 Os itens auto-gerados são sincronizados automaticamente com a lista de
+   equipamentos. Se você adiciona ou remove um equipamento, clique em
+   "Sincronizar" para atualizar o escopo.
+
+📌 Para equipamentos do tipo ELETROCENTRO, existe uma seção separada de
+   escopo com uma matriz de responsabilidades (PTC / N/A / Cliente) para
+   cada grupo de itens da sala elétrica. A matriz cobre 4 grupos:
+
+┌────────────────┬───────────────────────────────────────────────────────────┐
+│ GRUPO          │ EXEMPLOS DE ITENS                                         │
+├────────────────┼───────────────────────────────────────────────────────────┤
+│ PROJETOS       │ Layout do eletrocentro, projeto eletromecânico executivo,  │
+│                │ projeto de iluminação, SPDA, SDAI, CFTV, Dados/Voz,       │
+│                │ sistemas de combate a incêndio, projeto de infraestrutura  │
+│                │ elétrica, memorial descritivo.                             │
+│                │                                                            │
+│ MATERIAIS      │ Eletrocentro pintado, sistema de iluminação, pilotis,     │
+│                │ leitos porta-cabos, cabos de força e controle, sistema     │
+│                │ de aterramento, SPDA, combate a incêndio, CFTV,            │
+│                │ controle de acesso, sistema de climatização (HVAC),        │
+│                │ pressurização de salas, bancada de operação.               │
+│                │                                                            │
+│ MÃO DE OBRA    │ Montagem eletromecânica, instalação de cabos, testes,     │
+│                │ comissionamento, start-up.                                │
+│                │                                                            │
+│ SERVIÇOS       │ Projeto executivo, supervisão técnica, comissionamento,   │
+│                │ elaboração de ART/TRT, gerenciamento de obra,             │
+│                │ fornecimento de documentação técnica ("as built").        │
+└────────────────┴───────────────────────────────────────────────────────────┘
+
+📌 Para cada item, você define se a responsabilidade é da PTC, do Cliente
+   ou Não Aplicável (N/A). Isso aparece no documento Word exportado.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  19. ABA: VENDOR LIST                                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A Vendor List define qual FABRICANTE você prefere para cada tipo de componente.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  ┌────────────────────────────────┬────────────────────────┬──────────────────┐ │
+│  │ COMPONENTE                     │ FABRICANTE              │ OPÇÃO            │ │
+│  ├────────────────────────────────┼────────────────────────┼──────────────────┤ │
+│  │ Disjuntores                    │ ABB                     │ Padrão           │ │
+│  │ Contatores                     │ Siemens                │ Padrão           │ │
+│  │ Relés de Sobrecarga            │ Siemens                │ Padrão           │ │
+│  │ Soft-Starter                   │ WEG                    │ Similar          │ │
+│  │ Inversor de Frequência         │ Siemens                │ Padrão           │ │
+│  │ Cabos                          │ Sinox                  │ Outro: Prysmian  │ │
+│  │ ... (total de ~30 categorias)  │                        │                  │ │
+│  └────────────────────────────────┴────────────────────────┴──────────────────┘ │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Opções disponíveis:
+  • **Padrão** — Usa o fabricante mapeado como padrão no sistema
+  • **Similar** — Usa o fabricante digitado como sugestão (similar ao padrão)
+  • **Outro** — Você digita o fabricante desejado livremente
+
+💡 As escolhas são salvas como PREFERÊNCIA da empresa. Na próxima proposta,
+   os valores já aparecem preenchidos.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  20. ABA: EXCLUSÕES                                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Lista de itens que NÃO estão inclusos no fornecimento.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. Obra civil (fundações, bases, canaletas)                                   │
+│  2. Cabos de força entre painéis                                               │
+│  3. Para-raios e sistema de aterramento                                        │
+│  4. Projeto executivo de engenharia                                            │
+│  ...                                                                           │
+│                                                                                 │
+│  [➕ Adicionar Exclusão]                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 Cada item pode ser editado inline ou removido. As exclusões vão para o
+   documento Word exportado.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  21. ABA: REVISÕES                                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Controle de versões da proposta:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  ┌──────┬──────────────────────┬──────────┬──────────┬──────────┬────────────┐ │
+│  │ NÚ   │ DESCRIÇÃO            │ ELAB.    │ VERIF.   │ APROV.   │ DATA       │ │
+│  ├──────┼──────────────────────┼──────────┼──────────┼──────────┼────────────┤ │
+│  │ 00   │ Emissão Inicial      │ JC       │ LP       │ MV       │ 10/03/2026 │ │
+│  │ 01   │ Rev. após aprovação │ JC       │ LP       │ MV       │ 25/03/2026 │ │
+│  └──────┴──────────────────────┴──────────┴──────────┴──────────┴────────────┘ │
+│                                                                                 │
+│  [➕ Nova Revisão]                                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 A ÚLTIMA revisão é a que aparece no cabeçalho do documento Word exportado.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  22. ABA: ASSINATURAS (RODAPÉ)                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Até 3 blocos de assinatura que aparecem no final do documento Word:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  ┌──────────────────────────────────────────────────────────────────────────┐  │
+│  │ ☑ Assinatura 1 (Consultor)                                              │  │
+│  │ ┌──────────────────────┐ ┌──────────────────┐                            │  │
+│  │ │ José Cirqueira       │ │ Consultor Vendas  │                            │  │
+│  │ │ (16) 3945-2145       │ │ (16) 9 9793-2877  │                            │  │
+│  │ │ jose@email.com       │ │                   │                            │  │
+│  │ └──────────────────────┘ └──────────────────┘                            │  │
+│  │                                                                           │  │
+│  │ ☑ Assinatura 2 (Gerente)                                                 │  │
+│  │ ☐ Assinatura 3 (Diretor)                                                 │  │
+│  └──────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 Desmarque o checkbox se a assinatura não for necessária (ela não aparece
+   no documento Word).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  23. SEU (SUBESTAÇÃO ELÉTRICA UNITÁRIA)                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A SEU é um recurso especial que permite AGRUPAR equipamentos em uma subestação.
+
+─── POR QUE USAR? ────────────────────────────────────────────────────────────────
+
+  Quando você fornece uma subestação completa (transformador + painéis), o
+  conjunto é classificado como "Subestação Unitária" e tem benefício fiscal:
+  o IPI dos componentes é ISENTO.
+
+─── COMO FUNCIONA ────────────────────────────────────────────────────────────────
+
+  1. Você cria os equipamentos normalmente (TR-MT, CCM-BT, etc.)
+  2. Clique no botão "Adicionar SEU"
+  3. Dê um nome para a SEU (ex: "SEU-01")
+  4. Selecione quais equipamentos fazem parte dela
+  5. ✅ Pronto! Os equipamentos selecionados viram "componentes" da SEU
+
+─── O QUE MUDA ───────────────────────────────────────────────────────────────────
+
+  • Na SIDEBAR, a SEU aparece como pasta expansível com os componentes dentro
+  • No ESCOPO, aparecem itens específicos "Subestação SEU-01 — N equipamento(s)"
+  • Na PRECIFICAÇÃO, os componentes da SEU têm IPI = 0 (isento)
+  • É possível DESFAZER a SEU (botão "Desfazer SEU") — os componentes voltam
+    a ter IPI normal
+
+⚠️ Cuidado: desfazer uma SEU afeta a Precificação (o IPI volta a ser calculado).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  24. MÃO DE OBRA (ESTIMATIVA AUTOMÁTICA)                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Na sub-aba "Mão de Obra" de cada equipamento, o sistema pode CALCULAR
+automaticamente quantas horas de trabalho são necessárias para montar o painel.
+
+─── COMO FUNCIONA ────────────────────────────────────────────────────────────────
+
+  1. O sistema olha os Típicos de Partida associados às cargas
+  2. Aplica "Regras de Derivação" — regras que definem quantas horas cada
+     tipo de componente leva para montar
+  3. Combina com as "Composições de Mão de Obra" — perfis de trabalhador
+     (eletricista, técnico, ajudante) com seus custos horários
+  4. Gera uma estimativa detalhada: "Horas de Eletricista: 40h", "Horas de
+     Técnico: 20h", etc.
+
+─── COMO USAR ────────────────────────────────────────────────────────────────────
+
+  • Clique no botão "🔧 Estimar Mão de Obra" na sidebar
+  • O sistema calcula para TODOS os equipamentos de uma vez
+  • Você pode ver o detalhamento por equipamento na sub-aba "Mão de Obra"
+  • Os valores de horas vão para a Precificação como custo de mão de obra
+
+💡 Se preferir, você pode digitar as horas manualmente em vez de usar o
+   cálculo automático.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  25. EXPORTAR PARA WORD                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O botão "📄 Exportar Word" gera um documento .docx profissional usando:
+
+  • **Docxtemplater** — Motor que preenche um modelo do Word com os dados
+  • **PizZip** — Biblioteca para manipular arquivos .docx
+  • **ImageModule** — Para incluir logos e imagens no documento
+
+──O QUE VAI NO DOCUMENTO ──────────────────────────────────────────────────────
+
+  O template `TEMPLATE_TEC.docx` é preenchido com:
+
+  • Dados do cliente (razão social, CNPJ, endereço, contato)
+  • Dados da proposta (projeto, referência, código, data)
+  • Engenheiro responsável, vendedor
+  • Revisão atual
+  • **Lista de equipamentos** — Cada equipamento vira uma seção no documento
+    com suas especificações técnicas completas (tensão, ICC, IP, dimensões,
+    cargas, barramentos, etc.)
+  • **Escopo** — Tabela com responsabilidades
+  • **Vendor List** — Tabela de fabricantes
+  • **Exclusões**
+  • **Assinaturas**
+
+📌 O arquivo gerado é salvo como `Proposta_Tecnica_{projeto}.docx`.
+
+📌 Você pode personalizar o modelo `TEMPLATE_TEC.docx` (ele fica na pasta
+   raiz do sistema) para incluir o logotipo da sua empresa, cores, etc.
+
+⚠️ A exportação é BLOQUEADA se a proposta estiver em modo somente leitura
+   (Fechada/Perdida no Pipeline).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  26. SALVAR COMO NOVO                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O botão "📋 Salvar como Novo" permite criar uma CÓPIA da proposta para
+aproveitar os dados em um novo projeto.
+
+─── OPÇÕES DISPONÍVEIS ───────────────────────────────────────────────────────────
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │                                                                              │
+  │  📋 Salvar Proposta Técnica como...                                         │
+  │                                                                              │
+  │  ┌────────────────────────────────────────────────────────────────────────┐ │
+  │  │ ○ Criar nova PTC (2 arquivos PT + PC)                                 │ │
+  │  │   Cria uma nova pasta PTC e salva a Proposta Técnica e a Comercial    │ │
+  │  │                                                                        │ │
+  │  │ ● Criar nova PTC (arquivo único)                                      │ │
+  │  │   Cria uma nova pasta e salva apenas a Proposta Técnica               │ │
+  │  │                                                                        │ │
+  │  │ ○ PTC existente                                                       │ │
+  │  │   Escolha uma PTC já existente para salvar                            │ │
+  │  └────────────────────────────────────────────────────────────────────────┘ │
+  │                                                                              │
+  │  [💾 Salvar]  [Cancelar]                                                     │
+  │                                                                              │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+💡 Útil quando:
+  • Você quer reaproveitar uma proposta antiga como base para uma nova
+  • Precisa criar uma variação do projeto sem perder a original
+  • A proposta original está Fechada/Perdida e você precisa editar
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  27. MODO SOMENTE LEITURA                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando um cartão no Pipeline Comercial está como "Fechado" ou "Perdido", a
+Proposta Técnica associada entra em MODO SOMENTE LEITURA.
+
+─── O QUE ACONTECE ───────────────────────────────────────────────────────────────
+
+  • Aparece um AVISO VERMELHO no topo da tela:
+    "SOMENTE LEITURA — Esta proposta está Fechada/Perdida no Pipeline."
+  • TODOS os campos ficam desabilitados — não é possível editar nada
+  • O botão "Exportar Word" fica bloqueado
+  • O botão "Salvar" não funciona
+  • O único botão que funciona é "Salvar como Novo" (para criar uma cópia)
+
+─── POR QUE ISSO EXISTE? ─────────────────────────────────────────────────────────
+
+  Para garantir a INTEGRIDADE das propostas já decididas. Se o cliente já
+  aprovou ou recusou, não faz sentido alterar o documento depois.
+
+  Se precisar fazer alterações, crie uma cópia com "Salvar como Novo".
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  28. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  **Sempre salve antes de trocar de aba.** O sistema captura os dados da aba
+    atual quando você muda para outra. Se não salvar, pode perder alterações.
+
+✅  **Mantenha os Típicos atualizados.** A qualidade da Lista de Materiais
+    depende diretamente dos Típicos de Partida. Se eles estiverem desatualizados,
+    a LM vai ficar incorreta.
+
+✅  **Use a SEU quando aplicável.** Se você está fornecendo uma subestação
+    completa, agrupar em SEU pode reduzir IPI e deixar o escopo mais claro.
+
+✅  **Sincronize o Escopo** sempre que alterar os equipamentos. Os itens
+    auto-gerados precisam ser atualizados.
+
+✅  **Preencha a Especificação Técnica** de cada equipamento com cuidado.
+    É isso que o cliente vai ler no documento Word.
+
+✅  **Configure a Vendor List** corretamente. Ela evita dúvidas na hora da
+    compra: "Qual disjuntor eu uso? — O que está na vendor list."
+
+✅  **Para PLC/REM**, preencha a Lista de I/O (racks, slots, canais). O sistema
+    gera automaticamente a BOM (lista de materiais de automação).
+
+⚠️  **Não misture equipamentos de clientes diferentes na mesma PTC.** Cada
+    PTC é um projeto. Crie uma nova PTC para cada cliente.
+
+⚠️  **Propostas Fechadas/Perdidas são bloqueadas.** Se precisar alterar, use
+    "Salvar como Novo" para criar uma cópia editável.
+
+⚠️  **O custo dos materiais vem dos Típicos.** Se o preço no catálogo mudou,
+    use "Recalcular Custos" nos Típicos e depois reabra a Proposta Técnica.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  29. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ PTC                   │ Proposta Técnico-Comercial — pasta do projeto que       │
+│                       │ contém a Proposta Técnica e a Comercial juntas.        │
+│                       │                                                         │
+│ PT                    │ Proposta Técnica — documento técnico do fornecimento.   │
+│                       │                                                         │
+│ PC                    │ Proposta Comercial — preços e condições.                │
+│                       │                                                         │
+│ Equipamento           │ Cada painel ou sistema na proposta.                     │
+│                       │ Ex: CCM-BT-01, QGBT-01.                                │
+│                       │                                                         │
+│ Tag                   │ Identificação do equipamento ou carga.                  │
+│                       │ Ex: "CCM-BT-01", "M-01".                               │
+│                       │                                                         │
+│ Carga (Load)          │ Motor ou alimentador ligado a um painel.                │
+│                       │                                                         │
+│ Típico de Partida     │ Modelo padronizado de componentes para a partida       │
+│                       │ de um motor. Cada carga tem um típico associado.        │
+│                       │                                                         │
+│ LM (Lista de          │ Visão consolidada de todos os materiais de todas       │
+│ Materiais)            │ as cargas, com quantidades e preços.                    │
+│                       │                                                         │
+│ Escopo                │ O que está incluído no fornecimento e de quem é a      │
+│                       │ responsabilidade (PTC e/ou Cliente).                    │
+│                       │                                                         │
+│ Exclusões             │ Itens que NÃO estão inclusos no fornecimento.           │
+│                       │                                                         │
+│ Vendor List           │ Lista de fabricantes preferenciais por componente.      │
+│                       │                                                         │
+│ SEU                   │ Subestação Elétrica Unitária — agrupamento de          │
+│                       │ equipamentos que formam uma subestação. IPI isento.    │
+│                       │                                                         │
+│ TR-MT                 │ Transformador de Média Tensão.                         │
+│                       │                                                         │
+│ CCM-BT                │ Centro de Controle de Motores — Baixa Tensão.          │
+│                       │                                                         │
+│ QGBT                  │ Quadro Geral de Baixa Tensão.                          │
+│                       │                                                         │
+│ CUB-MT                │ Cubículo de Média Tensão.                              │
+│                       │                                                         │
+│ PLC                   │ Controlador Lógico Programável — painel de automação. │
+│                       │                                                         │
+│ REM                   │ Remota de Automação — expansão de I/O do PLC.          │
+│                       │                                                         │
+│ BOM                   │ Bill of Materials — Lista de Materiais do típico       │
+│                       │ ou do painel de automação.                              │
+│                       │                                                         │
+│ I/O                   │ Input/Output — entradas e saídas digitais/analógicas   │
+│                       │ do PLC.                                                │
+│                       │                                                         │
+│ IP (Índice de         │ Grau de proteção do invólucro contra poeira e água.   │
+│ Proteção)             │ Ex: IP65 (protegido contra jatos d'água).             │
+│                       │                                                         │
+│ ICC                   │ Corrente de Curto-Circuito — capacidade de             │
+│                       │ interrupção do painel em kA.                          │
+│                       │                                                         │
+│ FP (Fator de          │ Cosseno Phi — eficiência do uso da energia elétrica.  │
+│ Potência)             │                                                         │
+│                       │                                                         │
+│ Envoltória            │ O invólucro/gabinete do painel (portas, laterais,      │
+│                       │ teto, fundo).                                          │
+│                       │                                                         │
+│ Barramento            │ Conjunto de barras de cobre que distribuem energia     │
+│                       │ dentro do painel.                                      │
+│                       │                                                         │
+│ Mão de Obra (MOD)     │ Horas de trabalho para montar o painel (eletricista,  │
+│                       │ técnico, ajudante).                                    │
+│                       │                                                         │
+│ Composição de Mão de  │ Perfil de trabalhador com seu custo horário.           │
+│ Obra                  │ Ex: "Eletricista: R$ 45,00/h".                        │
+│                       │                                                         │
+│ Regra de Derivação    │ Regra que define quantas horas cada tipo de            │
+│                       │ componente leva para montar.                           │
+│                       │                                                         │
+│ Revisão               │ Versão do documento. Ex: Rev00, Rev01.                 │
+│                       │                                                         │
+│ Docxtemplater         │ Biblioteca que preenche modelos do Word com dados.     │
+│                       │ Usa tags como {cliente}, {#lista_paineis}...           │
+│                       │                                                         │
+│ Infraestrutura        │ Aba da Proposta Técnica com itens fora dos painéis:    │
+│                       │ obra civil, cabos, aterramento, serviços técnicos.     │
+│                       │                                                         │
+│ Disciplina            │ Cada categoria dentro da Infraestrutura.                │
+│                       │ Ex: Obra Civil, Infra Elétrica, SPDA.                  │
+│                       │                                                         │
+│ Invólucro             │ Gabinete físico do painel (tipo, material, cor,         │
+│                       │ dimensões).                                             │
+│                       │                                                         │
+│ Barramento            │ Barras de cobre/alumínio que distribuem energia        │
+│                       │ dentro do painel.                                       │
+│                       │                                                         │
+│ Desvio Técnico        │ Item do fornecimento que foge ao padrão especificado,  │
+│                       │ com justificativa.                                     │
+│                       │                                                         │
+│ Ficha Técnica         │ Sub-aba com as especificações técnicas do equipamento. │
+│                       │                                                         │
+│ Cálculos Elétricos    │ Sub-aba que calcula potência total, corrente nominal   │
+│                       │ e disjuntor sugerido do painel.                        │
+│                       │                                                         │
+│ Cálculos Mecânicos    │ Sub-aba que calcula dimensões totais e peso do         │
+│                       │ barramento de cobre.                                   │
+│                       │                                                         │
+│ Layout Sugerido       │ Sub-aba com canvas visual da distribuição dos          │
+│                       │ cubículos no painel, com exportação PDF.               │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  30. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "Não consigo editar os campos — tudo está desabilitado"            │
+│  SOLUÇÃO:  A proposta está em modo SOMENTE LEITURA. Verifique se o cartão    │
+│            no Pipeline não está como "Fechado" ou "Perdido". Se estiver,      │
+│            use "Salvar como Novo" para criar uma cópia editável.              │
+│                                                                                 │
+│  PROBLEMA: "A Lista de Materiais está vazia"                                 │
+│  SOLUÇÃO:  Você precisa associar Típicos de Partida às cargas. Sem típico,   │
+│            não há materiais. Vá na sub-aba "Cargas" e selecione um típico    │
+│            para cada carga.                                                    │
+│                                                                                 │
+│  PROBLEMA: "Os valores na LM estão com preço antigo"                         │
+│  SOLUÇÃO:  Os preços vêm dos Típicos. Vá no módulo de Típicos, abra o        │
+│            típico e clique em "Recalcular Custos" para atualizar do           │
+│            catálogo. Depois volte na Proposta Técnica e recarregue.          │
+│                                                                                 │
+│  PROBLEMA: "Não encontro o típico que preciso na carga"                      │
+│  SOLUÇÃO:  O sistema FILTRA os típicos por potência, tensão e tipo. Se o     │
+│            típico não aparece, verifique se os parâmetros da carga            │
+│            correspondem aos do típico. Ex: carga 50CV não vai mostrar        │
+│            típico de 75CV.                                                    │
+│                                                                                 │
+│  PROBLEMA: "O escopo não mostra todos os equipamentos"                       │
+│  SOLUÇÃO:  Clique em "Sincronizar do Equipamento" para atualizar os itens    │
+│            auto-gerados.                                                      │
+│                                                                                 │
+│  PROBLEMA: "O campo de corrente da carga está zerado"                        │
+│  SOLUÇÃO:  Preencha a potência (CV), tensão, FP e rendimento. A corrente é  │
+│            calculada automaticamente. Se ainda assim não aparecer, preencha  │
+│            a "Corrente de Placa" manualmente.                                │
+│                                                                                 │
+│  PROBLEMA: "Exportei para Word mas faltam informações"                       │
+│  SOLUÇÃO:  O template Word usa tags como {cliente}, {#lista_paineis}...      │
+│            Se faltou informação, pode ser: (a) o campo não foi preenchido    │
+│            na proposta; (b) o template não tem a tag correspondente.         │
+│            Verifique o TEMPLATE_TEC.docx.                                     │
+│                                                                                 │
+│  PROBLEMA: "Quero adicionar um material extra na LM"                          │
+│  SOLUÇÃO:  Use o botão "➕ Incluir Item" na visão LM. Isso adiciona o        │
+│            material à carga sem alterar o típico original.                   │
+│                                                                                 │
+│  PROBLEMA: "Meu equipamento PLC não tem a aba de cargas"                     │
+│  SOLUÇÃO:  É NORMAL. PLC e REM têm abas diferentes (Lista de I/O, BOM).     │
+│            Cargas são para CCM-BT, QGBT e similares.                         │
+│                                                                                 │
+│  PROBLEMA: "Criei uma SEU mas o IPI continua sendo calculado"                │
+│  SOLUÇÃO:  O IPI isento para componentes de SEU é aplicado na PRECIFICAÇÃO, │
+│            não na Proposta Técnica. Abra a Precificação e veja se os         │
+│            componentes aparecem com IPI = 0. Se não, desfaça a SEU e recrie. │
+│                                                                                 │
+│  PROBLEMA: "A aba Infraestrutura não aparece na minha proposta"               │
+│  SOLUÇÃO:  A aba Infraestrutura fica entre Equipamentos e Escopo. Se você     │
+│            não está vendo, pode ser que a tela esteja em resolução baixa —    │
+│            use a rolagem horizontal das abas ou maximize o navegador.         │
+│                                                                                 │
+│  PROBLEMA: "Os valores da Infraestrutura não aparecem na Precificação"        │
+│  SOLUÇÃO:  Os custos de Infraestrutura são transportados automaticamente       │
+│            para a Precificação. Se não aparecerem, salve a Proposta Técnica   │
+│            e recarregue a Precificação. Verifique também se os itens têm      │
+│            custo unitário preenchido.                                          │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   A Proposta Técnica é o DOCUMENTO BASE de todo o processo.                     ║
+║                                                                                  ║
+║   • É ela que descreve para o cliente o que você está vendendo                 ║
+║   • É ela que alimenta a Precificação com os custos dos materiais              ║
+║   • É ela que gera a Lista de Materiais para o setor de compras               ║
+║   • É ela que contém as especificações técnicas que a engenharia vai usar      ║
+║   • É ela que define a Infraestrutura (obra civil, cabos, serviços)            ║
+║                                                                                  ║
+║   Uma Proposta Técnica bem feita:                                                ║
+║   • Reduz dúvidas com o cliente (tudo está especificado)                        ║
+║   • Reduz erros de compra (a LM tem os códigos certos)                          ║
+║   • Acelera a precificação (os custos já estão lá)                              ║
+║   • Transmite profissionalismo (o documento Word fica completo)                 ║
+║                                                                                  ║
+║   "Uma proposta bem escrita vende mais do que qualquer desconto."              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

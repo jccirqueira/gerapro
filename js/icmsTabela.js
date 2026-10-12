@@ -5,7 +5,12 @@ export const INTERNAL_RATES = {
     SE: 18, SP: 18, TO: 17
 };
 
-const SUL_SUDESTE = new Set(['SP', 'RJ', 'MG', 'ES', 'PR', 'RS', 'SC']);
+// Estados do Sul/Sudeste cujas SAÍDAS são sempre a 12% (Res. Senado 22/1989).
+// O ES não entra aqui: suas saídas seguem a regra das demais regiões (7% para S/SE).
+const ORIGIN_ALWAYS_12 = new Set(['SP', 'RJ', 'MG', 'PR', 'RS', 'SC']);
+
+// Destinos que disparam a alíquota de 7% para origens fora do Sul/Sudeste.
+const DEST_FOR_7 = new Set(['SP', 'RJ', 'MG', 'ES', 'PR', 'RS', 'SC']);
 
 export function getIcmsRate(origem, destino) {
     if (!origem || !destino) return null;
@@ -13,15 +18,16 @@ export function getIcmsRate(origem, destino) {
     const d = destino.toUpperCase().trim();
     if (!INTERNAL_RATES[o] || !INTERNAL_RATES[d]) return null;
 
+    // Operação interna → alíquota estadual do próprio estado
     if (o === d) return INTERNAL_RATES[o];
 
-    const oSulSudeste = SUL_SUDESTE.has(o);
-    const dSulSudeste = SUL_SUDESTE.has(d);
+    // Saída de SP/RJ/MG/PR/RS/SC → sempre 12% (qualquer destino)
+    if (ORIGIN_ALWAYS_12.has(o)) return 12;
 
-    if (oSulSudeste && dSulSudeste) return 12;
-    if (oSulSudeste && !dSulSudeste) return 7;
-    if (!oSulSudeste) return 12;
+    // Origem fora do Sul/Sudeste (inclui ES) com destino no Sul/Sudeste → 7%
+    if (DEST_FOR_7.has(d)) return 7;
 
+    // Demais operações interestaduais (ex.: BA → AM) → 12%
     return 12;
 }
 

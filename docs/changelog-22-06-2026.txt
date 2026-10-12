@@ -1,0 +1,121 @@
+CHANGELOG - GeraPro
+Data: 22/06/2026
+Arquivo modificado: js/propostaTecnica.js
+
+====================================================================
+1. POSICIONAMENTO X MANUAL DAS PEÇAS NO LAYOUT
+====================================================================
+
+O que foi implementado:
+- Campo "X:" no badge de alocação da Lista de Materiais (BOM)
+- Campo "Posição X (mm)" no overlay Configuração do Layout (⚙)
+- Botão "A" (Auto) para resetar o valor ao lado de cada campo
+
+Comportamento:
+- Ao definir X, todas as instâncias daquele material se deslocam
+  horizontalmente pelo valor informado, mantendo os gaps entre elas
+- Enter ou sair do campo (blur) → recalcula o layout
+- Se o X fizer os itens ultrapassarem o trilho, o sistema desloca
+  automaticamente tudo para a esquerda até caber (auto-clamp)
+- Vazio/null = posicionamento automático (algoritmo best-fit)
+
+Funções criadas/modificadas:
+- _setManualX(): nova função que atualiza xOffset e recalcula
+- _layoutCabinetRows(): packLinhaRow aplica xOffset + auto-clamp
+- _renderBOMAlocacao(): campo X no badge do BOM
+- _showLayoutConfigPanel(): campo X no overlay de configuração
+- _atribuirMaterial(): inicializa xOffset como null
+
+====================================================================
+2. SISTEMA DE LINHAS / FAIXAS - Y Centro do Trilho
+====================================================================
+
+O que mudou:
+- Antes: cada linha tinha Y Início e Y Fim (faixa/zona vertical)
+- Agora: cada linha tem Y Centro Trilho (posição central do trilho DIN)
+
+Benefício:
+- Cada linha = um único trilho DIN em posição Y específica
+- Se muitos itens não couberem horizontalmente, o usuário cria
+  múltiplas linhas com a mesma categoria em Y diferentes
+- Sem warnings de "altura insuficiente"
+- Mais intuitivo e previsível
+
+Compatibilidade:
+- Configs antigas com yInicio/yFim são convertidas automaticamente
+  usando o ponto médio como yCentroTrilho
+
+Funções modificadas:
+- _getDefaultLayoutConfig(): yCentroTrilho no lugar de yInicio/yFim
+- _showLayoutConfigPanel(): tabela com 1 campo Y Centro
+- _adicionarLinhaLayout(): campo yCentro na nova linha
+- _saveLayoutConfig(): salva yCentroTrilho
+- _layoutCabinetRows(): packLinhaRow substitui bestFitPack multi-row
+- _drawVerticalDimensions(): marcas de dimensão no yCentroTrilho
+
+====================================================================
+3. GAPS TÉRMICOS
+====================================================================
+
+Correções aplicadas:
+- Match exato primeiro: se a categoria existe como chave no objeto
+  gapsTermicos, retorna seu valor diretamente
+- Fallback com chave mais longa: se não houver match exato, busca
+  a chave mais longa que esteja contida na categoria (evita que
+  'DISJUNTOR MOTOR' pegue o gap de 'DISJUNTOR')
+- Merge com defaults: gaps salvos são mesclados com os padrão,
+  garantindo que todas as categorias tenham valor mesmo se o
+  layoutConfig salvo estiver incompleto
+- Aceita valor zero: '0' não é mais convertido para 5 (o operador
+  || 5 foi removido em favor de validação numérica correta)
+- Categorias completas no overlay: o overlay exibe todas as 17
+  categorias mesmo que o layoutConfig salvo tenha apenas algumas
+
+Funções modificadas:
+- _getGapTermico(): match exato + ordered fallback
+- _showLayoutConfigPanel(): merge com defaults na exibição
+- _saveLayoutConfig(): parseFloat com validação correta para zero
+- suggestLayout(): gapsTermicos merge no cabConfig
+
+====================================================================
+4. CORREÇÕES DE BUGS
+====================================================================
+
+4.1 store.setState causando erro no listener
+- Sintoma: ao clicar Aplicar, o layout não atualizava porque um
+  listener do store tentava renderizar a lista de propostas num
+  elemento DOM que não existia (removido pelo overlay)
+- Correção: try-catch em store.setState no _saveLayoutConfig() e
+  _recalcularLayout()
+
+4.2 Array de equipments modificado in-place
+- Sintoma: store não detectava mudanças porque o array equipments
+  era o mesmo objeto (mesma referência)
+- Correção: usar [...(data.equipments || [])] para criar novo array
+
+4.3 Variável eq não declarada em renderModal
+- Sintoma: o layout usava uma variável eq que não era a mesma que
+  activeEq, podendo apontar para equipamento errado
+- Correção: adicionado const eq = activeEq;
+
+====================================================================
+5. COMO USAR
+====================================================================
+
+5.1 Ajustar posição X de componentes:
+- No Layout Sugerido, expanda "Lista de Materiais" (▶)
+- Aloque materiais aos armários (dropdown + Alocar)
+- No badge azul, digite o valor X desejado e pressione Enter
+- Ou no overlay ⚙ Configurar, seção Armários, clique no nome
+  do armário para expandir e ajuste os X de cada material
+
+5.2 Ajustar gaps térmicos:
+- ⚙ Configurar → Gaps Térmicos (mm)
+- Altere o valor desejado por categoria
+- Clique Aplicar
+
+5.3 Criar múltiplas linhas para mesma categoria:
+- ⚙ Configurar → Linhas / Faixas
+- Crie linhas com Y Centro Trilho diferentes e mesma categoria
+- Ex: "Disj A" Y=600, "Disj B" Y=700, ambos categoria DISJUNTOR
+- Clique Aplicar

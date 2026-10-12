@@ -28,6 +28,41 @@ function getDb() {
     return db;
 }
 
+// Executa fn() dentro de uma transação SQLite; em caso de erro, ROLLBACK completo.
+// Suporta aninhamento via SAVEPOINT (ex.: bulk que chama update() com priceHistory,
+// que internamente grava price_history em outra transação).
+// (node:sqlite não possui a API .transaction() do better-sqlite3)
+let _txDepth = 0;
+function withTransaction(fn) {
+    if (_txDepth > 0) {
+        const sp = 'gerapro_sp_' + _txDepth;
+        _txDepth++;
+        db.exec('SAVEPOINT ' + sp);
+        try {
+            const result = fn();
+            db.exec('RELEASE ' + sp);
+            return result;
+        } catch (e) {
+            try { db.exec('ROLLBACK TO ' + sp); db.exec('RELEASE ' + sp); } catch (_) { /* já abortada */ }
+            throw e;
+        } finally {
+            _txDepth--;
+        }
+    }
+    db.exec('BEGIN IMMEDIATE TRANSACTION');
+    _txDepth = 1;
+    try {
+        const result = fn();
+        db.exec('COMMIT');
+        return result;
+    } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (_) { /* transação já abortada */ }
+        throw e;
+    } finally {
+        _txDepth = 0;
+    }
+}
+
 function initSchema() {
     db.exec(`
         CREATE TABLE IF NOT EXISTS empresas (
@@ -1316,11 +1351,13 @@ function bulkImportMateriais(items, empresaId = 'default') {
     return { addedIds, updatedIds, snapshots };
 }
 
-function update(entity, id, data) {
+function update(entity, id, data, empresaId = null) {
     const info = getTableInfo(entity);
     if (!info) return null;
     const existing = findById(entity, id);
     if (!existing) return null;
+    // Escopo multi-empresa: registros de outra empresa não podem ser alterados
+    if (empresaId && existing.empresa_id !== empresaId) return null;
     const priceHistory = data.priceHistory;
     const dataClean = priceHistory ? { ...data } : data;
     if (priceHistory) delete dataClean.priceHistory;
@@ -1356,12 +1393,32 @@ function update(entity, id, data) {
     return { ...record, ...(record.dados ? JSON.parse(record.dados) : {}), priceHistory: priceHistory || existing.priceHistory || [] };
 }
 
-function remove(entity, id) {
+function remove(entity, id, empresaId = null) {
     const info = getTableInfo(entity);
     if (!info) return false;
+    if (empresaId) {
+        // Escopo multi-empresa: registros de outra empresa não podem ser excluídos
+        const scoped = db.prepare(`DELETE FROM ${info.table} WHERE ${info.pk} = ? AND empresa_id = ?`);
+        return scoped.run(id, empresaId).changes > 0;
+    }
     const stmt = db.prepare(`DELETE FROM ${info.table} WHERE ${info.pk} = ?`);
     const result = stmt.run(id);
     return result.changes > 0;
+}
+
+// Atualização em massa de materiais (ex.: reajuste de preços, importação por código).
+// Transacional: ou aplicam todos os itens válidos, ou nada.
+function bulkUpdateMateriais(items, empresaId = 'default') {
+    if (!Array.isArray(items)) throw new Error('Itens devem ser uma lista');
+    return withTransaction(() => {
+        let updated = 0;
+        for (const item of items) {
+            if (!item || typeof item !== 'object' || !item.id) continue;
+            // update() faz merge com a linha existente, trata priceHistory à parte e respeita o escopo da empresa
+            if (update('materiais', item.id, item, empresaId)) updated++;
+        }
+        return updated;
+    });
 }
 
 // --- Specialized helpers ---
@@ -1372,15 +1429,16 @@ function getPriceHistory(materialId) {
 }
 
 function savePriceHistory(materialId, entries) {
-    const del = db.prepare('DELETE FROM price_history WHERE material_id = ?');
+    withTransaction(() => _replacePriceHistoryRows(materialId, entries));
+}
+
+// Versão sem transação — usar apenas quando já dentro de uma transação externa.
+function _replacePriceHistoryRows(materialId, entries) {
+    db.prepare('DELETE FROM price_history WHERE material_id = ?').run(materialId);
     const ins = db.prepare('INSERT INTO price_history (material_id, custo, markup, date, title, origin) VALUES (?, ?, ?, ?, ?, ?)');
-    del.run(materialId);
-    const tx = db.transaction(() => {
-        for (const entry of entries) {
-            ins.run(materialId, entry.custo, entry.markup, entry.date, entry.title, entry.origin || 'manual');
-        }
-    });
-    tx();
+    for (const entry of entries) {
+        ins.run(materialId, entry.custo, entry.markup, entry.date, entry.title, entry.origin || 'manual');
+    }
 }
 
 function getSettings(empresaId = 'default') {
@@ -1825,6 +1883,7 @@ function getFullSync(empresaId = 'default') {
         }),
         crmInteracoes: findAll('crmInteracoes', empresaId),
         crmTarefas: findAll('crmTarefas', empresaId),
+        crmNotas: findAll('crmNotas', empresaId),
         crmEmailTemplates: findAll('crmEmailTemplates', empresaId),
         crmStages: findAll('crmStages', empresaId),
         manufaturaProjetos: findAll('manufaturaProjetos', empresaId),
@@ -2001,7 +2060,7 @@ function getEmpresaIdForUser(userId) {
 }
 
 function migrateFromLegacy(data, empresaId = 'default') {
-    const tx = db.transaction(() => {
+    withTransaction(() => {
         // Insert clientes
         if (data.clientes) {
             for (const c of data.clientes) {
@@ -2215,7 +2274,110 @@ function migrateFromLegacy(data, empresaId = 'default') {
             saveAiSettings(data.aiSettings, empresaId);
         }
     });
-    tx();
+}
+
+// --- Restore de backup completo ---
+// Substitui, em uma única transação, todas as coleções de dados PRESENTES no backup.
+// Coleções ausentes do backup são mantidas intactas (backups parciais não apagam o resto).
+
+const _restoreColCache = {};
+function _getTableColumns(table) {
+    if (!_restoreColCache[table]) {
+        _restoreColCache[table] = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+    }
+    return _restoreColCache[table];
+}
+
+function restoreFromBackup(data, empresaId = 'default') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error('Backup inválido: o conteúdo não é um objeto JSON');
+    }
+    const counts = {};
+    const ignored = {};
+
+    withTransaction(() => {
+        for (const entity of Object.keys(TABLE_MAP)) {
+            if (data[entity] === undefined) continue;
+            const rows = data[entity];
+            if (!Array.isArray(rows)) throw new Error(`Backup inválido: "${entity}" deveria ser uma lista`);
+            const info = getTableInfo(entity);
+            const cols = _getTableColumns(info.table);
+
+            db.prepare(`DELETE FROM ${info.table} WHERE empresa_id = ?`).run(empresaId);
+
+            for (const row of rows) {
+                if (!row || typeof row !== 'object' || Array.isArray(row)) {
+                    throw new Error(`Backup inválido: linha inválida em "${entity}"`);
+                }
+                if (!row.id) throw new Error(`Backup inválido: linha sem id em "${entity}"`);
+
+                let record = { ...row, empresa_id: empresaId };
+                // Histórico de preços: tabela própria, tratada à parte
+                const priceHistory = record.priceHistory;
+                delete record.priceHistory;
+
+                // Entidades "dados" guardam o excedente em JSON na coluna `dados`
+                if (info.dados) {
+                    const dados = {};
+                    for (const k of Object.keys(record)) {
+                        if (!DADOS_BASE_KEYS.includes(k)) { dados[k] = record[k]; delete record[k]; }
+                    }
+                    record.dados = JSON.stringify(dados);
+                }
+
+                // Remove chaves inexistentes no schema atual (backups antigos);
+                // registra o que foi ignorado para o relatório.
+                const keys = Object.keys(record).filter(k => {
+                    if (cols.has(k)) return true;
+                    if (!ignored[entity]) ignored[entity] = new Set();
+                    ignored[entity].add(k);
+                    return false;
+                });
+                if (keys.length === 0) continue;
+
+                const values = keys.map(k => {
+                    const v = record[k];
+                    return typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
+                });
+                db.prepare(`INSERT OR REPLACE INTO ${info.table} (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`)
+                    .run(...values);
+
+                if (entity === 'materiais' && Array.isArray(priceHistory)) {
+                    _replacePriceHistoryRows(record.id, priceHistory);
+                }
+            }
+            counts[entity] = rows.length;
+        }
+
+        // Configurações da empresa (tema, dados fiscais, templates, login, telegram)
+        if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
+            const s = { ...data.settings };
+            // Nunca apagar um token Telegram já configurado com valor vazio vindo do backup
+            const existing = db.prepare('SELECT telegram_bot_token FROM settings WHERE empresa_id = ?').get(empresaId);
+            if (!s.telegram_bot_token && existing && existing.telegram_bot_token) {
+                s.telegram_bot_token = existing.telegram_bot_token;
+            }
+            saveSettings(s, empresaId);
+            counts.settings = 1;
+        }
+
+        // Templates de importação de preços (objeto indexado por fornecedor)
+        if (data.priceImportTemplates && typeof data.priceImportTemplates === 'object' && !Array.isArray(data.priceImportTemplates)) {
+            db.prepare('DELETE FROM price_import_templates WHERE empresa_id = ?').run(empresaId);
+            for (const [fornecedorId, tmpl] of Object.entries(data.priceImportTemplates)) {
+                if (tmpl && typeof tmpl === 'object') savePriceImportTemplate(fornecedorId, tmpl, empresaId);
+            }
+            counts.priceImportTemplates = Object.keys(data.priceImportTemplates).length;
+        }
+
+        // aiSettings NÃO é restaurado de propósito: chaves/URLs de IA são específicas
+        // do ambiente (produção vs. local) e um backup antigo não deve sobrescrevê-las.
+    });
+
+    return {
+        counts,
+        ignoredKeys: Object.fromEntries(Object.entries(ignored).map(([k, v]) => [k, [...v]]))
+    };
 }
 
 function searchMateriais({ q, fabricante, categoria, grupoSiemens, favorito, page = 1, limit = 100 }, empresaId = 'default') {
@@ -2448,6 +2610,8 @@ module.exports = {
     peekNextProposalNumber,
     updatePipelineRevision,
     getFullSync,
+    restoreFromBackup,
+    bulkUpdateMateriais,
     migrateFromLegacy,
     bulkImportMateriais,
     searchMateriais,

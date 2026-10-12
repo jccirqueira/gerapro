@@ -1760,7 +1760,7 @@ const App = {
         // Persist company data to server
         const _tkSC = store.getState().auth?.token;
         const _s = store.getState().settings || {};
-        fetch(`http://${location.hostname}:8082/api/settings/company`, {
+        fetch(`/api/settings/company`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...(_tkSC ? { 'Authorization': 'Bearer ' + _tkSC } : {}) },
             body: JSON.stringify({
@@ -2025,7 +2025,7 @@ const App = {
     async loadMailSettingsForm() {
         try {
             const token = store.getState().auth?.token;
-            const res = await fetch(`http://${location.hostname}:8082/api/settings/mail`, {
+            const res = await fetch(`/api/settings/mail`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -2080,7 +2080,7 @@ const App = {
         if (statusEl) statusEl.textContent = 'Salvando...';
         try {
             const token = store.getState().auth?.token;
-            const res = await fetch(`http://${location.hostname}:8082/api/settings/mail`, {
+            const res = await fetch(`/api/settings/mail`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -2108,7 +2108,7 @@ const App = {
         if (statusEl) statusEl.textContent = 'Testando...';
         try {
             const token = store.getState().auth?.token;
-            const res = await fetch(`http://${location.hostname}:8082/api/test-email`, {
+            const res = await fetch(`/api/test-email`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
@@ -2685,29 +2685,54 @@ const App = {
         `;
     },
 
-    restoreBackup(input) {
+    async restoreBackup(input) {
         const file = input.files[0];
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
+            let data;
             try {
-                const data = JSON.parse(e.target.result);
-                // Basic validation
-                if (data.clientes && Array.isArray(data.materiais)) {
-                    this.confirm("Isso substituirá todos os dados atuais. Deseja continuar?", "Restaurar Backup").then(confirmed => {
-                        if (confirmed) {
-                            store.setState(data);
-                            this.showToast("Backup restaurado com sucesso! A página será recarregada.", "success");
-                            setTimeout(() => location.reload(), 1000);
-                        }
-                    });
-                } else {
-                    this.showToast("Arquivo de backup inválido.", "error");
-                }
+                data = JSON.parse(e.target.result);
             } catch (err) {
                 console.error(err);
-                this.showToast("Erro ao ler arquivo de backup.", "error");
+                this.showToast("Arquivo de backup inválido (JSON ilegível).", "error");
+                return;
+            }
+            if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                this.showToast("Arquivo de backup inválido.", "error");
+                return;
+            }
+            // Conta registros das coleções para o diálogo de confirmação
+            const COLLECTIONS = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente'];
+            const total = COLLECTIONS.reduce((s, k) => s + (Array.isArray(data[k]) ? data[k].length : 0), 0);
+            if (total === 0 && !data.settings) {
+                this.showToast("Arquivo de backup vazio ou de formato desconhecido.", "error");
+                return;
+            }
+            const confirmed = await this.confirm(
+                `Restaurar o backup "${file.name}" com ${total} registro(s)?\n\n` +
+                "As coleções presentes no arquivo SUBSTITUIRÃO os dados atuais da empresa. " +
+                "Configurações de IA não são restauradas. Esta ação não pode ser desfeita no navegador.",
+                "Restaurar Backup"
+            );
+            if (!confirmed) return;
+            try {
+                const resp = await fetch('/api/data/restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (store.getState().auth?.token || '') },
+                    body: JSON.stringify({ data })
+                });
+                const result = await resp.json().catch(() => ({}));
+                if (!resp.ok || !result.success) {
+                    this.showToast("Falha na restauração: " + (result.error || resp.statusText || 'erro desconhecido'), "error", 6000);
+                    return;
+                }
+                this.showToast("Backup restaurado com sucesso! A página será recarregada.", "success");
+                setTimeout(() => location.reload(), 1200);
+            } catch (err) {
+                console.error(err);
+                this.showToast("Erro ao restaurar backup: " + err.message, "error", 6000);
             }
         };
         reader.readAsText(file);
@@ -3891,7 +3916,7 @@ const App = {
             const token = store.getState().auth?.token;
             const headers = {};
             if (token) headers['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(`http://${location.hostname}:8082/api/list-templates`, { headers });
+            const res = await fetch(`/api/list-templates`, { headers });
             const data = await res.json();
             if (data.success && data.templates) {
                 const ids = ['conf-template-tecnica', 'conf-template-comercial', 'conf-template-completa'];
@@ -3930,7 +3955,7 @@ const App = {
                 reader.onload = async (e) => {
                     const base64 = e.target.result.split(',')[1];
                     const token = store.getState().auth?.token;
-                    const res = await fetch(`http://${location.hostname}:8082/api/templates/upload`, {
+                    const res = await fetch(`/api/templates/upload`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ fileName: file.name, fileData: base64 })
@@ -3967,7 +3992,7 @@ const App = {
         if (!confirmed) return;
         try {
             const token = store.getState().auth?.token;
-            const res = await fetch(`http://${location.hostname}:8082/api/templates/${encodeURIComponent(fileName)}`, {
+            const res = await fetch(`/api/templates/${encodeURIComponent(fileName)}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -3997,11 +4022,24 @@ const App = {
     },
 
     parseCurrency(val) {
-        if (!val) return 0;
-        if (typeof val === 'number') return val;
-        // Remove separador de milhar (.) e substitui separador decimal (,) por ponto
-        const clean = val.toString().replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
-        return parseFloat(clean) || 0;
+        if (!val && val !== 0) return 0;
+        if (typeof val === 'number') return isNaN(val) ? 0 : val;
+        let s = String(val).trim().replace(/[^\d.,\-]/g, '');
+        if (!s) return 0;
+        const lastComma = s.lastIndexOf(',');
+        const lastDot = s.lastIndexOf('.');
+        if (lastComma > lastDot) {
+            // Formato BR: "1.234,56" → remove pontos (milhar) e vira decimal
+            s = s.replace(/\./g, '').replace(',', '.');
+        } else if (lastDot >= 0 && /^-?\d{1,3}(\.\d{3})+$/.test(s)) {
+            // Só pontos em grupos de 3 dígitos → são separadores de milhar: "1.234" → 1234
+            s = s.replace(/\./g, '');
+        } else {
+            // Formato US ou número simples: remove vírgulas de milhar
+            s = s.replace(/,/g, '');
+        }
+        const n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
     },
 
     async syncProposals() {
@@ -4150,9 +4188,11 @@ const App = {
     }
 };
 
-// Global accessor - apontar para o App real via __realApp (Proxy no HTML delega chamadas)
-window.__realApp = App;
-window.__realApp.clientes = {};
+// Global: window.app É o próprio App (o Proxy de compatibilidade do HTML foi
+// removido na Fase 4 — módulos carregados depois anexam seus namespaces aqui;
+// init() vincula abaixo os métodos usados por onclick/HTML)
+window.app = App;
+window.app.clientes = {};
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => App.init());

@@ -1,57 +1,132 @@
-# GeraPro - SaaS de Engenharia Elétrica
+# GeraPro — SaaS de Propostas Técnicas e Comerciais
 
-**GeraPro** é uma aplicação web moderna para gestão de projetos elétricos, focada na criação ágil de propostas, orçamentos e definição de típicos de engenharia.
+**GeraPro** é uma aplicação web multiempresa para automatizar a rotina de uma empresa de
+automação/engenharia elétrica: desde a proposta técnica (PTC) com cálculos elétricos até a
+proposta comercial, precificação, pipeline de vendas e fábrica (manufatura).
 
-## 🚀 Funcionalidades
+Hoje é um sistema **cliente–servidor real**: backend Node.js, banco SQLite e frontend em
+ES Modules — sem etapa de build.
 
-### Gestão
-- **Clientes**: Cadastro completo de clientes.
-- **Materiais**: Catálogo de peças com custos, markup e dados fiscais.
-- **Típicos**: Construtor de blocos de engenharia (ex: Partida Direta 5CV).
-- **Orçamentos**: Criação de propostas comerciais profissionais com cálculo automático de impostos.
+---
 
-### Sistema
-- **Backup & Restore**: Porteira seus dados salvando/carregando arquivos JSON.
-- **Configurações**: Personalize o nome da empresa, logo e dados fiscais.
-- **Importação**: Importe listas de preços via CSV/Excel.
+## Funcionalidades
 
-### Visual
-- **Tema Industrial**: Interface limpa e técnica com Modo Escuro (Dark Mode).
-- **Dashboard**: Gráficos de vendas e status de propostas.
-- **Impressão Profissional**: Layout limpo para gerar PDFs de propostas.
+**Comercial**
+- **Proposta Técnica (PTC)** — dados gerais, equipamentos e cargas, cálculos elétricos
+  (barramentos, tipicos, QET), IO-List/BOM, materiais, mão de obra, infraestrutura e
+  exportação DOCX/PDF.
+- **Proposta Comercial / Completa** — itens, IPI/impostos, condições e exportação.
+- **Pipeline Comercial** — funil de vendas com valores, revisões e log de alterações.
+- **Precificação** — markup, ICMS (interestadual automático por UF), IPI, custos fixos e
+  despesas.
+- **CRM** — leads, funil, templates de e-mail e histórico.
 
-## 🛠️ Tecnologia
+**Operação**
+- **Importação com IA** — extrai dados de PDF/DOCX/planilhas para dentro da proposta.
+- **Catálogo de Materiais / Fornecedores / Clientes** — cadastros com sincronização ao servidor.
+- **Manufatura** — ordens, DXF e relatórios de produção.
+- **Comparar Documentos** — comparação de versões de documentos.
+- **Gerador QET**, **LM (Lista de Materiais)** e relatórios gerenciais.
+- **Ajuda integrada** com conteúdo e capturas de tela.
 
-Construído com **Vanilla JavaScript (ES Modules)**, HTML5 e CSS3 moderno.
-- Sem dependências de build complexas (npm/webpack não obrigatórios para rodar).
-- Persistência local (`LocalStorage`).
-- Bibliotecas Externas (via CDN): `Chart.js` (Gráficos), `Phosphor Icons` (Ícones).
+**Plataforma**
+- Multiempresa (cada empresa tem seus templates, usuários e dados).
+- Autenticação JWT com níveis de acesso (admin / engenheiro / visualizador).
+- Backup/restauração de dados pelo servidor.
 
-## 📦 Como Rodar
+---
 
-Este projeto utiliza Módulos ES6, o que exige um servidor HTTP local para evitar erros de CORS (Cross-Origin Resource Sharing).
+## Arquitetura e stack
 
-### Opção Recomendada (Node.js)
+| Camada | Tecnologia |
+|---|---|
+| Backend | Node.js “puro” (sem framework web) — `server_new.js` |
+| Banco | SQLite via `node:sqlite` (nativo do Node, sem dependência externa) |
+| Frontend | Vanilla JS com **ES Modules** (carregados pelo loader do `index.html`, sem bundler) |
+| Estilo | CSS próprio (`css/theme-industrial.css`) |
+| PDF / DOCX | `pdfmake` (servidor) e `docxtemplater` + `pizzip` (servidor) |
+| Auth | `jsonwebtoken` (JWT) + `bcryptjs` |
+| E-mail | `nodemailer` (SMTP) e `@sendgrid/mail` |
+| Extras | `exceljs`/`xlsx`, `tesseract.js` (OCR), `pdf-parse`, `mammoth`, `dxf-parser`, Telegram (`node-telegram-bot-api`) |
+| CDNs (frontend) | Chart.js, SortableJS, SheetJS, QRCode |
 
-1.  Certifique-se de ter o [Node.js](https://nodejs.org/) instalado.
-2.  Na pasta do projeto, rode:
-    ```bash
-    npm start
-    ```
-    Isso iniciará um servidor local e abrirá o navegador automaticamente.
+---
 
-### Alternativa (VS Code)
+## Requisitos
 
-1.  Instale a extensão **Live Server**.
-2.  Clique com o botão direito no arquivo `index.html` e escolha "Open with Live Server".
+- **Node.js 22.5 ou superior** (o banco usa `node:sqlite`; testado com Node 24)
+- npm
 
-## 📝 Primeiros Passos
+## Como executar
 
-1.  Vá em **Configurações** e defina o nome da sua empresa.
-2.  Use a aba **Importação** para carregar seus materiais (ou cadastre manualmente).
-3.  Crie seus **Típicos** (padrões de montagem).
-4.  Gere sua primeira proposta na aba **Orçamentos** e clique no ícone de Impressora.
+```bash
+# 1. Dependências
+npm install
 
-## 📄 Licença
+# 2. Arquivo de ambiente (na primeira execução o servidor também
+#    gera JWT_SECRET e MAIL_ENCRYPTION_KEY e grava no .env)
+Copy-Item .env.example .env     # PowerShell  |  cp .env.example .env  (Linux/macOS)
 
-Uso Privado.
+# 3. Subir o servidor
+npm start                       # ou: node server_new.js  |  npm run dev (nodemon)
+```
+
+Acesse **http://localhost:8082**
+
+### Primeiro acesso
+
+- Na **primeira execução** (sistema sem usuários), o cadastro está aberto: crie o
+  administrador inicial pela tela de login (“Criar Conta”).
+- A partir daí o **registro fica fechado**: novas contas são criadas pelo administrador
+  no painel de usuários.
+
+---
+
+## Configuração (`.env`)
+
+| Variável | Descrição |
+|---|---|
+| `PORT` | Porta HTTP (padrão `8082`) |
+| `JWT_SECRET` | Segredo dos tokens — gerado automaticamente se ausente |
+| `MAIL_ENCRYPTION_KEY` | Chave que criptografa senhas de e-mail no banco — gerada automaticamente se ausente (a rotação exige reentrar as senhas SMTP) |
+| `GERAPRO_DATA_DIR` | Diretório-base onde as pastas `GeraPro/<empresa>/PTC-*` são gravadas. **Recomendado em produção** |
+| `NODE_ENV` | `development` \| `production` (em produção o servidor exige segredos persistíveis) |
+| `AI_PROVIDER`, `OLLAMA_URL`, `OLLAMA_MODEL`, `OPENAI_KEY`, `OPENAI_MODEL` | IA (valores do banco prevalecem) |
+| `TELEGRAM_BOT_TOKEN` | Notificações via Telegram (opcional) |
+
+---
+
+## Estrutura de pastas
+
+```
+server_new.js        Servidor HTTP + API (rotas, auth, uploads, exports)
+index.html           Shell da aplicação + loader dos módulos
+js/                  Módulos ES do frontend (state, app, propostaTecnica, …)
+css/                 Tema e estilos
+img/                 Ícones e imagens de interface
+prints/              Capturas usadas na ajuda
+fonts/               Fontes Roboto usadas na geração de PDF
+templates/<empresa>/ Templates DOCX por empresa (fallback: templates/default)
+data/                Banco SQLite, uploads e backups  (não versionado)
+docs/                Guias (.md/.txt versionados) e documentos de cliente (não versionados)
+_archive/            Lixo antigo movido para fora da raiz (não versionado)
+xx/                  Planilhas avulsas de cliente (não versionado)
+```
+
+---
+
+## Segurança
+
+- Autenticação JWT; rotas de IA/exportação exigem token.
+- Rate limiting em login, cadastro e chamadas de IA.
+- Servidor de arquivos estáticos com **allowlist** (banco, `.git` e `.env` não são servidos).
+- Sanitização de caminhos nas APIs de arquivo (anti path-traversal).
+- Cada usuário opera no escopo da sua empresa (multi-tenancy).
+
+## Deploy
+
+O guia de implantação está em [`docs/deploy-vps-hostinger-2026-07-01.md`](docs/deploy-vps-hostinger-2026-07-01.md).
+
+## Licença
+
+Uso privado.

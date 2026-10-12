@@ -158,9 +158,11 @@ class Store {
             if (data.success && data.data) {
                 const sd = data.data;
                 console.log('[Load] Got data:', Object.keys(sd).map(k => `${k}:${Array.isArray(sd[k]) ? sd[k].length : '?'}`).join(', '));
-                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas',    'orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente']) {
+                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente']) {
                     if (Array.isArray(sd[key])) this.state[key] = sd[key];
                 }
+                // O servidor usa a entidade 'paineis'; o estado/chave de UI é 'painelTypes'
+                if (Array.isArray(sd.paineis)) this.state.painelTypes = sd.paineis;
                 if (sd.settings) this.state.settings = { ...this.state.settings, ...sd.settings };
                 if (sd.aiSettings) this.state.aiSettings = { ...this.state.aiSettings, ...sd.aiSettings };
                 if (sd.loginTheme) this.state.loginTheme = { ...this.state.loginTheme, ...sd.loginTheme };
@@ -271,6 +273,29 @@ class Store {
         }
         this.notify();
         return this.sync.online;
+    }
+
+    // Sincroniza atualização em massa de materiais (reajuste de preços / importação por código).
+    // Envia apenas os itens alterados; falha aqui não desfaz o estado local (mesmo contrato dos _sync*).
+    _syncBulkMateriais(items) {
+        const token = this.state.auth.token;
+        if (!token || !items || items.length === 0) return;
+        fetch(`${this._getServerUrl()}/api/materiais/bulk-update`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items })
+        })
+            .then(res => res.ok ? res.json() : Promise.reject(new Error('HTTP ' + res.status)))
+            .then(body => {
+                console.log(`[Sync] materiais bulk OK: ${body.updated} atualizado(s)`);
+                this.sync.online = true;
+                this.notify();
+            })
+            .catch(e => {
+                console.error('[Sync] materiais bulk FAIL:', e);
+                this.sync.online = false;
+                this.notify();
+            });
     }
 
     _getServerUrl() {
@@ -902,6 +927,41 @@ class Store {
         return ok;
     }
 
+    // --- Painel Types (estado local: painelTypes; entidade no servidor: paineis) ---
+    async addPainelType(proposta) {
+        const item = {
+            ...proposta,
+            id: proposta.id || crypto.randomUUID(),
+            createdAt: proposta.createdAt || new Date().toISOString()
+        };
+        this.setState({ painelTypes: [...(this.state.painelTypes || []), item] });
+        const ok = await this._syncCreate('paineis', item);
+        if (!ok) {
+            this.setState({ painelTypes: (this.state.painelTypes || []).filter(p => p.id !== item.id) });
+        }
+        return ok;
+    }
+
+    async updatePainelType(id, updates) {
+        const prev = (this.state.painelTypes || []).find(p => p.id === id);
+        this.setState({ painelTypes: (this.state.painelTypes || []).map(p => p.id === id ? { ...p, ...updates } : p) });
+        const ok = await this._syncUpdate('paineis', id, updates);
+        if (!ok && prev) {
+            this.setState({ painelTypes: (this.state.painelTypes || []).map(p => p.id === id ? prev : p) });
+        }
+        return ok;
+    }
+
+    async deletePainelType(id) {
+        const prev = (this.state.painelTypes || []).find(p => p.id === id);
+        this.setState({ painelTypes: (this.state.painelTypes || []).filter(p => p.id !== id) });
+        const ok = await this._syncDelete('paineis', id);
+        if (!ok && prev) {
+            this.setState({ painelTypes: [...(this.state.painelTypes || []), prev] });
+        }
+        return ok;
+    }
+
     async addPropostaCompleta(proposta) {
         const item = {
             ...proposta,
@@ -1117,6 +1177,7 @@ class Store {
         const { fabricante, categoria, area, grupoSiemens } = filters;
         const { type, value, title, date } = updateData;
 
+        const changed = [];
         const newItems = (this.state.materiais || []).map(m => {
             const matchFab = !fabricante || m.fabricante === fabricante;
             const matchCat = !categoria || m.categoria === categoria;
@@ -1131,7 +1192,7 @@ class Store {
                     newCusto = value;
                 }
 
-                return {
+                const updated = {
                     ...m,
                     custo: newCusto,
                     priceHistory: [...(m.priceHistory || []), {
@@ -1144,17 +1205,20 @@ class Store {
                     lastUpdateDate: date || new Date().toISOString(),
                     lastUpdateTitle: title || 'Reajuste em Massa'
                 };
+                changed.push(updated);
+                return updated;
             }
             return m;
         });
 
         this.setState({ materiais: newItems });
-        this._syncUpdate('materiais', null, { materiais: newItems });
+        this._syncBulkMateriais(changed);
     }
 
     importPricesByCode(updates, metadata) {
         const { title, date } = metadata;
         let updateCount = 0;
+        const changed = [];
 
         const newItems = (this.state.materiais || []).map(m => {
             const update = updates.find(u =>
@@ -1180,7 +1244,7 @@ class Store {
                     ? update.newMarkup : m.markup;
 
                 updateCount++;
-                return {
+                const updated = {
                     ...m,
                     custo: newCusto,
                     markup: newMarkup,
@@ -1194,12 +1258,15 @@ class Store {
                     lastUpdateDate: date || new Date().toISOString(),
                     lastUpdateTitle: title || 'Importação de Planilha'
                 };
+                changed.push(updated);
+                return updated;
             }
             return m;
         });
 
         if (updateCount > 0) {
             this.setState({ materiais: newItems });
+            this._syncBulkMateriais(changed);
         }
         return updateCount;
     }

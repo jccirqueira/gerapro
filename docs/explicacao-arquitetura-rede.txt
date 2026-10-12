@@ -1,0 +1,705 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    EXPLICAÇÃO SIMPLES — ARQUITETURA DE REDE INDUSTRIAL NO GERAPRO                ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠  IMPORTANTE: Este documento explica o módulo de Arquitetura de Rede         ║
+║   Industrial. Ele NÃO explica como criar Propostas Técnicas ou Comerciais.       ║
+║   Se você precisa disso, procure o help do sistema (botão ❓ no canto superior). ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É A ARQUITETURA DE REDE INDUSTRIAL?                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você está montando o sistema elétrico de uma fábrica. Você tem vários
+CLPs (controladores), painéis, sensores, motores, inversores e uma sala de
+supervisão. Todos esses equipamentos precisam conversar entre si.
+
+A pergunta é: COMO eles se conectam?
+
+- Que tipo de cabo usar?
+- Quantos switches são necessários?
+- Como garantir que a rede não pare se um cabo romper?
+- Como endereçar cada equipamento?
+
+O módulo de **Arquitetura de Rede Industrial** do GeraPro responde tudo isso
+automaticamente. Você informa quais CLPs e equipamentos de campo existem, e o
+sistema gera:
+
+  - Um diagrama visual da rede (como um desenho técnico)
+  - Uma lista completa de materiais (cabos, switches, conectores)
+  - Um memorial descritivo técnico (documento em texto)
+  - O custo estimado da rede
+  - O plano de endereçamento IP
+  - A verificação de conformidade com normas técnicas
+
+Tudo isso para que o engenheiro não precise desenhar do zero ou calcular na mão.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde o módulo se encaixa no fluxo de trabalho?                                │
+│                                                                                 │
+│  1. Você cadastra os equipamentos (CLPs, REMs) na Proposta Técnica             │
+│  2. Para cada CLP, você informa quantas entradas e saídas ele tem              │
+│     (DI = entrada digital, DO = saída digital, AI = entrada analógica,         │
+│      AO = saída analógica)                                                     │
+│  3. No módulo Arquitetura de Rede, você escolhe parâmetros:                    │
+│     - Qual protocolo usar (PROFINET, EtherNet/IP, Modbus TCP)                  │
+│     - Qual topologia (anel, estrela, linha, árvore)                            │
+│     - Qual tipo de cabo, fibra óptica, etc.                                     │
+│  4. O sistema gera a arquitetura completa                                      │
+│  5. Você pode exportar: JSON, CSV (planilha), PDF, SVG (figura), DXF (CAD)     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. AS TRÊS CAMADAS DA REDE (A Hierarquia)                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O sistema organiza a rede em TRÊS NÍVEIS, seguindo o padrão internacional ISA-95.
+Pense como uma pirâmide:
+
+          ┌──────────────────────────────────────┐
+          │                                      │
+          │   NÍVEL GESTÃO / IIoT                │
+          │   (Servidores, SCADA, Cloud)         │
+          │                                      │
+          │   Ex: Gateway, Firewall, Roteador    │
+          │                                      │
+          ├──────────────────────────────────────┤
+          │                                      │
+          │   NÍVEL CÉLULA / CONTROLE            │
+          │   (CLPs, Switches, IHMs)             │
+          │                                      │
+          │   Ex: CLP S7-1500, Switch SCALANCE   │
+          │                                      │
+          ├──────────────────────────────────────┤
+          │                                      │
+          │   NÍVEL DE CAMPO                     │
+          │   (Sensores, Atuadores, Motores)     │
+          │                                      │
+          │   Ex: SIMOCODE, Inversor, REM        │
+          │                                      │
+          └──────────────────────────────────────┘
+
+NÍVEL DE CAMPO — É a base. Onde estão os sensores, atuadores, motores e
+dispositivos que interagem com o processo físico. Eles se conectam ao CLP
+através de um barramento de campo (ex: Profibus DP, Modbus RTU, IO-Link).
+
+NÍVEL DE CÉLULA / CONTROLE — É o cérebro. Onde estão os CLPs, painéis de
+comando, IHMs (telas de operação) e os switches que interligam tudo. Aqui
+roda o protocolo industrial Ethernet (PROFINET, EtherNet/IP, Modbus TCP).
+
+NÍVEL DE GESTÃO / IIoT — É a supervisão. Onde ficam os servidores de
+supervisão (SCADA), firewalls, roteadores 4G/5G e acesso remoto. Conecta
+a fábrica ao mundo externo e aos sistemas de gestão (ERP, MES).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. OS PROTOCOLOS DE COMUNICAÇÃO                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O sistema suporta 3 protocolos para a rede industrial Ethernet:
+
+┌─────────────────────┬──────────────────────────────────────────────────────────┐
+│ PROTOCOLO           │ O QUE É                                                   │
+├─────────────────────┼──────────────────────────────────────────────────────────┤
+│ PROFINET            │ O padrão mais usado no mundo (30% do mercado).           │
+│                     │ Desenvolvido pela Siemens e pela PI (Profibus &           │
+│                     │ Profinet International). Permite desde controle           │
+│                     │ simples até motion control de altíssima precisão.         │
+│                     │ Suporta redundância (MRP/MRPD), segurança (PROFIsafe),   │
+│                     │ e Gigabit Ethernet com TSN (CC-D).                        │
+│                     │                                                          │
+│ EtherNet/IP         │ Padrão da Rockwell Automation (Allen-Bradley).           │
+│                     │ Muito usado nos Estados Unidos. 2º do mercado (25%).     │
+│                     │                                                          │
+│ Modbus TCP          │ Protocolo aberto e simples. Usado em equipamentos        │
+│                     │ de diversos fabricantes. Ótimo para integração.          │
+└─────────────────────┴──────────────────────────────────────────────────────────┘
+
+E 3 protocolos para o barramento de campo:
+
+┌─────────────────────┬──────────────────────────────────────────────────────────┐
+│ PROTOCOLO           │ O QUE É                                                   │
+├─────────────────────┼──────────────────────────────────────────────────────────┤
+│ Profibus DP         │ O clássico barramento RS-485 da Siemens. Ainda muito     │
+│                     │ usado em plantas existentes. Cabo roxo de 2 fios.        │
+│                     │                                                          │
+│ Modbus RTU          │ Protocolo serial aberto. Usado em inversores,            │
+│                     │ medidores e IHMs de diversos fabricantes.                │
+│                     │                                                          │
+│ IO-Link             │ Padrão para conectar sensores inteligentes.              │
+│                     │ Substitui o sinal analógico 4-20mA por comunicação       │
+│                     │ digital. Cabo M12 de 3/4/5 vias.                        │
+└─────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. AS TOPOLOGIAS (Os Formatos de Ligação)                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Topologia é o formato como os equipamentos são ligados entre si. O sistema
+suporta 5 tipos:
+
+┌─────────────────────┬──────────────────────────────────────────────────────────┐
+│ TOPOLOGIA           │ COMO FUNCIONA                                             │
+├─────────────────────┼──────────────────────────────────────────────────────────┤
+│ ANEL (MRP)          │ Os dispositivos são ligados em círculo. Se um cabo       │
+│                     │ romper, a rede se recupera em menos de 200ms.            │
+│                     │ Ideal para processos que não podem parar.                │
+│                     │ A versão MRPD recupera em ZERO milissegundos             │
+│                     │ (duplicando os dados nas duas direções).                 │
+│                     │                                                          │
+│ ESTRELA             │ Todos os dispositivos ligados a um switch central.       │
+│                     │ Se um cabo romper, só aquele dispositivo sai da rede.    │
+│                     │ Simples e fácil de diagnosticar.                         │
+│                     │                                                          │
+│ LINHA (Daisy-Chain) │ Dispositivos ligados em sequência, um após o outro.     │
+│                     │ Economiza cabos, mas se um falhar, os próximos param.    │
+│                     │                                                          │
+│ ÁRVORE              │ Uma combinação de estrela + linha. Switches core         │
+│                     │ (centro) ligados a switches access (nas máquinas).       │
+│                     │ Ideal para fábricas grandes com várias áreas.            │
+│                     │                                                          │
+│ MALHA               │ Várias conexões entre os switches. A mais redundante,    │
+│                     │ mas também a mais cara (mais cabos e equipamentos).      │
+└─────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. RECURSOS AVANÇADOS DO PROFINET                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você seleciona PROFINET como protocolo, o sistema libera opções
+avançadas que permitem refinar a arquitetura. Aqui está o que cada uma faz:
+
+CLASSE DE CONFORMIDADE (CC-A, CC-B, CC-C, CC-D)
+
+  Define o nível de capacidade dos equipamentos:
+
+  CC-A (Básico)       — Para automação predial e infraestrutura simples.
+                        Switch não-gerenciável é suficiente. Sem diagnósticos.
+                        Velocidade: 100 Mbps.
+
+  CC-B (Diagnóstico)  — Para fábricas que precisam monitorar a saúde da rede.
+                        Switch gerenciável com SNMP e informações de topologia.
+                        Velocidade: 100 Mbps.
+
+  CC-C (IRT/Motion)   — Para máquinas com sincronismo de eixos, robótica e
+                        controle de movimento de alta precisão. Exige switches
+                        com chip especial (ASIC ERTEC). Jitter abaixo de 1μs.
+                        Velocidade: 100 Mbps a 1 Gbps.
+
+  CC-D (TSN)          — A classe mais moderna (2025+). Permite rodar dados de
+                        tempo real e tráfego de TI no mesmo cabo Gigabit sem
+                        interferência. Usa TSN (Time Sensitive Networking).
+                        Velocidade: 1 Gbps.
+
+TEMPO REAL (RT / IRT)
+
+  RT (Real-Time)      — Tempo real padrão. Ciclo mínimo de 250μs (microssegundos).
+                        Jitter de 1 a 10ms. Adequado para 99% das aplicações.
+
+  IRT (Isócrono)      — Tempo real isócrono. Ciclo mínimo de 31,25μs.
+                        Jitter abaixo de 1μs (milhões de vezes mais rápido
+                        que um piscar de olhos). Para motion control.
+
+REDUNDÂNCIA (MRP / MRPD)
+
+  MRP                 — Media Redundancy Protocol. Se um cabo do anel romper,
+                        a rede se recupera em até 200ms. Padrão na indústria.
+
+  MRPD                — Media Redundancy Protocol com zero-loss. Os dados são
+                        enviados DUAS VEZES (uma em cada direção do anel).
+                        Se um cabo romper, a perda é ZERO milissegundos.
+                        Para aplicações críticas (segurança, motion).
+
+PROFIsafe (Segurança)
+
+  Permite enviar dados de SEGURANÇA (como parada de emergência, SIL 3)
+  no MESMO cabo que os dados normais. Elimina a necessidade de um segundo
+  barramento de segurança. Exige CLPs especiais (F-CPU) e dispositivos
+  compatíveis (SIMOCODE failsafe, SIRIUS 3RW55 F).
+
+DISPOSITIVOS SIEMENS
+
+  Quando ativado, o sistema insere equipamentos Siemens reais no lugar
+  de dispositivos genéricos:
+
+  - SIMOCODE pro V PN:     Gerenciamento inteligente de motores
+                           (proteção contra sobrecarga, falta de fase,
+                            medição de corrente e potência)
+  - SIRIUS 3RW55:          Soft starter (partida suave de motores)
+                           com bypass integrado e PROFINET
+  - SINAMICS G120:         Inversor de frequência modular
+                           com comunicação PROFIdrive
+  - SINAMICS S120:         Servoconversor para motion control multicixos
+  - ET 200SP:              Periferia remota de E/S descentralizada
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. OS TIPOS DE CABO E CONECTORES INDUSTRIAIS                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Diferente de uma rede de escritório (que usa cabos CAT5e comuns), a rede
+industrial usa cabos especiais, mais robustos. O sistema oferece 4 tipos:
+
+CABOS:
+
+┌─────────────┬──────────────────────────────────────────────────────────────────┐
+│ TIPO        │ ONDE USAR                                                        │
+├─────────────┼──────────────────────────────────────────────────────────────────┤
+│ Tipo A      │ Instalação fixa — dentro de calhas, eletrodutos e painéis.       │
+│ (Fixo)      │ O cabo não se move depois de instalado. O mais barato.           │
+│             │                                                                  │
+│ Tipo B      │ Instalação flexível — onde há vibração ou movimento ocasional.   │
+│ (Flexível)  │ Ex: motores que vibram, painéis que abrem e fecham.             │
+│             │                                                                  │
+│ Tipo C      │ Altamente flexível — para esteiras porta-cabos (drag chain)      │
+│ (Contínuo)  │ que se movem continuamente. Ex: máquinas de embalagem.          │
+│             │                                                                  │
+│ Tipo R      │ Robótica — para braços robóticos que torcem o cabo              │
+│ (Robô)      │ constantemente. Blindagem especial para suportar torção.        │
+│             │ O mais caro, mas o único que dura em robôs.                     │
+└─────────────┴──────────────────────────────────────────────────────────────────┘
+
+CONECTORES:
+
+┌──────────────────────┬─────────────────────────────────────────────────────────┐
+│ CONECTOR             │ ONDE USAR                                               │
+├──────────────────────┼─────────────────────────────────────────────────────────┤
+│ RJ45 Industrial      │ O conector padrão, igual ao do computador, mas mais     │
+│ IP20                 │ robusto (carcaça metálica). Para uso dentro de painéis. │
+│                      │ Proteção IP20 (não toma chuva).                         │
+│                      │                                                         │
+│ M12 D-Coded          │ Conector redondo rosqueável, 4 pinos. Para uso em       │
+│ IP65/67              │ campo (na máquina). Resiste a jatos d'água, poeira e    │
+│                      │ óleo. Velocidade máxima: 100 Mbps.                      │
+│                      │                                                         │
+│ M12 X-Coded          │ Conector redondo rosqueável, 8 pinos. Mais rápido,      │
+│ IP65/67              │ suporta Gigabit Ethernet. Para câmeras e dados pesados. │
+│                      │                                                         │
+│ SCRJ                 │ Conector de fibra óptica (POF). Para longas distâncias  │
+│ (Fibra)              │ ou ambientes com muito ruído elétrico (solda,           │
+│                      │ inversores de potência). Imune a interferências.        │
+└──────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. O QUE O SISTEMA GERA (Os Resultados)                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Depois que você configura os parâmetros e clica em "Gerar Arquitetura",
+o sistema produz tudo isso:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  1. DIAGRAMA DE TOPOLOGIA (Figura)                                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Um desenho bonito mostrando os 3 níveis da rede: gestão em cima, célula        │
+│ no meio, campo embaixo. Cada equipamento aparece como um bloco colorido        │
+│ com seu nome e tipo. As conexões entre eles são desenhadas com linhas.         │
+│ Se for topologia anel, aparece o círculo MRP em verde tracejado.               │
+│ Você pode baixar como SVG (figura) ou DXF (para abrir no AutoCAD).             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  2. LISTA DE MATERIAIS (BOM)                                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Uma tabela com todos os materiais necessários:                                  │
+│   - Switches (quantidade, tipo, portas, margem de expansão)                    │
+│   - Cabos Ethernet (metros, por tipo de cabo)                                  │
+│   - Conectores (quantidade, por tipo)                                          │
+│   - Patch cords, repetidores, conversores de fibra                            │
+│   - Custo estimado total                                                       │
+│                                                                                 │
+│ Você pode exportar como CSV (planilha Excel) ou incluir no memorial.            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  3. PLANO DE ENDEREÇAMENTO IP                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Uma tabela com:                                                                 │
+│   - VLANs: nome, ID, sub-rede (ex: 10.0.0.0/24), gateway (ex: 10.0.0.1)       │
+│   - Dispositivos: tag, tipo, IP atribuído, VLAN                                │
+│   - Station Name (para PROFINET): nome simbólico do dispositivo                │
+│     (ex: "clp-01-plc", "inversor-esteira")                                     │
+│                                                                                 │
+│ Isso substitui o trabalho manual de planilha de IPs.                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  4. FICHAS TÉCNICAS DOS EQUIPAMENTOS                                            │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Para cada equipamento na rede, o sistema gera uma ficha com:                    │
+│   - Equipamento e fabricante sugerido                                           │
+│   - Portas, alimentação (24 VDC)                                               │
+│   - Temperatura de operação (-40°C a +75°C)                                    │
+│   - Grau de proteção (IP30, IP65/67)                                           │
+│   - Normas atendidas (IEC 61850, IEEE 1613, IEC 62443, etc.)                   │
+│                                                                                 │
+│ Útil para incluir em editais e cotações.                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  5. CONFORMIDADE NORMATIVA                                                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ O sistema verifica se a arquitetura atende às normas técnicas:                  │
+│   ✅ ISA-95:       Hierarquia de 3 níveis (Campo, Célula, Gestão)              │
+│   ✅ IEC 62443:    Segurança cibernética (firewall na DMZ)                     │
+│   ✅ NBR 14565:    Cabeamento estruturado                                       │
+│   ✅ IEC 61158:    Redes de comunicação industrial                              │
+│   ✅ IEC 61508:    Segurança funcional (se PROFIsafe ativo)                    │
+│                                                                                 │
+│ Cada verificação mostra OK (verde), ALERTA (amarelo) ou INFO (azul).           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  6. MEMORIAL DESCRITIVO TÉCNICO                                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Um documento de texto completo, pronto para incluir na proposta:                │
+│   1. Objetivo                                                                   │
+│   2. Hierarquia (Campo, Célula, Gestão)                                        │
+│      2.1 Classe de Conformidade (se PROFINET)                                  │
+│      2.2 GSDML e DCP (descrição de dispositivos)                               │
+│      2.3 Cabo e Conectores (se configurado)                                    │
+│      2.4 Dados de Mercado PROFINET 2025-2026                                   │
+│   3. Lista de Materiais                                                         │
+│   4. Plano de Endereçamento IP                                                 │
+│   5. Validação de Restrições                                                   │
+│   6. Considerações Finais                                                       │
+│                                                                                 │
+│ Você pode copiar, exportar PDF ou imprimir.                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. PASSO A PASSO NA TELA                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Vamos simular o uso completo:
+
+ETAPA 1 — ACESSAR O MÓDULO
+  • No menu lateral, clique em "Arquitetura de Rede" (ícone de rede).
+  • Se não houver CLPs na Proposta Técnica ativa, o sistema avisa.
+
+ETAPA 2 — VERIFICAR OS CONTROLADORES
+  • O card "Controladores Detectados" mostra os CLPs e REMs encontrados
+    na proposta ativa, com seus totais de I/O.
+
+ETAPA 3 — CONFIGURAR OS PARÂMETROS BÁSICOS
+  • Protocolo Industrial: escolha PROFINET, EtherNet/IP ou Modbus TCP.
+  • Protocolo de Campo: escolha Profibus DP, Modbus RTU ou IO-Link.
+  • Topologia: escolha anel, estrela, linha ou árvore.
+  • Distância Estimada: quantos metros de cabo aproximadamente.
+  • Categoria do Cabo: CAT5e, CAT6, CAT6a ou CAT7.
+
+ETAPA 4 — CONFIGURAR ENDEREÇAMENTO IP
+  • IP Base: o início da faixa de IPs (ex: 10.0.0.0).
+  • Prefixo: /24 (254 hosts), /23 (510) ou /22 (1022).
+  • Quantidade de VLANs: quantas redes virtuais (mín. 1, máx. 10).
+
+ETAPA 5 — ATIVAR RECURSOS EXTRAS
+  • SCADA: ativa integração com supervisório via OPC UA.
+  • IIoT: ativa integração com Internet das Coisas via MQTT.
+  • Fibra Óptica: se a distância for grande ou houver muito ruído.
+  • Firewall: adiciona um firewall industrial entre a fábrica e a
+    rede corporativa (DMZ).
+  • Roteador WAN: adiciona roteador 4G/5G para acesso remoto.
+  • Access Point: adiciona Wi-Fi industrial (IWLAN).
+
+ETAPA 6 — CONFIGURAR AVANÇADOS PROFINET (se aplicável)
+  • Classe de Conformidade: CC-A, CC-B, CC-C ou CC-D.
+  • Tempo Real: RT ou IRT (se for motion control).
+  • Redundância: MRP ou MRPD (se for processo crítico).
+  • Tipo de Cabo Industrial: A (fixo), B (flexível), C (contínuo) ou
+    R (robótica).
+  • Conector de Campo: RJ45, M12 D-Coded, M12 X-Coded ou SCRJ (fibra).
+  • Dispositivos Siemens: ativa para incluir SIMOCODE, SIRIUS, SINAMICS.
+  • PROFIsafe: ativa segurança funcional no mesmo cabo.
+
+ETAPA 7 — GERAR ARQUITETURA
+  • Clique em "Gerar Arquitetura" no cabeçalho azul.
+  • O sistema processa e exibe o resultado completo.
+
+ETAPA 8 — ANALISAR O RESULTADO
+  • Confira o diagrama de topologia (desenho SVG).
+  • Veja a lista de materiais e o custo estimado.
+  • Veja o plano de IP (VLANs + dispositivos + Station Names).
+  • Veja as fichas técnicas e a conformidade normativa.
+  • Leia o memorial descritivo.
+
+ETAPA 9 — EXPORTAR
+  • JSON: resultado completo em formato de dados.
+  • CSV: lista de materiais para planilha.
+  • PDF: memorial descritivo para documento.
+  • SVG: diagrama da topologia (figura).
+  • DXF: diagrama para AutoCAD.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. DICAS IMPORTANTES                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  Coloque as listas de I/O dos CLPs na Proposta Técnica antes de usar
+    este módulo. Sem I/O, o sistema não consegue dimensionar os dispositivos
+    de campo.
+
+✅  A topologia em ANEL é a mais recomendada para processos contínuos.
+    Se um cabo romper, a rede se recupera sozinha em milissegundos.
+
+✅  Use MRPD (em vez de MRP) apenas se você tiver aplicações de motion
+    control que não toleram NENHUMA perda de comunicação. MRPD é mais caro
+    (precisa de switches especiais).
+
+✅  A classe CC-D (TSN) é a mais moderna, mas exige switches TSN específicos
+    e cabos CAT6a ou superiores. Verifique disponibilidade com o fornecedor.
+
+✅  Se a fábrica tiver robôs, use cabo TIPO R para as conexões nos robôs.
+    Cabo comum não dura em aplicações com torção constante.
+
+✅  Use conectores M12 para dispositivos em campo (sujeito a respingos,
+    poeira, vibração). Use RJ45 apenas dentro de painéis fechados.
+
+✅  Ative "Dispositivos Siemens" se você for usar equipamentos reais da
+    Siemens. O memorial e o diagrama ficam mais detalhados e realistas.
+
+✅  O Firewall é OBRIGATÓRIO se a rede industrial tiver acesso à internet
+    ou à rede corporativa (proteção contra ataques cibernéticos).
+
+✅  Os Station Names gerados para PROFINET seguem o formato padronizado
+    (tag-tipo). Você pode usá-los diretamente na configuração do TIA Portal.
+
+✅  Exporte o memorial em PDF e inclua na proposta técnica. Ele já vem
+    formatado com todas as informações técnicas.
+
+⚠️  A topologia LINHA é a mais vulnerável: se um dispositivo no meio da
+    linha falhar, todos os seguintes perdem comunicação. Use com cuidado.
+
+⚠️  O custo estimado é aproximado (preços de referência). Sempre solicite
+    cotação com fornecedores para valores exatos.
+
+⚠️  Se você mudar a Proposta Técnica (adicionar/remover CLPs), precisa
+    gerar a arquitetura novamente para refletir as alterações.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. GLOSSÁRIO                                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────┬─────────────────────────────────────────────────────┐
+│ TERMO                     │ SIGNIFICADO                                         │
+├───────────────────────────┼─────────────────────────────────────────────────────┤
+│ CLP                       │ Controlador Lógico Programável. O "cérebro" da      │
+│                           │ automação. Ex: S7-1200, S7-1500.                    │
+│                           │                                                     │
+│ REM                       │ Remote I/O Module. Módulo remoto de entradas e      │
+│                           │ saídas, conectado via rede ao CLP.                  │
+│                           │                                                     │
+│ I/O                       │ Input/Output. Entradas (sensores) e saídas          │
+│                           │ (atuadores, motores) do CLP.                        │
+│                           │                                                     │
+│ DI / DO                   │ Entrada Digital / Saída Digital. Liga/desliga.      │
+│                           │ Ex: sensor de presença (DI), relé (DO).            │
+│                           │                                                     │
+│ AI / AO                   │ Entrada Analógica / Saída Analógica. Valores        │
+│                           │ variáveis. Ex: temperatura 4-20mA (AI).            │
+│                           │                                                     │
+│ Switch                    │ Equipamento que interliga dispositivos na rede.     │
+│                           │ Pode ser gerenciável (configurável) ou não.         │
+│                           │                                                     │
+│ Switch Gerenciável        │ Switch que você pode configurar: VLANs, SNMP,       │
+│                           │ prioridade de tráfego, redundância MRP.             │
+│                           │                                                     │
+│ Switch Não-Gerenciável    │ Switch "plug and play". Liga e funciona.            │
+│                           │ Sem configuração. Para redes simples.               │
+│                           │                                                     │
+│ MRP                       │ Media Redundancy Protocol. Anel que se recupera     │
+│                           │ sozinho em <200ms se um cabo romper.                │
+│                           │                                                     │
+│ MRPD                      │ Media Redundancy zero-loss. Duplica os dados        │
+│                           │ nas duas direções. 0ms de perda.                    │
+│                           │                                                     │
+│ IRT                       │ Isochronous Real-Time. Tempo real isócrono.         │
+│                           │ Jitter < 1μs. Para motion control.                 │
+│                           │                                                     │
+│ TSN                       │ Time Sensitive Networking. Padrão IEEE para        │
+│                           │ garantir tempo real em redes Gigabit Ethernet.     │
+│                           │                                                     │
+│ PROFIsafe                 │ Perfil de segurança do PROFINET. Permite dados     │
+│                           │ de segurança (SIL 3) no mesmo cabo dos dados        │
+│                           │ normais.                                            │
+│                           │                                                     │
+│ GSDML                     │ General Station Description Markup Language.        │
+│                           │ Arquivo XML que descreve um dispositivo PROFINET.   │
+│                           │ O TIA Portal usa para saber o que o hardware faz.  │
+│                           │                                                     │
+│ DCP                       │ Discovery and basic Configuration Protocol.         │
+│                           │ Protocolo que atribui IP automaticamente baseado    │
+│                           │ no nome do dispositivo (Station Name).              │
+│                           │                                                     │
+│ Station Name              │ Nome simbólico do dispositivo na rede PROFINET.    │
+│                           │ Ex: "clp-01-plc". O CLP usa o nome para            │
+│                           │ encontrar o dispositivo pelo MAC address.           │
+│                           │                                                     │
+│ VLAN                      │ Virtual LAN. Rede virtual que separa o tráfego.    │
+│                           │ Ex: VLAN 10 para campo, VLAN 20 para controle.     │
+│                           │                                                     │
+│ DMZ                       │ Zona Desmilitarizada. Rede isolada entre a         │
+│                           │ internet e a rede da fábrica, protegida por        │
+│                           │ firewall.                                           │
+│                           │                                                     │
+│ SCADA                     │ Supervisory Control and Data Acquisition.          │
+│                           │ Sistema de supervisão da fábrica (telas,          │
+│                           │ históricos, alarmes).                              │
+│                           │                                                     │
+│ OPC UA                    │ Open Platform Communications Unified Architecture.  │
+│                           │ Protocolo padronizado para integração de sistemas   │
+│                           │ de automação.                                       │
+│                           │                                                     │
+│ MQTT                      │ Message Queuing Telemetry Transport. Protocolo     │
+│                           │ leve para Internet das Coisas (IIoT).              │
+│                           │                                                     │
+│ IWLAN                     │ Industrial Wireless LAN. Wi-Fi industrial para     │
+│                           │ comunicação sem fio na fábrica.                     │
+│                           │                                                     │
+│ BOM                       │ Bill of Materials. Lista de materiais.             │
+│                           │                                                     │
+│ ISA-95                    │ Norma internacional para integração entre          │
+│                           │ sistemas de automação e sistemas corporativos.     │
+│                           │                                                     │
+│ IEC 62443                 │ Norma de segurança cibernética para redes          │
+│                           │ industriais (OT).                                   │
+│                           │                                                     │
+│ IEC 61508                 │ Norma de segurança funcional. Define SIL          │
+│                           │ (Safety Integrity Level) de 1 a 4.                  │
+│                           │                                                     │
+│ SIL 3                     │ Safety Integrity Level 3. Nível de segurança       │
+│                           │ usado em máquinas industriais. Risco residual       │
+│                           │ muito baixo.                                        │
+│                           │                                                     │
+│ ERTEC                     │ ASIC da Siemens para processamento IRT em          │
+│                           │ hardware. Usado em switches CC-C.                   │
+│                           │                                                     │
+│ IP20 / IP65/67            │ Grau de proteção (Ingress Protection). IP20:       │
+│                           │ só em painel fechado. IP65/67: resiste a jatos     │
+│                           │ d'água e poeira.                                   │
+│                           │                                                     │
+│ SIMOCODE                  │ Sistema Siemens de gerenciamento e proteção de      │
+│                           │ motores elétricos. Versão pro V PN tem PROFINET.  │
+│                           │                                                     │
+│ SIRIUS 3RW55              │ Soft starter Siemens. Partida suave de motores     │
+│                           │ com PROFINET integrado.                            │
+│                           │                                                     │
+│ SINAMICS                  │ Família de inversores de frequência Siemens.       │
+│                           │ G120: uso geral. S120: motion control.            │
+│                           │                                                     │
+│ PROFIdrive                │ Perfil de comunicação para drives (inversores)     │
+│                           │ sobre PROFINET. Define telegramas padronizados.    │
+│                           │ Ex: Telegrama 1 (STW1/ZSW1/NSOLL_A/NIST_A).       │
+└───────────────────────────┴─────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. PROBLEMAS COMUNS E SOLUÇÕES                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "O sistema diz que não há controladores"                             │
+│  SOLUÇÃO:  Você precisa ter equipamentos do tipo "PLC" ou "REM" cadastrados     │
+│            na Proposta Técnica ativa, com lista de I/O preenchida.              │
+│            Vá em Proposta Técnica, adicione os equipamentos, preencha I/O,     │
+│            e volte ao módulo.                                                   │
+│                                                                                 │
+│  PROBLEMA: "Aparece erro de validação"                                          │
+│  SOLUÇÃO:  Verifique se todos os CLPs têm nome (tag) e lista de I/O.           │
+│            Se usou caracteres especiais no tag, pode causar erro.              │
+│                                                                                 │
+│  PROBLEMA: "As opções avançadas do PROFINET não aparecem"                       │
+│  SOLUÇÃO:  Selecione "PROFINET" no campo "Protocolo Industrial Ethernet".       │
+│            As opções só aparecem quando PROFINET está selecionado.              │
+│                                                                                 │
+│  PROBLEMA: "O diagrama SVG não aparece"                                         │
+│  SOLUÇÃO:  Pode ser erro ao gerar. Verifique se há muitos dispositivos.        │
+│            Atualize a página e tente novamente com menos controladores.        │
+│                                                                                 │
+│  PROBLEMA: "O custo estimado está muito alto / baixo"                          │
+│  SOLUÇÃO:  O custo é estimado com preços de referência. Ajuste os parâmetros   │
+│            (tipo de cabo, classe de conformidade, etc.) para refletir melhor   │
+│            a realidade. Sempre solicite cotação com fornecedores.              │
+│                                                                                 │
+│  PROBLEMA: "O Station Name não aparece no plano IP"                            │
+│  SOLUÇÃO:  Station Name só é gerado quando o protocolo é PROFINET.            │
+│            Se estiver usando EtherNet/IP ou Modbus TCP, o campo fica vazio.   │
+│                                                                                 │
+│  PROBLEMA: "O memorial parece incompleto"                                      │
+│  SOLUÇÃO:  Algumas seções do memorial (CC, GSDML, cabos, dados de mercado)     │
+│            só aparecem quando PROFINET está selecionado com opções avançadas.  │
+│            Elas não aparecem para outros protocolos.                           │
+│                                                                                 │
+│  PROBLEMA: "Quero gerar uma arquitetura nova mas não consigo"                  │
+│  SOLUÇÃO:  Clique no botão "Regenerar" no cabeçalho do resultado.              │
+│            Se quiser começar do zero, recarregue a página.                     │
+│                                                                                 │
+│  PROBLEMA: "Exportei CSV mas não abre direito no Excel"                        │
+│  SOLUÇÃO:  O CSV usa separador ";" (ponto e vírgula). Ao abrir no Excel,       │
+│            escolha "Importar" e selecione separador ponto e vírgula.           │
+│                                                                                 │
+│  PROBLEMA: "Exportei DXF mas não aparece nada no AutoCAD"                      │
+│  SOLUÇÃO:  O DXF é gerado no formato R12 (compatível com todos os programas).  │
+│            Use o comando ZOOM → EXTENTS no AutoCAD para centralizar a vista.   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  LEMBRE-SE                                                                      │
+│                                                                                 │
+│  O módulo de Arquitetura de Rede Industrial foi projetado para ECONOMIZAR      │
+│  TEMPO DE ENGENHARIA. Em vez de desenhar cada detalhe da rede no AutoCAD       │
+│  ou fazer cálculos manuais de cabos e switches, você configura os parâmetros   │
+│  e o sistema gera tudo automaticamente.                                        │
+│                                                                                 │
+│  Uma arquitetura bem dimensionada = proposta mais profissional                │
+│  = menos revisões em campo = economia real na obra.                           │
+│                                                                                 │
+│  🙋 VENDEDOR → usa a Proposta Técnica                                          │
+│  👷 ENGENHEIRO → usa a Arquitetura de Rede                                    │
+│  🤝 JUNTOS → propostas mais completas e assertivas                            │
+│                                                                                 │
+│  Sempre gere a arquitetura ANTES de finalizar a proposta.                      │
+│  Isso garante que a lista de materiais de rede já esteja incluída no          │
+│  orçamento final.                                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘

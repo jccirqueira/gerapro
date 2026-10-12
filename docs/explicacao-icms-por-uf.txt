@@ -1,0 +1,337 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — ICMS POR UF (TABELA CONFAZ)                             ║
+║                                                                                  ║
+║   (para quem não é programador, nem engenheiro, nem contador)                   ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o sistema novo de ICMS que considera   ║
+║   o estado de origem e o estado de destino de cada equipamento.                  ║
+║   Ele NÃO explica o módulo de Precificação completo — para isso, leia o          ║
+║   arquivo "explicacao-precificacao.txt" na mesma pasta.                          ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É ICMS E POR QUE A UF IMPORTA?                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+ICMS é um imposto estadual. Cada estado brasileiro define sua própria alíquota.
+
+Pense numa compra online:
+  • Se você compra de uma loja DENTRO do seu estado → o imposto é um (ex: 18%)
+  • Se você compra de uma loja em OUTRO estado → o imposto pode ser menor (ex: 12% ou 7%)
+  • Se você É a loja em outro estado vendendo para alguém → muda de novo
+
+Agora traduzindo para o GeraPro:
+  • Você (sua empresa) fabrica ou compra equipamentos em um estado (UF de Origem)
+  • O equipamento será instalado na obra do cliente em outro estado (UF de Destino)
+  • O ICMS muda conforme esses dois estados
+
+O sistema novo faz esse cálculo automaticamente, usando a tabela oficial do CONFAZ
+(Conselho Nacional de Política Fazendária — o órgão que define essas regras).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. COMO ERA ANTES VS. COMO É AGORA                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────┬────────────────────────────────────────────────────────────────────┐
+│ ANTES      │ O ICMS era um número fixo que você precisava saber e digitar       │
+│            │ toda vez. O sistema usava sempre o mesmo valor padrão (18%, 12%,   │
+│            │ ou 0%) para todos os equipamentos, independente de onde eram       │
+│            │ fabricados ou instalados.                                          │
+│            │                                                                    │
+│ AGORA      │ O sistema consulta automaticamente a tabela CONFAZ.                │
+│            │ Ele olha:                                                          │
+│            │   • De ONDE vem o equipamento (UF de Origem)                       │
+│            │   • Para ONDE vai (UF de Destino, extraída da Localização)         │
+│            │ E preenche o ICMS sozinho com o valor correto.                     │
+│            │                                                                    │
+│            │ Mas se você quiser, ainda pode digitar manualmente — o sistema     │
+│            │ respeita sua escolha.                                              │
+└────────────┴────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. AS DUAS UFs QUE O SISTEMA USA                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O sistema precisa de DOIS endereços para calcular o ICMS:
+
+┌──────────────────┬──────────────────────────────────────────────────────────────┐
+│ NOME             │ O QUE É                                                      │
+├──────────────────┼──────────────────────────────────────────────────────────────┤
+│ UF DE ORIGEM      │ O estado onde o equipamento é FABRICADO ou FORNECIDO.       │
+│ (Fornecedor)     │ Ex: se o painel é montado em São Paulo (SP), a UF de origem  │
+│                  │ é SP.                                                        │
+│                  │                                                              │
+│                  │ 💡 Padrão: sua empresa (configurações). Você pode mudar      │
+│                  │ por equipamento na Ficha Técnica.                            │
+│                  │                                                              │
+│                  │ 💡 Dica: se o material principal do equipamento vem de um    │
+│                  │ fornecedor em MG, mas a montagem é na sua empresa em SP,     │
+│                  │ use SP (onde o equipamento é montado).                       │
+│                  │                                                              │
+│                  │ 💡 Dica avançada: no cadastro de cada Material, você pode    │
+│                  │ informar a UF do Fornecedor (aba Fiscal). Isso ajuda na      │
+│                  │ importação de planilhas, mas o ICMS final é calculado pelo    │
+│                  │ equipamento, não pelo material individual.                   │
+├──────────────────┼──────────────────────────────────────────────────────────────┤
+│ UF DE DESTINO    │ O estado onde o equipamento será INSTALADO (obra do          │
+│ (Instalação)    │ cliente).                                                     │
+│                  │                                                              │
+│                  │ 💡 É extraída automaticamente do campo "Localização"          │
+│                  │ (Cidade/Estado) que você preenche no cabeçalho da            │
+│                  │ Proposta Técnica. Ex: "SERTÃOZINHO/SP" → UF = SP.            │
+│                  │                                                              │
+│                  │ Este campo é somente LEITURA na tela de Precificação —        │
+│                  │ você altera ele no cabeçalho da Proposta Técnica.            │
+└──────────────────┴──────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. A TABELA CONFAZ EM PORTUGUÊS CLARO                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O sistema divide os estados em dois grupos:
+
+  GRUPO SUL/SUDESTE: SP, RJ, MG, ES, PR, RS, SC
+  GRUPO NORTE/NORDESTE/CENTRO-OESTE: todos os outros (AC, AL, AM, AP, BA, CE,
+  DF, GO, MA, MS, MT, PA, PB, PE, PI, RN, RO, RR, SE, TO)
+
+E aplica estas regras:
+
+┌─────────────────────────────────────┬───────────────────────────────────────────┐
+│ SITUAÇÃO                            │ ALÍQUOTA                                  │
+├─────────────────────────────────────┼───────────────────────────────────────────┤
+│ DENTRO DO MESMO ESTADO              │ A alíquota interna do estado              │
+│ (Origem = Destino)                  │ (varia de 17% a 20% conforme o estado)    │
+│                                     │ Ex: SP → SP = 18%, RJ → RJ = 20%         │
+├─────────────────────────────────────┼───────────────────────────────────────────┤
+│ SUL/SUDESTE → SUL/SUDESTE           │ 12%                                       │
+│ (estados diferentes, mas no mesmo   │ Ex: SP → RJ = 12%, PR → MG = 12%         │
+│  grupo)                             │                                           │
+├─────────────────────────────────────┼───────────────────────────────────────────┤
+│ SUL/SUDESTE → NORTE/NORDESTE/CO    │ 7%                                         │
+│ (de um grupo mais rico para um      │ Ex: SP → BA = 7%, RJ → PE = 7%,          │
+│  menos rico)                        │     SC → MT = 7%                          │
+├─────────────────────────────────────┼───────────────────────────────────────────┤
+│ NORTE/NORDESTE/CO → QUALQUER LUGAR  │ 12%                                       │
+│ (inclusive Sul/Sudeste)             │ Ex: BA → SP = 12%, MT → RJ = 12%         │
+└─────────────────────────────────────┴───────────────────────────────────────────┘
+
+📌 Alíquotas internas de cada estado (quando Origem = Destino):
+
+  AC=17%   AL=17%   AM=18%   AP=17%   BA=18%
+  CE=18%   DF=18%   ES=17%   GO=17%   MA=18%
+  MG=18%   MS=17%   MT=17%   PA=17%   PB=18%
+  PE=18%   PI=18%   PR=18%   RJ=20%   RN=18%
+  RO=17%   RR=17%   RS=17%   SC=17%   SE=18%
+  SP=18%   TO=17%
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. DE ONDE VÊM OS DADOS (O FLUXO COMPLETO)                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O caminho que o ICMS percorre até aparecer na Precificação:
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                                                                         │
+  │  1. CADASTRO DO MATERIAL (opcional)                                     │
+  │     • Na aba "Fiscal", campo "UF do Fornecedor"                         │
+  │     • Usado na importação de planilhas para preencher automaticamente   │
+  │                                                                         │
+  │  2. EQUIPAMENTO (na Proposta Técnica)                                   │
+  │     • Campo "UF de Origem (Fornecedor)" na Ficha Técnica                │
+  │     • Padrão: a UF da sua empresa (configurações do sistema)            │
+  │     • Você pode mudar por equipamento                                   │
+  │                                                                         │
+  │  3. CABEÇALHO DA PROPOSTA TÉCNICA                                       │
+  │     • Campo "Localização (Cidade/Estado)"                               │
+  │     • O sistema extrai a UF de Destino automaticamente                  │
+  │     • Ex: "SERTÃOZINHO/SP" → UF destino = SP                           │
+  │                                                                         │
+  │  4. PRECIFICAÇÃO                                                        │
+  │     • Ao abrir a Precificação de cada equipamento, o sistema cruza      │
+  │       a UF de Origem com a UF de Destino na tabela CONFAZ               │
+  │     • Preenche o campo ICMS automaticamente                             │
+  │     • Mostra o selo "✓ CONFAZ" indicando que foi auto-calculado         │
+  │                                                                         │
+  │  5. RELATÓRIO                                                            │
+  │     • No relatório da proposta, aparece a UF Origem, UF Destino e       │
+  │       o percentual de ICMS para cada equipamento                        │
+  │                                                                         │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. AUTO-CALCULADO VS. MANUAL                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O sistema tenta ser inteligente, mas não substitui o conhecimento de quem
+entende de tributação. Por isso ele tem dois modos:
+
+┌──────────────┬──────────────────────────────────────────────────────────────────┐
+│ MODO         │ COMPORTAMENTO                                                     │
+├──────────────┼──────────────────────────────────────────────────────────────────┤
+│ AUTOMÁTICO   │ • O sistema preenche o ICMS pela tabela CONFAZ                   │
+│              │ • Aparece um selo azul "✓ CONFAZ" ao lado do campo              │
+│              │ • O texto "✓ CONFAZ" indica: "confie em mim, usei a tabela       │
+│              │   oficial"                                                        │
+│              │ • Toda vez que você abre o equipamento, o sistema recalcula       │
+│              │                                                                  │
+│ MANUAL       │ • Quando você DIGITA um valor no campo ICMS                      │
+│              │ • O selo "✓ CONFAZ" some                                         │
+│              │ • O sistema NUNCA mais sobrescreve aquele valor                   │
+│              │ • Ele entende: "ok, o usuário sabe o que está fazendo"           │
+│              │ • Esse respeito é permanente (mesmo se fechar e abrir de novo)   │
+│              │ • Para voltar ao automático: apague o número, deixe o campo      │
+│              │   vazio, salve e recarregue a página                              │
+└──────────────┴──────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. EXEMPLOS PRÁTICOS                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+EXEMPLO 1 — TUDO NO MESMO ESTADO
+  Sua empresa:         São Paulo (SP)
+  Cliente:             Usina Açucareira em Sertãozinho/SP
+  Equipamento:         CCM-01 (fabricado na sua empresa em SP)
+  UF Origem:           SP
+  UF Destino:          SP
+  ICMS calculado:      18% (alíquota interna de SP)
+
+
+EXEMPLO 2 — VENDA DE SP PARA A BAHIA
+  Sua empresa:         São Paulo (SP)
+  Cliente:             Fábrica de Cimento em Camaçari/BA
+  Equipamento:         CCM-02 (fabricado na sua empresa em SP)
+  UF Origem:           SP
+  UF Destino:          BA
+  ICMS calculado:      7% (Sul/Sudeste → Norte/Nordeste)
+
+
+EXEMPLO 3 — COMPRA DE FORNECEDOR DE MG, INSTALAÇÃO EM SP
+  Sua empresa:         São Paulo (SP)
+  Fornecedor:          Fabricante em Contagem/MG
+  Equipamento:         TR-01 (transformador comprado de MG, instalado em SP)
+  UF Origem:           MG (você altera na Ficha Técnica)
+  UF Destino:          SP
+  ICMS calculado:      12% (Sul/Sudeste → Sul/Sudeste, estados diferentes)
+
+  💡 Neste caso, se você deixar a UF de Origem como SP (padrão), o sistema
+  usaria 18% (SP→SP), o que estaria ERRADO. Por isso é importante ajustar a
+  UF de Origem na Ficha Técnica quando o equipamento vem de outro estado.
+
+
+EXEMPLO 4 — REVENDA (COMPROU PRONTO DE FORA)
+  Sua empresa:         São Paulo (SP)
+  Fornecedor:          Siemens em Manaus/AM
+  Equipamento:         PAINEL-01 (comprado pronto da Zona Franca de Manaus)
+  UF Origem:           AM
+  UF Destino:          SP
+  ICMS calculado:      12% (Norte → Sul/Sudeste)
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. O QUE FAZER SE O ICMS AUTOMÁTICO ESTIVER ERRADO?                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A tabela CONFAZ cobre a maioria dos casos, mas existem situações especiais:
+
+  • Produtos com alíquota diferenciada (ex: energia elétrica, comunicações)
+  • Empresas do Simples Nacional (alíquota unificada DAS)
+  • Regimes especiais de tributação
+  • Benefícios fiscais estaduais (guerra fiscal)
+  • Produtos importados com tratamento específico
+
+Nestes casos:
+  1. Ignore o valor automático
+  2. Digite manualmente o ICMS correto no campo
+  3. O sistema respeita sua alteração e não sobrescreve
+
+📌 Importante: a Precificação tem um campo separado "DAS" para empresas do
+Simples Nacional. Se sua empresa é Simples Nacional, o ICMS não se aplica —
+use o campo DAS e o sistema automaticamente oculta os campos de ICMS.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. TABELA RESUMIDA PARA CONSULTA RÁPIDA                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+   ORIGEM ↓  ┆  DESTINO →  │  MSM ESTADO  │  S/SE → S/SE  │  S/SE → N/NE/CO │  N/NE/CO → TUDO
+   ──────────┼──────────────┼──────────────┼────────────────┼──────────────────┼─────────────────
+   ICMS      ┆             │  Interna*    │     12%       │       7%        │      12%
+              ┆             │              │                │                  │
+
+   * Alíquota interna varia por estado (ver lista na seção 4)
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  CONFAZ         Conselho Nacional de Política Fazendária. É o órgão que reúne
+                 os secretários de fazenda de todos os estados para definir as
+                 regras do ICMS.
+
+  ICMS           Imposto sobre Circulação de Mercadorias e Serviços. É um imposto
+                 estadual — cada estado define sua alíquota.
+
+  ALÍQUOTA       A porcentagem do imposto. Ex: 18% significa que R$ 18 de cada
+                 R$ 100 vão para o estado.
+
+  ALÍQUOTA       A porcentagem que vale para operações DENTRO do mesmo estado.
+  INTERNA        Ex: SP → SP = 18%.
+
+  ALÍQUOTA       A porcentagem para operações entre estados DIFERENTES.
+  INTERESTADUAL  Ex: SP → BA = 7%.
+
+  UF             Unidade da Federação (estado). Ex: SP, RJ, MG, BA, etc.
+
+  UF DE ORIGEM   O estado de onde o equipamento SAI (onde é fabricado ou
+                 fornecido).
+
+  UF DE DESTINO  O estado para onde o equipamento VAI (onde será instalado).
+
+  OPERAÇÃO       Quando a origem e o destino são o MESMO estado.
+  INTERNA        Ex: equipamento fabricado em SP e instalado em SP.
+
+  OPERAÇÃO       Quando a origem e o destino são estados DIFERENTES.
+  INTERESTADUAL  Ex: equipamento fabricado em SP e instalado na BA.
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║  Documento criado em junho/2026.                                                ║
+║  Dúvidas? Consulte o arquivo "explicacao-precificacao.txt" para o contexto      ║
+║  completo do módulo de Precificação, ou fale com o administrador do sistema.    ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

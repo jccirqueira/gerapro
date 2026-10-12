@@ -1231,6 +1231,9 @@
             <!-- MODULE: COMPARACAO DE DOCUMENTOS -->
             <div id="view-comparacao-documentos" class="module-view hidden-module fade-in"></div>
 
+            <!-- MODULE: COMPARACAO DE DOCUMENTOS -->
+            <div id="view-comparacao-documentos" class="module-view hidden-module fade-in"></div>
+
             <!-- MODULE: RELATORIO DE PROPOSTAS -->
             <div id="view-relatorio-propostas" class="module-view hidden-module fade-in"></div>
 
@@ -1322,36 +1325,6 @@
                 document.body.appendChild(s);
             });
         })();
-    </script>
-
-    <script>
-        // Proxy-based app: primeiro verifica target (métodos vinculados por App.init()),
-        // depois tenta window.__realApp, senão avisa.
-        window.app = new Proxy(window.app || {}, {
-            get(target, prop) {
-                if (prop in target) return target[prop];
-                if (prop === 'backup') {
-                    return () => {
-                        const data = localStorage.getItem('gerapro_db_v1');
-                        const blob = new Blob([data], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `gerapro_backup_${new Date().toISOString().slice(0, 10)}.json`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                    };
-                }
-                return (...args) => {
-                    const real = window.__realApp;
-                    if (real && typeof real[prop] === 'function') {
-                        return real[prop].call(real, ...args);
-                    }
-                    console.warn(`app["${prop}"]() não disponível`);
-                };
-            }
-        });
     </script>
 </body>
 

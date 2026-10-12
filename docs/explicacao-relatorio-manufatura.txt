@@ -1,0 +1,389 @@
+﻿╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    EXPLICAÇÃO SIMPLES — RELATÓRIO DE MANUFATURA — GERAPRO            ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Relatório de Manufatura.   ║
+║   Ele mostra como gerar relatórios gerenciais, aplicar filtros, visualizar       ║
+║   dados em 5 tipos de relatório diferentes e exportar para Excel (XLSX) ou CSV.  ║
+║   Se você precisa de ajuda sobre outros módulos, procure o help do sistema       ║
+║   (botão ❓ no canto superior) ou os outros arquivos de explicação na pasta      ║
+║   /docs.                                                                         ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É O RELATÓRIO DE MANUFATURA?                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você é o gerente de uma fábrica de painéis elétricos. Você precisa saber:
+
+  • Quantos projetos estão em andamento? E qual o progresso de cada um?
+  • Quantas gavetas já foram liberadas? E quantas ainda estão em teste?
+  • Qual a taxa de aprovação nos testes? Tem alguma gaveta com problema recorrente?
+  • Quais componentes foram usados? Preciso de uma lista para o setor de compras.
+  • Quem fez o quê e quando? Preciso de um histórico de atividades para auditoria.
+
+O Relatório de Manufatura responde a todas essas perguntas. Ele reúne os dados de
+produção em tabelas dinâmicas com filtros poderosos. Você pode:
+
+  • Escolher entre 5 tipos de relatório (Andamento, Gavetas, Testes, Componentes,
+    Histórico)
+  • Filtrar por data, projeto, cliente, status, etapa, tipo de gaveta e resultado
+    de teste
+  • Ver indicadores (KPIs) no topo da página
+  • Exportar os dados para Excel (.xlsx) ou CSV (.csv)
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. A TELA PRINCIPAL                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em "Relatório de Manufatura" no menu lateral (seção RELATÓRIOS),
+a tela é dividida em várias áreas:
+
+  1. KPIs (indicadores) — No topo, 6 cartões mostram um resumo geral:
+     projetos, projetos com colunas, total de gavetas, testes aprovados,
+     gavetas liberadas e gavetas em teste.
+
+  2. Filtros — Um painel com campos para refinar os dados.
+
+  3. Seletor de relatório — Botões para escolher entre os 5 tipos.
+
+  4. Barra de ações — Contador de registros e botão "Exportar" com opções
+     XLSX e CSV.
+
+  5. Tabela de dados — A visualização principal com os dados filtrados.
+
+  6. Paginação — Botões para navegar entre páginas (20 registros por página).
+
+📌 NOTA: O relatório carrega os dados de TODOS os projetos de manufatura da
+   empresa. Use os filtros para focar no que interessa.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. OS FILTROS                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O painel de filtros permite refinar os dados exibidos. Você pode combinar vários:
+
+  ┌──────────────────────────┬──────────────────────────────────────────────────┐
+  │  FILTRO                  │  O QUE FAZ                                      │
+  ├──────────────────────────┼──────────────────────────────────────────────────┤
+  │  Data Criação (início)   │  Mostra registros criados a partir desta data.  │
+  │  Data Criação (fim)      │  Mostra registros criados até esta data.        │
+  │  Projeto                 │  Seleciona um projeto específico.               │
+  │  Cliente                 │  Filtra por cliente.                            │
+  │  Status                  │  Em Andamento / Concluído / Parado / Cancelado. │
+  │  Etapa                   │  Início / Mont. Mec. / Fiação / Teste / Liber. │
+  │  Tipo Gaveta             │  Partida Direta / Soft-Starter / Inversor / ... │
+  │  Resultado Teste         │  Aprovado / Reprovado / Pendente.               │
+  │  Busca                   │  Pesquisa em todos os campos do relatório.      │
+  └──────────────────────────┴──────────────────────────────────────────────────┘
+
+Botões:
+  • "Aplicar" — Aplica os filtros e recarrega a tabela.
+  • "Limpar" — Remove todos os filtros e mostra todos os dados.
+
+💡 DICA: Pressione Enter no campo de busca para aplicar os filtros rapidamente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. VISÃO "ANDAMENTO DE PROJETOS"                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esta visão mostra um resumo gerencial de cada projeto. Ideal para acompanhar o
+progresso geral da produção.
+
+  ┌──────────────────┬───────────────────────────────────────────────────────────┐
+  │  COLUNA          │  O QUE SIGNIFICA                                        │
+  ├──────────────────┼───────────────────────────────────────────────────────────┤
+  │  Projeto         │  Nome do projeto de manufatura.                         │
+  │  Cliente         │  Cliente do projeto.                                    │
+  │  Status          │  Em Andamento / Concluído / Parado / Cancelado.         │
+  │  Etapa           │  Etapa geral do projeto.                                │
+  │  Colunas         │  Quantidade de colunas (painéis).                       │
+  │  Gavetas         │  Quantidade total de gavetas.                           │
+  │  Componentes     │  Quantidade total de componentes instalados.             │
+  │  Testes (Apv/Total)│  Ex: 5/8 = 5 aprovados de 8 testes realizados.       │
+  │  % Liberado      │  Percentual de gavetas liberadas.                       │
+  │  Criação         │  Data de criação do projeto.                            │
+  │  Atualização     │  Data da última atualização.                            │
+  └──────────────────┴───────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. VISÃO "GAVETAS & PRODUÇÃO"                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Mostra o detalhamento de cada gaveta em toda a produção. Ideal para o chão de
+fábrica.
+
+  ┌──────────────────┬───────────────────────────────────────────────────────────┐
+  │  COLUNA          │  O QUE SIGNIFICA                                        │
+  ├──────────────────┼───────────────────────────────────────────────────────────┤
+  │  Projeto         │  Projeto ao qual a gaveta pertence.                     │
+  │  Coluna          │  TAG da coluna (painel).                                │
+  │  Gaveta          │  TAG da gaveta (ex: GAV-01).                            │
+  │  Tipo            │  Partida Direta / Soft-Starter / Inversor / ...         │
+  │  Modelo          │  Modelo do equipamento.                                 │
+  │  Potência        │  Potência em kW.                                         │
+  │  Etapa           │  Etapa atual na produção.                               │
+  │  Último Teste    │  APROVADO / REPROVADO / PENDENTE.                       │
+  │  Operador        │  Operador do último teste.                               │
+  │  Data Teste      │  Data do último teste.                                   │
+  └──────────────────┴───────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. VISÃO "RESULTADOS DE TESTES"                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Mostra o histórico completo de todos os testes realizados. Ideal para controle de
+qualidade.
+
+  ┌──────────────────┬───────────────────────────────────────────────────────────┐
+  │  COLUNA          │  O QUE SIGNIFICA                                        │
+  ├──────────────────┼───────────────────────────────────────────────────────────┤
+  │  Projeto         │  Projeto ao qual a gaveta pertence.                     │
+  │  Coluna          │  TAG da coluna.                                         │
+  │  Gaveta          │  TAG da gaveta testada.                                  │
+  │  Tipo            │  Tipo da gaveta.                                         │
+  │  Resultado       │  APROVADO / REPROVADO / PENDENTE.                       │
+  │  Operador        │  Quem realizou o teste.                                  │
+  │  Data Teste      │  Data e hora do teste.                                   │
+  │  Perfil          │  Perfil de teste utilizado.                              │
+  │  Observações     │  Anotações do teste.                                     │
+  └──────────────────┴───────────────────────────────────────────────────────────┘
+
+💡 DICA: Use o filtro "Resultado Teste" selecionando "Reprovado" para ver apenas
+   os testes que falharam. Isso ajuda a identificar padrões de falha.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. VISÃO "LISTA DE COMPONENTES (BOM)"                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Mostra a lista completa de componentes (Bill of Materials) de todas as gavetas.
+Ideal para compras e almoxarifado.
+
+  ┌──────────────────┬───────────────────────────────────────────────────────────┐
+  │  COLUNA          │  O QUE SIGNIFICA                                        │
+  ├──────────────────┼───────────────────────────────────────────────────────────┤
+  │  Projeto         │  Projeto ao qual o componente pertence.                  │
+  │  Coluna          │  TAG da coluna onde está a gaveta.                       │
+  │  Gaveta          │  TAG da gaveta onde o componente está instalado.         │
+  │  Tipo Comp.      │  Disjuntor / Contator / Relé Térmico / ...              │
+  │  Código          │  Código de fábrica (ex: 3RT2017-1BB44).                 │
+  │  Fabricante      │  Siemens / WEG / Schneider / ...                        │
+  │  Qtd             │  Quantidade usada.                                       │
+  │  Observações     │  Informações adicionais.                                 │
+  └──────────────────┴───────────────────────────────────────────────────────────┘
+
+💡 DICA: Use o filtro "Busca" para localizar um componente específico pelo código
+   ou fabricante. Exporte para XLSX para enviar ao setor de compras.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. VISÃO "HISTÓRICO DE ATIVIDADES"                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Mostra o registro de todas as ações executadas no módulo de Manufatura. Ideal para
+auditoria e rastreabilidade.
+
+  ┌──────────────────┬───────────────────────────────────────────────────────────┐
+  │  COLUNA          │  O QUE SIGNIFICA                                        │
+  ├──────────────────┼───────────────────────────────────────────────────────────┤
+  │  Projeto         │  Projeto relacionado à ação.                            │
+  │  Entidade        │  Tipo: projeto / coluna / gaveta.                       │
+  │  ID              │  Identificador único da entidade.                        │
+  │  Ação            │  Descrição do que foi feito.                            │
+  │  Usuário         │  Quem executou a ação.                                   │
+  │  Data            │  Data e hora da ação.                                    │
+  └──────────────────┴───────────────────────────────────────────────────────────┘
+
+💡 DICA: Use o filtro "Data Criação" para ver ações de um período específico.
+   Exporte para XLSX se precisar anexar o histórico a um relatório de auditoria.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. INDICADORES (KPIs)                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+No topo da página, seis cartões coloridos mostram um resumo geral da produção:
+
+  ┌──────────────────────────────────────┬───────────────────────────────────────┐
+  │  INDICADOR                           │  O QUE MOSTRA                        │
+  ├──────────────────────────────────────┼───────────────────────────────────────┤
+  │  🔧 Projetos                         │  Total de projetos cadastrados.      │
+  │  🔲 Projetos c/ Colunas             │  Projetos com pelo menos 1 coluna.   │
+  │  📥 Gavetas                         │  Total de gavetas cadastradas.       │
+  │  🧪 Testes Aprovados                │  Total de testes APROVADOS.          │
+  │  ✅ Liberadas                        │  Gavetas na etapa "Liberado".        │
+  │  ⏳ Em Teste                         │  Gavetas aguardando teste.           │
+  └──────────────────────────────────────┴───────────────────────────────────────┘
+
+Os KPIs são atualizados automaticamente quando você entra na página e não são
+afetados pelos filtros — eles mostram o panorama geral de toda a empresa.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. EXPORTAÇÃO DE DADOS                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Clique no botão "Exportar" e escolha o formato desejado:
+
+  ┌──────────┬───────────────────────────────────────────────────────────────────┐
+  │  FORMATO │  DESCRIÇÃO                                                       │
+  ├──────────┼───────────────────────────────────────────────────────────────────┤
+  │  XLSX    │  Arquivo Excel (.xlsx). Use para análises, formatação ou envio.  │
+  │  CSV     │  Arquivo CSV (.csv) separado por vírgula. Use para importar em   │
+  │          │  outros sistemas ou abrir em programas leves.                    │
+  └──────────┴───────────────────────────────────────────────────────────────────┘
+
+💡 DICA: A exportação considera todos os filtros ativos e o tipo de relatório
+   selecionado. Se você aplicou filtros, apenas os dados visíveis serão exportados.
+   O nome do arquivo segue o padrão: manufatura_TIPORELATORIO_DATA.xlsx
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. PAGINAÇÃO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando a consulta retorna mais de 20 registros, a tabela exibe botões de paginação:
+
+  • Clique nos números para ir para uma página específica.
+  • Use as setas ◀ e ▶ para avançar/voltar uma página.
+  • Veja o total de registros ao lado do botão "Exportar".
+
+A página atual fica destacada em azul. Quando há muitas páginas, o sistema mostra
+as primeiras, as últimas e algumas do meio com "..." para economizar espaço.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. GLOSSÁRIO                                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────┬───────────────────────────────────────────────────────┐
+  │  TERMO               │  SIGNIFICADO                                         │
+  ├──────────────────────┼───────────────────────────────────────────────────────┤
+  │  BOM                 │  Bill of Materials. Lista de materiais/componentes.  │
+  │  CSV                 │  Arquivo texto com valores separados por vírgula.    │
+  │  Filtro              │  Critério para selecionar registros específicos.     │
+  │  KPI                 │  Key Performance Indicator — indicador de desempenho.│
+  │  Paginação           │  Divisão dos resultados em páginas de 20 registros.  │
+  │  XLSX                │  Formato de arquivo do Microsoft Excel.             │
+  │  Etapa               │  Fase da produção: Início → Mont. Mec. → Fiação →   │
+  │                      │  Teste → Liberado.                                   │
+  │  Gaveta              │  Módulo extraível dentro de uma coluna (painel).    │
+  │  Coluna              │  Painel elétrico físico (CCM, QGBT, Cubículo MT).   │
+  └──────────────────────┴───────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. PROBLEMAS COMUNS                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  PROBLEMA: A tabela está vazia — "Nenhum registro encontrado"                  │
+│                                                                                 │
+│  CAUSA: Filtros muito restritivos ou nenhum dado de manufatura cadastrado.     │
+│                                                                                 │
+│  SOLUÇÃO: Clique em "Limpar" para remover todos os filtros. Se ainda assim     │
+│  não aparecer nada, verifique se há projetos no módulo Manufatura.             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  PROBLEMA: O botão "Exportar" não faz nada                                     │
+│                                                                                 │
+│  CAUSA: Bloqueador de pop-ups ou biblioteca SheetJS não carregada.             │
+│                                                                                 │
+│  SOLUÇÃO: Verifique se o navegador não está bloqueando downloads. Tente usar   │
+│  CSV como alternativa se XLSX não funcionar.                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  PROBLEMA: O filtro de data não funciona como esperado                         │
+│                                                                                 │
+│  CAUSA: O filtro compara com a data de criação do registro.                    │
+│                                                                                 │
+│  SOLUÇÃO: Deixe os campos em branco para ver todos. Para um mês específico,   │
+│  coloque dia 01 como início e último dia do mês como fim.                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  PROBLEMA: A página está lenta com muitos dados                                │
+│                                                                                 │
+│  CAUSA: O sistema processa os dados no seu navegador. Muitos projetos pode     │
+│  deixar lento.                                                                 │
+│                                                                                 │
+│  SOLUÇÃO: Use filtros mais específicos (projeto, período de datas) para        │
+│  reduzir a quantidade de dados processados.                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  PROBLEMA: O relatório não aparece no menu lateral                             │
+│                                                                                 │
+│  CAUSA: O menu "Relatório de Manufatura" fica na seção RELATÓRIOS, abaixo de   │
+│  "Relatório de Cubículos".                                                     │
+│                                                                                 │
+│  SOLUÇÃO: Role o menu lateral para baixo. Ele aparece antes de "Configurações".│
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  RESUMO — O QUE VOCÊ PRECISA LEMBRAR                                           │
+│                                                                                 │
+│  1. O Relatório de Manufatura consolida dados de produção em tabelas           │
+│     dinâmicas com 5 visões diferentes.                                         │
+│  2. Use os filtros para refinar a busca (data, projeto, cliente, status, ...).│
+│  3. Os KPIs no topo mostram o panorama geral da produção.                      │
+│  4. Exporte para XLSX (Excel) ou CSV com um clique.                            │
+│  5. A paginação divide resultados em blocos de 20 registros.                   │
+│  6. Use filtros para melhorar a performance com muitos dados.                  │
+│  7. O relatório respeita as permissões de acesso da sua empresa.               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,588 @@
+﻿?╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    EXPLICAÇÃO SIMPLES — PRECIFICAÇÃO E RENTABILIDADE NO GERAPRO                  ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica a lógica do módulo de Precificação.    ║
+║   Ele NÃO explica como criar uma Proposta Técnica ou como cadastrar materiais.   ║
+║   Se você precisa disso, procure o help do sistema (botão ❓ no canto superior). ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É A PRECIFICAÇÃO?                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você tem um restaurante. Você compra ingredientes, paga o cozinheiro,
+paga a conta de luz, e depois precisa decidir: quanto vou cobrar por um prato?
+
+Se você cobrar muito barato, não sobra dinheiro no fim do mês.
+Se cobrar muito caro, o cliente não compra.
+
+A Precificação no GeraPro faz exatamente esse trabalho, mas para equipamentos
+elétricos (painéis, cubículos, CCMs, etc.). Ela pega todos os custos que foram
+calculados na Proposta Técnica e calcula qual deve ser o preço de venda ideal.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde a Precificação se encaixa no fluxo de trabalho?                          │
+│                                                                                 │
+│  1. Você cria uma Proposta Técnica (com equipamentos, materiais, mão de obra)  │
+│  2. Você cadastra as Despesas (viagens, fretes, etc.)                          │
+│  3. ❗ Você ABRE a Precificação (é um módulo separado no menu lateral)          │
+│  4. A Precificação lê os custos da Proposta Técnica automaticamente            │
+│  5. Você configura os impostos e margens                                       │
+│  6. O sistema calcula o preço de venda e mostra o lucro                        │
+│  7. Você salva tudo                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. DE ONDE VÊM OS NÚMEROS?                                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A Precificação NÃO inventa os números do nada. Ela busca os custos da Proposta
+Técnica que está aberta no momento. São quatro tipos de custo:
+
+┌──────────────┬──────────────────────────────────────────────────────────────────┐
+│ CUSTO        │ DE ONDE VEM                                                     │
+├──────────────┼──────────────────────────────────────────────────────────────────┤
+│ Materiais    │ Dos Típicos de Partida — é a soma de todos os materiais que     │
+│              │ você colocou em cada equipamento (disjuntores, cabos, etc.)      │
+│              │                                                                  │
+│ Consumíveis  │ Um percentual sobre o valor dos materiais. Você escolhe quanto. │
+│              │ Ex: 5% para eletrodutos, fios, conectores, etc.                  │
+│              │                                                                  │
+│ Mão de Obra  │ Das Composições de Mão de Obra e Regras de Derivação.           │
+│              │ Inclui MOD (Mão de Obra Direta) + ENG (Engenharia).              │
+│              │                                                                  │
+│ Despesas     │ Do módulo de Despesas (frete, viagem, hospedagem, etc.).        │
+│              │ Se você não cadastrou despesas, esse valor fica zero.            │
+└──────────────┴──────────────────────────────────────────────────────────────────┘
+
+📌 ATENÇÃO: Esses quatro custos aparecem no lado ESQUERDO da tela de Precificação,
+na seção "Custos Diretos". Eles são atualizados automaticamente quando você mexe
+na Proposta Técnica.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. OS TRÊS TIPOS DE NEGÓCIO                                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+No topo da tela de Precificação, você encontra o campo "Tipo de Negócio". Isso
+muda completamente quais impostos serão calculados.
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ TIPO                │ O QUE SIGNIFICA                                          │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Industrialização    │ Você mesmo fabrica os equipamentos. É o mais comum.      │
+│                      │ ICMS = 12%, IPI = 9,75%, PIS/COFINS = 9,25%.           │
+│                      │                                                          │
+│ Revenda             │ Você compra pronto e revende.                             │
+│                      │ ICMS = 18%, IPI = 0%, PIS/COFINS = 9,25%.              │
+│                      │ (não tem IPI porque você não fabricou)                   │
+│                      │                                                          │
+│ Prestação de        │ Você só presta o serviço (sem fornecimento de material). │
+│ Serviços            │ ICMS = 0%, ISS = 5%, IPI = 0%, PIS/COFINS = 4,65%.      │
+│                      │ (não tem ICMS porque é serviço, não mercadoria)          │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+✅ Ao mudar o Tipo de Negócio, os impostos são ajustados automaticamente.
+Você ainda pode ajustar manualmente se precisar.
+
+✅ Existe também uma diferença no Regime Tributário da empresa (configurado em
+   Ajustes > Dados da Empresa). Se a empresa for Simples Nacional, o imposto é
+   unificado em uma alíquota única chamada DAS, e os outros impostos somem.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. FATURAMENTO PRÓPRIO vs DIRETO                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esse campo decide QUEM vai emitir a nota fiscal.
+
+┌───────────────────┬─────────────────────────────────────────────────────────────┐
+│ OPÇÃO             │ O QUE ACONTECE                                             │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ Faturamento       │ Você vende e fatura direto para o cliente final.           │
+│ PRÓPRIO           │ O preço é calculado normalmente com markup, impostos e     │
+│                   │ margem de lucro. É a opção padrão.                         │
+│                   │                                                             │
+│ Faturamento       │ O equipamento vai ser faturado por outra empresa           │
+│ DIRETO            │ (ex: uma montadora que emite a NF).                        │
+│                   │ Nesse caso: PREÇO = CUSTO. Lucro = ZERO.                   │
+│                   │ O equipamento aparece em laranja no Resumo Consolidado.    │
+└───────────────────┴─────────────────────────────────────────────────────────────┘
+
+❌ Se você selecionar "Faturamento Direto", o preço final é IGUAL ao custo total.
+   Não adianta mexer em margens ou descontos — eles não têm efeito.
+   A ideia é que a outra empresa vai embutir o lucro dela na nota dela.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. OS CAMPOS DA TELA DE PRECIFICAÇÃO (LADO ESQUERDO)                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em um equipamento na barra lateral, abre o formulário de
+precificação daquele equipamento. Vamos ver campo por campo.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Seção 1 — CUSTOS DIRETOS                                                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+
+  Total de Materiais (R$) ──── Soma de todos os materiais do equipamento.
+                               ⛔ Campo somente leitura (vem da Proposta Técnica).
+
+  Consumíveis (%) ──────────── Percentual de materiais extras (fios, conectores,
+                               etc.) que você quer incluir. Ex: 5% de 10.000 = 500.
+
+  Mão de Obra (R$) ────────── Custo de montagem + engenharia.
+                               ⛔ Campo somente leitura (vem das Composições).
+
+  Despesas (R$) ───────────── Custos de logística, viagem, etc.
+                               ⛔ Campo somente leitura (vem do módulo Despesas).
+
+  --- Créditos de Impostos (só aparece para Lucro Real) ---
+  Crédito ICMS (R$) ───────── Valor de ICMS que você pode abater (crédito fiscal).
+  Crédito PIS/COFINS (R$) ─── Crédito de PIS e COFINS.
+  Crédito IPI (R$) ────────── Crédito de IPI.
+
+  💡 Para equipamentos de automação (PLC, REM), esses créditos são
+     preenchidos AUTOMATICAMENTE a partir dos valores de ICMS e IPI
+     informados na coluna "Lista de Materiais (Automação)" da Proposta
+     Técnica. Você ainda pode ajustá-los manualmente se necessário.
+
+Custo Total (R$) ────────── ⛔ Automático. É a soma de tudo acima.
+
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Seção 2 — IMPOSTOS                                                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+
+  Os impostos que aparecem dependem do Tipo de Negócio e do Regime Tributário.
+
+  DAS (%) ─────────────────── Só aparece se a empresa for Simples Nacional.
+                               É a alíquota única do Simples (ex: 13,5%).
+
+  ICMS (%) ────────────────── Imposto sobre circulação de mercadorias.
+                               Industrialização: 12% | Revenda: 18% | Serviços: 0%
+
+  PIS/COFINS (%) ──────────── Contribuições federais.
+                               Industrialização/Revenda: 9,25% | Serviços: 4,65%
+
+  ISS (%) ─────────────────── Só aparece para Prestação de Serviços. Ex: 5%.
+
+  IPI (%) ─────────────────── Imposto sobre Produtos Industrializados.
+                               Só aparece para Industrialização. Padrão: 9,75%.
+
+  Isento de IPI ──────────── ☑ Marque se o equipamento for isento de IPI.
+                               Para equipamentos de SEU (subestação) e CUB-MT,
+                               isso é marcado automaticamente.
+
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  Seção 3 — MARGENS E NEGOCIAÇÃO                                                 │
+├─────────────────────────────────────────────────────────────────────────────────┤
+
+  Custos Fixos (%) ────────── Custos administrativos, aluguel, energia, etc.
+                               Padrão: 8%. Você pode ajustar.
+
+  Comissão (%) ────────────── Comissão do vendedor sobre o valor das vendas.
+                               Padrão: 5%.
+
+  Margem Ideal (%) ────────── Quanto você QUER lucrar. É a meta.
+                               Padrão: 20%. Se você quer lucrar 20% sobre o
+                               preço de venda, coloque 20 aqui.
+
+  Desconto (%) ────────────── Desconto que você vai dar para fechar o negócio.
+                               Ex: se você vai dar 5% de desconto, coloque 5.
+                               O sistema recalcula o lucro com o desconto.
+
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. COMO O PREÇO É CALCULADO (O FAMOSO MARKUP)                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Vamos usar um exemplo concreto para ficar mais fácil.
+
+EXEMPLO:
+  Custo Total do equipamento: R$ 10.000,00
+  ICMS: 12% | PIS/COFINS: 9,25% | IPI: 9,75%
+  Custos Fixos: 8% | Comissão: 5% | Margem Ideal: 20%
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   O SEGREDO DO MARKUP                                                            ║
+║                                                                                  ║
+║   Se você simplesmente somar 20% de lucro em cima do custo, vai ter prejuízo.   ║
+║   Porque os impostos e comissões também incidem sobre o preço de venda.          ║
+║                                                                                  ║
+║   Exemplo: Se você vende por R$ 12.000 (custo + 20%), o ICMS de 12% sobre       ║
+║   esse valor é R$ 1.440 — e esse valor também sai do seu bolso.                  ║
+║                                                                                  ║
+║   O MARKUP resolve isso: ele "empurra" o preço para cima o suficiente para      ║
+║   pagar todos os percentuais e ainda sobrar o lucro desejado.                    ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+PASSO A PASSO DO CÁLCULO (simplificado):
+
+1. Somar todos os percentuais que incidem sobre o preço:
+   ICMS(12%) + PIS/COFINS(9,25%) + Custos Fixos(8%) + Comissão(5%) + Margem Ideal(20%)
+   = 54,25%
+
+2. Calcular o "fator do markup":
+   100% - 54,25% = 45,75%
+   Fator = 45,75 ÷ 100 = 0,4575
+
+3. Preço ideal (sem IPI):
+   R$ 10.000 ÷ 0,4575 = R$ 21.857,92
+
+   👍 Este é o preço que cobre TODOS os custos, impostos, comissões
+      e ainda deixa 20% de lucro sobre o preço de venda.
+
+4. Aplicar desconto (se houver):
+   Se você deu 5% de desconto: R$ 21.857,92 × 0,95 = R$ 20.765,02
+
+5. Calcular o IPI por fora:
+   R$ 20.765,02 × 9,75% = R$ 2.024,59 de IPI
+   Preço final com IPI: R$ 20.765,02 + R$ 2.024,59 = R$ 22.789,61
+
+6. Verificar o lucro real:
+   Preço vendido:       R$ 20.765,02
+   (-) Custos:         -R$ 10.000,00
+   (-) ICMS (12%):     -R$ 2.491,80
+   (-) PIS/COFINS:     -R$ 1.920,76
+   (-) Custos Fixos:   -R$ 1.661,20
+   (-) Comissão:       -R$ 913,63    (sobre o valor após impostos)
+   (=) LUCRO LÍQUIDO:   R$ 3.777,63
+   Margem Real: 3.777,63 ÷ 20.765,02 = 18,19%  (menor que a ideal por causa do desconto)
+
+📌 O IPI NÃO entra no cálculo do markup porque ele é calculado "por fora" —
+   ele é adicionado DEPOIS do preço final. Ou seja, o IPI não impacta o
+   cálculo dos impostos, comissões e margens.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. O PAINEL DE RESULTADOS (LADO DIREITO)                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Enquanto você digita os valores do lado esquerdo, o painel direito é atualizado
+automaticamente. Ele mostra:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ INDICADOR            │ O QUE SIGNIFICA                                         │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Preço Final s/ IPI   │ O preço de venda ANTES de somar o IPI.                  │
+│                      │ É o valor que aparece na nota (o IPI é destacado).      │
+│                      │                                                          │
+│ Valor do IPI         │ Quanto de IPI será cobrado.                             │
+│                      │                                                          │
+│ Preço Final c/ IPI   │ O preço TOTAL que o cliente vai pagar (com IPI).        │
+│                      │ ✅ Destacado em azul — é o número mais importante.       │
+│                      │                                                          │
+│ Total de Impostos    │ Soma de ICMS + PIS/COFINS (e ISS se for serviço).       │
+│                      │                                                          │
+│ Custos Fixos         │ Quanto do preço vai para custos administrativos.         │
+│                      │                                                          │
+│ Comissão             │ Quanto o vendedor vai receber.                          │
+│                      │                                                          │
+│ Lucro Líquido (R$)   │ 💰 O que SOBRA para a empresa depois de tudo pago.      │
+│                      │ Aparece em VERDE se for positivo, VERMELHO se negativo.  │
+│                      │                                                          │
+│ Margem Real (%)      │ O percentual de lucro REAL (não o ideal).               │
+│                      │ Se a Margem Ideal era 20% mas você deu desconto, aqui   │
+│                      │ vai aparecer um valor menor (ex: 18,19%).               │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. NAVEGAÇÃO ENTRE EQUIPAMENTOS                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Na barra lateral esquerda da Precificação, você encontra todos os equipamentos
+da Proposta Técnica. Eles são organizados assim:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  📋 Navegação por Equipamento                                                   │
+│  ─────────────────────────────────────────────                                  │
+│                                                                                 │
+│    CCM-BT-01  ← Clique para ver a precificação do CCM-BT-01                    │
+│    CCM-BT-02                                                                    │
+│    QGF-01                                                                       │
+│    CUB-MT-01                                                                    │
+│    SEU-01 (3 componentes)  ← Amarelo = Subestação (agrupa vários equipamentos) │
+│    ─────────────────────────────────────────────                                  │
+│    [📊 RESUMO CONSOLIDADO]  ← Verde = visão geral de todos                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+TRÊS VISÕES:
+
+  1️⃣  VISÃO POR TAG (equipamento individual)
+      - Clique no nome do equipamento (ex: CCM-BT-01)
+      - Mostra o formulário completo de precificação DAQUELE equipamento
+      - Você pode configurar impostos e margens diferentes para cada um
+
+  2️⃣  VISÃO DE SEU (subestação)
+      - Clique no equipamento amarelo (ex: SEU-01)
+      - Mostra os componentes da subestação em uma tabela
+      - O IPI de cada componente é zero (isento)
+
+  3️⃣  RESUMO CONSOLIDADO
+      - Clique no botão verde "RESUMO CONSOLIDADO"
+      - Mostra uma tabela com TODOS os equipamentos lado a lado
+      - 4 cards no topo com os números GLOBAIS:
+        • Custo Total de Todos os Equipamentos
+        • Venda Total (soma de todos os preços)
+        • Lucro Líquido Global
+        • Margem Média Real
+      - ❗ É aqui que você vê se o projeto TODO está dando lucro ou prejuízo
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. PASSO A PASSO NA TELA                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Vamos simular o uso completo do módulo:
+
+ETAPA 1 — ABRIR A PRECIFICAÇÃO
+  • Clique em "Precificação" no menu lateral esquerdo.
+  • A tela carrega com a barra lateral (equipamentos) e o conteúdo vazio.
+  • Automaticamente o sistema já calcula a precificação inicial de todos
+    os equipamentos.
+
+ETAPA 2 — ESCOLHER O TIPO DE NEGÓCIO
+  • No alto do formulário, selecione o Tipo de Negócio.
+  • Ex: se você fabrica os equipamentos, deixe "Industrialização".
+  • Repare que os impostos mudam automaticamente.
+
+ETAPA 3 — CONFIGURAR UM EQUIPAMENTO
+  • Clique em um equipamento na barra lateral (ex: CCM-BT-01).
+  • Veja os custos diretos já preenchidos (materiais, mão de obra, despesas).
+  • Ajuste Consumíveis se necessário (ex: 5%).
+  • Se a empresa for Lucro Real, preencha os créditos de impostos.
+  • Confira os impostos. Ajuste se o cliente tiver alíquota diferente.
+  • Ajuste Custos Fixos, Comissão e Margem Ideal.
+  • Veja os resultados atualizarem em tempo real no painel da direita.
+
+ETAPA 4 — MARCAR COMO FATURAMENTO DIRETO (se aplicável)
+  • Se o equipamento vai ser faturado por outra empresa, mude o campo
+    "Faturamento" para "Direto".
+  • O preço final automaticamente iguala o custo.
+
+ETAPA 5 — VERIFICAR O RESUMO CONSOLIDADO
+  • Clique em "RESUMO CONSOLIDADO" na barra lateral.
+  • Veja se o lucro total do projeto está dentro do esperado.
+  • Se algum equipamento estiver com margem negativa, ele aparece
+    em vermelho na tabela.
+
+ETAPA 6 — APLICAR DESCONTO (se necessário)
+  • Volte no equipamento que vai receber desconto.
+  • No campo "Desconto", coloque o percentual (ex: 5 para 5%).
+  • Veja o lucro diminuir no painel de resultados.
+
+ETAPA 7 — SALVAR TUDO
+  • Clique no botão "💾 Salvar Tudo" na barra lateral.
+  • ✅ Todos os dados de precificação de TODOS os equipamentos
+     são salvos de uma vez.
+  • Se você fechar e abrir a Proposta Técnica depois, os dados
+    de precificação são recuperados.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  Salve SEMPRE antes de sair da Precificação. Os dados ficam em memória até
+    você clicar em "Salvar Tudo". Se você recarregar a página sem salvar, perde
+    tudo que ajustou.
+
+✅  O Resumo Consolidado é seu melhor amigo. Olhe sempre o lucro total do
+    projeto, não de um equipamento só.
+
+✅  A Margem Ideal é uma META. A Margem Real é a VERDADE. Se você deu desconto,
+    a Margem Real será menor que a Ideal. Veja se ainda vale a pena.
+
+✅  Faturamento Direto = zero de lucro naquele equipamento. Use com consciência.
+
+✅  Se a empresa for Simples Nacional, apenas o campo DAS aparece. Os outros
+    impostos somem — não se preocupe, é o correto.
+
+✅  Para SEU (subestação) e CUB-MT, o IPI é automaticamente zerado porque
+    esses equipamentos têm NCM 8537.20.90 (isentos de IPI).
+
+✅  Se você alterar os materiais ou a mão de obra na Proposta Técnica,
+    os custos na Precificação NÃO atualizam sozinhos. Feche e abra a
+    Precificação novamente, ou clique em "Salvar Tudo".
+
+⚠️  Se algum equipamento aparecer com margem negativa (prejuízo), revise:
+    • O preço está muito baixo?
+    • O desconto está muito alto?
+    • Os impostos estão corretos para o tipo de negócio?
+    • Não esqueceu de marcar Faturamento Direto onde necessário?
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ TAG                   │ Identificação do equipamento na Proposta Técnica.       │
+│                       │ Ex: CCM-BT-01, QGF-02, CUB-MT-01.                      │
+│                       │                                                         │
+│ SEU                   │ Subestação Unitária — agrupamento de equipamentos       │
+│                       │ que formam uma subestação. O IPI é isento.              │
+│                       │                                                         │
+│ Markup                │ Técnica de cálculo que "empurra" o preço para cima      │
+│                       │ para cobrir todos os percentuais (impostos, comissões,  │
+│                       │ custos fixos) e ainda gerar o lucro desejado.           │
+│                       │                                                         │
+│ Margem Ideal          │ O percentual de lucro que você DESEJA ter sobre o       │
+│                       │ preço de venda. Ex: 20%. É a meta.                     │
+│                       │                                                         │
+│ Margem Real           │ O percentual de lucro que você REALMENTE vai ter        │
+│                       │ depois de aplicar descontos. Costuma ser menor que      │
+│                       │ a Margem Ideal.                                         │
+│                       │                                                         │
+│ Lucro Líquido         │ O valor em REAIS que sobra para a empresa depois de     │
+│                       │ pagar todos os custos, impostos, comissões e despesas.  │
+│                       │                                                         │
+│ IPI                   │ Imposto sobre Produtos Industrializados. É federal.     │
+│                       │ Só se aplica para Industrialização. É calculado "por    │
+│                       │ fora" — ou seja, somado DEPOIS do preço final.          │
+│                       │                                                         │
+│ ICMS                  │ Imposto sobre Circulação de Mercadorias. É estadual.    │
+│                       │ Varia conforme o Tipo de Negócio.                       │
+│                       │                                                         │
+│ PIS/COFINS            │ Contribuições federais sobre o faturamento.             │
+│                       │                                                         │
+│ ISS                   │ Imposto Sobre Serviços. É municipal.                    │
+│                       │ Só aparece para Prestação de Serviços.                  │
+│                       │                                                         │
+│ DAS                   │ Documento de Arrecadação do Simples Nacional.           │
+│                       │ É uma alíquota ÚNICA que substitui todos os outros      │
+│                       │ impostos. Só aparece no regime Simples Nacional.        │
+│                       │                                                         │
+│ Faturamento Próprio   │ Você emite a nota fiscal e recebe do cliente.           │
+│                       │ Preço = custo + markup normal.                          │
+│                       │                                                         │
+│ Faturamento Direto    │ Outra empresa emite a nota. Você só fornece.            │
+│                       │ Preço = custo (sem lucro).                              │
+│                       │                                                         │
+│ Consumíveis           │ Materiais extras não contados nos Típicos.              │
+│                       │ Ex: fios, conectores, canaletas. É um percentual        │
+│                       │ sobre o valor total dos materiais.                      │
+│                       │                                                         │
+│ Custos Fixos          │ Custos indiretos da empresa: aluguel, energia,          │
+│                       │ admin, etc. É rateado como percentual sobre a venda.    │
+│                       │                                                         │
+│ Crédito de Imposto    │ Valor de imposto que você pagou na compra de insumos    │
+│                       │ e pode abater do imposto devido na venda.               │
+│                       │ Só se aplica para empresas de Lucro Real.               │
+│                       │ Para equipamentos de automação (PLC, REM), o sistema    │
+│                       │ calcula automaticamente os créditos com base nos        │
+│                       │ impostos dos materiais cadastrados na BOM de Automação. │
+│                       │                                                         │
+│ Resumo Consolidado    │ Visão geral que mostra a precificação de TODOS os       │
+│                       │ equipamentos do projeto em uma única tela.              │
+│                       │                                                         │
+│ Precificação          │ Ato de definir o preço de venda com base nos custos,    │
+│                       │ impostos e margem de lucro desejada.                    │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "O preço final está muito alto!"                                    │
+│  SOLUÇÃO:  Reduza a Margem Ideal ou aumente os Créditos de Imposto.            │
+│            Ou negocie um desconto menor.                                        │
+│                                                                                 │
+│  PROBLEMA: "O lucro está negativo (prejuízo)"                                  │
+│  SOLUÇÃO:  Verifique se o Faturamento não está como "Direto" sem querer.       │
+│            Verifique se os impostos não estão muito altos.                      │
+│            Verifique se o desconto não está muito grande.                       │
+│                                                                                 │
+│  PROBLEMA: "Meus custos estão zerados"                                         │
+│  SOLUÇÃO:  Você precisa primeiro criar a Proposta Técnica com os               │
+│            equipamentos, materiais e mão de obra. A Precificação só funciona   │
+│            se houver uma Proposta Técnica aberta.                               │
+│                                                                                 │
+│  PROBLEMA: "Mudei os materiais mas a Precificação não atualizou"               │
+│  SOLUÇÃO:  Feche a Precificação (vá para outro módulo) e abra de novo.         │
+│            Ou clique em "Salvar Tudo" para forçar a atualização.               │
+│                                                                                 │
+│  PROBLEMA: "O IPI não está sendo calculado"                                    │
+│  SOLUÇÃO:  Verifique: (1) O Tipo de Negócio é Industrialização?                │
+│            (2) O equipamento não é isento (SEU ou CUB-MT)?                      │
+│            (3) O checkbox "Isento de IPI" não está marcado?                     │
+│                                                                                 │
+│  PROBLEMA: "Não consigo editar os campos de custo"                             │
+│  SOLUÇÃO:  É NORMAL. Os custos diretos (materiais, mão de obra, despesas)      │
+│            são somente leitura porque vêm da Proposta Técnica. Para alterar,   │
+│            mexa nos Típicos, Composições ou Despesas.                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+│                                                                                 │
+│  PROBLEMA: "Os créditos de ICMS/IPI estão zerados"                             │
+│  SOLUÇÃO:  Verifique se os materiais na BOM de Automação (PLC/REM) têm ICMS     │
+│            e IPI preenchidos. O crédito é calculado a partir desses valores.    │
+│            Para outros equipamentos, o crédito deve ser informado manualmente.  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   A Precificação é a ponte entre o CUSTO (quanto você gasta) e o PREÇO          ║
+║   (quanto você cobra). Uma precificação bem feita garante que sua empresa       ║
+║   não vai ter prejuízo escondido no final do projeto.                           ║
+║                                                                                  ║
+║   "Preço baixo demais atrai cliente, mas leva a empresa à falência."            ║
+║   "Preço alto demais afasta cliente, mas não adianta se ninguém comprar."       ║
+║                                                                                  ║
+║   A Margem Ideal é o EQUILÍBRIO entre essas duas pontas.                        ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+

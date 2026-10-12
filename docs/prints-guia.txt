@@ -1,0 +1,628 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    GUIA DE CAPTURA DE SCREENSHOTS — MÓDULO DE AJUDA DO GERAPRO                   ║
+║                                                                                  ║
+║    Instruções: Capture cada tela descrita abaixo e salve como PNG                ║
+║    no caminho indicado dentro da pasta prints/.                                  ║
+║    Resolução sugerida: 1366x768 ou superior. Formato: PNG.                       ║
+║                                                                                  ║
+║    ✅ = já existe    ❌ = pendente                                               ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  GERAL (4 prints)                                                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/geral/introducao.png                                                   │
+│    Tela de login do sistema com o logo e formulário de entrada.                 │
+│                                                                                 │
+│ ❌ prints/geral/interface.png                                                    │
+│    Dashboard principal com sidebar esquerda, header superior e área de          │
+│    conteúdo mostrando os cards de indicadores.                                   │
+│                                                                                 │
+│ ❌ prints/geral/navegacao.png                                                    │
+│    Sidebar expandida mostrando todas as categorias: Principal, Cadastros,       │
+│    Comercial, Engenharia, Relatórios e Configurações.                            │
+│                                                                                 │
+│ ❌ prints/geral/ptc.png                                                          │
+│    Modal de seleção/abertura de PTC, mostrando a lista de projetos com seus     │
+│    códigos, datas e status.                                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  DASHBOARD (1 print)                                                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/dashboard/visao-geral.png                                              │
+│    Dashboard completo mostrando: Total de Clientes, Propostas Emitidas,         │
+│    Resumo de Materiais, Gráfico de Pipeline (funil), Valor total em pipeline,   │
+│    Ticket médio e Atividades Recentes.                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CLIENTES (5 prints)                                                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ✅ prints/clientes/visao-geral.png                                              │
+│    Tabela de listagem de clientes com colunas: Razão Social, CNPJ, Cidade/UF,   │
+│    Segmento, botão "+ Novo Cliente" e campo de busca.                            │
+│                                                                                 │
+│ ✅ prints/clientes/cadastro.png                                                 │
+│    Formulário de cadastro de novo cliente na aba "Geral" com campos: Razão      │
+│    Social, Nome Fantasia, CNPJ, Segmento, CNAE.                                  │
+│                                                                                 │
+│ ✅ prints/clientes/campos-geral.png                                             │
+│    Aba "Geral" do formulário preenchido, mostrando todos os campos: Razão       │
+│    Social, Nome Fantasia, CNPJ, Segmento, CNAE.                                  │
+│                                                                                 │
+│ ✅ prints/clientes/campos-endereco.png                                          │
+│    Aba "Endereço e Fiscal" do formulário com: Inscrição Estadual, Municipal,    │
+│    CEP, Logradouro, Número, Bairro, Cidade, UF, Complemento.                     │
+│                                                                                 │
+│ ✅ prints/clientes/contatos.png                                                 │
+│    Aba "Contatos" com tabela de contatos (Nome, Cargo, E-mail, Telefone) e      │
+│    botão "Adicionar Contato".                                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  FORNECEDORES (3 prints)                                                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/fornecedores/visao-geral.png                                           │
+│    Tabela de listagem de fornecedores com colunas: Nome, CNPJ, Contato,         │
+│    botão "+ Novo Fornecedor" e campo de busca.                                   │
+│                                                                                 │
+│ ❌ prints/fornecedores/cadastro.png                                              │
+│    Formulário de cadastro de fornecedor com campos: Razão Social, CNPJ,         │
+│    Nome Fantasia, Endereço completo, E-mail, Telefone.                           │
+│                                                                                 │
+│ ❌ prints/fornecedores/campos.png                                                │
+│    Formulário preenchido, destacando os campos de endereço e dados comerciais.   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROPOSTA TÉCNICA (11 prints)                                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/visao-geral.png                                       │
+│    Visão geral da Proposta Técnica com header (nome do projeto, botões de       │
+│    ação), abas de navegação (Dados Gerais, Equipamentos, Infraestrutura, etc.)   │
+│    e conteúdo da primeira aba.                                                   │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/dados-gerais.png                                      │
+│    Aba "Dados Gerais" com campos: Cliente, Projeto, Descrição, Data,             │
+│    Vendedor, Status, Local da Obra, e informações do cabeçalho da proposta.      │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/equipamentos.png                                      │
+│    Aba "Equipamentos" mostrando lista de equipamentos em cards ou tabela,        │
+│    cada um com TAG, tipo, descrição e sub-abas (Dados, Cargas, LM, I/O).         │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/infraestrutura.png                                    │
+│    Aba "Infraestrutura" com as 6 disciplinas (Obra Civil, Elétrica, SPDA,       │
+│    Mecânica, Cabeamento, Serviços Técnicos) e tabela de itens de uma disciplina. │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/io-list.png                                           │
+│    Sub-aba "Lista de I/O" de um equipamento PLC mostrando racks, canais         │
+│    (DI, DO, AI, AO), botões de importar/exportar CSV e configuração.             │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/layout-sugerido.png                                   │
+│    Sub-aba "Layout Sugerido" mostrando a disposição dos componentes no           │
+│    painel com vista gráfica ou esquemática.                                       │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/seu.png                                               │
+│    Sub-aba "SEU" (Sugestão de Equipamentos e Unidades) com a lista de           │
+│    típicos sugeridos baseados nas cargas do projeto.                              │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/escopo.png                                            │
+│    Aba "Escopo" com tabela de itens de fornecimento e escopo de serviços,        │
+│    checkboxes de responsabilidade (Minha Empresa, Cliente, Não Aplicável).        │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/vendor.png                                            │
+│    Aba "Vendor List" com tabela de fabricantes preferenciais para cada           │
+│    componente do projeto.                                                         │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/revisoes.png                                          │
+│    Aba "Revisões" com tabela de histórico de revisões (data, autor,             │
+│    descrição, arquivo) e botão "Adicionar Revisão".                               │
+│                                                                                 │
+│ ❌ prints/proposta-tecnica/assinaturas.png                                       │
+│    Aba "Assinaturas" com campos para até 3 signatários: nome, cargo,            │
+│    telefone, e-mail que aparecem no rodapé dos documentos Word.                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROPOSTA COMERCIAL (7 prints)                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/proposta-comercial/visao-geral.png                                     │
+│    Visão geral da Proposta Comercial com header, abas de navegação e            │
+│    conteúdo da primeira aba.                                                     │
+│                                                                                 │
+│ ❌ prints/proposta-comercial/dados-gerais.png                                    │
+│    Aba "Dados Gerais" com campos: Cliente, Projeto, Proposta, Condição de       │
+│    Pagamento, Prazo de Entrega, Validade, e dados do contrato.                   │
+│                                                                                 │
+│ ❌ prints/proposta-comercial/escopo.png                                          │
+│    Aba "Escopo" com tabela de itens de investimento (descrição, quantidade,     │
+│    valor unitário, subtotal) e totais.                                           │
+│                                                                                 │
+│ ❌ prints/proposta-comercial/condicoes.png                                       │
+│    Aba "Condições Comerciais" com campos: Condição de Pagamento, Prazo,         │
+│    Validade da Proposta, Garantia, Impostos e Observações.                       │
+│                                                                                 │
+│ ❌ prints/proposta-comercial/assinaturas.png                                     │
+│    Aba "Assinaturas" com campos de signatários para o rodapé do documento       │
+│    Word da proposta comercial.                                                    │
+│                                                                                 │
+│ ❌ prints/proposta-comercial/revisoes.png                                        │
+│    Aba "Revisões" com histórico de versões da proposta comercial.                │
+│                                                                                 │
+│ ❌ prints/proposta-comercial/salvar-como-nova.png                                │
+│    Botão ou modal "Salvar Como Nova Proposta" permitindo criar uma cópia da     │
+│    proposta atual com novo código PTC.                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROPOSTA COMPLETA (4 prints)                                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/proposta-completa/visao-geral.png                                      │
+│    Visão geral da Proposta Completa (Técnica + Comercial) mostrando o layout    │
+│    integrado com dados das duas propostas.                                       │
+│                                                                                 │
+│ ❌ prints/proposta-completa/como-criar.png                                       │
+│    Modal ou tela de criação de Proposta Completa com seleção de PTC,            │
+│    propostas técnica e comercial a serem vinculadas.                              │
+│                                                                                 │
+│ ❌ prints/proposta-completa/dados-gerais.png                                     │
+│    Aba "Dados Gerais" da proposta completa com campos consolidados das          │
+│    propostas técnica e comercial.                                                 │
+│                                                                                 │
+│ ❌ prints/proposta-completa/exportacao.png                                       │
+│    Modal ou tela de exportação para Word mostrando opções de template,          │
+│    pré-visualização e botão de download.                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PIPELINE COMERCIAL (8 prints)                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/visao-geral.png                                     │
+│    Visão completa do Pipeline Comercial com header, botão "+ Novo Lead" e       │
+│    colunas do kanban.                                                             │
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/kanban.png                                          │
+│    Quadro kanban mostrando cards coloridos distribuídos nas colunas:             │
+│    Aguardando Início, Em Andamento, Proposta Enviada, Negociação,               │
+│    Fechado (Ganho/Perdido).                                                       │
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/criar-lead.png                                      │
+│    Modal de criação de lead com campos: Cliente, Projeto, Valor Estimado,       │
+│    Observações, Vendedor e botão "Adicionar Lead".                               │
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/editar-lead.png                                     │
+│    Modal de edição de lead com todos os campos editáveis: Cliente, Status,      │
+│    Valor, Vendedor, Observações e interações.                                    │
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/interacoes.png                                      │
+│    Seção de interações de um card mostrando timeline de comentários,            │
+│    histórico de movimentações e opções de contato.                               │
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/origem-itens.png                                    │
+│    Indicador de origem do lead mostrando de qual módulo o card foi gerado       │
+│    (ex: "Origem: Proposta Comercial PTC-0012").                                  │
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/exportacao.png                                      │
+│    Funcionalidade de exportação do pipeline: relatório CSV/Excel, filtros       │
+│    por período, status e vendedor.                                               │
+│                                                                                 │
+│ ❌ prints/pipeline-comercial/impressao.png                                       │
+│    Visualização de impressão do pipeline com layout resumido por coluna.        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PRECIFICAÇÃO (5 prints)                                                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/precificacao/visao-geral.png                                           │
+│    Visão geral da Precificação com header do projeto e resumo dos modos de      │
+│    cálculo (Por Equipamento / Por Categoria).                                     │
+│                                                                                 │
+│ ❌ prints/precificacao/modos.png                                                 │
+│    Seletor de modos de precificação mostrando as opções: Por Equipamento,       │
+│    Por Categoria, Por Valor Global, com indicação visual do modo ativo.          │
+│                                                                                 │
+│ ❌ prints/precificacao/campos.png                                                │
+│    Formulário de precificação com campos: Custo Direto, ICMS, PIS/COFINS,       │
+│    IPI, Margem de Lucro, Markup, DAS (Simples Nacional), Comissão, Frete.        │
+│                                                                                 │
+│ ❌ prints/precificacao/resultados.png                                            │
+│    Tabela de resultados da precificação: Preço de Venda, Impostos, Margem       │
+│    de Contribuição, Lucro Líquido, Markup aplicado, Preço Final.                 │
+│                                                                                 │
+│ ❌ prints/precificacao/impressao-resumo.png                                      │
+│    Resumo para impressão da precificação com dados do cliente, resumo fiscal    │
+│    e tabela de preços formatada.                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  MATERIAIS (6 prints)                                                            │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/materiais/visao-geral.png                                              │
+│    Tabela de listagem de materiais com colunas: Código, Descrição,              │
+│    Fabricante, Modelo, Preço, busca e filtros.                                   │
+│                                                                                 │
+│ ❌ prints/materiais/campos-tecnicos.png                                          │
+│    Aba "Dados Técnicos" do formulário de material: Código, Descrição,           │
+│    Modelo, Categoria, Fabricante, Peso, Dimensões.                                │
+│                                                                                 │
+│ ❌ prints/materiais/campos-comerciais.png                                        │
+│    Aba "Dados Comerciais": Fornecedor, Preço de Compra, Preço de Venda,         │
+│    Custo, Margem, Última Atualização.                                             │
+│                                                                                 │
+│ ❌ prints/materiais/impostos.png                                                 │
+│    Aba "Impostos" do material: NCM, ICMS (origem/destino), IPI,                 │
+│    PIS/COFINS, alíquotas configuráveis.                                           │
+│                                                                                 │
+│ ❌ prints/materiais/reajuste.png                                                 │
+│    Funcionalidade de reajuste de preços mostrando tabela de materiais com       │
+│    coluna de percentual de reajuste e botão "Aplicar".                            │
+│                                                                                 │
+│ ❌ prints/materiais/importar-precos.png                                          │
+│    Modal de importação de preços via arquivo CSV/Excel com mapeamento de        │
+│    colunas e confirmação de importação.                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  TIPOS DE PAINÉIS (3 prints)                                                     │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/paineis/visao-geral.png                                                │
+│    Tabela de tipos de painéis com colunas: Código, Descrição, Tipo, Dimensões,  │
+│    grau de proteção (IP) e botão "+ Novo Painel".                                 │
+│                                                                                 │
+│ ❌ prints/paineis/campos.png                                                     │
+│    Formulário de cadastro de painel com campos técnicos e dimensões.            │
+│                                                                                 │
+│ ❌ prints/paineis/bom.png                                                        │
+│    Lista de Materiais (BOM) de um painel mostrando itens associados com         │
+│    quantidades e referências de materiais.                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  TÍPICOS DE PARTIDA (5 prints)                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/tipicos/visao-geral.png                                               │
+│    Tabela de típicos de partida: Nome, Corrente (A), Tipo de Partida,           │
+│    Tensão, botão "+ Novo Típico".                                                 │
+│                                                                                 │
+│ ❌ prints/tipicos/campos.png                                                     │
+│    Builder de típico com coluna esquerda (parâmetros elétricos), centro          │
+│    (especificação + BOM) e direita (visualização Word).                           │
+│                                                                                 │
+│ ❌ prints/tipicos/bom.png                                                        │
+│    Lista de Materiais do típico com tabela de itens, seletor de materiais       │
+│    e botão "Adicionar Material".                                                  │
+│                                                                                 │
+│ ❌ prints/tipicos/selecao-materiais.png                                          │
+│    Modal seletor de materiais com filtro por fabricante, busca por descrição    │
+│    e lista de resultados para seleção.                                            │
+│                                                                                 │
+│ ❌ prints/tipicos/layout-3-colunas.png                                           │
+│    Builder de típico no layout de 3 colunas, com a coluna 1 (parâmetros)         │
+│    recolhida para dar mais espaço à seleção de materiais.                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CUBÍCULOS (3 prints)                                                            │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/cubiculos/visao-geral.png                                              │
+│    Tabela de típicos de cubículo: Nome, Tipo de Cubículo, Tensão, Icc (KA),    │
+│    Comunicação, Custo Ref., ações (editar, duplicar, excluir).                    │
+│                                                                                 │
+│ ❌ prints/cubiculos/campos.png                                                   │
+│    Builder de cubículo com campos: Nome, Tipo de Acionamento, Tensão,           │
+│    Corrente Nominal, NBI, Frequência, Icc, Proteção, Relé, Drives.              │
+│                                                                                 │
+│ ❌ prints/cubiculos/bom.png                                                      │
+│    Lista de Materiais do cubículo com seletor de materiais e cálculo de         │
+│    custo total automático.                                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  RELATÓRIO DE PROPOSTAS (4 prints)                                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/relatorio-propostas/visao-geral.png                                    │
+│    Tela do relatório com header, filtros (período, cliente, vendedor) e         │
+│    tabela de resultados.                                                          │
+│                                                                                 │
+│ ❌ prints/relatorio-propostas/filtros.png                                        │
+│    Painel de filtros expandido: Data Início/Fim, Cliente, Status, Vendedor,     │
+│    Tipo de Proposta (Técnica/Comercial/Completa), botão "Filtrar".               │
+│                                                                                 │
+│ ❌ prints/relatorio-propostas/secoes.png                                         │
+│    Relatório com múltiplas seções visíveis: Resumo, Propostas por Cliente,      │
+│    Propostas por Status, Pipeline, totais consolidados.                           │
+│                                                                                 │
+│ ❌ prints/relatorio-propostas/exportacao.png                                     │
+│    Botões de exportação (CSV, Excel, PDF) e modal de confirmação de download.   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  RELATÓRIO DE CADASTROS (1 print)                                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/relatorio-cadastros/visao-geral.png                                    │
+│    Relatório de cadastros com tabelas de Clientes, Fornecedores, Vendedores     │
+│    e Materiais, com totalizadores por categoria.                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  RELATÓRIO DE TÍPICOS (1 print)                                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/relatorio-tipicos/visao-geral.png                                      │
+│    Relatório de típicos de partida com tabela de todos os típicos cadastrados,  │
+│    parâmetros elétricos, BOM associada e botões de exportação (CSV/XLS).         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  RELATÓRIO DE CUBÍCULOS (1 print)                                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/relatorio-cubiculos/visao-geral.png                                    │
+│    Relatório de cubículos com tabela de todos os cubículos cadastrados,         │
+│    parâmetros técnicos (tensão, Icc, NBI, proteção) e custos totais.            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  IMPORTAÇÃO DE DADOS (2 prints)                                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/importacao/visao-geral.png                                             │
+│    Tela de importação de dados com cards para cada tipo: Materiais, Clientes,   │
+│    Fornecedores, cada um com botão de upload e link para template.               │
+│                                                                                 │
+│ ❌ prints/importacao/uso.png                                                     │
+│    Modal de upload de arquivo CSV/Excel com mapeamento de colunas,              │
+│    pré-visualização dos dados e botão "Importar".                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CONFIGURAÇÕES (10 prints)                                                       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/configuracoes/dados-empresa.png                                        │
+│    Card "Dados da Empresa" com campos: Nome, CNPJ, Endereço, E-mail,           │
+│    Regime Tributário, IPI Padrão.                                                 │
+│                                                                                 │
+│ ❌ prints/configuracoes/empresas.png                                             │
+│    Card "Empresas (Templates)" com formulário (Nome, CNPJ, Sigla), botão        │
+│    "Adicionar" e tabela de empresas cadastradas com ações.                       │
+│                                                                                 │
+│ ❌ prints/configuracoes/modelos-documentos.png                                   │
+│    Card "Modelos de Documentos (Templates)" com dropdowns para Proposta         │
+│    Técnica, Comercial e Completa, cada um com botão de upload de .docx.          │
+│                                                                                 │
+│ ❌ prints/configuracoes/usuarios.png                                             │
+│    Card "Usuários" com botão "Gerenciar Usuários" e modal de gestão com        │
+│    tabela de usuários (Nome, E-mail, Nível, Status).                              │
+│                                                                                 │
+│ ❌ prints/configuracoes/vendedores.png                                           │
+│    Card "Vendedores" com formulário (Nome, E-mail, Telefone), botão             │
+│    "Adicionar" e tabela de vendedores com ações.                                  │
+│                                                                                 │
+│ ❌ prints/configuracoes/ia.png                                                   │
+│    Card "Inteligência Artificial" com provedor (Ollama/OpenAI), campos de       │
+│    API Key, modelo, URL do Ollama, botões "Salvar" e "Testar Conexão".           │
+│                                                                                 │
+│ ❌ prints/configuracoes/telegram.png                                             │
+│    Card "Telegram" com campo de Token do Bot, tabela de usuários (Nome,         │
+│    E-mail, Perfil, Chat ID), botões "Salvar" e "Testar".                          │
+│                                                                                 │
+│ ❌ prints/configuracoes/personalizacao-login.png                                 │
+│    Card "Personalização da Tela de Login" com upload de logo, nome, subtítulo,  │
+│    cor do título, tipo de fundo, cores do cartão, borda, texto, input e botão.   │
+│                                                                                 │
+│ ❌ prints/configuracoes/mao-de-obra.png                                          │
+│    Card "Tabela de Custos de Mão de Obra" com tabela de funções agrupadas       │
+│    por área e campo de valor/hora (R$) para cada função.                          │
+│                                                                                 │
+│ ❌ prints/configuracoes/seguranca.png                                            │
+│    Card "Segurança e Backup" com botões: Baixar Backup JSON, Restaurar          │
+│    Backup, Resetar Fábrica, Carregar Dados de Exemplo.                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CARGAS (2 prints)                                                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/cargas/visao-geral.png                                                 │
+│    Tabela de cargas com colunas: TAG, Descrição, Tensão, Potência (CV),         │
+│    Típico de Partida, botão "+ Nova Carga".                                       │
+│                                                                                 │
+│ ❌ prints/cargas/cadastro.png                                                    │
+│    Formulário de cadastro de carga: TAG, Tensão, Descrição, Potência (CV),      │
+│    dropdown de Típico de Partida associado.                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  ORÇAMENTOS (2 prints)                                                           │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/orcamentos/visao-geral.png                                             │
+│    Tabela de orçamentos/propostas comerciais com colunas: Código, Cliente,      │
+│    Projeto, Valor, Status (Em Aberto, Enviado, Aprovado, Perdido).               │
+│                                                                                 │
+│ ❌ prints/orcamentos/campos.png                                                  │
+│    Formulário de orçamento com campos comerciais e tabela de itens.             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  COMPOSIÇÕES DE MÃO DE OBRA (3 prints)                                           │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/composicoes/visao-geral.png                                            │
+│    Tabela de composições de mão de obra com colunas: Código, Descrição,         │
+│    Área, botão "+ Nova Composição".                                               │
+│                                                                                 │
+│ ❌ prints/composicoes/campos.png                                                 │
+│    Builder de composição de mão de obra com parâmetros e lista de itens.        │
+│                                                                                 │
+│ ❌ prints/composicoes/importacao.png                                             │
+│    Modal de importação de composições via arquivo, com mapeamento de campos.    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  REGRAS DE DERIVAÇÃO (4 prints)                                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/regras-derivacao/visao-geral.png                                       │
+│    Tabela de regras de derivação com colunas: Nome, Condição, Expressão,        │
+│    Prioridade, Status (Ativo/Inativo), botão "+ Nova Regra".                     │
+│                                                                                 │
+│ ❌ prints/regras-derivacao/estrutura.png                                         │
+│    Explicação visual ou formulário de criação de regra mostrando a estrutura:   │
+│    condição (IF), ação (THEN) e expressão de cálculo.                             │
+│                                                                                 │
+│ ❌ prints/regras-derivacao/expressoes.png                                        │
+│    Editor de expressões com campos e operadores disponíveis, pré-visualização   │
+│    da expressão montada.                                                          │
+│                                                                                 │
+│ ❌ prints/regras-derivacao/testar.png                                            │
+│    Modal de teste de regra com campos de entrada para valores de teste e        │
+│    resultado da avaliação da regra (Verdadeiro/Falso, valor calculado).          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  MÃO DE OBRA (2 prints)                                                          │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/mao-de-obra/visao-geral.png (estimativa-automatica.png)               │
+│    Tela de Mão de Obra mostrando estimativa automática por equipamento           │
+│    com horas calculadas e custo total.                                            │
+│                                                                                 │
+│ NOTA: O código referencia os paths acima mas as seções visao-geral e            │
+│ estimativa-automatica NÃO possuem o campo 'screenshot'. Os prints podem       │
+│ ser omitidos ou capturados para referência futura.                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  DESPESAS (2 prints)                                                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/despesas/visao-geral.png                                               │
+│    Tela de Despesas do projeto com tabela de itens de despesa (descrição,       │
+│    valor, tipo) e botão "+ Nova Despesa".                                         │
+│                                                                                 │
+│ ❌ prints/despesas/itens.png                                                     │
+│    Formulário de cadastro de despesa com campos: Descrição, Valor, Tipo         │
+│    (Fixa, Variável, Administrativa), Data e Observações.                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CÁLCULOS ELÉTRICOS (2 prints)                                                   │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/calculos-eletricos/visao-geral.png                                     │
+│    Tela de Cálculos Elétricos com abas por painel (TAG) e tabela de cargas      │
+│    com correntes calculadas e resumo de demanda.                                   │
+│                                                                                 │
+│ ❌ prints/calculos-eletricos/disjuntor.png                                       │
+│    Seção de dimensionamento de disjuntores com corrente nominal, Icc,           │
+│    curva de disparo e sugestão automática baseada nas cargas.                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  CÁLCULOS MECÂNICOS (1 print)                                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/calculos-mecanicos/visao-geral.png                                     │
+│    Tela de Cálculos Mecânicos com abas por painel, dimensões totais (L×A×P)    │
+│    e peso estimado do barramento de cobre (kg) por painel.                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  LISTA DE MATERIAIS — BOM (2 prints)                                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/lm/visao-geral.png                                                     │
+│    Tela da Lista de Materiais com grupos por carga (TAG), subtotais por         │
+│    grupo e tabela detalhada de materiais (Qtd, Descrição, Modelo, Fabricante).   │
+│                                                                                 │
+│ ❌ prints/lm/exportacao.png                                                      │
+│    Modal ou confirmação de exportação Excel com nome do arquivo                 │
+│    (BOM_PTC-XXXX.xlsx) e botão de download.                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  IMPORTAÇÃO POR IA (3 prints)                                                    │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│ ❌ prints/importacaoET/visao-geral.png                                           │
+│    Modal "Importar de Documento (IA)" com área de upload (arrastar arquivo),    │
+│    indicador de progresso e abas de resultados.                                    │
+│                                                                                 │
+│ ❌ prints/importacaoET/como-usar.png                                             │
+│    Modal após análise bem-sucedida mostrando abas: Dados Gerais, Equipamentos,  │
+│    Cargas, Normas, Vendor List, Infraestrutura com dados extraídos.               │
+│                                                                                 │
+│ ❌ prints/importacaoET/formatos.png                                              │
+│    Seção informativa sobre formatos aceitos (PDF, DOCX, XLSX, CSV) e           │
+│    limitações (tamanho máximo, texto digitalizado vs scaneado).                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   RESUMO:                                                                        ║
+║   Total de prints: 95                                                            ║
+║   ✅ Já existem:   5 (prints/clientes/*.png)                                     ║
+║   ❌ Pendentes:   90                                                              ║
+║                                                                                  ║
+║   Pastas necessárias (já existem, faltam os PNGs):                              ║
+║   geral/ dashboard/ fornecedores/ proposta-tecnica/ proposta-comercial/         ║
+║   proposta-completa/ pipeline-comercial/ precificacao/ materiais/               ║
+║   paineis/ tipicos/ cubiculos/ relatorio-propostas/ relatorio-cadastros/        ║
+║   relatorio-tipicos/ relatorio-cubiculos/ importacao/ configuracoes/            ║
+║   cargas/ orcamentos/ composicoes/ regras-derivacao/ mao-de-obra/               ║
+║   despesas/ calculos-eletricos/ calculos-mecanicos/ lm/ importacaoET/           ║
+║                                                                                  ║
+║   Dica: Quando um screenshot não existir, o sistema de ajuda exibirá            ║
+║          automaticamente o caminho esperado. Use essa informação como            ║
+║          referência ao capturar a tela.                                          ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

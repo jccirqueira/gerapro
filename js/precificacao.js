@@ -1,6 +1,7 @@
 import { store } from './state.js';
 import { getIcmsRate, INTERNAL_RATES } from './icmsTabela.js';
 import { deriveMaterials } from './automacaoMateriais.js';
+import { infraSubtotal, infraPrecoFinal } from './infraPricing.js';
 
 /**
  * Módulo de Precificação e Rentabilidade (Refatorado)
@@ -512,12 +513,8 @@ class PrecificacaoModule {
         pt.infraestrutura.disciplinas.forEach(disc => {
             const perda = disc.perda ?? 10;
             (disc.itens || []).forEach(item => {
-                const sub = (item.qtd||0) * (1 + perda/100) * (item.custoUnitario||0) + (item.horasInstalacao||0) * (item.valorHora||0) * (item.dificuldade||1.0);
-                cost += sub;
-                const totalPercent = (item.desconto||0) + (item.markup||0);
-                const fator = 1 - totalPercent / 100;
-                const pf = fator > 0 ? sub / fator : sub;
-                finalPrice += pf;
+                cost += infraSubtotal(item, perda);
+                finalPrice += infraPrecoFinal(item, perda);
             });
         });
         return { cost, finalPrice };

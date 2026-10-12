@@ -1,0 +1,145 @@
+================================================================================
+ EDIÇÃO DE ITENS DO TÍPICO — LOCAL vs GLOBAL
+================================================================================
+ Data: Junho/2026
+ Arquivo: js/propostaTecnica.js
+--------------------------------------------------------------------------------
+
+1. OBJETIVO
+--------------------------------------------------------------------------------
+Permitir que o usuário edite os itens de um Típico (ou Cubículo) dentro da
+Proposta Técnica sem necessariamente alterar o template original na base de
+dados. O sistema pergunta se a alteração deve ser global (no típico) ou
+apenas na proposta atual.
+
+2. CONCEITO
+--------------------------------------------------------------------------------
+Cada carga (load) dentro de um equipamento pode receber uma propriedade
+opcional chamada _itemsOverride. Se ela existir, a Lista de Materiais (LM)
+exibe esses itens no lugar dos itens originais do típico.
+
+  load = {
+    tag: "M1",
+    desc: "Motor 1",
+    typicalId: "uuid-do-tipico",
+    _itemsOverride: [ ... ],   // ← itens personalizados só desta proposta
+    _overrideCustoTotal: 123.45
+  }
+
+Essa propriedade é salva naturalmente quando a proposta é persistida via
+"/api/save-proposal" — não requer mudanças no backend nem no schema do
+banco de dados.
+
+3. LOCAIS ALTERADOS
+--------------------------------------------------------------------------------
+
+  3.1 renderLoadsLM() — linha ~9034
+      A LM verifica se a carga tem _itemsOverride. Se sim, usa esses itens.
+      Se não, usa os itens do típico (comportamento original).
+
+  3.2 exportLMXLS() — linhas ~5835 e ~5857
+      A exportação para Excel segue a mesma lógica: usa _itemsOverride se
+      existir, senão usa typical.items.
+
+  3.3 openAddItemModal(typicalId, isCubMt, loadIndex) — linha ~9176
+      Agora aceita o índice da carga (loadIndex). O footer do modal informa
+      se os itens serão salvos no típico (global) ou apenas na proposta
+      (local). O loadIndex fica armazenado em modal._loadIndex.
+
+  3.4 _addSingleItem() — linha ~9494
+      Quando o usuário clica no "+" para adicionar um material:
+      - Se a carga tem _itemsOverride, o material é adicionado DENTRO desse
+        override (local).
+      - Se não tem, adiciona no típico normalmente (global).
+
+  3.5 _editTypicalItems(typicalId, isCubMt, loadIndex) — linha ~9240
+      Aceita loadIndex. Se a carga tem override, carrega esses itens como
+      dados iniciais da tabela de edição. O footer mostra o número de itens
+      e o indicador "(apenas nesta proposta)" quando aplicável.
+
+  3.6 _confirmEditItems() — linha ~9378
+      Tornada async. Quando loadIndex >= 0, exibe um modal de confirmação
+      antes de salvar:
+        ┌─────────────────────────────────────┐
+        │  Alterar Típico na Base?            │
+        │                                     │
+        │  Sim  — altera o típico original.   │
+        │         Todas as propostas que usam  │
+        │         este típico serão afetadas.  │
+        │                                     │
+        │  Não  — altera apenas nesta         │
+        │         proposta. O típico original  │
+        │         permanece intacto.          │
+        │                                     │
+        │          [Não]    [Sim]             │
+        └─────────────────────────────────────┘
+      - "Sim" → salva no banco via store.updateTipico() e remove o override
+      - "Não" → salva os itens em load._itemsOverride (apenas no state)
+
+  3.7 _hasOverride(loadIndex) — linha ~9334
+      Retorna true se a carga no índice informado possui _itemsOverride.
+
+  3.8 _getOverrideItems(loadIndex) — linha ~9340
+      Retorna o array _itemsOverride da carga, ou [] se não existir.
+
+  3.9 _confirmSaveToDatabase(isCubMt) — linha ~9345
+      Exibe o modal de confirmação "Sim"/"Não" e retorna uma Promise que
+      resolve para true (Sim) ou false (Não).
+
+  3.10 updateLoadFromTypical() — linha ~9925
+      Quando o usuário troca o típico associado a uma carga (dropdown),
+      o override existente é automaticamente removido (delete). Isso
+      evita inconsistências entre o típico selecionado e os itens
+      exibidos.
+
+4. FLUXO COMPLETO
+--------------------------------------------------------------------------------
+
+  Ação                          | Comportamento
+  ------------------------------|----------------------------------------------
+  Editar Itens                  | Abre tabela editável. Ao clicar "Concluído",
+  (carga sem override)          | mostra pergunta Sim/Não.
+                                | Sim  → salva no típico (DB)
+                                | Não  → cria _itemsOverride na carga
+  ------------------------------|----------------------------------------------
+  Editar Itens                  | Abre tabela com os itens do override.
+  (carga com override)          | Mostra pergunta Sim/Não.
+                                | Sim  → substitui típico + remove override
+                                | Não  → atualiza o override
+  ------------------------------|----------------------------------------------
+  Incluir Itens                 | Adiciona no típico (global).
+  (carga sem override)          | Sem pergunta. Comportamento original.
+  ------------------------------|----------------------------------------------
+  Incluir Itens                 | Adiciona no override (local).
+  (carga com override)          | Sem pergunta — o modo já está definido.
+  ------------------------------|----------------------------------------------
+  Trocar típico (dropdown)      | Override é removido automaticamente.
+  ------------------------------|----------------------------------------------
+  Visualizar LM                 | Exibe _itemsOverride se existir,
+                                | senão exibe typical.items.
+  ------------------------------|----------------------------------------------
+  Exportar Excel                | Mesma lógica da LM.
+
+5. LIMITAÇÕES CONHECIDAS
+--------------------------------------------------------------------------------
+  - A visualização de LM pelo botão "Visualizar" (modal de preview na edição
+    de cargas) ainda usa typical.items. O override é respeitado apenas na
+    aba LM do equipamento.
+  - O cálculo de sugestão de layout (suggestLayout) também usa os itens
+    originais do típico, pois depende das dimensões dos materiais no
+    cadastro, não dos itens editados.
+
+6. COMO TESTAR
+--------------------------------------------------------------------------------
+  1. Abra uma Proposta Técnica que tenha equipamentos com típicos
+     associados.
+  2. Navegue até a aba LM de um equipamento.
+  3. Clique em "Editar Itens" em uma carga.
+  4. Altere quantidades, descrições, ou remova itens.
+  5. Clique em "Concluído".
+  6. Deve aparecer a pergunta: "Alterar Típico na Base?"
+     - Clique "Não" para salvar apenas na proposta.
+     - Clique "Sim" para salvar no banco.
+  7. Verifique que a LM reflete as alterações.
+  8. Reabra a proposta para confirmar que overrides locais persistiram
+     após salvar/recaregar.

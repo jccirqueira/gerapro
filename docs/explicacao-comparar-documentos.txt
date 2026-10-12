@@ -1,0 +1,588 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — COMPARAR DOCUMENTOS NO GERAPRO                          ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Comparar Documentos,      ║
+║   que serve para comparar quantitativos entre documentos técnicos.              ║
+║   Ele NÃO explica Proposta Técnica (descrição de equipamentos),                ║
+║   Precificação (cálculo de preços) ou Importação por IA.                       ║
+║   Se você precisa disso, consulte os outros arquivos de explicação na pasta    ║
+║   docs/ ou use o help do sistema (botão ❓).                                     ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É O COMPARAR DOCUMENTOS?                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você recebeu uma planilha de orçamento de um fornecedor e quer
+comparar os quantitativos com a sua própria planilha. Ou o cliente enviou três
+PDFs com a lista de materiais e você precisa ver se está tudo de acordo com
+o seu levantamento.
+
+O módulo COMPARAR DOCUMENTOS resolve isso. Ele usa Inteligência Artificial para
+extrair os itens (descrição, quantidade, unidade) de cada documento, depois faz
+a correspondência entre eles — item por item — com um percentual de MATCH %
+(quanto maior, mais confiante a IA está), e mostra as diferenças em uma
+tabela colorida.
+
+O que você pode fazer:
+
+  • Enviar 2 ou mais documentos (PDF, XLSX, DOCX)
+  • Escolher qual documento é a REFERÊNCIA (o "certo")
+  • Comparar a referência com 1 ou mais documentos de uma vez
+  • Agrupar documentos do cliente em um lado só da comparação (merge automático)
+  • Exportar para XLSX, CSV ou PDF
+  • Ver o Match % de cada correspondência entre itens
+  • Preencher preço unitário para ver o impacto financeiro das diferenças
+  • Editar quantidades diretamente na tabela
+  • Filtrar a tabela clicando nos cards de resumo
+  • Vincular manualmente itens que a IA não conseguiu parear
+  • Salvar a sessão de comparação e restaurar depois pelo histórico
+  • Cache automático no navegador por 24h
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ✅  Comparar Documentos = Confrontar quantitativos entre fontes diferentes.   ║
+║   ✅  Referência = o documento base. Comparados = os demais documentos.         ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde o Comparar Documentos se encaixa no fluxo de trabalho?                  │
+│                                                                                 │
+│  1. Você recebe documentos de fornecedores ou do cliente                       │
+│  2. Abre o módulo Comparar Documentos no menu Engenharia                      │
+│  3. Faz upload dos arquivos e dá rótulos a cada um                            │
+│  4. A IA extrai os itens automaticamente                                      │
+│  5. Configura referência e documentos a comparar                              │
+│  6. Analisa a tabela de diferenças                                            │
+│  7. Exporta XLSX ou salva a sessão                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. FLUXO DE TRABALHO                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O fluxo completo tem 4 etapas:
+
+  1. UPLOAD — Você seleciona os arquivos (PDF, XLSX, DOCX) e dá um rótulo para
+     cada um (ex: "Proposta do Cliente", "Planilha Interna").
+
+  2. EXTRAÇÃO POR IA — O sistema extrai os itens de cada documento
+     automaticamente usando inteligência artificial.
+
+  3. CONFIGURAÇÃO — Você define: qual documento é a Referência (REF), quais
+     documentos serão comparados (COMP), e o modo de visualização
+     (Individual ou Agregado).
+
+  4. RESULTADO — A tabela comparativa é exibida com cores para cada status
+     (OK, Excedente, Faltante). Você pode exportar XLSX ou salvar a sessão.
+
+💡 Você pode voltar uma etapa sem perder os dados já extraídos. Ex: se não
+   gostou da configuração, clique em "Voltar" e mude.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. TELA DE UPLOAD                                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Na tela inicial, você adiciona os documentos que quer comparar. O primeiro slot
+é o Documento de Referência e os demais são Documentos para Comparar.
+Para cada documento, você precisa:
+
+  • ARQUIVO — Selecionar o arquivo (PDF, XLSX, DOCX, DOC, XLS, CSV)
+  • RÓTULO — Dar um nome de identificação (ex: "Orçamento Fornecedor A")
+
+Limites:
+
+  • Tamanho máximo por arquivo: 15 MB
+  • Mínimo de 2 documentos para poder comparar
+  • Você pode adicionar quantos quiser
+
+💡 O rótulo é importante — é ele que aparece nas colunas da tabela de resultado
+   e nas abas do XLSX exportado.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. TELA DE CONFIGURAÇÃO                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Após a extração, você configura como a comparação será feita:
+
+REF — Documento de Referência
+  Escolha UM documento como base da comparação. É contra ele que todos os
+  outros serão comparados. Você seleciona via rádio (apenas um).
+
+COMP — Documentos para Comparar
+  Escolha UM OU MAIS documentos para comparar contra a referência. Você
+  marca via checkboxes. Se marcar mais de um, eles podem ser vistos lado a
+  lado (Modo Individual) ou mesclados (Modo Agregado).
+
+Modo de Visualização — duas opções:
+
+  ┌────────────┬────────────────────────────────┬────────────────────────────────┐
+  │ MODO       │ QUANDO USAR                    │ COMO FICA A TABELA             │
+  ├────────────┼────────────────────────────────┼────────────────────────────────┤
+  │ Individual │ Cada documento comparado é     │ Colunas dinâmicas: Ref |       │
+  │            │ independente — você quer ver   │ Doc1 Qtd | Doc1 Dif |          │
+  │            │ a diferença de cada um         │ Doc2 Qtd | Doc2 Dif | ...      │
+  │            │ separadamente contra a ref     │                                │
+  │            │                                │                                │
+  │ Agregado   │ Documentos comparados são      │ Tabela clássica 1:1 com        │
+  │            │ partes do mesmo todo (ex:      │ merge automático               │
+  │            │ cliente enviou elétrica num    │ (dedup fuzzy)                  │
+  │            │ PDF, hidráulica noutro) —      │                                │
+  │            │ você quer juntar tudo e        │                                │
+  │            │ comparar o todo                │                                │
+  └────────────┴────────────────────────────────┴────────────────────────────────┘
+
+✅ No modo Agregado, itens similares são unidos automaticamente. Ex: "Cabo
+   240mm² 100m" em um doc e "Cabo de Cobre 240mm² 95m" em outro viram um
+   item só com a maior quantidade. A similaridade mínima para considerar o
+   mesmo item é 70% (fuzzy match).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. MODO INDIVIDUAL — TABELA MULTI-COLUNA                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O modo Individual é ideal quando você tem uma referência e quer comparar com
+vários documentos independentes. Exemplo:
+
+  • Ref = "Planilha Mestra" (seu levantamento)
+  • Comp = "Orçamento Fornecedor A", "Orçamento Fornecedor B",
+           "Orçamento Fornecedor C"
+
+A tabela gerada tem colunas dinâmicas:
+
+  ┌─────────────┬─────┬─────────────────┬──────────────────┬──────────────────┐
+  │ Descrição   │ UN  │ Ref (Plan.      │ Doc 1 — Orç.     │ Doc 2 — Orç.     │
+  │             │     │ Mestra) Qtd     │ Forn. A Qtd/Dif  │ Forn. B Qtd/Dif  │
+  ├─────────────┼─────┼─────────────────┼──────────────────┼──────────────────┤
+  │ Cabo 240mm² │ m   │ 100             │ 65  / -35        │ 90  / -10        │
+  │ Barr. 63A   │ un  │ 10              │ 8   / -2         │ 12  / +2         │
+  │ Disj. 100A  │ un  │ 5               │ 5   / 0          │ 4   / -1         │
+  └─────────────┴─────┴─────────────────┴──────────────────┴──────────────────┘
+
+Legenda de cores das diferenças:
+
+  • Verde   — Quantidade igual (OK)
+  • Amarelo — Excedente (ref tem mais que o documento)
+  • Vermelho — Faltante (ref tem menos que o documento)
+
+Itens que existem apenas nos documentos comparados (não na referência) aparecem
+no rodapé da tabela com a frase "Itens que aparecem apenas nos documentos
+comparados".
+
+💡 Cada par de colunas (Qtd + Diferença) tem um separador vertical para
+   facilitar a leitura. O cabeçalho mostra o número (Doc 1, Doc 2...) e o
+   nome abreviado do documento.
+
+FUNCIONALIDADES DA TABELA:
+  • Busca — Campo de texto para filtrar itens por descrição
+  • Ordenação — Clique nos cabeçalhos para ordenar crescente/decrescente
+  • Edição inline — Edite as quantidades diretamente, diferença e preço
+    recalculam automaticamente
+  • Excluir/Restaurar — Marque checkboxes e clique em "Excluir selecionados"
+  • Match % — Coluna com percentual de correspondência entre itens
+    (verde >= 80%, amarelo >= 50%, vermelho < 50%)
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. MODO AGREGADO — MERGE DE DOCUMENTOS                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O modo Agregado é ideal quando o cliente enviou a documentação fracionada em
+vários arquivos e você precisa comparar o TODO contra sua referência única.
+
+Como o merge funciona:
+
+  1. Cada documento a comparar tem seus itens extraídos individualmente
+  2. O sistema percorre todos os itens de todos os documentos comparados
+  3. Itens com descrições similares (fuzzy match >= 70%) são considerados
+     o mesmo item
+  4. Quando há duplicata, a MAIOR quantidade entre os documentos é mantida
+  5. O resultado é uma lista única de itens mesclada
+  6. Essa lista mesclada é comparada contra a Referência
+
+Exemplo de merge:
+
+  Doc 1: "Cabo 240mm² 100m"
+  Doc 2: "Cabo de Cobre 240mm² 90m"
+  Resultado do merge: "Cabo 240mm² 100m" (maior qtd)
+
+💡 A tabela de resultado do modo Agregado inclui:
+   Descrição | UN | Qtd Ref | Qtd Merge | Diferença | % | Status | Match % |
+   Preço (R$) | Dif. Total (R$)
+   Além de busca textual e filtro "Mostrar apenas diferenças".
+
+PREÇO UNITÁRIO E DIFERENÇA TOTAL:
+  No toolbar superior, há um campo "Preço unit. (R$)". Ao preencher, a tabela
+  exibe automaticamente:
+  • Preço (R$) — o preço unitário do item
+  • Dif. Total (R$) — a diferença de qtd x preço unitário
+  Cores: verde (zero), amarelo (excedente em custo), vermelho (economia).
+
+GRÁFICO DE DISTRIBUIÇÃO:
+  Ao lado dos cards de resumo, um gráfico de barras mostra a distribuição
+  visual dos itens por status.
+
+FILTRO RÁPIDO POR STATUS:
+  Clique em qualquer card de resumo (OK, Excedente, Faltante, Só Ref, Só Docs)
+  para filtrar a tabela. Clique novamente ou no "x" para limpar.
+
+RE-MATCH MANUAL:
+  Itens com Match % < 50% exibem botão 🔗. Clique para abrir um seletor com
+  itens órfãos do outro documento e vincular manualmente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. EXPORTAR RESULTADOS (XLSX / CSV / PDF)                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Você pode exportar o resultado da comparação em três formatos. Os botões ficam
+no canto superior direito da tela de resultado.
+
+📊 XLSX (Excel) — Relatório completo com abas separadas por par:
+
+  Modo Individual:
+    • Resumo — tabela com um resumo por par (total itens, OK, excedente,
+      faltante, só ref, só doc)
+    • vs [Nome do Doc] — uma aba para cada par, com a tabela de diferenças
+      completa
+    • Doc 1, Doc 2, ... — abas com o conteúdo extraído de cada documento
+      original
+
+  Modo Agregado:
+    • Diferenças — tabela de diferenças com cores
+    • Resumo — totais da comparação
+    • Doc 1, Doc 2, ... — conteúdo original de cada documento
+
+  ✅ O arquivo já vem formatado: cabeçalhos coloridos, linhas alternadas,
+     cores de status, congelamento da primeira linha.
+
+📄 CSV — Planilha CSV (delimitador ;) com BOM UTF-8 para compatibilidade
+     com Excel brasileiro. Inclui todas as colunas (Descrição, UN, Ref, Doc,
+     Diferença, %, Status, Match, Preço, Dif. Total).
+
+📄 PDF — Gera um PDF profissional pelo servidor (download direto, sem janela
+     de impressão). Inclui:
+     • Cabeçalho com título, documentos comparados e data
+     • Tabela de resumo (OK, Excedente, Faltante, Só Ref, Só Doc)
+     • Tabela de itens completa com cores, % e match %
+     • Preço e Diferença Total (se preenchido)
+     • Rodapé com numeração de páginas
+     • Formato A4, fonte Roboto, layout profissional
+   No modo Individual mostra resumo por par + tabela lado a lado.
+   No modo Agregado mostra tabela clássica com merge.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. SALVAR E RESTAURAR SESSÃO                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Você pode salvar a sessão de comparação para consultar depois. O botão "Salvar
+Sessão" fica ao lado dos botões de exportação.
+
+O que é salvo:
+
+  • Quais documentos foram comparados (rótulos e nomes de arquivo)
+  • Qual foi a referência
+  • Qual modo de visualização foi usado
+  • Todos os resultados item a item
+  • Vínculo com a Proposta Técnica ativa (se houver)
+
+HISTÓRICO DE SESSÕES:
+  Na tela de Upload, clique no botão "Histórico" para ver todas as sessões
+  salvas. Uma janela exibe a lista com nome, data e quantidade de itens.
+  Clique em "Restaurar" para recarregar a comparação exatamente como estava.
+
+CACHE AUTOMÁTICO:
+  O sistema salva automaticamente o último resultado no navegador (localStorage).
+  Se você sair do módulo acidentalmente, ao reabrir a comparação anterior é
+  restaurada automaticamente (válido por 24 horas).
+
+💡 Salvar a sessão no servidor é útil para consultar dias depois. O cache local
+   é apenas para recuperação rápida.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. CENÁRIOS DE USO                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────┬───────────────────────────────────────────────┐
+  │ CENÁRIO                      │ DESCRIÇÃO                                     │
+  ├──────────────────────────────┼───────────────────────────────────────────────┤
+  │ Orçamento vs Orçamento       │ Comparar 2+ propostas de fornecedores         │
+  │                              │ contra sua base                               │
+  │                              │                                               │
+  │ Cliente Fracionado           │ Cliente enviou 3 PDFs com partes diferentes  │
+  │                              │ — use Modo Agregado                           │
+  │                              │                                               │
+  │ Revisão vs Revisão           │ Comparar revisão antiga vs nova de um         │
+  │                              │ mesmo documento                               │
+  │                              │                                               │
+  │ Fornecedor A vs B vs C       │ Modo Individual: referência vs 3             │
+  │                              │ fornecedores lado a lado                      │
+  │                              │                                               │
+  │ LM vs Planilha               │ Comparar Lista de Materiais contra            │
+  │                              │ planilha de compras                           │
+  │                              │                                               │
+  │ Especificação Técnica        │ Conferir se especificação do cliente          │
+  │                              │ bate com a sua                                │
+  └──────────────────────────────┴───────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. PASSO A PASSO NA TELA                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+ETAPA 1 — Acessar o Módulo
+  • No menu lateral esquerdo, vá em Engenharia > Comparar Docs.
+  • Ou clique no botão "Comparar Documentos" na toolbar da Proposta Técnica.
+
+ETAPA 2 — Upload dos Documentos
+  • Clique em "Adicionar Documento" para cada arquivo.
+  • O primeiro slot é o Documento de Referência; os demais são Documentos
+    para Comparar.
+  • Para cada slot: selecione o arquivo e dê um rótulo.
+  • Adicione pelo menos 2 documentos.
+  • Clique em "Extrair e Configurar".
+
+ETAPA 3 — Aguardar Extração
+  • Uma tela de loading aparece enquanto a IA extrai os itens.
+  • O tempo depende do tamanho dos arquivos e do provedor de IA configurado.
+
+ETAPA 4 — Configurar a Comparação
+  • No painel REF, selecione o documento de referência (apenas um).
+  • No painel COMP, marque os documentos a comparar (um ou mais).
+  • Escolha o modo: Individual (colunas separadas) ou Agregado (merge).
+  • Clique em "Comparar".
+
+ETAPA 5 — Analisar o Resultado
+  • Veja os cards de resumo no topo (OK, Excedente, Faltante, Só Ref, Só Docs)
+    — clique neles para filtrar a tabela por status.
+  • Ao lado dos cards, o gráfico de barras mostra a distribuição visual.
+  • Use o campo de busca para localizar itens por descrição.
+  • Clique nos cabeçalhos das colunas para ordenar.
+  • Edite as quantidades diretamente nos campos numéricos — a diferença e o
+    preço são recalculados na hora.
+  • Marque checkboxes e clique em "Excluir selecionados" para remover itens.
+  • Itens com baixo Match % exibem botão 🔗 para vincular manualmente.
+  • Role a tabela para ver todos os itens comparados.
+  • Itens em cinza são os que estão OK (iguais).
+
+ETAPA 6 — Exportar ou Salvar
+  • Preencha o campo "Preço unit. (R$)" para ver os valores totais.
+  • Clique em "XLSX" para baixar o relatório em Excel.
+  • Clique em "CSV" para exportar em formato de texto.
+  • Clique em "Exportar PDF" para baixar um PDF profissional gerado pelo servidor.
+  • Clique em "Salvar Sessão" para guardar no servidor.
+  • Clique em "Voltar" para mudar a configuração sem perder os dados.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. DICAS IMPORTANTES                                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  ✅ Use rótulos descritivos para cada documento. Eles aparecem nos cabeçalhos
+     das tabelas e nas abas do XLSX.
+
+  ✅ Se o cliente enviou a documentação fracionada (elétrica num PDF, hidráulica
+     noutro), use o modo Agregado para unir tudo antes de comparar.
+
+  ✅ Para cotar 3 fornecedores contra sua planilha mestra, use o modo
+     Individual — você vê os 3 lado a lado na mesma tabela.
+
+  ✅ O botão "Voltar" na tela de resultado leva de volta à configuração sem
+     precisar extrair de novo.
+
+  ✅ O merge fuzzy (modo Agregado) usa similaridade de 70%. Se dois itens têm
+     descrições muito diferentes, eles não serão mesclados.
+
+  ✅ Arquivos muito grandes (>15 MB) não são aceitos. Se precisar, divida o
+     arquivo antes.
+
+  ✅ A extração por IA depende do provedor configurado em Configurações >
+     Inteligência Artificial. Verifique se o provedor está funcionando.
+
+  ✅ No modo Individual, itens que só existem nos documentos comparados
+     (não na referência) aparecem no rodapé da tabela em itálico.
+
+  ✅ Preço unitário: preencha o campo "Preço unit. (R$)" para ver o impacto
+     financeiro de cada diferença.
+
+  ✅ Filtro rápido: clique nos cards de resumo para filtrar a tabela por um
+     status específico.
+
+  ✅ Edição inline: edite as quantidades diretamente na tabela — diferença e
+     preço recalculam automaticamente.
+
+  ✅ Re-match manual: se a IA não encontrou correspondência, use o botão 🔗
+     para vincular manualmente.
+
+  ✅ Histórico: use o botão "Histórico" na tela de upload para restaurar
+     sessões salvas anteriormente.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. GLOSSÁRIO                                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  REF                        Badge do documento de referência — apenas 1 doc.
+  COMP                       Badge dos documentos a comparar — 1 ou mais.
+  Modo Individual            Cada documento comparado aparece em colunas
+                             separadas na tabela.
+  Modo Agregado              Documentos comparados são mesclados em um todo
+                             antes da comparação.
+  Merge / Mesclagem          União de itens de vários documentos em uma lista
+                             única, com dedup fuzzy.
+  Dedup Fuzzy                Identificação de itens duplicados mesmo quando
+                             as descrições não são idênticas (ex: "Cabo 240"
+                             vs "Cabo de Cobre 240mm²").
+  Extração por IA            Processo automático que lê o documento e
+                             identifica os itens (descrição, qtd, unidade).
+  Excedente                  Quando a referência tem mais quantidade que o
+                             documento comparado.
+  Faltante                   Quando a referência tem menos quantidade que o
+                             documento comparado.
+  Só Ref / Só Doc            Item que existe apenas na referência ou apenas
+                             no documento comparado.
+  Sessão de Comparação       Registro salvo da comparação, incluindo
+                             configuração e todos os resultados.
+  Fuzzy Match                Algoritmo que calcula o quanto duas strings são
+                             similares (0 a 1). Acima de 0.7 é considerado
+                             o mesmo item.
+  Rótulo                     Nome de identificação dado ao documento na tela
+                             de upload (ex: "Proposta Fornecedor").
+  Match %                    Percentual de correspondência entre itens.
+                             Verde >= 80%, Amarelo >= 50%, Vermelho < 50%.
+  Preço Unitário             Valor por unidade. Preenchido no toolbar para
+                             calcular custo total da divergência.
+  Dif. Total (R$)            Diferença de qtd x Preço Unitário. Impacto
+                             financeiro de cada divergência.
+  Filtro por Status          Clique nos cards de resumo para filtrar a
+                             tabela por aquele status.
+  Edição Inline              Campos de qtd editáveis direto na tabela.
+                             Diferenças recalculadas automaticamente.
+  Re-match Manual            Vinculação manual de itens com baixo Match %.
+                             Botão 🔗 em itens sem correspondência.
+  Cache Local                Último resultado salvo automaticamente no
+                             navegador por 24h para recuperação rápida.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. PROBLEMAS COMUNS E SOLUÇÕES                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+❓ "O botão Comparar está desabilitado"
+  ✅ Você precisa selecionar ao menos 1 documento no painel COMP (checkboxes).
+     Se a referência não estiver selecionada, ou nenhum documento estiver
+     marcado no COMP, o botão fica desabilitado.
+
+❓ "A extração demorou e não apareceu nada"
+  ✅ Pode ser que o provedor de IA esteja offline ou configurado
+     incorretamente. Vá em Configurações > Inteligência Artificial e
+     verifique o provedor. Tente mudar para um provedor diferente
+     (ex: de Ollama para OpenAI).
+
+❓ "Os itens extraídos estão errados ou incompletos"
+  ✅ A extração depende da qualidade do documento original. PDFs escaneados
+     (imagem) podem ter baixa precisão. Tente usar arquivos XLSX ou DOCX
+     quando possível. Verifique também se o OCR está ativado nas
+     configurações de IA.
+
+❓ "Dois itens iguais não foram mesclados no modo Agregado"
+  ✅ O merge usa similaridade fuzzy de 70%. Se as descrições forem muito
+     diferentes (ex: "Cabo 240mm²" vs "Condutor Cobre 240"), eles não
+     serão mesclados. Tente usar descrições mais padronizadas nos docs.
+
+❓ "Exportei XLSX mas o arquivo não abre"
+  ✅ Verifique se o navegador não bloqueou o download. Tente limpar o cache
+     e exportar novamente. Se o problema persistir, salve a sessão primeiro
+     e tente exportar depois.
+
+❓ "Esqueci de marcar um documento no COMP"
+  ✅ Clique em "Voltar" no canto superior direito da tela de resultado.
+     Você volta à configuração sem perder a extração. Marque o documento
+     faltante e clique em "Comparar" novamente.
+
+❓ "O documento que eu quero como referência não é o primeiro da lista"
+  ✅ Na tela de Configuração, o primeiro slot é definido como referência
+     por padrão. Basta clicar no rádio do documento que você quer como
+     referência — qualquer um pode ser.
+
+❓ "O XLSX exportado tem cores que se estendem para fora da tabela"
+  ✅ Isso foi corrigido na versão atual. O arquivo agora usa autoFilter para
+     delimitar a área de dados. Reexporte com a versão mais recente do
+     sistema.
+
+❓ "Editei uma quantidade mas a tabela não atualizou"
+  ✅ Pressione Enter ou clique fora do campo após editar. A diferença,
+     percentual e preço são recalculados automaticamente.
+
+❓ "O botão 🔗 não aparece mesmo para itens sem match"
+  ✅ O botão 🔗 só aparece para itens com status "Só Ref" e Match % menor
+     que 50%. Se o item já está pareado, o botão não aparece.
+
+❓ "Fechei o módulo sem salvar e perdi a comparação"
+  ✅ O sistema salva o último resultado no cache do navegador por 24h.
+     Ao reabrir o módulo, a comparação anterior será restaurada.
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   🌟 LEMBRE-SE                                                                    ║
+║                                                                                  ║
+║   O Comparar Documentos é a ferramenta certa quando você precisa confrontar     ║
+║   quantitativos entre fontes diferentes. Use o modo Individual para ver tudo    ║
+║   lado a lado, e o modo Agregado quando o cliente espalhou as informações em    ║
+║   vários arquivos.                                                               ║
+║                                                                                  ║
+║   Uma boa comparação evita comprar material errado ou em quantidade errada.     ║
+║                                                                                  ║
+║   🔹 Extraia, configure, compare — em 3 passos.                                  ║
+║   🔹 Modo Individual = visão lado a lado | Modo Agregado = merge automático     ║
+║   🔹 Exporte XLSX, CSV ou PDF — o formato que seu cliente precisar               ║
+║   🔹 Preencha o preço unitário para ver o impacto financeiro                     ║
+║   🔹 Clique nos cards para filtrar | Edite quantidades | Vincule itens           ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

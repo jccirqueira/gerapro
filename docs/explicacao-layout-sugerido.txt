@@ -1,0 +1,586 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — LAYOUT SUGERIDO E EXPORTAÇÃO DXF NO GERAPRO              ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Layout Sugerido e a        ║
+║   exportação para DXF (AutoCAD) dentro do GeraPro.                              ║
+║                                                                                  ║
+║   Ele NÃO explica como cadastrar materiais, criar típicos ou montar uma         ║
+║   Proposta Técnica. Se você precisa disso, procure o help do sistema            ║
+║   (botão ❓ no canto superior).                                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É O LAYOUT SUGERIDO?                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Layout Sugerido é uma ferramenta que GERA AUTOMATICAMENTE um desenho técnico
+da distribuição física dos componentes DENTRO do painel elétrico.
+
+Imagine que você tem um quadro CCM-BT com 10 motores. O sistema:
+
+  1. Pega as cargas que você cadastrou (motores, bombas, etc.)
+  2. Pega os típicos associados a cada carga (Partida Direta, Soft-Starter, etc.)
+  3. Pega os materiais de cada típico (disjuntores, contatores, bornes, etc.)
+  4. CALCULA onde cada peça vai ficar no painel
+  5. DESENHA o painel em uma tela, mostrando:
+     - Os armários (largura calculada automaticamente)
+     - A zona de barramentos
+     - As canaletas (quadro e linear)
+     - Os trilhos DIN
+     - Os componentes (disjuntores, contatores, relés, bornes, etc.)
+     - A barra de terra
+     - A base
+     - As dimensões verticais
+
+O resultado é um LAYOUT ORIENTATIVO que ajuda o engenheiro a visualizar como o
+painel vai ficar antes de comprar os materiais ou fabricar.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. QUANDO USAR O LAYOUT SUGERIDO?                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬──────────────────────────────────────────────────────────┐
+│ SITUAÇÃO               │ PARA QUE SERVE                                          │
+├───────────────────────┼──────────────────────────────────────────────────────────┤
+│ Proposta Técnica      │ Você quer mostrar ao cliente como o painel será          │
+│                        │ distribuído fisicamente.                                │
+│                        │                                                          │
+│ Dimensionamento       │ Você quer confirmar se os componentes cabem dentro       │
+│                        │ do armário antes de comprar.                             │
+│                        │                                                          │
+│ Exportar para CAD     │ Você quer gerar um arquivo .dxf para abrir no            │
+│                        │ AutoCAD e fazer ajustes finos ou cotas.                  │
+│                        │                                                          │
+│ Lista de Materiais    │ O layout também gera uma lista de materiais alocados     │
+│                        │ por armário, o que ajuda no orçamento.                  │
+│                        │                                                          │
+│ Back-to-Back          │ Para painéis com montagem "Back to Back", o sistema      │
+│                        │ gera as vistas Frontal e Traseira automaticamente.      │
+└───────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. REQUISITOS PARA O LAYOUT FUNCIONAR                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O layout só funciona quando TODOS os itens abaixo estão preenchidos:
+
+  1. FORMA DE SEGREGAÇÃO: O equipamento deve ter uma forma de segregação
+     compatível na Ficha Técnica: "Forma 1", "Forma 2a" ou "Forma 2b".
+
+  2. CARGAS COM TÍPICOS: As cargas do equipamento devem ter um "Típico"
+     (starting block) associado. Sem típico, o sistema não sabe quais
+     materiais usar.
+
+  3. MATERIAIS COM DIMENSÕES: Os materiais usados nos típicos precisam
+     ter largura (mm) e altura (mm) preenchidos no cadastro. Sem as
+     dimensões, o sistema não consegue posicionar os componentes.
+
+  4. LAYOUT CONFIG (opcional): Você pode configurar:
+     - Posição das canaletas (esquerda/direita)
+     - Posição dos trilhos DIN (altura Y)
+     - Linhas de componentes (Proteções, Acionamentos, Comandos, Bornes)
+     - Espaçamento entre componentes (gaps térmicos por categoria)
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ✅ DICA: Se o layout não aparecer, a primeira coisa a verificar é se          ║
+║   as cargas têm típicos associados (aba Cargas) e se os materiais têm           ║
+║   largura e altura preenchidas (cadastro de Materiais > dimensões mm).          ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. PASSO A PASSO NA TELA                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+ETAPA 1 — ACESSAR O LAYOUT
+
+  • Abra uma Proposta Técnica.
+  • Vá até a seção do equipamento (ex: CCM-01).
+  • Na aba "Layout Sugerido" você vê o desenho gerado automaticamente.
+
+ETAPA 2 — ENTENDER A TELA
+
+  O layout mostra:
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │                                                                              │
+  │  4 CARDs de resumo:                                                          │
+  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐                      │
+  │  │ Armários │ │ Largura  │ │ Largura  │ │ Altura   │                      │
+  │  │    3     │ │ Calc.    │ │ Instal.  │ │ Padrão   │                      │
+  │  │          │ │  1850mm  │ │  2000mm  │ │ 2300mm   │                      │
+  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘                      │
+  │                                                                              │
+  │  Botões: [⚙ Configurar] [📄 Exportar PDF] [📐 Exportar DXF] [☐ Vista    │
+  │  Lateral]                                                              │
+  │                                                                              │
+  │  ┌──────────────────────────────────────────────────────────────────────┐   │
+  │  │                     DESENHO DO LAYOUT                                │   │
+  │  │  ┌──────┐ ┌──────┐ ┌──────┐                                         │   │
+  │  │  │CCM-01│ │CCM-02│ │CCM-03│                                         │   │
+  │  │  │      │ │      │ │      │                                         │   │
+  │  │  │Barram│ │Barram│ │Barram│                                         │   │
+  │  │  │──────│ │──────│ │──────│                                         │   │
+  │  │  │DISJ  │ │DISJ  │ │INV   │                                         │   │
+  │  │  │CONT  │ │CONT  │ │PLC   │                                         │   │
+  │  │  │BORNES│ │BORNES│ │BORNES│                                         │   │
+  │  │  │[Terra│ │[Terra│ │[Terra│                                         │   │
+  │  │  │[Base ]│ │[Base ]│ │[Base ]                                         │   │
+  │  │  │ Col.1 │ │ Col.2 │ │ Col.3 │                                         │   │
+  │  └──────┘ └──────┘ └──────┘                                         │   │
+  │  └──────────────────────────────────────────────────────────────────────┘   │
+  │                                                                              │
+  │  Abaixo: controles de largura por armário + Lista de Materiais              │
+  │                                                                              │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+ETAPA 3 — AJUSTAR LARGURAS DOS ARMÁRIOS
+
+  • Abaixo do desenho, cada armário tem um dropdown de largura:
+    [400mm | 600mm | 800mm | 1000mm]
+  • Selecione a largura desejada. O layout é recalculado na hora.
+  • Você também pode adicionar ou remover armários.
+
+ETAPA 4 — CONFIGURAR O LAYOUT (OPCIONAL)
+
+  Clique no botão "⚙ Configurar" para abrir o painel de configuração onde
+  você pode ajustar:
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │ CONFIGURAÇÃO DE LAYOUT                                                       │
+  │ ──────────────────────────────                                               │
+  │                                                                              │
+  │ CANALETAS:                                                                   │
+  │ • Canaleta Esquerda (mm): [ 50 ]                                            │
+  │ • Canaleta Direita (mm):    [ 50 ]                                          │
+  │ • Largura do Trilho DIN:    [ 35 ]                                          │
+  │ • Espaçamento entre linhas: [ 10 ]                                          │
+  │                                                                              │
+  │ LINHAS DE COMPONENTES:                                                       │
+  │ ┌──────────────────────────────────────────────────────────────────────────┐│
+  │ │ Linha        │ Y Centro   │ Altura │ Categorias                         ││
+  │ ├──────────────┼────────────┼────────┼─────────────────────────────────────┤│
+  │ │ Proteções    │   525mm    │  300mm │ Disjuntor, Disjuntor Motor          ││
+  │ │ Acionamentos │  1025mm    │  300mm │ Contator, Inversor, Soft-Starter    ││
+  │ │ Comandos     │  1500mm    │  250mm │ PLC, Relé, Fonte                    ││
+  │ │ Bornes       │  1900mm    │  150mm │ Borne, Módulo                       ││
+  │ └──────────────────────────────────────────────────────────────────────────┘│
+  │                                                                              │
+  │ GAPS TÉRMICOS:                                                               │
+  │ • Disjuntor: [10]mm  • Contator: [5]mm  • Inversor: [15]mm                 │
+  │ • Relé: [5]mm         • Borne: [2]mm                                        │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+ETAPA 5 — EXPORTAR
+
+  Você tem 3 opções de saída:
+
+  ┌──────────────┬────────────────────────────────────────────────────────────────┐
+  │ BOTÃO         │ O QUE GERA                                                    │
+  ├──────────────┼────────────────────────────────────────────────────────────────┤
+  │ Exportar PDF │ Abre a visualização de impressão do navegador. Você pode       │
+  │              │ salvar como PDF ou imprimir.                                   │
+  │              │                                                                │
+  │ Exportar DXF │ Gera um arquivo .dxf (AutoCAD R12) com o desenho completo.     │
+  │              │ O arquivo é baixado automaticamente.                           │
+  │              │ Você pode abrir no AutoCAD, LibreCAD ou no                     │
+  │              │ Autodesk Viewer (viewer.autodesk.com).                         │
+  └──────────────┴────────────────────────────────────────────────────────────────┘
+
+  A Vista Lateral, se ativada, também é incluída no PDF e no DXF.
+
+ETAPA 6 — VISTA LATERAL (CORTE) — OPCIONAL
+
+  Ao lado dos botões de exportação há um checkbox "☐ Vista Lateral". Quando
+  marcado, o sistema exibe um corte transversal do painel (profundidade ×
+  altura) abaixo do desenho principal.
+
+  • Profundidade: cada material precisa ter a profundidade (mm) preenchida
+    no cadastro para aparecer no corte. O padrão do armário é 600 mm.
+
+  • Posição Z: na Lista de Materiais, cada item alocado tem um campo "Z:"
+    (profundidade em mm). Deixe em branco para distribuição automática (os
+    componentes são empacotados da frente para o fundo). Preencha um valor
+    manual para fixar a posição exata.
+
+  • Seletor de Armário: acima do desenho da Vista Lateral há um dropdown
+    para escolher o que exibir:
+
+      "Todos (Combinado)" — mostra os componentes de TODOS os armários
+      superpostos em uma única caixa com a profundidade máxima entre eles.
+      Ideal para verificar interferências no conjunto.
+
+      "CCM-01-A" (ou outro nome) — mostra apenas os componentes daquele
+      armário específico.
+
+  A Vista Lateral sempre usa uma ÚNICA caixa combinada (não uma caixa por
+  armário), independente do modo selecionado.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. MONTAGEM BACK-TO-BACK                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Se o equipamento estiver configurado como "Back to Back" na Ficha Técnica,
+o layout mostra AMBAS as vistas:
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │                                                                              │
+  │   VISTA FRONTAL                    VISTA TRASEIRA                           │
+  │  ┌──────┐ ┌──────┐               ┌──────┐ ┌──────┐                         │
+  │  │CCM-01│ │CCM-02│               │CCM-01│ │CCM-02│                         │
+  │  │ (F)  │ │ (F)  │               │ (T)  │ │ (T)  │                         │
+  │  └──────┘ └──────┘               └──────┘ └──────┘                         │
+  │                                                                              │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+  • O sufixo "(F)" significa Frente (Front)
+  • O sufixo "(T)" significa Traseira (Rear)
+  • Os componentes são distribuídos de forma independente em cada face.
+  • No DXF, as duas vistas aparecem lado a lado no mesmo arquivo.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. EXPORTAÇÃO DXF — DETALHADO                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em "Exportar DXF", o sistema gera um arquivo no formato
+DXF R12 (AC1009) — o formato mais compatível com AutoCAD, LibreCAD e
+visualizadores online.
+
+O QUE VAI NO DXF:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ ELEMENTO NO LAYOUT   │ CAMADA (LAYER) NO DXF                                   │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Contorno do armário  │ CABINETE (cor ciano)                                    │
+│ Zona de barramentos  │ BARRAMENTO (linha tracejada magenta)                    │
+│ Canaletas            │ CANALETA (cor verde)                                    │
+│ Trilhos DIN          │ TRILHO_DIN (cor amarela)                                │
+│ Componentes          │ COMPONENTE (cor branca)                                 │
+│ Barra de terra       │ BARRA_TERRA (cor verde)                                │
+│ Base                 │ BASE (cor branca)                                       │
+│ Dimensões            │ DIMENSAO (cor branca)                                  │
+│ Textos/rótulos       │ TEXTO (cor branca)                                     │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+As layers (camadas) no DXF são muito valorizadas por engenheiros porque
+permitem ligar/desligar elementos no AutoCAD com um clique.
+
+Ex: você pode desligar a layer CANALETA para ver só os componentes, ou
+desligar TEXTO para ver apenas as linhas.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. BLOCO DXF POR PEÇA (DESENHO REAL DOS COMPONENTES)                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Além de desenhar retângulos para representar os componentes, o GeraPro
+permite associar um ARQUIVO DXF a cada material. Assim, em vez de um
+retângulo genérico, o componente aparece no layout com seu DESENHO REAL.
+
+COMO FUNCIONA:
+
+  1. Você obtém o desenho DXF da peça (ex: o contorno de um disjuntor,
+     com furos de montagem, dimensões, etc.)
+
+  2. No cadastro do Material, vá na aba "Técnico" e role até a seção
+     "Desenho DXF da Peça".
+
+  3. Clique em "Importar DXF" e selecione o arquivo .dxf da peça.
+
+  4. O sistema armazena as entidades geométricas do desenho no banco
+     de dados.
+
+  5. Ao exportar o layout para DXF, o sistema:
+     • Se a peça TEM DXF associado → usa o desenho real da peça (BLOCK)
+     • Se a peça NÃO TEM DXF associado → desenha um retângulo com o
+       nome abreviado (comportamento padrão)
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ✅ DICA: Comece associando DXF às peças mais importantes (disjuntores,       ║
+║   contatores, inversores) — o layout já fica muito mais profissional.          ║
+║   Para bornes e componentes pequenos, o retângulo simples já é suficiente.      ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. LISTA DE MATERIAIS ALOCADOS POR ARMÁRIO                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Abaixo do desenho do layout, há uma seção expansível chamada "Lista de
+Materiais" (BOM — Bill of Materials). Ela mostra todos os materiais
+alocados, agrupados por armário:
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │  ▶ Lista de Materiais (15 itens)                                             │
+  │                                                                              │
+  │  ┌──────────────────────────────────────────────────────────────────────────┐│
+  │  │ ARMÁRIO CCM-01-A (Frente) — 600mm                                       ││
+  │  │ ┌──────────┬────────┬────┬──────┬──────────────────────────────────────┐ ││
+  │  │ │ Código   │ Desc.  │ Qtd│ Cat. │ Tags                                │ ││
+  │  │ ├──────────┼────────┼────┼──────┼──────────────────────────────────────┤ ││
+  │  │ │ DIS-001  │ Disj.  │ 1  │ Disj │ M-01                                │ ││
+  │  │ │          │ Motor  │    │      │                                      │ ││
+  │  │ │          │ MPW40  │    │      │                                      │ ││
+  │  │ │ CT-001  │ Cont.  │ 1  │ Cont │ M-01                                │ ││
+  │  │ │          │ CWCE   │    │      │                                      │ ││
+  │  │ │ RL-001  │ Relé   │ 1  │ Relé │ M-01                                │ ││
+  │  │ │          │ Térm.  │    │      │                                      │ ││
+  │  │ │ ...      │ ...    │ ...│ ...  │ ...                                  │ ││
+  │  │ └──────────┴────────┴────┴──────┴──────────────────────────────────────┘ ││
+  │  │                                                                          ││
+  │  │ ARMÁRIO CCM-01-B (Frente) — 600mm                                       ││
+  │  │ ┌──────────┬────────┬────┬──────┬──────────────────────────────────────┐ ││
+  │  │ │ ...      │ ...    │ ...│ ...  │ ...                                  │ ││
+  │  │ └──────────┴────────┴────┴──────┴──────────────────────────────────────┘ ││
+  │  └──────────────────────────────────────────────────────────────────────────┘│
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+  Cada linha mostra:
+  • Código do material
+  • Descrição resumida
+  • Quantidade no armário (se um típico tem 2 disjuntores, aparecem 2)
+  • Categoria (Disjuntor, Contator, etc.)
+  • Tags — as cargas que usam aquele material (ex: M-01, M-02)
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. LIMITAÇÕES DO LAYOUT SUGERIDO                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Layout Sugerido é uma ferramenta ORIENTATIVA. Ele tem as seguintes
+limitações importantes:
+
+  • FORMAS DE SEGREGAÇÃO: Só funciona com Forma 1, Forma 2a e Forma 2b.
+    Para Forma 3, 4a, 4b o layout não é gerado (o sistema avisa).
+
+  • DIMENSIONAMENTO ELÉTRICO: O layout NÃO substitui um projeto elétrico
+    detalhado. Ele não calcula esforços térmicos, curto-circuito, nem
+    verifica se os componentes suportam a corrente.
+
+  • POSICIONAMENTO EXATO: A posição Y dos trilhos e componentes é baseada
+    na configuração do layout — você deve ajustar manualmente se precisar
+    de posições específicas.
+
+  • CANALETAS: O layout considera as canaletas como infraestrutura fixa.
+    O dimensionamento do tamanho das canaletas (ex: 50x80mm) não é
+    calculado — você informa as dimensões na configuração.
+
+  • BACK-TO-BACK: Em montagem Back-to-Back, os componentes da frente e
+    da traseira são independentes e podem ser alocados separadamente
+    na Lista de Materiais.
+
+  • O DXF gerado é uma representação 2D (planta do painel). Não contém
+    informações 3D ou de cabeamento.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  Preencha as DIMENSÕES (largura_mm, altura_mm) de todos os materiais
+    que aparecem no layout. Sem dimensões, o sistema não sabe o tamanho
+    do componente e usa valores genéricos (50x80mm).
+
+✅  Associe TÍPICOS a todas as cargas. Cada carga sem típico é ignorada
+    no layout. Você pode criar típicos personalizados no módulo Típicos.
+
+✅  Use a CONFIGURAÇÃO DE LAYOUT para ajustar a distribuição. Os valores
+    padrão (canaletas 50mm, trilho DIN 35mm, espaçamento 10mm) funcionam
+    para a maioria dos casos, mas você pode otimizar.
+
+✅  Para painéis BACK-TO-BACK, aloque os materiais corretamente entre
+    Frente e Traseira na BOM (Lista de Materiais). Alguns componentes
+    podem ficar na frente, outros atrás.
+
+✅  Exporte o DXF e abra no AutoCAD para fazer ajustes finos — cotas,
+    anotações, detalhes construtivos. O layout do GeraPro é o ponto
+    de partida.
+
+✅  Associe DXF às peças principais (disjuntores, contatores, inversores)
+    para um resultado mais profissional. O sistema aceita qualquer
+    arquivo .dxf com entidades 2D (LINE, CIRCLE, POLYLINE, TEXT).
+
+✅  Revise a LISTA DE MATERIAIS antes de fechar o orçamento. Ela reflete
+    exatamente o que foi alocado no layout.
+
+✅  O layout é um documento ORIENTATIVO. Sempre valide com um engenheiro
+    antes de fabricar.
+
+⚠️  O DXF é gerado no formato AC1009 (AutoCAD R12) com polilinhas
+    (POLYLINE+VERTEX+SEQEND). Se o seu visualizador não abrir, tente
+    usar o Autodesk Viewer (viewer.autodesk.com) — é gratuito e
+    compatível.
+
+⚠️  Peças SEM DXF associado aparecem como RETÂNGULOS no DXF. O nome
+    abreviado (4 letras + ponto) é exibido dentro do retângulo.
+
+⚠️  Se a tela de layout não aparecer, verifique:
+    1. A forma de segregação está como Forma 1, 2a ou 2b?
+    2. As cargas têm típicos associados?
+    3. Os materiais têm largura e altura preenchidas?
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Layout                │ Desenho da distribuição física dos componentes dentro   │
+│                       │ do painel elétrico.                                     │
+│                       │                                                         │
+│ Sugerido              │ Gerado automaticamente pelo sistema com base nas        │
+│                       │ cargas, típicos e materiais.                            │
+│                       │                                                         │
+│ Armário (Cabinet)     │ Unidade física do painel (ex: CCM-01-A). Cada armário  │
+│                       │ tem largura, altura e profundidade.                     │
+│                       │                                                         │
+│ Canaleta (Duct)       │ Estrutura para passagem de fios/cabos dentro do        │
+│                       │ painel. Pode ser "quadro" (moldura) ou "linear".        │
+│                       │                                                         │
+│ Trilho DIN            │ Barra metálica onde os componentes são montados.        │
+│                       │ Padrão: 35mm de largura.                                │
+│                       │                                                         │
+│ Barramento            │ Conjunto de barras de cobre para distribuição de        │
+│                       │ energia (fase, neutro, terra).                          │
+│                       │                                                         │
+│ DXF                   | Drawing Exchange Format — formato de arquivo do         │
+│                       │ AutoCAD para intercâmbio de desenhos técnicos.          │
+│                       │                                                         │
+│ Layer (Camada)        │ Nível de organização no DXF. Cada elemento do layout    │
+│                       │ vai em uma layer diferente (CABINETE, CANALETA, etc.).  │
+│                       │                                                         │
+│ BLOCK / INSERT        │ Mecanismo do DXF para reutilizar geometria. Uma peça    │
+│                       │ com DXF vira um BLOCK, e cada ocorrência é um INSERT.   │
+│                       │                                                         │
+│ Back-to-Back          │ Montagem onde dois painéis são montados costa a costa,  │
+│                       │ com componentes na frente e atrás.                      │
+│                       │                                                         │
+│ Gap Térmico           │ Espaço entre componentes do mesmo tipo para             │
+│                       │ dissipação de calor (ex: 10mm entre disjuntores).       │
+│                       │                                                         │
+│ BOM                   │ Bill of Materials — Lista de Materiais.                 │
+│                       │                                                         │
+│ LWPOLYLINE            │ Tipo de entidade DXF para polilinhas leves.             │
+│                       │ Não usado neste sistema — usamos POLYLINE clássico      │
+│                       │ para máxima compatibilidade.                            │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PROBLEMA: "Layout não disponível — Disponível apenas para Formas de Segregação..."
+  Causa: A forma de segregação do equipamento não é compatível.
+  SOLUÇÃO: Vá na Ficha Técnica do equipamento e mude a segregação para
+  "Forma 1", "Forma 2a" ou "Forma 2b".
+
+PROBLEMA: "Nenhuma carga vinculada a típicos"
+  Causa: As cargas do equipamento não têm típicos associados.
+  SOLUÇÃO: Vá na aba Cargas, edite cada carga e selecione um Típico
+  (ex: "PD-001 — Partida Direta 5CV").
+
+PROBLEMA: O layout mostra só retângulos vazios (sem nomes)
+  Causa: Os materiais podem não ter largura/altura preenchidas.
+  SOLUÇÃO: Edite os materiais usados nos típicos e preencha as dimensões
+  em mm na aba Técnico.
+
+PROBLEMA: "Erro de processamento — O projeto está vazio" no visualizador DXF
+  Causa: O arquivo DXF pode estar danificado ou o visualizador não
+  suporta o formato.
+  SOLUÇÃO: Tente abrir no Autodesk Viewer (viewer.autodesk.com) —
+  é gratuito e testado com este sistema.
+
+PROBLEMA: O DXF baixou mas não abre em nada
+  Causa: O navegador pode ter bloqueado o download ou o arquivo está
+  corrompido.
+  SOLUÇÃO: Tente de novo. Se persistir, use o botão "Exportar PDF"
+  como alternativa.
+
+PROBLEMA: A Lista de Materiais está vazia
+  Causa: Os materiais não foram alocados aos armários.
+  SOLUÇÃO: Clique na Lista de Materiais, expanda e use os controles
+  de alocação para distribuir os materiais entre os armários.
+
+PROBLEMA: Os componentes estão aparecendo em armário errado
+  Causa: A alocação manual pode ter sido feita incorretamente.
+  SOLUÇÃO: Na BOM, você pode mover materiais entre armários usando
+  os controles de alocação. Use "Auto-alocar" para redistribuir.
+
+PROBLEMA: O layout não tem canaletas no DXF
+  Causa: A configuração de layout pode não ter canaletas definidas.
+  SOLUÇÃO: Vá em "⚙ Configurar" e adicione canaletas no painel de
+  configuração (quadro ou linear).
+
+PROBLEMA: Meu DXF personalizado da peça não aparece no layout
+  Causa: O DXF pode ter sido rejeitado no upload (formato inválido)
+  ou a peça tem um ID de material diferente.
+  SOLUÇÃO: Verifique se o DXF foi importado com sucesso (deve aparecer
+  "Desenho DXF associado" no cadastro do material). O formato aceito
+  é DXF texto (não binário) com entidades 2D.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  LEMBRE-SE                                                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  ╔══════════════════════════════════════════════════════════════════════════════╗
+  ║                                                                              ║
+  ║   O Layout Sugerido é uma ferramenta para ECONOMIZAR TEMPO na               ║
+  ║   elaboração de propostas técnicas.                                          ║
+  ║                                                                              ║
+  ║   Em vez de desenhar o painel do zero no AutoCAD, você:                     ║
+  ║                                                                              ║
+  ║   1. Cadastra as cargas e típicos uma vez                                    ║
+  ║   2. O sistema gera o layout automaticamente                                 ║
+  ║   3. Exporta o DXF para ajustes finos                                        ║
+  ║                                                                              ║
+  ║   "Invista 10 minutos configurando os materiais para economizar             ║
+  ║    horas desenhando painéis."                                               ║
+  ║                                                                              ║
+  ╚══════════════════════════════════════════════════════════════════════════════╝
+

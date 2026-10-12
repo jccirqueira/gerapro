@@ -1,0 +1,602 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    EXPLICAÇÃO SIMPLES — MANUFATURA — GERAPRO                        ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Manufatura.                ║
+║   Ele mostra como gerenciar a produção de painéis elétricos, desde o projeto     ║
+║   até a liberação final, incluindo rastreabilidade via QR Code, testes           ║
+║   automatizados e documentação digital (Data Book).                              ║
+║   Se você precisa de ajuda sobre outros módulos, procure o help do sistema       ║
+║   (botão ❓ no canto superior) ou os outros arquivos de explicação na pasta      ║
+║   /docs.                                                                         ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É O MÓDULO DE MANUFATURA?                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que o GeraPro é uma fábrica de painéis elétricos. O módulo de Manufatura
+é o "chão de fábrica" digital — ele controla tudo que acontece desde que um projeto
+chega até a hora que o painel sai pronto:
+
+  • O que estamos montando? (Projetos — cada projeto é uma ordem de produção)
+  • Quais painéis compõem o projeto? (Colunas — CCM, QGBT, Cubículos MT)
+  • O que vai dentro de cada painel? (Gavetas — partidas, inversores, relés)
+  • Quais peças usamos? (Componentes — disjuntores, contatores, bornes)
+  • Em que etapa cada gaveta está? (Kanban — Montagem → Fiação → Teste → Liberado)
+  • Como rastrear cada item? (QR Code — código único que conta a história do item)
+  • Foi testado? (Testes — registro de aprovação/reprovação)
+  • Onde estão os documentos? (Data Book — certidão digital de nascimento do painel)
+
+Em resumo: a Manufatura é o "coração da produção". Ela organiza, controla e
+documenta tudo que acontece na fabricação dos painéis elétricos.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. A HIERARQUIA (DE QUE É FEITO UM PROJETO)                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A Manufatura usa uma estrutura de árvore. Você vai ouvir muito estes termos:
+
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │                                                                             │
+  │   PROJETO                                                                   │
+  │     │                                                                       │
+  │     ├── COLUNA 01 (ex: CCM-01 — Centro de Controle de Motores)             │
+  │     │      ├── GAVETA 01 (ex: GAV-01 — Partida Direta 15kW)                │
+  │     │      │      ├── Componente: Disjuntor 3RV2017                        │
+  │     │      │      ├── Componente: Contator 3RT2017                         │
+  │     │      │      └── Componente: Relé Térmico 3RU2017                     │
+  │     │      ├── GAVETA 02 (ex: GAV-02 — Soft-Starter 30kW)                  │
+  │     │      └── GAVETA 03 (ex: GAV-03 — Inversor 7.5kW)                     │
+  │     │                                                                       │
+  │     └── COLUNA 02 (ex: CCM-02)                                             │
+  │            ├── GAVETA 04 ...                                                │
+  │            └── GAVETA 05 ...                                                │
+  │                                                                             │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+  • PROJETO: É a "ordem de serviço". Ex: "CCM Indústria Química".
+    Contém dados do cliente, datas e observações.
+
+  • COLUNA: É um painel físico. Ex: CCM-01, QGBT-01, Cubículo MT-01.
+    Cada coluna tem um tipo (CCM-BT, QGBT, Cubículo MT) e uma TAG única.
+
+  • GAVETA: É um módulo extraível que vai dentro da coluna.
+    Ex: Partida Direta 15kW, Soft-Starter 30kW, Inversor 7.5kW.
+    Cada gaveta tem: TAG, modelo, potência, tipo e componentes.
+
+  • COMPONENTE: São as peças que formam a gaveta.
+    Ex: Disjuntor 3RV2017 (Siemens), Contator 3RT2017 (Siemens).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. A TELA PRINCIPAL                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em "Manufatura" no menu lateral (visível apenas para a empresa
+DVT), você vê três ambientes principais:
+
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │                                                                             │
+  │  AMBIENTE 1 — LISTA DE PROJETOS                                            │
+  │  -----------------------------------------------------------------------    │
+  │  Aqui você vê todos os projetos de manufatura cadastrados. Para cada        │
+  │  projeto mostra: nome, cliente, data, número de colunas e gavetas.          │
+  │  Botões: Novo Projeto / Importar da Proposta / Scan QR / Dashboard          │
+  │                                                                             │
+  │  AMBIENTE 2 — DETALHE DO PROJETO                                           │
+  │  -----------------------------------------------------------------------    │
+  │  Ao clicar em um projeto, você entra no detalhe com várias abas:            │
+  │    • Colunas: lista das colunas com suas gavetas e componentes              │
+  │    • Kanban: quadro visual de arrastar (drag & drop)                        │
+  │    • Testes: gerenciamento de testes por gaveta                             │
+  │    • Data Book: documentos, exportação, substituição em campo               │
+  │    • Histórico: timeline de tudo que aconteceu                              │
+  │                                                                             │
+  │  AMBIENTE 3 — DASHBOARD                                                    │
+  │  -----------------------------------------------------------------------    │
+  │  Indicadores de produção: total de projetos, colunas, gavetas,              │
+  │  componentes, testes aprovados, gavetas por etapa, gráfico.                 │
+  │                                                                             │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. CRIANDO UM PROJETO                                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Você pode criar um projeto de duas formas:
+
+  ▶️ Manual: Clique em "Novo Projeto" no canto superior direito.
+     Preencha: Nome do Projeto, Cliente e Observações.
+     Uma proposta técnica ativa pode ser vinculada automaticamente.
+
+  ▶️ Importar da Proposta Técnica: Clique em "Importar da Proposta".
+     O sistema pega os equipamentos da proposta técnica aberta e cria
+     automaticamente as colunas. Ex: se a PT tem CCM-01 e CCM-02,
+     o sistema cria duas colunas já com os dados preenchidos.
+
+📌 Dica: A importação da proposta técnica é o jeito mais rápido de começar.
+   Basta abrir a proposta, clicar em Manufatura e depois em "Importar".
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. ABA COLUNAS (VISÃO EM LISTA)                                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Na aba "Colunas" você vê a estrutura do projeto em formato de lista hierárquica:
+
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │                                                                             │
+  │  🔲 CCM-01  [CCM-BT]  3 gaveta(s)                                         │
+  │  ┌──────────────────────────────────────────────────────────────────────┐  │
+  │  │  📦 GAV-01  Partida Direta  MMS-32  15kW  2 componente(s)   [OK]    │  │
+  │  │  📦 GAV-02  Soft-Starter   SSW-07  30kW  4 componente(s)   [OK]    │  │
+  │  │  📦 GAV-03  Inversor  CFW-11  7.5kW  5 componente(s)   [OK]        │  │
+  │  └──────────────────────────────────────────────────────────────────────┘  │
+  │                                                                             │
+  │  🔲 QGBT-01  [QGBT]  1 gaveta(s)                                         │
+  │  └──────────────────────────────────────────────────────────────────────┐  │
+  │     📦 GAV-04  Disjuntor Geral  3VL  630A  1 componente(s)   [OK]      │  │
+  └─────────────────────────────────────────────────────────────────────────────┘
+
+Ações que você pode fazer em cada nível:
+
+  • Coluna: ✏️ Editar / 🗑️ Excluir / 📱 QR Code / ➕ Adicionar Gaveta
+  • Gaveta: ✏️ Editar / 🗑️ Excluir / 📱 QR Code / ➕ Adicionar Componente
+  • Componente: ❌ Remover / 📋 Ver lista
+
+✅ Para adicionar uma coluna, clique em "Adicionar Coluna" no cabeçalho.
+✅ Para adicionar uma gaveta, clique em "+ Gaveta" dentro da coluna.
+✅ Para adicionar um componente, clique em "+ Componente" na gaveta.
+
+📌 A etapa de produção (Início → Montagem → Fiação → Teste → Liberado) pode ser
+   alterada pelo seletor ao lado de cada coluna e gaveta.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. ABA KANBAN (QUADRO DE PRODUÇÃO)                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Kanban é um quadro visual que mostra todas as gavetas do projeto organizadas
+pela etapa de produção em que elas estão:
+
+  ┌────────────┐  ┌────────────────┐  ┌────────┐  ┌────────┐  ┌──────────┐
+  │   INÍCIO   │  │ MONTAGEM MEC.  │  │ FIAÇÃO │  │ TESTE  │  │ LIBERADO │
+  │  🔘 2 gav  │  │  🔘 5 gav      │  │ 🔘 3 g │  │ 🔘 1 g │  │ 🔘 4 gav │
+  │────────────│  │────────────────│  │────────│  │────────│  │──────────│
+  │ 📦 GAV-01  │  │ 📦 GAV-03      │  │📦 GAV-08│  │📦 GAV10│  │ 📦 GAV-02│
+  │ 📦 GAV-05  │  │ 📦 GAV-04      │  │📦 GAV-09│  │        │  │ 📦 GAV-06│
+  │            │  │ 📦 GAV-07      │  │        │  │        │  │ 📦 GAV-11│
+  │            │  │ 📦 GAV-12      │  │        │  │        │  │ 📦 GAV-13│
+  │            │  │ 📦 GAV-14      │  │        │  │        │  │          │
+  └────────────┘  └────────────────┘  └────────┘  └────────┘  └──────────┘
+
+COMO USAR:
+  ▶️ Arraste uma gaveta de uma coluna para outra para mudar a etapa.
+     Ex: arraste GAV-01 de "Início" para "Montagem Mecânica".
+
+  ▶️ Cada coluna tem uma cor:
+       🟤 Início (cinza)
+       🔵 Montagem Mecânica (azul)
+       🟡 Fiação (amarelo)
+       🟣 Teste (roxo)
+       🟢 Liberado (verde)
+
+  ▶️ Filtros: você pode filtrar por coluna específica ou buscar por TAG.
+
+  ▶️ O contador no topo de cada coluna mostra quantas gavetas estão naquela etapa.
+
+⚠️ IMPORTANTE: Uma gaveta só pode ir para "Liberado" se tiver passado no TESTE.
+   Caso contrário, o sistema trava (interlock) e mostra um aviso.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. RASTREABILIDADE VIA QR CODE                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada projeto, coluna e gaveta tem um QR Code único que funciona como uma
+"identidade digital". O QR Code contém um link que abre os dados do item.
+
+📍 ONDE ENCONTRAR OS QR CODES:
+  • Na lista de projetos: botão 📱 ao lado do status
+  • No detalhe do projeto: botão "QR" no cabeçalho
+  • Em cada coluna: botão 📱 ao lado do nome
+  • Em cada gaveta: botão 📱 ao lado da TAG
+
+🔍 COMO USAR O LEITOR:
+  1. Clique em "Scan QR" (na lista de projetos ou no cabeçalho do projeto)
+  2. Aponte a câmera para o QR Code
+  3. O sistema mostra os dados do item escaneado
+  4. Se preferir, digite o código manualmente no campo de texto
+
+🔗 VINCULAR GAVETA À COLUNA (ASSOCIAÇÃO PAI-FILHO):
+  1. Clique em "Scan QR" no cabeçalho do projeto
+  2. Escaneie o QR Code da COLUNA (primeiro) — o sistema reconhece como "pai"
+  3. Escaneie o QR Code da GAVETA (segundo) — o sistema reconhece como "filho"
+  4. Confirme a vinculação
+  5. A gaveta é vinculada à coluna e registrada no histórico
+
+📱 QR CODE PELO CELULAR:
+  Escaneie o QR Code com qualquer leitor de QR do celular.
+  O sistema abre uma página web com os dados do item:
+  • Tipo (Projeto/Coluna/Gaveta)
+  • Nome/TAG
+  • Cliente, Projeto, Coluna vinculada
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. TESTES (INTEGRAÇÃO COM BANCADA ATE)                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba "Testes" gerencia os testes elétricos e funcionais de cada gaveta.
+
+PERFIS DE TESTE:
+  Antes de testar, você pode criar "Perfis de Teste" que definem os parâmetros
+  para cada tipo de gaveta:
+
+  ┌───────────────────────┬─────────────────────────────────────────────────────┐
+  │ PERFIL                │ TIPO DE GAVETA                                     │
+  ├───────────────────────┼─────────────────────────────────────────────────────┤
+  │ Teste Partida Direta  │ partida_direta — tensão 380V, corrente, isolação   │
+  │ Teste Soft-Starter    │ soft_starter — parametrização, rampa, corrente      │
+  │ Teste Inversor        │ inversor — comunicação, rampa, frequência           │
+  │ Teste Geral           │ todos os tipos — teste funcional básico             │
+  └───────────────────────┴─────────────────────────────────────────────────────┘
+
+  ✅ Clique em "Novo Perfil de Teste" para criar.
+  ✅ Os parâmetros são salvos em JSON (formato texto estruturado).
+
+REALIZAR TESTE:
+  Para testar uma gaveta:
+  1. Clique em "Testar" ao lado da gaveta
+  2. Selecione o perfil de teste (se houver para o tipo)
+  3. Escolha o resultado: Aprovado (PASS) ou Reprovado (FAIL)
+  4. Informe o operador e observações
+  5. Clique em "Registrar Teste"
+
+  ✅ Se o teste PASSAR e a gaveta estiver na etapa "Teste", ela
+     automaticamente vai para "Liberado".
+  ✅ O resultado fica registrado no histórico da gaveta.
+
+INTERLOCK (TRAVA DE SEGURANÇA):
+  ⛔ Uma gaveta NÃO pode ser movida para "Liberado" no Kanban sem ter
+     pelo menos um teste aprovado. O sistema bloqueia e mostra:
+     "Interlock: Gaveta não pode ser liberada sem teste aprovado!"
+
+  ✅ Para liberar, registre um teste com resultado Aprovado.
+
+CERTIFICADO DIGITAL:
+  Clique no ícone 🏅 ao lado de uma gaveta testada para ver a Certidão Digital:
+  • Identificação completa (gaveta, coluna, projeto, tipo, modelo, potência)
+  • Lista de componentes instalados (tipo, código, fabricante, quantidade)
+  • Histórico de todos os testes realizados com resultado e operador
+  • Selo "CERTIFICADO DE CONFORMIDADE"
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. DATA BOOK (DOCUMENTAÇÃO DIGITAL)                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba "Data Book" é o "dossiê digital" completo do projeto. Ela reúne:
+
+  📊 INDICADORES DO PROJETO:
+     • Colunas • Gavetas • Testes Aprovados • Documentos Anexados
+
+  📄 DOCUMENTOS ANEXOS:
+     Faça upload de arquivos importantes para o projeto:
+     • Esquemas elétricos (.pdf)
+     • Certificados de calibração (.pdf)
+     • Fotos da montagem (.jpg/.png)
+     • Relatórios de ensaio (.xlsx/.docx)
+
+     ✅ Clique em "Anexar" para enviar um arquivo.
+     ✅ Clique em 📥 para baixar.
+     ✅ Clique em 🗑️ para excluir.
+
+  📥 EXPORTAR EXCEL:
+     Gere uma planilha completa do Data Book com:
+     Coluna | Gaveta | Tipo | Modelo | Potência | Etapa | Status |
+     Componentes | Teste | Operador | Data
+
+     ✅ Clique em "Exportar Excel" para baixar o arquivo .xlsx.
+
+  🌐 PORTAL DO CLIENTE:
+     Clique em "Portal" para abrir uma página pública (sem login) com:
+     • Resumo do projeto
+     • Lista de colunas e gavetas
+     • Status de teste de cada gaveta
+     • Esta página é acessível pelo QR Code do projeto!
+
+  🔧 SUBSTITUIÇÃO EM CAMPO:
+     Quando uma gaveta falha em campo e precisa ser substituída:
+     1. Clique em "Substituir" ao lado da gaveta
+     2. Informe o motivo (Falha em campo, Manutenção, etc.)
+     3. Opcional: selecione uma gaveta substituta (já produzida)
+     4. Confirme a substituição
+
+     ✅ A gaveta original é ARQUIVADA (status → cancelado)
+     ✅ A substituta (se houver) é vinculada à coluna
+     ✅ Tudo registrado no histórico
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 10. HISTÓRICO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A aba "Histórico" mostra uma timeline com tudo que aconteceu com o projeto:
+  • Criação de colunas e gavetas
+  • Movimentação entre etapas do Kanban
+  • Resultados de testes
+  • Vinculação de gavetas (QR Code)
+  • Substituições em campo
+  • Apontamento de mão de obra
+
+Cada registro mostra: o que aconteceu, quem fez e quando.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 11. DASHBOARD                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Clique em "Dashboard" na lista de projetos para ver os indicadores de produção:
+
+  ┌────────────┬────────────┬────────────┬────────────┬────────────┐
+  │  5 Projetos │ 12 Colunas │ 48 Gavetas │ 32/40 Teste│ 280 Comp.  │
+  │ 3 concluído│            │ 20 liberad │ 8 reprovad │            │
+  └────────────┴────────────┴────────────┴────────────┴────────────┘
+
+  📊 GRÁFICO DE GAVETAS POR ETAPA:
+     Barras coloridas mostrando quantas gavetas estão em cada etapa.
+     Útil para identificar gargalos na produção.
+
+  🏭 PROJETOS RECENTES:
+     Os 5 projetos mais recentes com navegação rápida.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 12. INTEGRAÇÃO COM CATÁLOGO DE MATERIAIS                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Ao adicionar um componente em uma gaveta, você pode buscar materiais diretamente
+do catálogo do GeraPro:
+
+  1. No campo "Buscar material no catálogo", digite o código ou fabricante
+  2. O sistema mostra sugestões da base de materiais
+  3. Clique em um material para auto-pREENCHER:
+     • Código do componente
+     • Fabricante
+     • Tipo (categoria do material)
+
+✅ Isto evita digitar dados repetidos e garante que os componentes estejam
+   no catálogo de materiais da empresa.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 13. APONTAMENTO DE MÃO DE OBRA                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Você pode registrar quantas horas de trabalho foram gastas em cada gaveta:
+
+  1. No modal de adicionar componente, clique em "Mão de Obra"
+  2. Informe: Atividade (ex: "Montagem mecânica"), Horas e Funcionário
+  3. Clique em "Registrar"
+
+  ✅ O registro vai para o histórico da gaveta.
+  ✅ Útil para controle de produtividade e custos.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 14. NOTIFICAÇÕES TELEGRAM                                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O módulo de Manufatura envia notificações no Telegram sempre que:
+  • 📦 Um projeto é criado ou importado
+  • ✅ Uma gaveta é liberada (teste aprovado)
+  • 🔗 Uma gaveta é vinculada a uma coluna via QR Code
+  • 🧪 Um teste é registrado (aprovado ou reprovado)
+  • 🔄 Uma gaveta é substituída em campo
+
+  Para receber: configure o Token do Bot e o Chat ID nas Configurações.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 15. COMO A MANUFATURA SE CONECTA COM OUTROS MÓDULOS                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────┬────────────────────┬──────────────────────────────────┐
+  │ O que você faz       │ Se conecta com     │ Como                            │
+  ├──────────────────────┼────────────────────┼──────────────────────────────────┤
+  │ Importar Projeto     │ Proposta Técnica   │ Os equipamentos da PT viram     │
+  │                      │                    │ colunas na Manufatura           │
+  │                      │                    │                                  │
+  │ Buscar componente    │ Materiais          │ Seus materiais cadastrados       │
+  │                      │                    │ aparecem como sugestão           │
+  │                      │                    │                                  │
+  │ Notificações         │ Telegram           │ Configuração do bot nas          │
+  │                      │                    │ Configurações do sistema         │
+  │                      │                    │                                  │
+  │ Dashboard            │ Todo o sistema     │ Dados consolidados de todos      │
+  │                      │                    │ os projetos de manufatura        │
+  └──────────────────────┴────────────────────┴──────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 16. GLOSSÁRIO                                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  ┌───────────────────────────────┬─────────────────────────────────────────────────┐
+  │ TERMO                         │ SIGNIFICADO                                    │
+  ├───────────────────────────────┼─────────────────────────────────────────────────┤
+  │ Projeto de Manufatura         │ Ordem de produção. Contém colunas, gavetas     │
+  │                               │ e componentes.                                 │
+  │                               │                                                 │
+  │ Coluna                        │ Painel elétrico físico (CCM, QGBT, Cubículo).   │
+  │                               │                                                 │
+  │ Gaveta                        │ Módulo extraível dentro de uma coluna.         │
+  │                               │                                                 │
+  │ TAG                           │ Identificação única. Ex: CCM-01, GAV-05.       │
+  │                               │                                                 │
+  │ Componente                    │ Peça que compõe a gaveta (disjuntor, contator). │
+  │                               │                                                 │
+  │ Kanban                        │ Quadro visual de produção com colunas de        │
+  │                               │ etapas. Arraste as gavetas entre as etapas.    │
+  │                               │                                                 │
+  │ Etapa                         │ Estágio de produção: Início / Montagem          │
+  │                               │ Mecânica / Fiação / Teste / Liberado.           │
+  │                               │                                                 │
+  │ Interlock                     │ Trava de segurança que impede uma gaveta de     │
+  │                               │ ir para "Liberado" sem teste aprovado.          │
+  │                               │                                                 │
+  │ QR Code                       │ Código bidimensional que armazena a identidade  │
+  │                               │ digital do item (projeto, coluna ou gaveta).    │
+  │                               │                                                 │
+  │ Associação Pai-Filho          │ Vincular uma gaveta (filho) a uma coluna (pai)  │
+  │                               │ escaneando os QR Codes.                         │
+  │                               │                                                 │
+  │ Perfil de Teste               │ Conjunto de parâmetros que definem como testar  │
+  │                               │ um tipo de gaveta.                              │
+  │                               │                                                 │
+  │ PASS / FAIL                   │ Resultado do teste: Aprovado (Pass) ou          │
+  │                               │ Reprovado (Fail).                               │
+  │                               │                                                 │
+  │ Certidão Digital              │ Documento que comprova a conformidade da        │
+  │                               │ gaveta, com componentes e testes.               │
+  │                               │                                                 │
+  │ Data Book                     │ Dossiê digital completo do projeto, com         │
+  │                               │ documentos, exportação e portal do cliente.     │
+  │                               │                                                 │
+  │ Substituição em Campo         │ Processo de arquivar uma gaveta com defeito     │
+  │                               │ e vincular uma nova.                            │
+  │                               │                                                 │
+  │ ATE (Automatic Test           │ Bancada de testes automática que pode enviar    │
+  │ Equipment)                    │ resultados diretamente para o sistema.          │
+  └───────────────────────────────┴─────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│ 17. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  ▶ "Não consigo arrastar uma gaveta no Kanban"
+     ✅ Verifique se você está logado com um usuário que tem permissão de
+        edição (Admin ou Engenheiro). Visualizadores não podem editar.
+
+  ▶ "Aparece 'Interlock' quando tento liberar uma gaveta"
+     ✅ A gaveta precisa ter um teste com resultado Aprovado (PASS) antes
+        de ir para "Liberado". Vá na aba "Testes" e registre o teste.
+
+  ▶ "Criei um projeto mas não aparece nenhuma coluna"
+     ✅ Você precisa adicionar colunas manualmente ou importar de uma
+        Proposta Técnica. Clique em "Importar da Proposta" ou em
+        "Adicionar Coluna" dentro do projeto.
+
+  ▶ "O QR Code não abre nada no celular"
+     ✅ Verifique se o servidor está acessível pela rede do celular.
+        O QR Code contém um link para o servidor GeraPro.
+
+  ▶ "A câmera do scanner não abre"
+     ✅ Pode ser permissão do navegador. Permita o acesso à câmera
+        quando o navegador solicitar. Como alternativa, digite o
+        código manualmente no campo de texto.
+
+  ▶ "O teste foi aprovado mas a gaveta não foi para Liberado"
+     ✅ Verifique se a gaveta estava na etapa "Teste" antes de
+        registrar o teste. Se estava em outra etapa, mude manualmente
+        pelo Kanban ou pelo seletor de etapa.
+
+  ▶ "Exportei o Data Book mas o Excel está vazio"
+     ✅ Certifique-se de que o projeto tem colunas e gavetas
+        cadastradas. O Excel só exporta os dados existentes.
+
+  ▶ "Anexei um documento mas ele não aparece"
+     ✅ Pode ser que o arquivo seja muito grande. O sistema aceita
+        arquivos de até alguns MB. Tente com um arquivo menor.
+
+  ▶ "Não encontro o módulo Manufatura no menu"
+     ✅ O módulo Manufatura está disponível apenas para a empresa
+        DVT (Drivetech). Se você é de outra empresa, o menu não
+        aparece.
+
+  ▶ "Quero substituir uma gaveta mas não tenho gaveta substituta"
+     ✅ Tudo bem! Na substituição, deixe o campo "Gaveta Substituta"
+        vazio. A gaveta original será arquivada e você pode criar
+        uma nova gaveta depois.
+
+  ▶ "Registrei horas de mão de obra erradas"
+     ✅ O apontamento de mão de obra é registrado no histórico.
+        Não é possível editar, mas você pode registrar uma nova
+        entrada com as horas corretas.
+
+  ▶ "O gráfico do Dashboard não aparece"
+     ✅ Verifique se o Chart.js foi carregado corretamente. Se não
+        aparecer, recarregue a página (F5).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  LEMBRE-SE                                                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  A Manufatura é o controle da produção. Quanto mais completo você preencher
+  os dados (componentes, testes, documentos), mais valor o sistema entrega.
+
+  ✅ Sempre importe da Proposta Técnica quando possível — economiza tempo.
+  ✅ Use QR Codes para identificar fisicamente os painéis na fábrica.
+  ✅ Registre TODOS os testes — é a garantia de qualidade de cada gaveta.
+  ✅ Mantenha o Data Book atualizado com fotos e certificados.
+  ✅ O histórico é seu "GPS" — tudo que aconteceu está registrado.
+
+  As etapas mais IMPORTANTES:
+  1. Criar/Importar o projeto com as colunas corretas
+  2. Cadastrar os componentes de cada gaveta
+  3. Mover as gavetas no Kanban conforme a produção avança
+  4. Testar cada gaveta antes de liberar
+  5. Gerar o Data Book ao final do projeto
+
+  ⚠️ O módulo de Manufatura é exclusivo para a empresa DVT.
+     Esta documentação é um guia completo para uso do sistema.

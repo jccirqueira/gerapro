@@ -83,29 +83,43 @@ function validateExtractionSchema(data) {
 }
 
 // Mail encryption helpers
-const MAIL_ENCRYPTION_KEY = process.env.MAIL_ENCRYPTION_KEY || 'GeraPro-Mail-Encrypt-Key-2026!';
+// A chave é resolvida em initSecrets() (após o carregamento do banco):
+// usa MAIL_ENCRYPTION_KEY do .env quando existir; caso contrário gera uma nova,
+// persiste em .env e re-criptografa os valores gravados com a chave legada abaixo.
+const LEGACY_MAIL_KEY = 'GeraPro-Mail-Encrypt-Key-2026!';
+let MAIL_ENCRYPTION_KEY = process.env.MAIL_ENCRYPTION_KEY || LEGACY_MAIL_KEY;
 
-function encryptMailPass(password) {
+function encryptWithKey(plain, key) {
     const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(MAIL_ENCRYPTION_KEY, 'mail-salt', 32), iv);
-    let enc = cipher.update(password, 'utf8', 'hex');
+    const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(key, 'mail-salt', 32), iv);
+    let enc = cipher.update(plain, 'utf8', 'hex');
     enc += cipher.final('hex');
     return iv.toString('hex') + ':' + enc;
 }
 
-function decryptMailPass(encrypted) {
+function decryptWithKey(encrypted, key) {
     try {
-        const parts = encrypted.split(':');
+        const parts = String(encrypted).split(':');
+        if (parts.length !== 2 || !/^[0-9a-f]+$/i.test(parts[0]) || !/^[0-9a-f]+$/i.test(parts[1])) return null;
         const iv = Buffer.from(parts[0], 'hex');
-        const enc = parts[1];
-        const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(MAIL_ENCRYPTION_KEY, 'mail-salt', 32), iv);
-        let dec = decipher.update(enc, 'hex', 'utf8');
+        const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(key, 'mail-salt', 32), iv);
+        let dec = decipher.update(parts[1], 'hex', 'utf8');
         dec += decipher.final('utf8');
         return dec;
     } catch (e) {
-        console.warn('[Mail] Failed to decrypt password, trying raw');
-        return encrypted;
+        return null;
     }
+}
+
+function encryptMailPass(password) {
+    return encryptWithKey(password, MAIL_ENCRYPTION_KEY);
+}
+
+function decryptMailPass(encrypted) {
+    const dec = decryptWithKey(encrypted, MAIL_ENCRYPTION_KEY);
+    if (dec !== null) return dec;
+    console.warn('[Mail] Failed to decrypt password, trying raw');
+    return encrypted;
 }
 
 // --- Email send abstractions (multi-provider) ---
@@ -181,6 +195,95 @@ process.on('warning', (warn) => {
 
 const db = require('./js/db');
 
+// === SECRETS (.env) ===
+// JWT_SECRET e MAIL_ENCRYPTION_KEY nunca devem ter valor fixo no código-fonte:
+// se não estiverem definidos no ambiente, são gerados aleatoriamente e persistidos em .env.
+function persistEnvVars(vars) {
+    try {
+        const envPath = path.join(__dirname, '.env');
+        let content = '';
+        try { content = fs.readFileSync(envPath, 'utf8'); } catch (e) { /* arquivo ainda não existe */ }
+        const lines = [];
+        for (const key of Object.keys(vars)) {
+            if (new RegExp('^' + key + '=', 'm').test(content)) continue; // já existe no .env
+            lines.push(key + '=' + vars[key]);
+        }
+        if (lines.length === 0) return true;
+        const prefix = (content && !content.endsWith('\n')) ? content + '\n' : content;
+        fs.writeFileSync(envPath, prefix + lines.join('\n') + '\n', { encoding: 'utf8' });
+        return true;
+    } catch (e) {
+        console.warn('[Secrets] Não foi possível gravar .env:', e.message);
+        return false;
+    }
+}
+
+function migrateLegacyMailSecrets(newKey) {
+    // Re-criptografa senhas SMTP / API keys gravadas com a chave legada para a nova chave.
+    const rows = db.getDb().prepare('SELECT empresa_id, pass, api_key FROM mail_settings').all();
+    let migrated = 0;
+    for (const row of rows) {
+        const updates = [];
+        const values = [];
+        for (const field of ['pass', 'api_key']) {
+            const val = row[field];
+            if (!val || !/^[0-9a-f]{32}:[0-9a-f]+$/i.test(val)) continue;
+            const plain = decryptWithKey(val, LEGACY_MAIL_KEY);
+            if (plain === null) continue;
+            updates.push(field + ' = ?');
+            values.push(encryptWithKey(plain, newKey));
+        }
+        if (updates.length > 0) {
+            db.getDb().prepare('UPDATE mail_settings SET ' + updates.join(', ') + ' WHERE empresa_id = ?')
+                .run(...values, row.empresa_id);
+            migrated++;
+        }
+    }
+    return migrated;
+}
+
+function initSecrets() {
+    // 1) JWT_SECRET — sem ele, qualquer pessoa forja tokens admin
+    if (!process.env.JWT_SECRET) {
+        const generated = crypto.randomBytes(48).toString('hex');
+        if (persistEnvVars({ JWT_SECRET: generated })) {
+            process.env.JWT_SECRET = generated;
+            console.warn('[Secrets] JWT_SECRET ausente — valor aleatório gerado e salvo em .env.');
+        } else if (process.env.NODE_ENV === 'production') {
+            console.error('[Secrets] JWT_SECRET não definido e .env indisponível em produção. Abortando.');
+            process.exit(1);
+        } else {
+            process.env.JWT_SECRET = generated;
+            console.warn('[Secrets] JWT_SECRET ausente — usando valor efêmero (válido só nesta execução). Defina JWT_SECRET no .env.');
+        }
+    }
+    // 2) MAIL_ENCRYPTION_KEY — com migração dos valores já gravados
+    if (process.env.MAIL_ENCRYPTION_KEY) {
+        MAIL_ENCRYPTION_KEY = process.env.MAIL_ENCRYPTION_KEY;
+        return;
+    }
+    const newKey = crypto.randomBytes(32).toString('hex');
+    if (persistEnvVars({ MAIL_ENCRYPTION_KEY: newKey })) {
+        try {
+            const migrated = migrateLegacyMailSecrets(newKey);
+            MAIL_ENCRYPTION_KEY = newKey;
+            console.warn('[Secrets] MAIL_ENCRYPTION_KEY gerada e salva em .env (' + migrated + ' registro(s) de e-mail re-criptografado(s)).');
+        } catch (e) {
+            console.warn('[Secrets] Migração de segredos de e-mail falhou — mantendo a chave legada:', e.message);
+            try {
+                // Reverte a chave recém-gravada em .env para manter a leitura dos dados existentes
+                const envPath = path.join(__dirname, '.env');
+                const content = fs.readFileSync(envPath, 'utf8');
+                fs.writeFileSync(envPath, content.replace(/^MAIL_ENCRYPTION_KEY=.*\r?\n?/m, ''), 'utf8');
+            } catch (e2) { /* melhor esforço */ }
+        }
+        return;
+    }
+    console.warn('[Secrets] Usando a chave legada de e-mail. Defina MAIL_ENCRYPTION_KEY no .env (recomendado em produção).');
+}
+
+initSecrets();
+
 function getAiConfig() {
     try {
         const dbSettings = db.getAiSettings();
@@ -209,7 +312,7 @@ function getAiConfig() {
     };
 }
 
-const PORT = 8082;
+const PORT = parseInt(process.env.PORT, 10) || 8082;
 const BASE_DIR = process.env.GERAPRO_DATA_DIR || path.join(__dirname, '..', '..');
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -226,7 +329,7 @@ const MIME_TYPES = {
     '.dxf': 'application/dxf'
 };
 
-const JWT_SECRET = process.env.JWT_SECRET || 'gerapro_dev_secret_2026';
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(48).toString('hex');
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const TEMPLATES_DIR = path.join(__dirname, 'templates');
@@ -851,7 +954,14 @@ function handleSaveProposal(data, res, empresaId) {
         return;
     }
 
-    let docsDir = path.join(getFullPtcPath(empresaId, ptcFolder), 'Documentação Minha_Empresa');
+    if (!isSafePathSegment(ptcFolder) || !isSafePathSegment(revisionFolder)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Caminho inválido' }));
+        return;
+    }
+
+    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    let docsDir = path.join(ptcPath, 'Documentação Minha_Empresa');
 
     // If a revision folder is provided, append it to the path
     if (revisionFolder && revisionFolder !== '0' && revisionFolder !== 0) {
@@ -899,8 +1009,13 @@ function handleSaveFile(data, res, empresaId) {
         sendJson(res, 400, { success: false, error: 'Missing required fields (ptcFolder, filename, content)' });
         return;
     }
+    if (!isSafePathSegment(filename) || !isSafePathSegment(revisionFolder) || !isSafePathSegment(subfolder)) {
+        sendJson(res, 400, { success: false, error: 'Caminho inválido' });
+        return;
+    }
     const targetSubfolder = subfolder || 'Documentação Minha_Empresa';
-    let docsDir = path.join(getFullPtcPath(empresaId, ptcFolder), targetSubfolder);
+    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    let docsDir = path.join(ptcPath, targetSubfolder);
     if (revisionFolder && revisionFolder !== '0' && revisionFolder !== 0) {
         docsDir = path.join(docsDir, revisionFolder);
     }
@@ -911,6 +1026,10 @@ function handleSaveFile(data, res, empresaId) {
         }
     }
     const filePath = path.join(docsDir, filename);
+    if (!isInsideDir(ptcPath, filePath)) {
+        sendJson(res, 400, { success: false, error: 'Caminho inválido' });
+        return;
+    }
     try {
         const buffer = isBase64 ? Buffer.from(content, 'base64') : Buffer.from(content, 'utf-8');
         fs.writeFileSync(filePath, buffer);
@@ -955,8 +1074,17 @@ function handleListPtcFiles(ptcFolder, subfolder, res, empresaId) {
         sendJson(res, 400, { success: false, error: 'Missing ptcFolder param' });
         return;
     }
+    if (!isSafePathSegment(subfolder)) {
+        sendJson(res, 400, { success: false, error: 'Caminho inválido' });
+        return;
+    }
     const targetDir = subfolder || 'Documentação Cliente';
-    const dir = path.join(getFullPtcPath(empresaId, ptcFolder), targetDir);
+    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    const dir = path.join(ptcPath, targetDir);
+    if (!isInsideDir(ptcPath, dir)) {
+        sendJson(res, 400, { success: false, error: 'Caminho inválido' });
+        return;
+    }
     if (!fs.existsSync(dir)) {
         sendJson(res, 200, { success: true, files: [] });
         return;
@@ -1025,13 +1153,25 @@ function handleLoadProposal(ptcFolder, filename, revisionFolder, res, empresaId)
         return;
     }
 
-    let docsDir = path.join(getFullPtcPath(empresaId, ptcFolder), 'Documentação Minha_Empresa');
+    if (!isSafePathSegment(ptcFolder) || !isSafePathSegment(filename) || !isSafePathSegment(revisionFolder)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Caminho inválido' }));
+        return;
+    }
+
+    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    let docsDir = path.join(ptcPath, 'Documentação Minha_Empresa');
 
     if (revisionFolder && revisionFolder !== '0' && revisionFolder !== 0) {
         docsDir = path.join(docsDir, revisionFolder);
     }
 
     const filePath = path.join(docsDir, filename);
+    if (!isInsideDir(ptcPath, filePath)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Caminho inválido' }));
+        return;
+    }
 
     fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) {
@@ -2584,7 +2724,7 @@ async function handleExportComparisonPdf(body, res) {
 
 // === AI IMPORT DOCUMENT ===
 
-async function handleImportDocument(body, res) {
+async function handleImportDocument(body, res, empresaId) {
     try {
         const { filename, content, mimeType, useOcr } = body;
         if (!filename || !content) {
@@ -2634,6 +2774,7 @@ async function handleImportDocument(body, res) {
                 const cfg = getAiConfig();
                 db.addExtractionHistory({
                     id: crypto.randomUUID(),
+                    empresa_id: empresaId || 'default',
                     filename: filename,
                     data_json: JSON.stringify(result),
                     provider: cfg.provider,
@@ -2735,12 +2876,40 @@ function sendJson(res, status, data) {
 }
 
 function readBody(req) {
+    const maxBytes = 100 * 1024 * 1024; // 100MB — uploads base64 (DOCX/PDF) legitimos; além disso é abuso
     return new Promise((resolve, reject) => {
+        const declared = parseInt(req.headers['content-length'] || '0', 10);
+        if (declared > maxBytes) {
+            const err = new Error('Payload muito grande');
+            err.statusCode = 413;
+            reject(err);
+            req.resume();
+            return;
+        }
         let body = '';
-        req.on('data', chunk => { body += chunk.toString(); });
+        let size = 0;
+        let settled = false;
+        req.on('data', chunk => {
+            if (settled) return;
+            size += chunk.length;
+            if (size > maxBytes) {
+                settled = true;
+                const err = new Error('Payload muito grande');
+                err.statusCode = 413;
+                reject(err);
+                return;
+            }
+            body += chunk.toString();
+        });
         req.on('end', () => {
+            if (settled) return;
+            settled = true;
             try { resolve(JSON.parse(body)); }
-            catch (e) { reject(new Error('Invalid JSON')); }
+            catch (e) {
+                const err = new Error('Invalid JSON');
+                err.statusCode = 400;
+                reject(err);
+            }
         });
         req.on('error', reject);
     });
@@ -2793,7 +2962,29 @@ function getEmpresaPtcDir(empresaId) {
     return dir;
 }
 
+// Valida segmentos de caminho vindos do cliente (ptcFolder, filename, etc.):
+// bloqueia traversal, caminhos absolutos e letras de drive.
+function isSafePathSegment(value) {
+    if (value === undefined || value === null || value === '') return true;
+    const s = String(value);
+    if (s.includes('\0') || s.includes('..') || s.includes('\\')) return false;
+    if (s.startsWith('/') || /^[a-zA-Z]:/.test(s)) return false;
+    return true;
+}
+
+// Confirma que um caminho final resolve para dentro da base esperada.
+function isInsideDir(baseDir, targetPath) {
+    const b = path.resolve(baseDir);
+    const t = path.resolve(targetPath);
+    return t === b || t.startsWith(b + path.sep);
+}
+
 function getFullPtcPath(empresaId, ptcFolder) {
+    if (!isSafePathSegment(ptcFolder)) {
+        const err = new Error('Caminho inválido');
+        err.statusCode = 400;
+        throw err;
+    }
     const baseDir = getEmpresaPtcDir(empresaId);
     const directPath = path.join(baseDir, ptcFolder);
     if (fs.existsSync(directPath)) return directPath;
@@ -3065,47 +3256,154 @@ async function dispatchWebhooks(entity, event, data, empresaId) {
 const CRM_ENTITIES = ['crmLeads', 'crmInteracoes', 'crmTarefas', 'crmNotas'];
 
 // === STATIC FILE SERVING ===
+// Allowlist: apenas estes diretórios/arquivos são servidos ao browser.
+// Banco de dados, .git, .env, docs, templates de teste etc. ficam inacessíveis.
+const STATIC_ALLOWED_DIRS = new Set(['css', 'js', 'img', 'prints', 'templates']);
+const STATIC_ALLOWED_ROOT_FILES = new Set(['index.html', 'favicon.svg', 'favicon.ico']);
+const UPLOAD_SERVE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf', '.docx', '.xlsx', '.csv']);
 
-function serveStatic(pathname, res) {
-    if (pathname.startsWith('/uploads/')) {
-        const filePath = path.join(__dirname, 'data', pathname);
-        const ext = path.extname(filePath);
-        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+function sendNotFound(res) {
+    sendJson(res, 404, { error: 'Not Found' });
+}
+
+// Normaliza o pathname e bloqueia traversal (..), segmentos ocultos (.git, .env),
+// locks do Office (~$...) e letras de drive. Retorna os segmentos limpos ou null.
+function safePathSegments(pathname) {
+    let decoded;
+    try { decoded = decodeURIComponent(pathname); } catch (e) { return null; }
+    if (decoded.includes('\0')) return null;
+    const segments = decoded.split(/[\\/]+/).filter(s => s !== '');
+    for (const seg of segments) {
+        if (seg === '.' || seg === '..') return null;
+        if (seg.startsWith('.')) return null;
+        if (seg.startsWith('~')) return null;
+        if (/^[a-zA-Z]:$/.test(seg)) return null;
+    }
+    return segments;
+}
+
+function serveStatic(pathname, req, res) {
+    const segments = safePathSegments(pathname);
+    if (!segments) { sendJson(res, 403, { error: 'Forbidden' }); return; }
+
+    // Uploads (logos etc.): servidos somente de data/uploads, com extensões permitidas
+    if (segments[0] === 'uploads') {
+        if (segments.length < 2) { sendNotFound(res); return; }
+        const uploadsRoot = path.join(__dirname, 'data', 'uploads');
+        const filePath = path.join(uploadsRoot, ...segments.slice(1));
+        if (!filePath.startsWith(uploadsRoot + path.sep)) { sendJson(res, 403, { error: 'Forbidden' }); return; }
+        const ext = path.extname(filePath).toLowerCase();
+        if (!UPLOAD_SERVE_EXTS.has(ext)) { sendNotFound(res); return; }
+        const headers = {
+            'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+            'X-Content-Type-Options': 'nosniff',
+            'Cache-Control': 'no-cache'
+        };
+        if (ext === '.svg') {
+            // SVG navegado diretamente poderia executar scripts → isola o documento
+            headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'";
+        }
         fs.readFile(filePath, (err, data) => {
-            if (err) { sendJson(res, 404, { error: 'Not Found' }); return; }
-            res.writeHead(200, { 'Content-Type': contentType });
+            if (err) { sendNotFound(res); return; }
+            res.writeHead(200, headers);
             res.end(data);
         });
         return;
     }
-    let filePath = pathname === '/'
-        ? path.join(__dirname, 'index.html')
-        : path.join(__dirname, pathname);
 
-    if (!filePath.startsWith(__dirname)) {
+    let filePath;
+    if (segments.length === 0) {
+        filePath = path.join(__dirname, 'index.html');
+    } else if (segments.length === 1) {
+        if (!STATIC_ALLOWED_ROOT_FILES.has(segments[0])) { sendNotFound(res); return; }
+        filePath = path.join(__dirname, segments[0]);
+    } else {
+        if (!STATIC_ALLOWED_DIRS.has(segments[0].toLowerCase())) { sendNotFound(res); return; }
+        filePath = path.join(__dirname, ...segments);
+    }
+    if (!filePath.startsWith(__dirname + path.sep) && filePath !== path.join(__dirname, 'index.html')) {
         sendJson(res, 403, { error: 'Forbidden' });
         return;
     }
 
-    const ext = path.extname(filePath);
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const ext = path.extname(filePath).toLowerCase();
+    if (!MIME_TYPES[ext]) { sendNotFound(res); return; }
+    // Em templates, só .docx/.dotx são servidos (evita .bak, locks e saídas de teste)
+    if (segments[0] === 'templates' && ext !== '.docx' && ext !== '.dotx') { sendNotFound(res); return; }
 
-    fs.readFile(filePath, (err, data) => {
-        if (err) {
-            sendJson(res, err.code === 'ENOENT' ? 404 : 500, { error: err.code === 'ENOENT' ? 'Not Found' : err.message });
+    fs.stat(filePath, (statErr, stat) => {
+        if (statErr) { sendNotFound(res); return; }
+        // no-cache: o navegador SEMPRE revalida → entrega de arquivos novos sem
+        // depender do cache-buster do loader; Last-Modified/304 mantêm a troca barata.
+        const lastModified = stat.mtime.toUTCString();
+        const headers = {
+            'Content-Type': MIME_TYPES[ext],
+            'X-Content-Type-Options': 'nosniff',
+            'Cache-Control': 'no-cache',
+            'Last-Modified': lastModified
+        };
+        const ims = req && req.headers['if-modified-since'];
+        if (ims && new Date(ims).getTime() === Math.floor(stat.mtime.getTime() / 1000) * 1000) {
+            res.writeHead(304, headers);
+            res.end();
             return;
         }
-        res.writeHead(200, { 'Content-Type': contentType });
-        res.end(data);
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                sendNotFound(res);
+                return;
+            }
+            res.writeHead(200, headers);
+            res.end(data);
+        });
     });
 }
 
 // === ROUTER ===
 
-const server = http.createServer(async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+// === CORS restrito: só reflete origens do próprio host (ou dev local) ===
+function applyCors(req, res) {
+    const origin = req.headers.origin;
+    if (!origin) return;
+    try {
+        const o = new URL(origin);
+        const reqHostname = String(req.headers.host || '').split(':')[0];
+        const allowed = o.hostname === reqHostname
+            || o.hostname === 'localhost'
+            || o.hostname === '127.0.0.1';
+        if (allowed) {
+            res.setHeader('Access-Control-Allow-Origin', origin);
+            res.setHeader('Vary', 'Origin');
+        }
+    } catch (e) { /* origem inválida → sem CORS */ }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
+// === Rate limiting simples em memória (janela fixa) ===
+const _rateBuckets = new Map();
+function rateLimit(key, limit, windowMs) {
+    const now = Date.now();
+    let bucket = _rateBuckets.get(key);
+    if (!bucket || now - bucket.start > windowMs) {
+        bucket = { start: now, count: 0 };
+        _rateBuckets.set(key, bucket);
+    }
+    bucket.count++;
+    if (_rateBuckets.size > 10000) {
+        for (const [k, v] of _rateBuckets) {
+            if (now - v.start > windowMs) _rateBuckets.delete(k);
+        }
+    }
+    return bucket.count <= limit;
+}
+
+function clientIp(req) {
+    return (req.socket && req.socket.remoteAddress) || '?';
+}
+
+const server = http.createServer(async (req, res) => {
+    applyCors(req, res);
 
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
@@ -3120,19 +3418,40 @@ const server = http.createServer(async (req, res) => {
         // === AUTH ROUTES ===
 
         if (pathname === '/api/auth/register' && req.method === 'POST') {
+            if (!rateLimit('register:' + clientIp(req), 5, 60000)) { sendJson(res, 429, { error: 'Muitas tentativas de cadastro. Aguarde um minuto.' }); return; }
             const body = await readBody(req);
-            const { email, password, name, empresa_id } = body;
+            const { email, password, name, empresa_id, nivel } = body;
             if (!email || !password || !name) { sendJson(res, 400, { error: 'Email, senha e nome obrigatórios' }); return; }
             const existing = db.findUsuarioByEmail(email);
             if (existing) { sendJson(res, 409, { error: 'Email já cadastrado' }); return; }
-            // Find or create empresa
-            let empId = empresa_id || 'default';
+            // Política de cadastro:
+            //  - Primeira execução (nenhum usuário no sistema): registro aberto → cria o admin inicial.
+            //  - Depois disso: apenas administradores autenticados podem criar contas.
+            const tokenUser = getTokenUser(req);
+            const hasUsers = db.listUsuarios().length > 0;
+            let empId = 'default';
+            let userNivel = 'admin';
+            if (hasUsers) {
+                if (!tokenUser || tokenUser.nivel !== 'admin') {
+                    sendJson(res, 403, { error: 'Registro fechado. Peça a um administrador para criar sua conta.' });
+                    return;
+                }
+                empId = tokenUser.empresa_id || 'default';
+                if (empresa_id && empresa_id !== empId) {
+                    sendJson(res, 403, { error: 'Não é permitido criar usuários em outra empresa.' });
+                    return;
+                }
+                const validNiveis = ['admin', 'engenheiro', 'visualizador'];
+                userNivel = validNiveis.includes(nivel) ? nivel : 'engenheiro';
+            } else if (empresa_id) {
+                empId = empresa_id;
+            }
             let emp = db.findEmpresaById(empId);
             if (!emp) {
                 emp = db.createEmpresa({ id: empId, nome: 'Empresa Padrão', cnpj: '', sigla: 'DEF', plano: 'trial' });
             }
             const hashed = bcrypt.hashSync(password, 10);
-            const newUser = db.createUsuario({ id: crypto.randomUUID(), empresa_id: empId, email, password: hashed, name, nivel: 'admin', ativo: true });
+            const newUser = db.createUsuario({ id: crypto.randomUUID(), empresa_id: empId, email, password: hashed, name, nivel: userNivel, ativo: true });
             const token = jwt.sign({ id: newUser.id, email: newUser.email, name: newUser.name, nivel: newUser.nivel, empresa_id: empId }, JWT_SECRET, { expiresIn: '7d' });
             const { password: _, ...safeUser } = newUser;
             sendJson(res, 200, { token, user: safeUser });
@@ -3140,6 +3459,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         if (pathname === '/api/auth/login' && req.method === 'POST') {
+            if (!rateLimit('login:' + clientIp(req), 15, 60000)) { sendJson(res, 429, { error: 'Muitas tentativas de login. Aguarde um minuto.' }); return; }
             const body = await readBody(req);
             const { email, password } = body;
             if (!email || !password) { sendJson(res, 400, { error: 'Email e senha obrigatórios' }); return; }
@@ -3321,6 +3641,30 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        // Restore de backup completo (admin apenas). Transacional: ou restaura tudo, ou nada.
+        if (pathname === '/api/data/restore' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { success: false, error: 'Não autenticado.' }); return; }
+            if (tokenUser.nivel !== 'admin') { sendJson(res, 403, { success: false, error: 'Restauração de backup exige usuário administrador.' }); return; }
+            const adminUser = tokenUser;
+            try {
+                const body = await readBody(req);
+                const empresaId = adminUser.empresa_id || 'default';
+                if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.data !== 'object' || body.data === null || Array.isArray(body.data)) {
+                    sendJson(res, 400, { success: false, error: 'Payload inválido: envie { data: <conteúdo do backup> }.' });
+                    return;
+                }
+                const result = db.restoreFromBackup(body.data, empresaId);
+                console.log(`[Backup] Restauração executada por ${adminUser.email} (empresa ${empresaId}):`, JSON.stringify(result.counts));
+                sendJson(res, 200, { success: true, data: result });
+            } catch (err) {
+                // transação com rollback: em caso de erro, nada foi alterado
+                const code = err && err.statusCode === 413 ? 413 : 400;
+                sendJson(res, code, { success: false, error: 'Falha na restauração (nenhum dado foi alterado): ' + err.message });
+            }
+            return;
+        }
+
         if (pathname === '/api/materiais/import-bulk' && req.method === 'POST') {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
@@ -3361,6 +3705,29 @@ const server = http.createServer(async (req, res) => {
             } catch (err) {
                 console.error('[CrmBulkImport] Error:', err);
                 sendJson(res, 500, { success: false, error: err.message });
+            }
+            return;
+        }
+
+        // Atualização em massa de materiais (reajuste de preços / importação por código)
+        if (pathname === '/api/materiais/bulk-update' && req.method === 'PUT') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const body = await readBody(req);
+                if (!body || !Array.isArray(body.items)) {
+                    sendJson(res, 400, { success: false, error: 'Payload inválido: envie { items: [...] }.' });
+                    return;
+                }
+                if (body.items.length > 50000) {
+                    sendJson(res, 400, { success: false, error: 'Máximo de 50000 itens por requisição.' });
+                    return;
+                }
+                const empresaId = tokenUser.empresa_id || 'default';
+                const updated = db.bulkUpdateMateriais(body.items, empresaId);
+                sendJson(res, 200, { success: true, updated });
+            } catch (err) {
+                sendJson(res, 400, { success: false, error: 'Falha no reajuste em massa (nenhum dado foi alterado): ' + err.message });
             }
             return;
         }
@@ -3529,13 +3896,18 @@ const server = http.createServer(async (req, res) => {
             try {
                 const entity = entityMatchWithId[1];
                 const id = entityMatchWithId[2];
+                const empresaId = tokenUser.empresa_id || 'default';
                 const body = await readBody(req);
                 const oldItem = db.findById(entity, id);
+                if (!oldItem || oldItem.empresa_id !== empresaId) {
+                    sendJson(res, 404, { success: false, error: 'Registro não encontrado' });
+                    return;
+                }
                 if (entity === 'pipelineItems' && oldItem?.status === 'fechado' && body.status && body.status !== oldItem.status) {
                     sendJson(res, 403, { success: false, error: 'Proposta Fechada não pode ter status alterado.' });
                     return;
                 }
-                const item = db.update(entity, id, body);
+                const item = db.update(entity, id, body, empresaId);
 
                 if (entity === 'pipelineItems' && item) {
                     const stageLabels = { prospect: 'Aguardando Início', elaboracao: 'Em Elaboração', enviado: 'Proposta Enviada', negociacao: 'Negociação', fechado: 'Fechado', perdido: 'Perdido' };
@@ -3599,8 +3971,13 @@ const server = http.createServer(async (req, res) => {
             try {
                 const entity = entityMatchWithId[1];
                 const id = entityMatchWithId[2];
+                const empresaId = tokenUser.empresa_id || 'default';
                 const item = db.findById(entity, id);
-                db.remove(entity, id);
+                if (!item || item.empresa_id !== empresaId) {
+                    sendJson(res, 404, { success: false, error: 'Registro não encontrado' });
+                    return;
+                }
+                db.remove(entity, id, empresaId);
 
                 if (entity === 'pipelineItems' && item) {
                     notifyTelegramUsers({
@@ -4354,11 +4731,21 @@ const server = http.createServer(async (req, res) => {
                     sendJson(res, 400, { error: 'fileName e fileData (base64) são obrigatórios' });
                     return;
                 }
+                // Somente imagens (logos/fundos) — bloqueia HTML/SVG/JS que poderiam executar na origem
+                const uploadImageExts = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
+                const ext = (path.extname(body.fileName) || '.png').toLowerCase();
+                if (!uploadImageExts.has(ext)) {
+                    sendJson(res, 400, { error: 'Apenas imagens são permitidas (png, jpg, gif, webp, svg)' });
+                    return;
+                }
                 const uploadsDir = path.join(__dirname, 'data', 'uploads');
                 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-                const ext = path.extname(body.fileName) || '.png';
                 const safeName = Date.now() + '_' + body.fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
                 const filePath = path.join(uploadsDir, safeName);
+                if (!filePath.startsWith(uploadsDir + path.sep)) {
+                    sendJson(res, 400, { error: 'Nome de arquivo inválido' });
+                    return;
+                }
                 const buffer = Buffer.from(body.fileData, 'base64');
                 fs.writeFileSync(filePath, buffer);
                 const url = '/uploads/' + safeName;
@@ -4770,8 +5157,19 @@ const server = http.createServer(async (req, res) => {
 
         // === AI IMPORT/EXPORT ===
 
-        if (pathname === '/api/import-document' && req.method === 'POST') { handleImportDocument(await readBody(req), res); return; }
-        if (pathname === '/api/export-ai-extraction' && req.method === 'POST') { handleExportAIExtraction(await readBody(req), res); return; }
+        if (pathname === '/api/import-document' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            if (!rateLimit('ai:' + clientIp(req), 20, 60000)) { sendJson(res, 429, { error: 'Limite de requisições de IA atingido. Aguarde um minuto.' }); return; }
+            handleImportDocument(await readBody(req), res, tokenUser.empresa_id || 'default');
+            return;
+        }
+        if (pathname === '/api/export-ai-extraction' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            handleExportAIExtraction(await readBody(req), res);
+            return;
+        }
 
         // === COMPARISON ENDPOINTS ===
 
@@ -4937,11 +5335,19 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        if (pathname === '/api/export-io-bom' && req.method === 'POST') { handleExportIOBOM(await readBody(req), res); return; }
-        if (pathname === '/api/export-io-list' && req.method === 'POST') { handleExportIOList(await readBody(req), res); return; }
-        if (pathname === '/api/export-lm' && req.method === 'POST') { handleExportLM(await readBody(req), res); return; }
-        if (pathname === '/api/export-qet' && req.method === 'POST') { handleExportQET(await readBody(req), res); return; }
-        if (pathname === '/api/export-pipeline-log-xlsx' && req.method === 'POST') { handleExportPipelineLog(await readBody(req), res); return; }
+        const exportRoutes = {
+            '/api/export-io-bom': handleExportIOBOM,
+            '/api/export-io-list': handleExportIOList,
+            '/api/export-lm': handleExportLM,
+            '/api/export-qet': handleExportQET,
+            '/api/export-pipeline-log-xlsx': handleExportPipelineLog
+        };
+        if (exportRoutes[pathname] && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            exportRoutes[pathname](await readBody(req), res);
+            return;
+        }
 
         // === DXF BLOCK API ===
 
@@ -5027,11 +5433,12 @@ const server = http.createServer(async (req, res) => {
 
         // === STATIC FILES ===
 
-        serveStatic(pathname, res);
+        serveStatic(pathname, req, res);
 
     } catch (err) {
-        console.error('[Server] Unhandled error:', err);
-        if (!res.headersSent) sendJson(res, 500, { error: err.message || 'Erro interno do servidor' });
+        const status = err.statusCode || 500;
+        if (status === 500) console.error('[Server] Unhandled error:', err);
+        if (!res.headersSent) sendJson(res, status, { error: status === 400 ? 'Caminho inválido' : (err.message || 'Erro interno do servidor') });
     }
 });
 

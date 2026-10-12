@@ -1,0 +1,347 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║  EXPLICAÇÃO SIMPLES — AUTOMAÇÃO DE MÃO DE OBRA NO GERAPRO         ║
+║  Composições de Mão de Obra  +  Regras de Derivação               ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+Escrito em linguagem simples, para quem não é programador nem engenheiro.
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  O PROBLEMA QUE QUEREMOS RESOLVER                                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+Imagine que você trabalha em uma empresa que fabrica painéis elétricos
+(quadros de comando, quadros de distribuição, etc.). Toda vez que
+chega um pedido de um cliente novo, alguém precisa calcular quantas
+horas de trabalho serão necessárias para montar aquele painel.
+
+Antes dessa automação, o jeito de fazer era:
+
+  1. Abrir uma planilha Excel
+  2. Olhar para a lista de equipamentos do projeto (por exemplo:
+     "CCM-01", "QGBT-02")
+  3. Pensar em cada atividade necessária:
+     - "Vou precisar montar a estrutura metálica… umas 8 horas"
+     - "Vou precisar montar o barramento de cobre… umas 4 horas"
+     - "Vou precisar lançar cabos… umas 6 horas"
+  4. Somar tudo manualmente na planilha
+  5. Multiplicar pelo valor da hora do profissional
+
+Isso funciona, mas tem vários problemas:
+  ❌ É muito demorado — cada proposta leva horas para ser calculada
+  ❌ É inconsistente — cada pessoa calcula de um jeito diferente
+  ❌ É sujeito a erros — esquecer uma atividade ou errar uma conta
+  ❌ É difícil de revisar — alguém precisa conferir linha por linha
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  A SOLUÇÃO: DUAS PEÇAS QUE SE ENCAIXAM                            │
+└─────────────────────────────────────────────────────────────────────┘
+
+O GeraPro resolve isso com duas ferramentas que trabalham juntas:
+
+  1. COMPOSIÇÕES DE MÃO DE OBRA   (o "cardápio" de atividades)
+  2. REGRAS DE DERIVAÇÃO          (as "receitas" que montam o cardápio)
+
+Vamos entender cada uma.
+
+
+╔════════════════════════════════════════════════════════════════════╗
+║  PARTE 1: COMPOSIÇÕES DE MÃO DE OBRA (O CARDÁPIO)               ║
+╚════════════════════════════════════════════════════════════════════╝
+
+O que é?
+
+Composições são como um "cardápio" de atividades que a sua empresa
+sabe fazer. Cada composição descreve uma atividade específica e diz
+quantas horas ela leva.
+
+Exemplos de composições que já vêm prontas no sistema:
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  Atividade: Montagem de estrutura metálica                      │
+  │  Unidade: unidade (cada painel)                                 │
+  │  Horas por unidade: 8,0 horas                                   │
+  │  Grupo: Estrutura                                               │
+  │  Profissional: Montador                                         │
+  │  Área: Montagem (fábrica)                                       │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  Atividade: Lançamento de cabos de potência                     │
+  │  Unidade: metro                                                  │
+  │  Horas por unidade: 0,5 hora (meia hora por metro)              │
+  │  Grupo: Elétrica                                                 │
+  │  Profissional: Eletricista                                       │
+  │  Área: Montagem (fábrica)                                        │
+  └──────────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  Atividade: Teste de continuidade e isolamento                  │
+  │  Unidade: ponto                                                  │
+  │  Horas por unidade: 0,25 hora (15 minutos por ponto)            │
+  │  Grupo: Testes                                                   │
+  │  Profissional: Técnico                                           │
+  │  Área: Montagem (fábrica)                                        │
+  └──────────────────────────────────────────────────────────────────┘
+
+O sistema já vem com 50 composições pré-cadastradas, divididas em
+grupos:
+
+  • Estrutura     → montagem de perfis, chapas, porteiras, etc.
+  • Elétrica      → cabos, barramentos, disjuntores, etc.
+  • Testes        → testes elétricos, ensaios, etc.
+  • Automação     → configuração de CLPs, IHM, redes, etc.
+  • Projeto       → desenhos, diagramas, especificações, etc.
+  • Pintura       → pintura de painéis, tratamento, etc.
+  • Expedição     → embalagem, carregamento, etc.
+
+Cada composição também diz:
+  - Quanto tempo leva (coeficiente HH = horas-homem)
+  - Em que unidade se mede (unidade, metro, hora, ponto)
+  - Quem faz o serviço (Montador, Eletricista, Técnico, etc.)
+  - Se o custo é de Montagem (fábrica/campo) ou Engenharia (projeto)
+
+Você também pode IMPORTAR suas próprias composições de uma planilha
+Excel, em vez de cadastrar uma por uma.
+
+
+╔════════════════════════════════════════════════════════════════════╗
+║  PARTE 2: REGRAS DE DERIVAÇÃO (AS RECEITAS)                     ║
+╚════════════════════════════════════════════════════════════════════╝
+
+O que é?
+
+Regras de Derivação são "receitas" que dizem: "se o equipamento tem
+tais características, então estas composições se aplicam."
+
+Cada regra funciona como um SE-ENTÃO:
+
+  SE  o equipamento é do tipo "CCM-BT"
+  E   ele tem corrente nominal maior que zero
+  ENTÃO  gere estas composições com estas quantidades
+
+Exemplo de regra pronta no sistema:
+
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  NOME: Barramento CCM BT                                        │
+  │  TIPO DE EQUIPAMENTO: CCM-BT                                    │
+  │  PRIORIDADE: 1 (executa primeiro)                               │
+  │                                                                │
+  │  CONDIÇÕES (todas precisam ser verdade):                        │
+  │     1. tipo == "CCM-BT"                                         │
+  │     2. correnteNominal > 0                                       │
+  │                                                                │
+  │  AÇÕES (o que gerar):                                           │
+  │     • Montagem de estrutura metálica  → 1 unidade               │
+  │     • Montagem de barramento de cobre → correnteNominal / 100   │
+  │     • Lançamento de cabos de potência → num_disjuntores * 2     │
+  │     • Teste de continuidade         → num_disjuntores * 1       │
+  └──────────────────────────────────────────────────────────────────┘
+
+Perceba que as quantidades podem ser DINÂMICAS:
+  - "1 unidade" é fixo (sempre 1)
+  - "correnteNominal / 100" é uma conta: se a corrente for 400A,
+    o resultado é 4 (400 ÷ 100 = 4)
+  - "num_disjuntores * 2" multiplica o número de disjuntores por 2
+
+O sistema já vem com 14 regras pré-cadastradas que cobrem os tipos
+de equipamento mais comuns: CCM-BT, QGBT, CUB-MT, PLC, etc.
+
+Cada regra tem:
+  - Um NOME para identificar
+  - O TIPO DE EQUIPAMENTO que ela atende (ou * para todos)
+  - PRIORIDADE (a ordem em que as regras são testadas)
+  - Um INTERRUPTOR para ativar/desativar sem apagar a regra
+  - CONDIÇÕES (filtros que o equipamento precisa satisfazer)
+  - AÇÕES (lista de composições + quantidades a gerar)
+
+Você pode TESTAR uma regra contra um equipamento real para ver se
+as condições são verdadeiras e quais composições seriam geradas.
+
+
+╔════════════════════════════════════════════════════════════════════╗
+║  COMO TUDO FUNCIONA JUNTO (PASSO A PASSO)                       ║
+╚════════════════════════════════════════════════════════════════════╝
+
+Vamos simular um exemplo real:
+
+___________________________________
+ETAPA 1 — Você está na Proposta Técnica
+
+Você abriu uma proposta para um cliente. Dentro dela, cadastrou um
+equipamento chamado "CCM-01" do tipo "CCM-BT", com corrente nominal
+de 400A e 8 disjuntores.
+
+___________________________________
+ETAPA 2 — Você clica em "Estimar"
+
+Na tela do equipamento, existe uma sub-aba chamada "Mão de Obra".
+Lá tem um botão "Estimar". Você clica nele.
+
+___________________________________
+ETAPA 3 — O motor de cálculo entra em ação
+
+O sistema (chamamos de "motor de automação") faz o seguinte:
+
+  a) Pega todas as REGRAS DE DERIVAÇÃO que estão ativas
+  b) Ordena pela prioridade (menor número primeiro)
+  c) Para cada regra, pergunta:
+     "Esta regra se aplica ao equipamento CCM-01?"
+  d) Para responder, ele testa as CONDIÇÕES da regra:
+     • tipo == "CCM-BT"? → SIM ✓
+     • correnteNominal > 0? → 400 > 0 → SIM ✓
+  e) Se TODAS as condições forem verdade, ele executa as AÇÕES
+
+___________________________________
+ETAPA 4 — As composições são geradas
+
+Para cada AÇÃO aprovada, o sistema gera uma linha de resultado:
+
+  │ COMPOSIÇÃO                         │ QTD  │ UNID │ HH  │
+  │────────────────────────────────────┼──────┼──────┼─────┤
+  │ Montagem de estrutura metálica     │  1   │  un  │ 8h  │
+  │ Montagem de barramento de cobre    │  4   │  un  │ 16h │
+  │ Lançamento de cabos de potência    │  16  │  m   │ 8h  │
+  │ Teste de continuidade              │  8   │ ponto│ 2h  │
+  │                                    │      │      │─────│
+  │ TOTAL DE HORAS ESTIMADAS           │      │      │ 34h │
+
+Como foi calculado:
+  - Estrutura: 1 unidade × 8,0 HH = 8 horas
+  - Barramento: correnteNominal/100 = 400/100 = 4 × 4,0 HH = 16 h
+  - Cabos: 8 disjuntores × 2 = 16 m × 0,5 HH = 8 horas
+  - Testes: 8 disjuntores × 1 = 8 pontos × 0,25 HH = 2 horas
+
+___________________________________
+ETAPA 5 — Você vê o resultado no equipamento
+
+No próprio equipamento (sub-aba "Mão de Obra"), em modo
+detalhado — mostrando cada composição gerada com suas
+quantidades.
+
+Você pode ajustar manualmente as horas e o valor/hora
+diretamente nesta tela, se necessário. As alterações
+são salvas junto com os dados da proposta.
+
+___________________________________
+ETAPA 6 — Visão consolidada (opcional)
+
+No menu Engenharia → "Mão de Obra", você encontra uma
+visão consolidada "Agregado por Equipamento" que soma
+todos os equipamentos da proposta em uma única tela.
+
+Este módulo é APENAS PARA VISUALIZAÇÃO — as horas
+exibidas vêm diretamente dos equipamentos. Para editar,
+volte à sub-aba "Mão de Obra" do equipamento na Proposta
+Técnica.
+
+___________________________________
+ETAPA 7 — O custo vai para a Precificação
+
+O módulo de Precificação (Precificação de Custos) lê as
+horas e valores diretamente de cada equipamento e calcula
+automaticamente o custo de mão de obra, que entra no preço
+final da proposta.
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  RESUMO EM ANALOGIA                                                │
+└─────────────────────────────────────────────────────────────────────┘
+
+Pense em uma PIZZARIA:
+
+  ┌────────────────────────────────────────────────────────────────┐
+  │  COMPOSIÇÕES = O CARDÁPIO                                     │
+  │                                                               │
+  │  "Mussarela: R$ 5,00"                                         │
+  │  "Calabresa: R$ 3,00"                                         │
+  │  "Tomate: R$ 2,00"                                            │
+  │  "Massa: R$ 4,00"                                             │
+  │                                                               │
+  │  → Cada ingrediente tem um nome e um preço (custo)            │
+  └────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────┐
+  │  REGRAS DE DERIVAÇÃO = AS RECEITAS                             │
+  │                                                               │
+  │  SE o cliente pede Pizza de Calabresa                         │
+  │  ENTÃO use: 1 massa + 1 mussarela + 1 calabresa               │
+  │                                                               │
+  │  SE o cliente pede Pizza Margherita                           │
+  │  ENTÃO use: 1 massa + 2 mussarela + 1 tomate                  │
+  │                                                               │
+  │  → Cada receita diz quais ingredientes usar e em que          │
+  │    quantidade, de acordo com o que o cliente pediu            │
+  └────────────────────────────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────────────────────────────┐
+  │  MOTOR DE AUTOMAÇÃO = O PIZZAIOLO                             │
+  │                                                               │
+  │  Quando chega um pedido (um equipamento), o pizzaiolo         │
+  │  consulta as receitas, junta os ingredientes certos e         │
+  │  calcula o custo total.                                       │
+  │                                                               │
+  │  Tudo automático, sem precisar pensar a cada pedido.          │
+  └────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  BENEFÍCIOS                                                         │
+└─────────────────────────────────────────────────────────────────────┘
+
+  ✅ VELOCIDADE — O que levava horas para calcular manualmente,
+     agora leva segundos. Basta clicar em "Estimar".
+
+  ✅ CONSISTÊNCIA — Todas as propostas usam as mesmas regras e
+     composições. Não depende de "achismo" de cada pessoa.
+
+  ✅ CONFIABILIDADE — Não tem erro de conta ou atividade esquecida.
+     O computador faz a matemática exatamente como foi programado.
+
+  ✅ FLEXIBILIDADE — O usuário ainda pode ajustar manualmente se
+     o caso for especial. A automação é uma AJUDA, não uma camisa
+     de força.
+
+  ✅ PADRÃO — A empresa cria seu próprio catálogo de composições
+     e regras, que reflete exatamente como ela trabalha. Novos
+     funcionários já sabem qual é o padrão.
+
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  GLOSSÁRIO SIMPLES                                                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+  COMPOSIÇÃO          → Uma atividade padronizada, com nome, unidade
+                        e horas por unidade. Ex: "Montar barramento
+                        de cobre: 4 horas por unidade"
+
+  COEFICIENTE HH      → Horas-Homem. Quantas horas uma pessoa leva
+                        para fazer uma unidade da atividade.
+
+  REGRA DE DERIVAÇÃO  → Uma "receita" que diz: se o equipamento tem
+                        tais características, gere tais composições.
+
+  CONDIÇÃO            → Um filtro que o equipamento precisa passar.
+                        Ex: "tipo do equipamento = CCM-BT"
+
+  AÇÃO                → Uma composição + uma quantidade a ser gerada.
+                        Ex: "Montagem de estrutura: 1 unidade"
+
+  EXPRESSÃO DINÂMICA  → Uma conta que calcula a quantidade automati-
+                        camente. Ex: correnteNominal / 100
+
+  ESTIMAR             → Botão que dispara o motor de automação para
+                        um equipamento específico.
+
+  AGREGADO            → Visão que junta todos os equipamentos e mostra
+                        o total de horas de cada composição no projeto.
+
+  CARREGAR DA PTC     → Botão que copia as horas automáticas para a
+                        tabela manual, onde você pode editá-las.
+
+
+────────────────────────────────────────────────────────────────────────
+  Data: junho/2026
+  Documento gerado para fins de documentação interna.
+────────────────────────────────────────────────────────────────────────

@@ -471,7 +471,7 @@ const PaineisModule = {
 
     // --- CRUD ---
 
-    save() {
+    async save() {
         // Collect Form Data from Left Pane
         const tipo = document.getElementById('p-tipo').value;
         if (!tipo) {
@@ -502,13 +502,10 @@ const PaineisModule = {
 
         if (newState.id) {
             // Update
-            const list = store.getState().painelTypes.map(p => p.id === newState.id ? newState : p);
-            store.setState({ painelTypes: list });
+            await store.updatePainelType(newState.id, newState);
         } else {
             // Create
-            newState.id = crypto.randomUUID();
-            const list = [...(store.getState().painelTypes || []), newState];
-            store.setState({ painelTypes: list });
+            await store.addPainelType(newState);
         }
 
         window.app.toast("Tipo de painel salvo com sucesso!", "success");
@@ -517,8 +514,7 @@ const PaineisModule = {
 
     async delete(id) {
         if (await window.app.confirm("Remover este tipo de painel?")) {
-            const list = store.getState().painelTypes.filter(p => p.id !== id);
-            store.setState({ painelTypes: list });
+            await store.deletePainelType(id);
             window.app.toast("Tipo de painel removido.", "info");
         }
     },

@@ -1,0 +1,668 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — IMPORTAÇÃO DE DADOS NO GERAPRO                           ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica COMO importar dados para dentro do     ║
+║   GeraPro usando planilhas. São três tipos de importação:                       ║
+║                                                                                  ║
+║   1. MATERIAIS: Listas de preços de fabricantes (Siemens, WEG, Schneider, etc.) ║
+║   2. CLIENTES: Dados fiscais e contatos de clientes                             ║
+║   3. FORNECEDORES: Dados fiscais e contatos de fornecedores                     ║
+║                                                                                  ║
+║   Ele NÃO explica como cadastrar dados manualmente ou como criar uma            ║
+║   Proposta Técnica. Se você precisa disso, procure o help do sistema            ║
+║   (botão ❓ no canto superior).                                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É A IMPORTAÇÃO DE DADOS?                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você precisa cadastrar 500 itens de uma lista de preços, ou 200
+clientes de uma planilha. Digitar um por um no GeraPro levaria horas (e você
+provavelmente erraria alguns).
+
+A Importação resolve isso: você joga a planilha no sistema, diz qual coluna
+significa o quê, e o GeraPro cadastra ou atualiza tudo de uma vez.
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ✅  A importação NÃO substitui o cadastro manual — ela acelera quando         ║
+║   você tem muitos itens para incluir ou atualizar.                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+Existem TRÊS tipos de importação no GeraPro:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ TIPO DE IMPORTAÇÃO   │ O QUE IMPORTA                                            │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Materiais            │ Listas de preços de fabricantes (Siemens, WEG,           │
+│                      │ Schneider, ABB, etc.) para o banco de materiais.         │
+│                      │ Acessível pelo menu lateral > Importar Dados.            │
+│                      │                                                          │
+│ Clientes             │ Dados de clientes (Razão Social, CNPJ, endereço,         │
+│                      │ contatos) a partir de planilha modelo.                   │
+│                      │ Acessível dentro do módulo Clientes > botão Importar.   │
+│                      │                                                          │
+│ Fornecedores         │ Dados de fornecedores (Razão Social, CNPJ, endereço,    │
+│                      │ contatos) a partir de planilha modelo.                   │
+│                      │ Acessível dentro do módulo Fornecedores > botão Importar.│
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. QUANDO USAR A IMPORTAÇÃO?                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Use a importação quando:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ SITUAÇÃO              │ EXEMPLO                                                  │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Lista de preços      │ Seu fornecedor Siemens enviou uma planilha com 300       │
+│ de fornecedor        │ códigos e preços atualizados.                            │
+│                       │                                                          │
+│ Migração de sistema  │ Você está trocando de sistema e tem 1.000 materiais      │
+│                       │ para cadastrar no GeraPro de uma vez.                    │
+│                       │                                                          │
+│ Atualização em massa  │ Seus custos mudaram e você precisa atualizar o preço    │
+│                       │ de 50 materiais específicos.                             │
+│                       │                                                          │
+│ Catálogo novo        │ Você comprou uma nova linha de produtos (ex: inversores  │
+│                       │ Siemens) e quer cadastrar tudo de uma vez.               │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. QUE TIPOS DE ARQUIVO FUNCIONAM?                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O GeraPro aceita dois formatos:
+
+┌──────────────┬──────────────────────────────────────────────────────────────────┐
+│ FORMATO      │ OBSERVAÇÕES                                                      │
+├──────────────┼──────────────────────────────────────────────────────────────────┤
+│ Excel (.xlsx │ O mais comum. Suporta planilhas com várias abas (o sistema       │
+│ ou .xls)     │ lê apenas a primeira aba).                                       │
+│              │                                                                  │
+│ CSV (.csv)   │ Arquivo de texto com valores separados por vírgula.             │
+│              │ Útil se você estiver exportando de outro sistema.                │
+└──────────────┴──────────────────────────────────────────────────────────────────┘
+
+📌 DICA: Se seu Excel tiver fórmulas ou células mescladas, gere
+uma cópia simples (colar como valor) antes de importar.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. O QUE É O MAPEAMENTO DE COLUNAS?                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada fabricante envia a planilha de um jeito diferente:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Planilha da Siemens:                                                            │
+│                                                                                 │
+│   C01  | Fus. 3P 160A                    | 45,90 | un | PC                     │
+│   C02  | Prolongador P010                | 32,50 | un | PC                     │
+│   ...  | ...                             |  ...   | .. | ...                    │
+│                                                                                 │
+│   (as colunas não têm nome — a primeira linha é "Lista de Preços" mesclado)    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Planilha de outro fabricante (ex: WEG):                                         │
+│                                                                                 │
+│   Código  | Descrição                     | Preço   | Und | Marca               │
+│   MOT-001 | Motor 1CV Trifásico           | 890,00  | un  | WEG                 │
+│   MOT-002 | Motor 2CV Trifásico           | 1.250,00| un  | WEG                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O MAPEAMENTO é o jeito que você ensina o sistema a entender CADA coluna.
+
+"Essa coluna aqui (C01) é o Código do material."
+"Essa coluna ali (Fus. 3P...) é a Descrição."
+"Essa outra (45,90) é o Custo."
+
+O GeraPro tenta adivinhar sozinho pelo nome da coluna, mas você pode corrigir.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. PASSO A PASSO NA TELA — IMPORTAÇÃO DE MATERIAIS                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+ETAPA 1 — ACESSAR A IMPORTAÇÃO
+
+  • No menu lateral esquerdo, vá até a seção "Configurações".
+  • Clique em "Importar Dados" (ícone de upload 📤).
+  • A tela de importação abre com a área de upload.
+
+ETAPA 2 — SELECIONAR O ARQUIVO
+
+  • Clique em "Escolher Arquivo" e selecione sua planilha (.xlsx, .xls ou .csv).
+  • O sistema carrega o arquivo e mostra a PRÉ-VISUALIZAÇÃO.
+
+ETAPA 3 — VERIFICAR A PRÉ-VISUALIZAÇÃO
+
+  • Você vê as primeiras 5 linhas do arquivo em uma tabela.
+  • Confira se os dados estão aparecendo corretamente.
+  • ✅ Se as colunas estiverem bagunçadas ou com nomes estranhos como
+     "__EMPTY_1", não se preocupe — você vai ajustar no mapeamento.
+
+ETAPA 4 — CONFIGURAR O MAPEAMENTO (O PASSO MAIS IMPORTANTE)
+
+  Abaixo da pré-visualização aparece o painel "Mapeamento de Colunas".
+  Cada linha do painel representa um campo do sistema:
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │  MAPEAMENTO DE COLUNAS                                                       │
+  │  ─────────────────────────────────────────────                               │
+  │                                                                              │
+  │  Código Interno ── [Selecione a coluna... ▼]     →  Escolha qual coluna     │
+  │                                                     do arquivo contém       │
+  │  Descrição * ───── [Selecione a coluna... ▼]        o código do material    │
+  │                                                     (ex: MLFB, Part Number) │
+  │  Custo (R$) ────── [Selecione a coluna... ▼]                                │
+  │                                                                              │
+  │  Fabricante ────── [Selecione a coluna... ▼]                                │
+  │                                                                              │
+  │  Unidade ───────── [Selecione a coluna... ▼]                                │
+  │                                                                              │
+  │  ... e mais campos                                                          │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+  📌 Se você quiser IGNORAR uma coluna do arquivo, deixe o campo como
+     "— Ignorar —". Ex: se o arquivo tem uma coluna "Observação" que
+     você não quer cadastrar.
+
+  ⚡ SE FOR PLANILHA DA SIEMENS:
+     O sistema DETECTA automaticamente (colunas __EMPTY*) e já preenche o
+     mapeamento correto. Você só precisa confirmar e clicar em Processar.
+
+ETAPA 5 — PROCESSAR A IMPORTAÇÃO
+
+  • Depois de configurar o mapeamento, clique no botão roxo "Processar Importação".
+  • O sistema percorre TODAS as linhas do arquivo e:
+    ┌────────────────────────────────────────────────────────────────────────────┐
+    │ • Se o Código (ou Cód. Fabricante) JÁ existe no GeraPro → ATUALIZA        │
+    │   os dados (preço, descrição, etc.)                                        │
+    │ • Se o Código NÃO existe no GeraPro → CRIA um novo material               │
+    └────────────────────────────────────────────────────────────────────────────┘
+  • No final, aparece uma mensagem verde:
+    "35 novos itens adicionados. 12 itens existentes atualizados."
+
+ETAPA 6 — CONFERIR O RESULTADO
+
+  • Os materiais importados aparecem na lista de Materiais.
+  • Você pode editar individualmente se precisar ajustar algo.
+  • O campo "Grupo Siemens" (se mapeado) aparece na aba Fiscal do material.
+  • A importação fica registrada no painel "Importações Recentes" — veja
+    a seção 13 deste documento para saber como desfazer se precisar.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. IMPORTAÇÃO DE CLIENTES E FORNECEDORES                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Além da importação de materiais, o GeraPro permite importar dados de CLIENTES
+e FORNECEDORES usando um assistente de 4 etapas dentro dos próprios módulos.
+
+Você NÃO encontra essas opções no menu "Importar Dados". Elas estão dentro de:
+- Módulo Clientes → botão "Importar" (no alto da tela)
+- Módulo Fornecedores → botão "Importar" (no alto da tela)
+
+AS 4 ETAPAS DO ASSISTENTE:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ ETAPA 1 — UPLOAD                                                                │
+│                                                                                 │
+│   • Primeiro, baixe o "Modelo CSV" para ver o formato esperado.                │
+│   • Prepare sua planilha seguindo o modelo (colunas: Razão Social, CNPJ,       │
+│     Endereço, Telefone, E-mail, etc.)                                          │
+│   • Arraste o arquivo ou clique para selecionar (.csv ou .xlsx).               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ ETAPA 2 — MAPEAMENTO                                                            │
+│                                                                                 │
+│   • O sistema tenta adivinhar qual coluna da sua planilha corresponde a        │
+│     cada campo (por sinônimos: "Razão Social" = "Nome", "CNPJ" = "CPF/CNPJ"). │
+│   • Confira o mapeamento e ajuste se necessário.                               │
+│   • Campos obrigatórios: Razão Social e CNPJ.                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ ETAPA 3 — PRÉ-VISUALIZAÇÃO                                                      │
+│                                                                                 │
+│   • O sistema valida as linhas e mostra quantas estão:                         │
+│     ✅ Válidas | ❌ Com Erro | ⚠️ Duplicatas                                   │
+│   • Você vê as primeiras 10 linhas em uma tabela.                              │
+│   • Dados inválidos (ex: CNPJ faltando) são marcados em vermelho.              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ ETAPA 4 — IMPORTAÇÃO                                                            │
+│                                                                                 │
+│   • Clique em "Importar" — o sistema processa linha por linha.                 │
+│   • Uma barra de progresso mostra o andamento.                                 │
+│   • Ao final, aparece o resumo:                                                │
+│     ┌─────────────────────────────────────────────────────────────────────────┐ │
+│     │ • Importados/Atualizados: quantos foram cadastrados ou atualizados      │ │
+│     │ • Com Erro: quantos falharam (com link para baixar relatório)           │ │
+│     │ • Ignorados: quantos foram pulados (duplicatas exatas)                  │ │
+│     └─────────────────────────────────────────────────────────────────────────┘ │
+│   • Se houver erros, clique em "Baixar Relatório de Erros" para ver            │
+│     em uma planilha quais linhas falharam e o motivo.                          │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 DIFERENÇAS EM RELAÇÃO À IMPORTAÇÃO DE MATERIAIS:
+
+  ┌───────────────────────┬───────────────────────┬───────────────────────────────┐
+  │                       │ Materiais             │ Clientes / Fornecedores       │
+  ├───────────────────────┼───────────────────────┼───────────────────────────────┤
+  │ Onde acessar          │ Sidebar > Importar    │ Dentro do módulo (Cliente     │
+  │                       │ Dados                 │ ou Fornecedor) > botão        │
+  │                       │                       │ "Importar"                     │
+  │                       │                       │                               │
+  │ Etapas                │ Única tela com        │ Assistente de 4 etapas        │
+  │                       │ upload + mapeamento   │ (Upload → Mapeamento →        │
+  │                       │ + processo            │ Preview → Importação)         │
+  │                       │                       │                               │
+  │ Modelo para download  │ Não tem               │ Sim (botão "Baixar Modelo     │
+  │                       │                       │ CSV")                          │
+  │                       │                       │                               │
+  │ Undo                 │ Sim (sessões)          │ Não                           │
+  │                       │                       │                               │
+  │ Relatório de erros    │ Mensagem simples       │ CSV detalhado para download   │
+  │                       │                       │                               │
+  │ Destino dos dados     │ Tabela Materiais       │ Tabela Clientes /             │
+  │                       │                       │ Fornecedores                   │
+  └───────────────────────┴───────────────────────┴───────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. SESSÕES RECENTES E LIMPEZA EM MASSA                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Após cada importação de materiais, o sistema registra uma "Sessão de Importação".
+Isso permite duas ferramentas úteis:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ SESÕES RECENTES (DESFAZER)                                                      │
+│                                                                                 │
+│   Logo abaixo da área de upload, aparece a seção "Importações Recentes".        │
+│   Cada importação que você fez fica listada com:                               │
+│   • Data e hora                                                                │
+│   • Quantidade de materiais criados e atualizados                              │
+│   • Botão "Desfazer" — clique para REVERTER aquela importação                  │
+│                                                                                 │
+│   ⚠️ O "Desfazer" restaura os materiais que existiam ANTES da importação.      │
+│      Materiais criados são removidos; materiais atualizados voltam ao           │
+│      preço/descrição anteriores.                                                │
+│      ⚠️ Só é possível desfazer a ÚLTIMA importação de cada sessão.             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ LIMPEZA EM MASSA POR FABRICANTE                                                 │
+│                                                                                 │
+│   Abaixo das Sessões Recentes, tem a ferramenta "Limpeza em Massa".            │
+│   Ela permite REMOVER TODOS os materiais de um fabricante de uma vez.          │
+│                                                                                 │
+│   Como usar:                                                                    │
+│   1. Selecione o fabricante no dropdown                                        │
+│   2. Veja a quantidade de materiais que serão removidos                        │
+│   3. Clique em "Limpar"                                                         │
+│   4. Confirme a ação — ⚠️ Não tem como desfazer!                               │
+│                                                                                 │
+│   Quando usar:                                                                  │
+│   • Você importou um catálogo inteiro da Siemens e depois percebeu que         │
+│     era a versão errada. Use Limpeza + reimporte o catálogo correto.           │
+│   • Você quer "resetar" os preços de um fabricante para começar de novo.       │
+│                                                                                 │
+│   ⚠️ ATENÇÃO: A limpeza remove DEFINITIVAMENTE os materiais.                  │
+│      Se algum material estiver sendo usado em um Típico ou Proposta            │
+│      Técnica, ele será removido da lista e o vínculo será perdido.             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. CAMPOS QUE VOCÊ PODE MAPEAR                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────┬──────────┬─────────────────────────────────────────┐
+│ CAMPO NO SISTEMA          │ OBRIG.   │ O QUE É                                │
+├───────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ Código Interno            │ Não*     │ Código único do material no GeraPro.    │
+│                           │          │ Se não tiver, o sistema gera um        │
+│                           │          │ automaticamente (ex: IMP-45231).        │
+│                           │          │                                         │
+│ Cód. Fabricante           │ Não      │ Código do fornecedor (Part Number,      │
+│                           │          │ MLFB da Siemens, etc.). Útil para       │
+│                           │          │ identificar o material nas próximas     │
+│                           │          │ importações (atualiza em vez de criar). │
+│                           │          │                                         │
+│ Descrição *               │ ✅ SIM   │ Nome do material. Ex: "Disjuntor 3P     │
+│                           │          │ 160A". Se não tiver descrição, a linha  │
+│                           │          │ é ignorada na importação.               │
+│                           │          │                                         │
+│ Custo (R$)                │ Não      │ Preço de custo do material.              │
+│                           │          │ Aceita formato brasileiro (1.234,56)    │
+│                           │          │ ou americano (1234.56).                 │
+│                           │          │                                         │
+│ Fabricante                │ Não      │ Nome do fabricante (Siemens, WEG, etc.) │
+│                           │          │ Se não tiver, fica "Genérico".          │
+│                           │          │                                         │
+│ Unidade                   │ Não      │ Unidade de medida (un, pc, kg, m, etc.) │
+│                           │          │ Se não tiver, fica "un".                │
+│                           │          │                                         │
+│ Categoria                 │ Não      │ Família do produto (Disjuntor, Contator)│
+│                           │          │                                         │
+│ NCM                       │ Não      │ Código NCM para fiscal.                 │
+│                           │          │                                         │
+│ ICMS (%)                  │ Não      │ Alíquota de ICMS do material.           │
+│                           │          │ Se vier como decimal (ex: 0,12) o       │
+│                           │          │ sistema converte para 12%.              │
+│                           │          │                                         │
+│ IPI (%)                   │ Não      │ Alíquota de IPI do material.             │
+│                           │          │                                         │
+│ UF Fornecedor             │ Não      │ Estado do fornecedor (SP, MG, etc.)     │
+│                           │          │ Usado no cálculo de ICMS por UF.        │
+│                           │          │                                         │
+│ Grupo Siemens             │ Não      │ Grupo de material 2 da Siemens           │
+│                           │          │ (C01, C02, K20, Z13...). Aparece na     │
+│                           │          │ aba Fiscal do material.                 │
+│                           │          │                                         │
+│ Área                      │ Não      │ Setor/departamento do material.         │
+│                           │          │                                         │
+│ Modelo                    │ Não      │ Modelo do produto.                       │
+└───────────────────────────┴──────────┴─────────────────────────────────────────┘
+
+* Se você não mapear Código Interno nem Cód. Fabricante, o sistema cria um
+  código automático (IMP-xxxxx). Na próxima importação, ele NÃO vai conseguir
+  identificar que é o mesmo material e vai criar um novo duplicado.
+  ✅ Recomendação: sempre mapeie pelo menos o Cód. Fabricante (MLFB, Part Number).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. O QUE ACONTECE QUANDO O CÓDIGO JÁ EXISTE?                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Essa é a parte mais importante para entender.
+
+O GeraPro usa o Código Interno ou o Cód. Fabricante para decidir:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1ª IMPORTAÇÃO (MÊS PASSADO):                                                   │
+│                                                                                 │
+│  Planilha:  C01 | Fusível 3P 160A | R$ 42,00                                   │
+│                                                                                 │
+│  → Código C01 não existe no GeraPro → CRIA novo material                       │
+│  → Material criado com código C01, preço R$ 42,00                              │
+│                                                                                 │
+│  2ª IMPORTAÇÃO (ESSE MÊS):                                                      │
+│                                                                                 │
+│  Planilha:  C01 | Fusível 3P 160A | R$ 48,90  (preço subiu)                   │
+│                                                                                 │
+│  → Código C01 JÁ existe → ATUALIZA o material existente                        │
+│  → Preço muda de R$ 42,00 para R$ 48,90                                        │
+│  → O histórico de preços guarda a versão anterior                              │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅ Isso significa que você pode importar a lista de preços TODO MÊS — os itens
+   novos são criados e os existentes são atualizados. Nada é duplicado.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. PLANILHA DA SIEMENS — DETALHE ESPECÍFICO                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A Siemens envia a planilha de preços em um formato especial. A primeira linha
+da planilha é um título mesclado "Lista de Preços", e as colunas não têm nome
+próprio — aparecem como __EMPTY, __EMPTY_1, __EMPTY_2, etc.
+
+Quando você carrega a planilha Siemens, o sistema:
+
+  1. ✅ DETECTA automaticamente que é uma planilha Siemens
+  2. ✅ MOSTRA um aviso vermelho "Planilha Siemens detectada"
+  3. ✅ PREENCHE o mapeamento automaticamente:
+
+     ┌──────────────────┬──────────────────────────────┐
+     │ Coluna Siemens   │ Mapeada para                 │
+     ├──────────────────┼──────────────────────────────┤
+     │ __EMPTY          │ Código Interno (MLFB)        │
+     │ __EMPTY_1        │ Descrição                    │
+     │ __EMPTY_3        │ Grupo Siemens (C01, C02...)  │
+     │ __EMPTY_4        │ NCM                          │
+     │ __EMPTY_7        │ Unidade                      │
+     │ __EMPTY_8        │ Custo (R$)                   │
+     └──────────────────┴──────────────────────────────┘
+
+  4. ✅ Você pode ajustar se precisar (ex: se a disposição das colunas mudou)
+
+⚡ SE A PLANILHA NÃO FOR DETECTADA AUTOMATICAMENTE:
+   • Se a planilha foi editada manualmente e ganhou cabeçalhos próprios, o sistema
+     pode não reconhecer como Siemens mesmo sendo uma.
+   • Nesse caso, aparecerá um BOTÃO VERMELHO "Forçar Mapeamento Siemens" no
+     painel de mapeamento, desde que as colunas __EMPTY ainda estejam presentes.
+   • Clique nele para aplicar o mapeamento padrão Siemens manualmente.
+
+📌 ATENÇÃO: O botão "Reaplicar Mapeamento Siemens" (verde, no topo do painel)
+   volta ao padrão caso você tenha mudado alguma coisa e queira resetar.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. MAPEAMENTO PARA OUTROS FABRICANTES                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Para fabricantes que NÃO são Siemens (WEG, Schneider, ABB, etc.), a planilha
+normalmente já vem com nomes de coluna legíveis. Nesse caso:
+
+  • O sistema tenta adivinhar o mapeamento pelo nome da coluna.
+  • Exemplos de auto-detect:
+
+    ┌────────────────────┬──────────────────────────────────────┐
+    │ Nome na planilha   │ Sistema entende como                 │
+    ├────────────────────┼──────────────────────────────────────┤
+    │ "Código"           │ Código Interno                       │
+    │ "Descrição"        │ Descrição                            │
+    │ "Preço" / "Custo"  │ Custo (R$)                           │
+    │ "Fabricante"       │ Fabricante                           │
+    │ "UF" / "Estado"    │ UF Fornecedor                        │
+    │ "NCM"              │ NCM                                  │
+    │ "ICMS"             │ ICMS (%)                             │
+    └────────────────────┴──────────────────────────────────────┘
+
+  • MESMO ASSIM, você pode ajustar manualmente. O sistema não é infalível.
+  • Se uma coluna tem um nome que o sistema não reconhece, ela fica sem
+    mapeamento — você escolhe manualmente no select.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  Tenha um Código (Interno ou do Fabricante) em cada linha. Sem ele, o
+    sistema não consegue identificar se o material já existe — e cada
+    importação criaria duplicatas.
+
+✅  A Descrição é OBRIGATÓRIA. Linhas sem descrição são ignoradas na
+    importação. Verifique se sua planilha não tem linhas em branco.
+
+✅  Confira sempre a PRÉ-VISUALIZAÇÃO antes de processar. Ela mostra
+    as primeiras 5 linhas com os dados reais — você vê se o preço está
+    sendo interpretado corretamente, se a descrição apareceu, etc.
+
+✅  Para a Siemens, o campo Grupo Siemens é preenchido automaticamente
+    a partir da coluna __EMPTY_3 (Grupo de material 2). Você pode
+    filtrar por esse grupo no Reajuste em Massa depois.
+
+✅  Se você importar a MESMA planilha duas vezes, os materiais existentes
+    serão ATUALIZADOS com os mesmos dados — não cria duplicatas.
+
+✅  O histórico de preços guarda cada alteração. Você pode ver no
+    material, na aba "Histórico", todas as vezes que o preço mudou
+    (inclusive via importação).
+
+✅  Após importar, use ⭐ "Só favoritos" na lista de Materiais
+    para marcar os itens que você usa no dia a dia. Funciona como
+    uma "lista rápida": importe o catálogo completo uma vez e
+    filtre só os favoritos nas telas de Típicos e Proposta Técnica.
+
+⚠️  Não feche a página enquanto a importação estiver processando.
+    O processo é rápido (segundos), mas se interromper no meio,
+    alguns materiais podem ficar incompletos.
+
+⚠️  Se aparecer a mensagem "Nenhum item válido encontrado", significa
+    que o sistema não encontrou a coluna de Descrição no mapeamento.
+    Verifique se você selecionou a coluna correta para "Descrição *".
+
+⚠️  Se os PREÇOS aparecerem errados (ex: 1000 em vez de 10,00):
+    • Verifique o formato dos números na planilha
+    • O sistema entende tanto 1.234,56 (BR) quanto 1234.56 (US)
+    • Se o número tiver separador de milhar, o sistema tenta interpretar
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Importar              │ Trazer dados de um arquivo externo (Excel, CSV)        │
+│                       │ para dentro do sistema.                                 │
+│                       │                                                         │
+│ Mapeamento            │ A correspondência entre as colunas do seu arquivo      │
+│                       │ e os campos do sistema. Ex: "coluna Preço → campo      │
+│                       │ Custo".                                                │
+│                       │                                                         │
+│ Pré-visualização      │ Primeiras linhas do arquivo mostradas na tela para     │
+│                       │ você conferir antes de processar.                      │
+│                       │                                                         │
+│ Código Interno        │ Identificação única do material DENTRO do GeraPro.     │
+│                       │ Você escolhe. Ex: "DIS-001", "CAB-010".                │
+│                       │                                                         │
+│ Cód. Fabricante       │ Código que o FABRICANTE usa. Ex: MLFB da Siemens,      │
+│                       │ Part Number, código WEG.                               │
+│                       │                                                         │
+│ MLFB                  │ Código de produto da Siemens.                           │
+│                       │ Ex: 3RV1011-0AA10.                                     │
+│                       │                                                         │
+│ Grupo Siemens         │ Classificação do produto Siemens, também chamado       │
+│                       │ de "Grupo de material 2". Ex: C01 (Disjuntores),        │
+│                       │ K20 (Inversores).                                      │
+│                       │                                                         │
+│ CSV                   │ Arquivo de texto simples com valores separados por     │
+│                       │ vírgula. Pode ser aberto no Excel. Extensão .csv.      │
+│                       │                                                         │
+│ XLSX                  │ Formato de planilha do Excel. Extensão .xlsx.           │
+│                       │                                                         │
+│ Atualizar             │ Quando um material JÁ existe e a importação só          │
+│                       │ modifica os dados (preço, descrição, etc.).             │
+│                       │                                                         │
+│ Criar                 │ Quando um material NÃO existe e a importação            │
+│                       │ cadastra um novo.                                       │
+│                       │                                                         │
+│ Histórico de Preços   │ Registro de todas as alterações de preço do material.  │
+│                       │ Cada importação ou edição manual fica registrada.       │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  14. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "Nenhum item válido encontrado"                                     │
+│  SOLUÇÃO:  Você não mapeou a coluna de Descrição. Ela é obrigatória.           │
+│            Volte no painel de mapeamento e selecione qual coluna do arquivo     │
+│            contém a descrição do material.                                      │
+│                                                                                 │
+│  PROBLEMA: "Os preços ficaram com valores errados"                             │
+│  SOLUÇÃO:  O problema é o formato dos números. Ex: se o arquivo tem            │
+│            1.234,56 e o sistema leu 1,23456, significa que ele confundiu       │
+│            o ponto com separador decimal. Você pode:                            │
+│            (a) Ajustar a planilha, substituindo pontos por nada ou vírgulas    │
+│            (b) Usar o template de exemplo como base                             │
+│                                                                                 │
+│  PROBLEMA: "Importei e criou materiais duplicados"                             │
+│  SOLUÇÃO:  O código do material (Interno ou Fabricante) não estava preenchido  │
+│            ou estava diferente. O sistema não conseguiu identificar que já     │
+│            existia. Mapeie corretamente a coluna de código na próxima vez.     │
+│                                                                                 │
+│  PROBLEMA: "O arquivo Excel não carrega"                                      │
+│  SOLUÇÃO:  Pode ser que o arquivo esteja corrompido. Tente:                    │
+│            (a) Abrir e salvar como cópia no Excel (Arquivo > Salvar como)      │
+│            (b) Salvar como CSV e importar o CSV                                │
+│            (c) Verificar se a extensão é .xlsx ou .xls (não .xlsb ou .xlsm)    │
+│                                                                                 │
+│  PROBLEMA: "A planilha Siemens não detectou automaticamente"                   │
+│  SOLUÇÃO:  As colunas precisam se chamar __EMPTY, __EMPTY_1, etc. Isso         │
+│            acontece quando a primeira linha é um título mesclado. Se a          │
+│            planilha já foi editada e ganhou cabeçalhos manuais, o sistema      │
+│            trata como planilha normal. Faça o mapeamento manual.                │
+│                                                                                 │
+│  PROBLEMA: "Importei mas o Grupo Siemens ficou em branco"                      │
+│  SOLUÇÃO:  Verifique se a coluna "Grupo de material 2" foi mapeada para        │
+│            o campo "Grupo Siemens" no painel de mapeamento. Se a coluna        │
+│            tinha outro nome, selecione manualmente.                             │
+│                                                                                 │
+│  PROBLEMA: "O sistema criou códigos IMP-xxxxx em vez de usar o meu"            │
+│  SOLUÇÃO:  Você não mapeou nenhuma coluna para "Código Interno". O sistema     │
+│            gera um automático. Se você tem um código na planilha, mapeie       │
+│            a coluna correta para o campo "Código Interno".                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   A importação de listas de preços é uma ferramenta para economizar TEMPO.      ║
+║   Em vez de digitar 300 itens um por um, você faz em 2 minutos.                 ║
+║                                                                                  ║
+║   O MAPEAMENTO é a única parte que exige atenção — depois que você             ║
+║   entende, fica fácil.                                                          ║
+║                                                                                  ║
+║   "Gaste 1 minuto configurando o mapeamento para economizar 1 hora              ║
+║    digitando códigos."                                                          ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

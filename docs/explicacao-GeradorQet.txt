@@ -1,0 +1,375 @@
+================================================================================
+                        GERADOR QET — MÓDULO DE EXPORTAÇÃO
+                    GeraPro → QElectroTech (.qet)
+================================================================================
+
+1. VISÃO GERAL
+--------------------------------------------------------------------------------
+
+O módulo Gerador QET (js/geradorQet.js) é um componente backend desenvolvido em
+Node.js que converte dados estruturados de propostas técnicas do GeraPro em
+arquivos de projeto do QElectroTech (.qet).
+
+O QElectroTech (QET) é um software livre e open-source para criação de diagramas
+elétricos industriais. O formato nativo .qet utiliza XML para armazenar:
+  - Elementos elétricos (disjuntores, contatores, relés, bornes, etc.)
+  - Condutores (fiação elétrica entre terminais)
+  - Carimbo/legenda (titleblock) com metadados do projeto
+  - Régua de bornes (terminal strips)
+
+O módulo utiliza a biblioteca fast-xml-parser para converter objetos JavaScript
+em XML formatado e indentado, seguindo fielmente o schema nativo do QET.
+
+Arquivo: js/geradorQet.js
+Dependência: fast-xml-parser (instalada via npm)
+Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
+
+
+2. FUNÇÃO PRINCIPAL
+--------------------------------------------------------------------------------
+
+  gerarProjetoQet(dadosOrcamento, caminhoSaida)
+
+  Parâmetros:
+    dadosOrcamento (objeto) — Estrutura com os dados da proposta
+    caminhoSaida (string) — Caminho absoluto ou relativo para salvar o .qet
+
+  Retorno:
+    string — O mesmo caminhoSaida passado, confirmando a escrita do arquivo
+
+  Exceções:
+    Erro se dadosOrcamento for inválido ou campos obrigatórios ausentes
+    Erro se não houver permissão de escrita no caminhoSaida
+
+
+3. ESTRUTURA DE DADOS DE ENTRADA
+--------------------------------------------------------------------------------
+
+  O objeto dadosOrcamento aceita 4 campos principais:
+
+  3.1. titleblock (objeto) — Metadados do carimbo
+
+    titulo: string          — Título do projeto / diagrama
+    cliente: string         — Nome do cliente
+    numeroProposta: string  — Número da proposta (ex: "PT-26070202")
+    data: string            — Data no formato "YYYY-MM-DD"
+    autor: string           — Nome do responsável / empresa
+
+    Estes dados preenchem a tag <inset> e <diagram> do QET, que controlam
+    as informações exibidas no carimbo (legenda) do desenho.
+
+  3.2. componentes (array de objetos) — Elementos elétricos
+
+    Cada objeto representa um componente posicionado no diagrama:
+
+    id: string              — Identificador único do componente
+    tag: string             — Identificação no diagrama (ex: "DJ1", "KM1")
+    fabricante: string      — Fabricante do componente
+    modelo: string          — Modelo do componente
+    posicaoX: number        — Posição horizontal em milímetros (mm)
+    posicaoY: number        — Posição vertical em milímetros (mm)
+    simboloQet: string      — Caminho do símbolo .elmt no QET
+                              (ex: "embed://import/industria/disjoncteur.elmt")
+    orientacao: number      — Rotação do símbolo:
+                                0 = Norte (padrão)
+                                1 = Leste
+                                2 = Sul
+                                3 = Oeste
+    terminais (array, opcional) — Pontos de conexão elétrica do componente:
+      x: number             — Posição X do terminal RELATIVA ao componente
+      y: number             — Posição Y do terminal RELATIVA ao componente
+      name: string          — Nome do terminal (ex: "1", "A1", "L1")
+      orientation: number   — Orientação do terminal (0=Norte, 1=Leste, 2=Sul, 3=Oeste)
+      number: string        — Número do terminal (opcional, pode ser igual ao name)
+
+    NOTA: As coordenadas são convertidas internamente para décimos de milímetro
+    (multiplicadas por 10), que é a unidade utilizada pelo QET.
+
+  3.3. condutores (array de objetos) — Fiação elétrica
+
+    Cada objeto representa um condutor conectando dois pontos no diagrama:
+
+    anilha: string          — Identificação do condutor (ex: "L1", "N", "PE")
+    origemX: number         — Coordenada X de início (mm)
+    origemY: number         — Coordenada Y de início (mm)
+    destinoX: number        — Coordenada X de fim (mm)
+    destinoY: number        — Coordenada Y de fim (mm)
+    bitola: string          — Seção transversal (ex: "2.5mm²", "4mm²")
+    cor: string             — Cor do condutor (ex: "Marrom", "Preto", "Azul")
+    cabo_grupo: string      — Grupo/cabô do condutor (ex: "W1", "C1")
+
+    Alternativamente, condutores podem ser definidos por terminais:
+    terminal1: number       — ID do terminal de origem
+    terminal2: number       — ID do terminal de destino
+
+    Os IDs dos terminais são gerados sequencialmente (0, 1, 2, ...) na ordem
+    em que os componentes são listados. Cada terminal de cada componente recebe
+    um ID único e incremental.
+
+  3.4. bornes (array de objetos) — Réguas de bornes
+
+    Cada objeto representa um borne em uma régua:
+
+    numero: string          — Número do borne (ex: "1", "2", "X1:1")
+    regua_parent: string    — Régua à qual o borne pertence (ex: "X1", "X2")
+    posicaoX: number        — Coordenada X do borne (mm)
+    posicaoY: number        — Coordenada Y do borne (mm)
+    simboloQet: string      — Símbolo do borne (opcional, default interno)
+
+    Os bornes são convertidos internamente em componentes com 2 terminais cada
+    (superior e inferior), e recebem a tag no formato "X1:1", "X1:2", etc.
+
+
+4. MAPEAMENTO PARA XML DO QELETROTECH
+--------------------------------------------------------------------------------
+
+  O XML gerado segue o schema nativo do QET versão 0.4:
+
+  <project version="0.4" title="..." folioSheetQuantity="0">
+    <properties/>
+    <newdiagrams>
+      <border .../>
+      <inset .../>                              ← titleblock
+      <conductors .../>                         ← condutores padrão
+      <report .../>
+      <xrefs>...</xrefs>
+      <conductors_autonums/>
+    </newdiagrams>
+    <diagram title="..." ...>                   ← diagrama principal
+      <defaultconductor .../>
+      <elements>
+        <element x="..." y="..." type="..." uuid="..." orientation="...">
+          <terminals>
+            <terminal x="..." y="..." id="..." name="..." orientation="..."/>
+          </terminals>
+          <inputs>
+            <input x="..." y="..." text="..."/>  ← tag do componente
+          </inputs>
+        </element>
+      </elements>
+      <conductors>
+        <conductor num="..." terminal1="..." terminal2="..." type="multi" ...>
+          <segment length="..." orientation="..."/>
+        </conductor>
+      </conductors>
+    </diagram>
+  </project>
+
+  Detalhamento do mapeamento:
+
+  titleblock → <inset> e atributos do <diagram>
+    - titleblock.titulo → @_title do <diagram> e @_title do <inset>
+    - titleblock.autor → @_author do <diagram> e <inset>
+    - titleblock.data → @_date do <diagram> e <inset>
+    - titleblock.numeroProposta → não mapeado diretamente no <inset>,
+      mas pode ser concatenado ao título
+
+  componentes[] → <element>
+    - Cada componente gera um <element> com:
+      - @_x = posicaoX * 10
+      - @_y = posicaoY * 10
+      - @_type = simboloQet (caminho do .elmt)
+      - @_uuid = UUID v4 gerado aleatoriamente
+      - @_orientation = orientacao
+      - <terminals> com <terminal> para cada terminal definido
+      - <inputs> com <input> para exibir a tag
+
+  terminais[] dentro de componentes → <terminal>
+    - Cada terminal recebe um ID sequencial (0, 1, 2, ...) no escopo de
+      todo o diagrama. Esse ID é usado por <conductor> para referenciar
+      as conexões.
+    - Coordenadas do terminal são relativas à posição do elemento.
+    - O QET usa terminal ID para identificar conexões entre elementos.
+
+  condutores[] → <conductor>
+    - Quando origem/destino são coordenadas: gera segmentos de fiação
+      (horizontal/vertical) calculando dx = (destinoX - origemX) e
+      dy = (destinoY - origemY).
+    - Quando terminal1/terminal2 são fornecidos: usa IDs de terminais
+      diretamente, permitindo que o QET gerencie a rota automaticamente.
+
+  bornes[] → <element> (tipo borne)
+    - Cada borne é convertido em um <element> com 2 terminais:
+      superior (orientação 0/Norte) e inferior (orientação 2/Sul).
+    - A tag exibida segue o formato "X1:1", "X1:2", etc.
+    - O símbolo padrão sugerido é "embed://bornes/bornes_2_elmt"
+      (deve ser ajustado conforme a biblioteca de símbolos instalada).
+
+
+5. COMO UTILIZAR
+--------------------------------------------------------------------------------
+
+  5.1. Importação no código
+
+    const { gerarProjetoQet } = require('./js/geradorQet');
+
+    const dados = {
+      titleblock: {
+        titulo: 'Painel CCM - Caldeira',
+        cliente: 'CMAA',
+        numeroProposta: 'PT-26070202',
+        data: '2026-07-07',
+        autor: 'GeraPro'
+      },
+      componentes: [
+        {
+          id: 'DJ1',
+          tag: 'DJ1',
+          fabricante: 'ABB',
+          modelo: 'S201-C16',
+          posicaoX: 50,
+          posicaoY: 50,
+          simboloQet: 'embed://import/industria/disjoncteur.elmt',
+          orientacao: 0,
+          terminais: [
+            { x: 0, y: -15, name: '1', orientation: 0, number: '1' },
+            { x: 0, y: 15, name: '2', orientation: 2, number: '2' }
+          ]
+        }
+      ],
+      condutores: [
+        { anilha: 'L1', origemX: 50, origemY: 65, destinoX: 50, destinoY: 190,
+          bitola: '2.5mm²', cor: 'Marrom', cabo_grupo: 'W1' }
+      ],
+      bornes: [
+        { numero: '1', regua_parent: 'X1', posicaoX: 0, posicaoY: 350 }
+      ]
+    };
+
+    gerarProjetoQet(dados, 'meu_projeto.qet');
+
+  5.2. Linha de comando (teste autônomo)
+
+    node js/geradorQet.js
+
+    Executa o módulo com dados mock internos e gera o arquivo
+    teste_gerado.qet na raiz do projeto para validação no QElectroTech.
+
+  5.3. Integração futura no frontend
+
+    O módulo foi projetado para ser chamado tanto do lado servidor (Node.js)
+    quanto, futuramente, do frontend via rota REST. A função gerarProjetoQet()
+    é síncrona e não depende de DOM ou APIs de navegador, podendo ser
+    executada em qualquer contexto Node.js.
+
+
+6. VALIDAÇÃO DO ARQUIVO GERADO
+--------------------------------------------------------------------------------
+
+  Após gerar o .qet, recomenda-se:
+
+  1. Abrir o arquivo diretamente no QElectroTech
+     - Verificar se todos os elementos foram posicionados corretamente
+     - Verificar se os condutores estão conectados aos terminais
+     - Verificar o carimbo com os metadados
+
+  2. Validar a estrutura XML (se não tiver o QET instalado)
+     node -e "
+       const fxp = require('fast-xml-parser');
+       const xml = require('fs').readFileSync('teste_gerado.qet','utf-8');
+       const parser = new fxp.XMLParser({ ignoreAttributes: false });
+       const doc = parser.parse(xml);
+       console.log(doc.project ? 'Estrutura OK' : 'Erro na estrutura');
+       console.log('Elementos:', doc.project.diagram.elements?.element?.length || 0);
+       console.log('Condutores:', doc.project.diagram.conductors?.conductor?.length || 0);
+     "
+
+  3. Verificar a existência dos símbolos .elmt referenciados
+     - O campo simboloQet em cada componente deve apontar para um arquivo
+       .elmt válido na biblioteca de símbolos do QET
+     - Símbolos padrão seguem o formato:
+       "embed://import/industria/disjoncteur.elmt"
+       "embed://import/industria/contacteur.elmt"
+       "embed://bornes/bornes_2_elmt"
+     - Caminhos podem variar conforme a instalação e coleção de símbolos
+
+
+7. LIMITAÇÕES E OBSERVAÇÕES
+--------------------------------------------------------------------------------
+
+  7.1. Dependência de símbolos
+
+    O QElectroTech precisa ter os arquivos .elmt referenciados em simboloQet
+    instalados em sua biblioteca de elementos. O GeraPro não inclui símbolos
+    — eles devem ser obtidos separadamente (coleção padrão do QET ou
+    biblioteca personalizada do usuário).
+
+  7.2. Roteamento automático de condutores
+
+    Quando condutores são definidos por coordenadas (origemX/destinoX), o
+    módulo gera segmentos retos (primeiro horizontal, depois vertical). O
+    QET pode recalcular a rota ao abrir o arquivo se os terminais de
+    origem/destino estiverem corretamente identificados.
+
+    Para roteamento automático mais preciso, use terminal1/terminal2 em
+    vez de coordenadas, referenciando os IDs dos terminais dos componentes.
+
+  7.3. Bornes como elementos
+
+    Bornes são convertidos em elementos com 2 terminais. O QET nativo trata
+    bornes de forma especial através do Gerenciador de Bornes (Terminal
+    Strip Manager). Para integração total com essa funcionalidade, seria
+    necessário utilizar a estrutura <terminalstrip> do QET, que está
+    prevista para versões futuras do módulo.
+
+  7.4. Inexistente no diagrama
+
+    O módulo gera APENAS o diagrama elétrico. Não há geração de:
+    - Lista de materiais (BOM) embutida
+    - Tabela de cabos
+    - Tabela de bornes
+    - Diagramas multifilares automáticos
+    - Cruzamento de referências (xrefs)
+    - Folhas adicionais com diagramas de comando
+
+    Estas funcionalidades podem ser implementadas em versões futuras.
+
+  7.5. Performance
+
+    Para diagramas com muitos elementos (centenas), a geração do XML pode
+    levar alguns segundos. O módulo é síncrono e monoliticamente construído
+    — carregar uma proposta completa com todos os equipamentos pode consumir
+    memória proporcional ao número de componentes.
+
+  7.6. Formato da data
+
+    O QET espera a data no formato ISO (YYYY-MM-DD) ou no formato local
+    conforme a configuração regional. O módulo usa o formato ISO
+    automaticamente.
+
+
+8. INTEGRAÇÃO FUTURA (ROADMAP)
+--------------------------------------------------------------------------------
+
+  Versão 1.0 (atual):
+    - Geração de diagrama único com elementos, terminais e condutores
+    - Suporte a réguas de bornes como elementos
+    - Preenchimento do carimbo (titleblock)
+    - Teste autônomo via mock
+
+  Versão 1.1 (planejado):
+    - Integração com o layout de armários do GeraPro (suggestLayout)
+    - Extração automática de componentes a partir das linhas (trilhos)
+    - Posicionamento baseado nos cálculos do layout
+
+  Versão 1.2 (planejado):
+    - Suporte a múltiplos diagramas (potência, comando, bornes)
+    - Tabela de cabos e bornes embutida
+    - Gerenciador de bornes nativo do QET (terminalstrip)
+
+  Versão 2.0 (visão):
+    - Botão de exportação no frontend da Proposta Técnica
+    - Exportação em lote (todos os equipamentos de uma PTC)
+    - Template personalizável de diagrama
+    - Sincronização bidirecional (QET → GeraPro)
+
+
+9. REFERÊNCIAS
+--------------------------------------------------------------------------------
+
+  QElectroTech:              https://qelectrotech.org/
+  Documentação XML .qet:     https://qelectrotech.org/wiki_new/doc/xml_projects_0.11
+  fast-xml-parser (npm):     https://www.npmjs.com/package/fast-xml-parser
+  Repositório GeraPro:       [local] C:\Users\jcc\Documents\Workspace_A\GeraPro
+  Módulo:                    js/geradorQet.js
+  Teste:                     node js/geradorQet.js (gera teste_gerado.qet)

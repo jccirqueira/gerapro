@@ -1244,7 +1244,7 @@ const ManufaturaModule = {
     },
 
     _buildQRData(entityType, entityId) {
-        const baseUrl = `http://${location.hostname}:8082`;
+        const baseUrl = '';
         const payload = {
             type: entityType,
             id: entityId,

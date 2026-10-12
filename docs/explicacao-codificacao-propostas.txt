@@ -1,0 +1,244 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    EXPLICAÇÃO SIMPLES — CODIFICAÇÃO DE PROPOSTAS — GERAPRO                       ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica como o GeraPro numera as               ║
+║   propostas técnicas (PT) e comerciais (PC) e como organiza as pastas            ║
+║   no servidor, especificamente para a empresa AUTPRO.                            ║
+║   Se você precisa de ajuda sobre outros módulos, procure o help do sistema       ║
+║   (botão ❓ no canto superior) ou os outros arquivos de explicação na pasta      ║
+║   /docs.                                                                         ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. POR QUE UMA NUMERAÇÃO ESPECIAL?                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Antes, o sistema numerava as propostas com a data do dia + um número sequencial.
+Exemplo: 26070801  (ano 26, mês 07, dia 08, sequencial 01).
+
+Para a empresa AUTPRO, isso foi mudado. Agora o número da proposta tem um
+significado e conta a história de qual cliente, qual unidade e qual o número
+daquela proposta. Fica muito mais profissional e organizado.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. COMO FUNCIONA O NÚMERO DA PROPOSTA?                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O número tem 8 dígitos, divididos em 3 partes:
+
+   ┌──────────┐  ┌──────────┐  ┌──────────┐
+   │          │  │          │  │          │
+   │   008    │  │    01    │  │   017    │
+   │          │  │          │  │          │
+   └──────────┘  └──────────┘  └──────────┘
+   Código do     Código da     Sequencial da
+   Cliente       Unidade       Proposta
+
+   Exemplo completo: 00801017
+
+   Onde:
+   • 008 = código do cliente (o usuário cadastra no cliente)
+   • 01  = código da unidade (o usuário cadastra na aba "Unidades")
+   • 017 = número sequencial (o sistema控制a automaticamente)
+
+   OS 5 PRIMEIROS DÍGITOS (00801) SÃO FIXOS para este cliente nesta unidade.
+   Apenas os 3 últimos variam: 017, 018, 019... até 999.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. E OS CÓDIGOS PT E PC?                                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Com o número base 00801017, o sistema gera:
+
+   • Proposta Técnica:  PT-00801017
+   • Proposta Comercial: PC-00801017
+
+Esses códigos aparecem nos documentos .docx e na interface do sistema.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. COMO AS PASTAS SÃO ORGANIZADAS NO SERVIDOR?                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Antes, todas as pastas ficavam soltas na raiz da empresa:
+
+   GeraPro/AUT_2e10603f/26070801-MEU-PROJETO/
+   GeraPro/AUT_2e10603f/26070802-OUTRO-PROJETO/
+
+Agora, as pastas seguem uma hierarquia de 3 níveis:
+
+   GeraPro/
+   └── AUT_2e10603f/                              ← pasta da empresa AUTPRO
+       └── 008 - BP BIOENERGY/                    ← pasta do cliente (código + nome)
+           └── 01 - MOEMA/                        ← pasta da unidade (código + nome)
+               └── 017 - INSTALACAO-E-CONFIG-SERVIDOR/   ← pasta da proposta
+                   ├── Documentação Cliente/
+                   ├── Documentação Minha_Empresa/
+                   ├── Documentação Fornecedores/
+                   ├── Log das Revisões/
+                   └── Outros/
+
+Isso mantém tudo organizado: todas as propostas de um mesmo cliente ficam
+dentro da pasta dele, separadas por unidade.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. QUEM DEFINE O CÓDIGO DO CLIENTE?                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O código do cliente (ex: 008) é definido pelo usuário no cadastro do cliente.
+
+Como fazer:
+   1. Vá em "Clientes" no menu lateral.
+   2. Abra um cliente ou crie um novo.
+   3. Na aba "Dados Gerais", existe o campo "Código do Cliente".
+   4. Digite o código desejado (ex: 008, 015, 100...).
+   5. Salve o cliente.
+
+ATENÇÃO: O código deve ser único para cada cliente dentro da AUTPRO.
+Se dois clientes tiverem o mesmo código, o sistema vai alertar.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. COMO CADASTRAR UMA UNIDADE DO CLIENTE?                                     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Depois de criar o cliente:
+
+   1. Abra o cliente para edição.
+   2. Clique na aba "Unidades" (é a última aba).
+   3. Clique em "+ Adicionar Unidade".
+   4. Preencha:
+      • Código: ex: 01, 02, 03... (2 dígitos)
+      • Nome da Unidade: ex: Matriz, Moema, Filial SP...
+      • Endereço da unidade (opcional)
+   5. Salve o cliente.
+
+Para cada unidade, o sistema guarda um contador automático (sequencial)
+que começa em 1 e aumenta a cada nova proposta.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. COMO CRIAR UMA PROPOSTA (PTC) — PASSO A PASSO                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+   1. Clique em "Iniciar Nova PTC" no menu.
+   2. Selecione o CLIENTE.
+      — Automaticamente, o sistema carrega as unidades daquele cliente.
+   3. Selecione a UNIDADE (ex: 01 - Moema).
+      — Automaticamente, o sistema busca o próximo número livre
+        para aquela unidade e já mostra o número completo.
+   4. O campo "Número da PTC" exibirá algo como: 00801001
+   5. Preencha o título do projeto, contato, etc.
+   6. Clique em "Salvar e Criar Pastas".
+   7. Pronto! A pasta foi criada na hierarquia correta.
+
+O sistema já consumiu o número 001. A próxima proposta para a mesma unidade
+será 00801002, depois 00801003, e assim por diante.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. O QUE ACONTECE COM AS PROPOSTAS ANTIGAS?                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+As propostas que já existiam antes desta mudança (formato YYMMDDNN, ex: 26070801)
+continuam na raiz da pasta da empresa. Elas NÃO são movidas nem renomeadas.
+
+Apenas as propostas NOVAS (criadas depois da mudança) seguirão o novo formato
+com hierarquia de pastas. As duas formas convivem lado a lado sem problemas.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. O QUE ACONTECE SE EU TROCAR DE CLIENTE?                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Se você abrir um cliente diferente antes de criar a PTC, o sistema recarrega
+as unidades daquele cliente e recalcula o próximo número sequencial disponível
+para aquela unidade. Cada cliente e unidade têm sua própria sequência.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. E SE A UNIDADE NÃO TIVER UNIDADES CADASTRADAS?                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Se você selecionar um cliente que não tem unidades cadastradas, o sistema
+mostrará a mensagem "Nenhuma unidade cadastrada para este cliente" e você
+precisará primeiro cadastrar as unidades no cadastro do cliente antes de
+criar uma proposta para ele.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. ISSO SÓ VALE PARA AUTPRO?                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+SIM. Esta numeração e organização de pastas é exclusiva da empresa AUTPRO.
+Para outras empresas que usam o GeraPro, o sistema continua funcionando
+como antes (número baseado na data do dia).
+
+O sistema detecta automaticamente se a empresa logada é a AUTPRO
+(pela pasta da empresa: AUT_2e10603f) e aplica as regras novas.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. TABELA RESUMO                                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ O QUE               │ ONDE FICA                    │ EXEMPLO                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Código do cliente   │ Cadastro > Dados Gerais     │ 008                        │
+│ Código da unidade   │ Cadastro > Aba Unidades     │ 01                         │
+│ Número da PTC       │ Gerado automaticamente      │ 00801017                   │
+│ Código PT           │ Na proposta                 │ PT-00801017                │
+│ Código PC           │ Na proposta                 │ PC-00801017                │
+│ Pasta do cliente    │ Servidor (GeraPro/)         │ 008 - BP BIOENERGY         │
+│ Pasta da unidade    │ Dentro do cliente           │ 01 - MOEMA                 │
+│ Pasta da proposta   │ Dentro da unidade           │ 017 - NOME-DO-PROJETO      │
+│ Propostas antigas   │ Raiz da pasta empresa       │ 26070801-TITULO ( intactas)│
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Resumo final:                                                                 │
+│                                                                                 │
+│  O sistema gera números com significado e organiza pastas de forma             │
+│  hierárquica (cliente > unidade > proposta). O usuário só precisa             │
+│  cadastrar o código do cliente e das unidades. O resto é automático.           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘

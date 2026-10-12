@@ -141,9 +141,10 @@ const ImportacaoETModule = {
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
             setStep(`IA processando (timeout: ${timeoutMin}min)...`);
             setProgress(30);
+            const _tkImpET = store.getState().auth?.token;
             const res = await fetch('/api/import-document', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(_tkImpET ? { 'Authorization': 'Bearer ' + _tkImpET } : {}) },
                 body: JSON.stringify({
                     filename: file.name,
                     content: base64,
@@ -741,9 +742,10 @@ const ImportacaoETModule = {
 
     async _exportExcel(data) {
         try {
+            const _tkExpET = store.getState().auth?.token;
             const res = await fetch('/api/export-ai-extraction', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(_tkExpET ? { 'Authorization': 'Bearer ' + _tkExpET } : {}) },
                 body: JSON.stringify(data)
             });
 

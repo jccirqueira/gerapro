@@ -1,0 +1,662 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — TÍPICOS DE PARTIDA NO GERAPRO                          ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de Típicos de Partida,         ║
+║   que é onde você cria modelos padronizados de partida de motores.               ║
+║   Ele mostra como criar, configurar e usar os típicos nas Propostas Técnicas.   ║
+║   Se você precisa de ajuda básica do sistema, procure o help (botão ❓).        ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE SÃO OS TÍPICOS DE PARTIDA?                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que você trabalha em uma cozinha industrial e precisa preparar 20 pratos
+diferentes todos os dias. Você não vai consultar a receita do começo ao fim cada
+vez que fizer arroz — você já sabe de cor: 1 xícara de arroz, 2 de água, sal,
+5 minutos na pressão.
+
+Os Típicos de Partida funcionam como essas "receitas de cor", mas para painéis
+elétricos.
+
+Em vez de escolher componente por componente toda vez que você precisa fazer a
+partida de um motor de 50CV, você cria um TÍPICO chamado "SS-50-380" e diz:
+
+  "Sempre que eu usar este típico, quero:
+   • 1 disjuntor motor X
+   • 1 soft-starter Y
+   • 1 contator Z
+   • 2 metros de cabo W
+   • ... (todos os componentes com quantidades e custos)"
+
+Depois, na Proposta Técnica, você simplesmente SELECIONA esse típico para uma
+carga, e o sistema monta a Lista de Materiais automaticamente.
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ✅  Típico = "Receita pronta" para a partida de um motor.                     ║
+║   ✅  Você cria uma vez e reusa em várias propostas.                            ║
+║   ✅  Garante que todos os projetos usem os mesmos componentes padrão.          ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde os Típicos se encaixam no fluxo de trabalho?                             │
+│                                                                                 │
+│  1. Você cadastra os MATERIAIS no catálogo (disjuntores, cabos, contatores)   │
+│  2. ❗ Você CRIA os TÍPICOS (combinações padronizadas desses materiais)       │
+│  3. Você cria uma Proposta Técnica com equipamentos (painéis)                  │
+│  4. Para cada motor/carga no painel, você SELECIONA um típico                 │
+│  5. O sistema monta a Lista de Materiais automaticamente                       │
+│  6. O custo dos materiais vai para a Precificação                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. OS TIPOS DE ACIONAMENTO (PARTIDA)                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada típico tem um "Tipo de Acionamento" — que é a forma como o motor é ligado.
+
+┌───────────────────────┬──────────┬──────────────────────────────────────────────┐
+│ TIPO                  │ SIGLA    │ PARA QUE SERVE                                │
+├───────────────────────┼──────────┼──────────────────────────────────────────────┤
+│ Partida Direta        │ PD       │ Liga o motor direto na rede.                  │
+│                       │          │ Simples e barato, mas dá um "tranco" na hora │
+│                       │          │ de ligar (corrente alta). Para motores       │
+│                       │          │ pequenos (até uns 7,5CV).                    │
+│                       │          │                                                │
+│ Soft-Starter          │ SS       │ Liga o motor de forma suave, aumentando      │
+│                       │          │ a tensão aos poucos. Reduz o tranco na       │
+│                       │          │ partida. Para motores médios.                 │
+│                       │          │                                                │
+│ Inversor de           │ IF       │ Além de ligar suave, controla a VELOCIDADE   │
+│ Frequência            │          │ do motor. É o mais completo (e caro).        │
+│                       │          │                                                │
+│ Estrela-Triângulo     │ ET       │ Liga primeiro em estrela (corrente baixa)    │
+│                       │          │ e depois muda para triângulo (potência       │
+│                       │          │ total). Para motores médios, mas hoje em      │
+│                       │          │ dia está sendo substituído por Soft-Starter.  │
+│                       │          │                                                │
+│ Compensadora          │ CP       │ Usa um autotransformador para reduzir a      │
+│                       │          │ corrente de partida. Está em desuso.         │
+│                       │          │                                                │
+│ Alimentador           │ AL       │ Só distribui energia (não tem motor).        │
+│                       │          │ Ex: um alimentador para um quadro secundário. │
+│                       │          │                                                │
+│ Entrada Geral         │ EG       │ A entrada de energia do painel principal.    │
+│                       │          │ Disjuntor geral, barramentos, etc.            │
+│                       │          │                                                │
+│ Banco de Capacitores  │ BC       │ Correção de fator de potência. Não tem       │
+│                       │          │ motor — tem capacitor. Medido em KVAr.       │
+│                       │          │                                                │
+│ Cubículo MT           │ MT       │ Para média tensão (13,8KV, 34,5KV...).       │
+│                       │          │ Outro mundo — componentes completamente       │
+│                       │          │ diferentes.                                    │
+└───────────────────────┴──────────┴──────────────────────────────────────────────┘
+
+📌 A SIGLA é usada na GERAÇÃO AUTOMÁTICA do nome do típico (ex: IF-50-380).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. A TELA PRINCIPAL (LISTA DE TÍPICOS)                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+No menu lateral, clique em "Engenharia" > "Típicos de Partida".
+
+A tela principal mostra uma TABELA com todos os típicos cadastrados:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  🔍 [Buscar típico..._____________________________]                             │
+│                                                                                 │
+│  ┌──────────────────────┬──────────┬────────┬──────────┬──────────────────────┐ │
+│  │ Nome                 │ Aciona.  │ Motor  │ Tensão   │ Custo                │ │
+│  ├──────────────────────┼──────────┼────────┼──────────┼──────────────────────┤ │
+│  │ IF-50-380-25-Modbus  │ Inversor │ 50 CV  │ 380 V    │ R$ 12.450,00        │ │
+│  │ SS-30-440            │ SoftSt.  │ 30 CV  │ 440 V    │ R$ 8.230,00         │ │
+│  │ PD-5-220             │ Direta   │ 5 CV   │ 220 V    │ R$ 850,00           │ │
+│  │ EG-1000A-380         │ Ent.Geral│ 1000A  │ 380 V    │ R$ 35.000,00        │ │
+│  │ ...                  │ ...      │ ...    │ ...      │ ...                  │ │
+│  └──────────────────────┴──────────┴────────┴──────────┴──────────────────────┘ │
+│                                                                                 │
+│  [➕ NOVO TÍPICO]                          [📥 EXPORTAR]                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Você pode:
+  • Filtrar pelo nome ou tipo de acionamento
+  • Clicar em um típico para EDITAR
+  • Usar o botão "📋 Clonar" para copiar um típico existente
+  • Excluir com o ícone de lixeira
+  • Exportar a lista para Excel ou CSV
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. CRIAR UM TÍPICO (O BUILDER)                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Ao clicar em "Novo Típico" ou "Editar", abre o BUILDER — uma tela com dois lados:
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║  ┌─────────────────────────────────────────────────────────────────────────┐    ║
+║  │                                                                         │    ║
+║  │  ⚙️ PARÂMETROS ELÉTRICOS             🧩 LISTA DE MATERIAIS (BOM)       │    ║
+║  │  ─────────────────────────             ─────────────────────────        │    ║
+║  │                                                                         │    ║
+║  │  Tipo de Acionamento: [Inversor ▼]      ┌────┬─────────────────────┐   │    ║
+║  │  Potência (CV):       [50        ]      │QTD │ Descrição           │   │    ║
+║  │  Tensão (V):          [380       ]      ├────┼─────────────────────┤   │    ║
+║  │  ICC (kA):            [25        ]      │ 1  │ Disjuntor Motor     │   │    ║
+║  │  Frequência:          [60 Hz ▼]         │ 1  │ Soft-Starter SSW07  │   │    ║
+║  │  Proteção:            [ABB ▼]           │ 1  │ Contator CW18       │   │    ║
+║  │  Drives:              [Siemens ▼]       │ 2m │ Cabo 10mm²          │   │    ║
+║  │  ...                                     │    │                     │   │    ║
+║  │                                          │    │                     │   │    ║
+║  │  Nome automático:                       │    │ Total: R$ 12.450   │   │    ║
+║  │  IF-50-380-25-ModbusTCP-ABB-Siemens-STD │    │                     │   │    ║
+║  │                                          │    │ [+ ADICIONAR]      │   │    ║
+║  └─────────────────────────────────────────────────────────────────────────┘    ║
+║                                                                                  ║
+║  [💾 SALVAR]  [❌ CANCELAR]                                                      ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+📌 Enquanto você preenche os parâmetros, o NOME é gerado automaticamente no
+   rodapé (você também pode digitar manualmente se quiser).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. OS PARÂMETROS ELÉTRICOS (CAMPO POR CAMPO)                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────┬──────────┬─────────────────────────────────────────┐
+│ CAMPO                     │ OBRIG.   │ O QUE É                                 │
+├───────────────────────────┼──────────┼─────────────────────────────────────────┤
+│ Tipo de Acionamento       │ ✅ SIM   │ O tipo de partida (PD, SS, IF, ET...). │
+│                           │          │ Muda os campos disponíveis na tela.    │
+│                           │          │                                          │
+│ Regime de Acionamento     │ Não      │ Standard (normal) ou Pesado (muitas    │
+│                           │          │ partidas por hora).                     │
+│                           │          │                                          │
+│ Potência (CV)             | Varía   │ Potência do motor em Cavalos-Vapor.     │
+│                           │ *        │ Aparece para PD, SS, IF, ET, CP.       │
+│                           │          │                                          │
+│ Potência (KVAr)           │ *        │ Para Banco de Capacitores (BC).        │
+│                           │          │ Medido em KVAr, não CV.                 │
+│                           │          │                                          │
+│ Tensão (V)                │ ✅ SIM   │ Tensão de alimentação.                  │
+│                           │          │ Ex: 220V, 380V, 440V, 480V, 760V.       │
+│                           │          │ Para MT: 13,8KV, 34,5KV.                │
+│                           │          │                                          │
+│ ICC (kA)                  │ Não      │ Corrente de curto-circuito disponível   │
+│                           │          │ no ponto de instalação.                 │
+│                           │          │ Ex: 25kA, 50kA, 65kA.                  │
+│                           │          │                                          │
+│ Frequência                │ Não      │ 50Hz ou 60Hz.                           │
+│                           │          │                                          │
+│ Corrente Aproximada (A)   | ⛔ Auto │ Calculada automaticamente pela fórmula  │
+│                           │          │ (explicada na seção 8).                 │
+│                           │          │                                          │
+│ Corrente de Placa (A)     │ Não      │ Corrente nominal que aparece na placa   │
+│                           │          │ do motor. Se preenchida, substitui a    │
+│                           │          │ corrente calculada.                     │
+│                           │          │                                          │
+│ FP (Fator de Potência)    │ Não      │ Cosseno Phi (cos φ). Padrão: 0,85.      │
+│                           │          │                                          │
+│ FS (Fator de Serviço)     │ Não      │ Fator de serviço do motor. Padrão: 1,15.│
+│                           │          │                                          │
+│ Rendimento (%)            │ Não      │ Eficiência do motor (η). Padrão: 85%.    │
+│                           │          │                                          │
+│ Aplicação                 │ Não      │ Descrição curta do que este típico faz. │
+│                           │          │ Ex: "Bomba de água 50CV".               │
+│                           │          │                                          │
+│ Fabricante Proteção       │ Não      │ Marca preferida dos disjuntores e       │
+│                           │          │ fusíveis. Ex: ABB, Siemens, WEG.         │
+│                           │          │                                          │
+│ Fabricante Drives         │ Não      │ Marca preferida dos inversores/         │
+│                           │          │ soft-starters. Ex: Siemens, WEG.         │
+│                           │          │                                          │
+│ Protocolo Comunicação     │ Não      │ Protocolo de comunicação industrial.    │
+│                           │          │ Ex: Modbus RTU, Profinet, Profibus.     │
+│                           │          │                                          │
+│ Especificação Técnica     │ Não      │ Texto detalhado que vai para o Word.    │
+│ (descricao_word)          │          │ Use para descrever tecnicamente o       │
+│                           │          │ equipamento na proposta.                │
+└───────────────────────────┴──────────┴─────────────────────────────────────────┘
+
+* Se o tipo é "Alimentador" ou "Entrada Geral", o campo principal é corrente (A),
+  não potência (CV). Se é "Banco de Capacitores", o campo principal é KVAr.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. BT vs MT (BAIXA TENSÃO vs MÉDIA TENSÃO)                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O sistema tem dois modos: BT (Baixa Tensão) e MT (Média Tensão).
+
+┌──────────────────┬───────────────────────────┬─────────────────────────────────┐
+│                  │ BT (Baixa Tensão)         │ MT / Cubículo MT               │
+├──────────────────┼───────────────────────────┼─────────────────────────────────┤
+│ Tensão           │ 220V, 380V, 440V, 480V... │ 13,8KV, 34,5KV                 │
+│ Potência         │ Em CV                     │ Em CV também                    │
+│ ICC              │ 25, 50, 65 kA             │ 12,5, 25, 31,5 kA              │
+│ Tipo             │ PD, SS, IF, ET...         │ CUB-MT                          │
+│ Fabricantes      │ Siemens, WEG, ABB...      │ Fabricantes específicos MT     │
+│ Materiais        │ Disjuntores, contatores   │ Disjuntores MT, relés,         │
+│                  │ cabos, soft-starters...   │ transformadores de corrente...  │
+└──────────────────┴───────────────────────────┴─────────────────────────────────┘
+
+💡 O sistema muda automaticamente os campos e opções quando você seleciona
+   "Cubículo MT" como Tipo de Acionamento.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. NOME AUTOMÁTICO                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Enquanto você preenche os parâmetros, o sistema GERA o nome automaticamente
+seguindo este padrão:
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│   NOME = {SIGLA}-{POTENCIA}-{TENSAO}-{ICC}-{COMUNICACAO}-{PROTECAO}-{DRIVES}   │
+│                                                                                 │
+│   EXEMPLO:                                                                      │
+│                                                                                 │
+│   IF-50-380-25-ModbusTCP-ABB-Siemens-STD                                       │
+│   │  │   │    │      │        │       │                                         │
+│   │  │   │    │      │        │       └── Regime: Standard (STD)                │
+│   │  │   │    │      │        └────────── Drives: Siemens                        │
+│   │  │   │    │      └─────────────────── Comunicação: ModbusTCP                │
+│   │  │   │    └─────────────────────── ICC: 25kA                                │
+│   │  │   └──────────────────────── Tensão: 380V                                 │
+│   │   └───────────────────────── Potência: 50CV                                 │
+│   └──────────────────────────── Tipo: Inversor de Frequência (IF)               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅ Você pode editar o nome manualmente se quiser um nome diferente.
+✅ O nome é importante porque é como você vai encontrar o típico na hora de
+   selecionar nas cargas da Proposta Técnica.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. CÁLCULO DE CORRENTE APROXIMADA                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O sistema calcula automaticamente a corrente aproximada do motor usando esta
+fórmula (para motores trifásicos):
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   I = (CV × 735,5 × FS) / (√3 × V × cosφ × η)                                  ║
+║                                                                                  ║
+║   Onde:                                                                          ║
+║   I    = Corrente em Ampères (A)                                                 ║
+║   CV   = Potência do motor em Cavalos-Vapor                                      ║
+║   735,5 = Fator de conversão de CV para Watts                                    ║
+║   FS   = Fator de Serviço (ex: 1,15)                                            ║
+║   √3   = 1,732 (raiz de três)                                                   ║
+║   V    = Tensão em Volts (ex: 380)                                               ║
+║   cosφ = Fator de Potência (ex: 0,85)                                           ║
+║   η    = Rendimento (ex: 0,85 = 85%)                                            ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+EXEMPLO PRÁTICO:
+  Motor de 50CV, 380V, FP = 0,85, FS = 1,15, Rendimento = 85%
+
+  I = (50 × 735,5 × 1,15) / (1,732 × 380 × 0,85 × 0,85)
+  I = 42.291 / 475,5
+  I = 88,9 A  ← Corrente aproximada
+
+📌 Esse valor é usado para dimensionar os componentes (disjuntores, cabos, etc.)
+   e aparece no campo "Corrente Aproximada" do típico.
+
+📌 Se você tem a corrente de placa do motor (dado real), preencha o campo
+   "Corrente de Placa" que ela substitui a calculada.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. A LISTA DE MATERIAIS (BOM) — O CORAÇÃO DO TÍPICO                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A Lista de Materiais (também chamada de BOM — Bill of Materials) é a parte mais
+importante do típico. É aqui que você define EXATAMENTE quais componentes entram
+na partida do motor.
+
+─── COMO ADICIONAR MATERIAIS ─────────────────────────────────────────────────────
+
+  1. Clique no botão "[➕ ADICIONAR MATERIAL]"
+  2. Abre um painel com o CATÁLOGO de materiais
+  3. Filtre por fabricante (ABB, Siemens, WEG...)
+  4. Filtre por texto (código, descrição, modelo)
+  5. Clique no material desejado
+  6. Escolha a QUANTIDADE (ex: 1 unidade, 2 metros)
+  7. ✅ O material aparece na lista com preço e fabricante
+
+─── COMO FUNCIONA A TABELA ───────────────────────────────────────────────────────
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  ┌─────┬─────────────────────────┬───────────┬──────────────┬──────────┬──────┐ │
+│  │ QTD │ DESCRIÇÃO               │ MODELO    │ CÓD. FABRIC. │ FABRIC.  │ CUSTO│ │
+│  ├─────┼─────────────────────────┼───────────┼──────────────┼──────────┼──────┤ │
+│  │  1  │ Disjuntor Motor 5-10A  │ DMW-5A    │ 1234-5678    │ WEG      │ 145  │ │
+│  │  1  │ Soft-Starter SSW07-... │ SSW07185  │ 7890-1234    │ WEG      │ 2.350│ │
+│  │  1  │ Contator CW18-11-10    │ CW18011   │ 5678-9012    │ WEG      │ 280  │ │
+│  │  2  │ Cabo 10mm² Azul        │ 10mm²     │ 9012-3456    │ Sinox    │ 80   │ │
+│  │     │                         │           │              │          │      │ │
+│  │     │                         │           │   TOTAL: R$ 2.855,00 │    │      │ │
+│  └─────┴─────────────────────────┴───────────┴──────────────┴──────────┴──────┘ │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+─── REGRAS IMPORTANTES ───────────────────────────────────────────────────────────
+
+  ✅ Se você adicionar o MESMO material duas vezes, a quantidade aumenta em vez
+     de criar uma linha duplicada.
+
+  ✅ Os valores de CUSTO vêm do catálogo de materiais. Se o preço do material
+     mudar depois, você pode usar o botão "Recalcular Custos" para atualizar.
+
+  ✅ Cada material guarda também ICMS, IPI e UF do fornecedor — essas
+     informações são usadas na Precificação para calcular créditos de impostos.
+
+  ✅ Você pode editar a QUANTIDADE diretamente na tabela (campo editável).
+
+  ✅ Pode remover um item com o ícone de lixeira.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. CLONAR UM TÍPICO                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O botão "📋 Clonar" cria uma CÓPIA exata do típico, com o nome alterado para
+"{Nome original} - Cópia".
+
+Quando usar:
+  • Você tem um típico para 50CV e quer criar um para 75CV que é muito parecido
+  • Você quer criar uma variação com fabricante diferente
+  • Você quer testar uma configuração alternativa sem perder a original
+
+💡 Clone + edite = muito mais rápido que criar do zero.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. COMO OS TÍPICOS SÃO USADOS NA PROPOSTA TÉCNICA                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esta é a parte mais importante para entender o valor dos típicos.
+
+─── PASSO 1: CRIAR O EQUIPAMENTO ─────────────────────────────────────────────────
+
+  Na Proposta Técnica, você adiciona um equipamento (ex: CCM-BT-01).
+
+─── PASSO 2: ADICIONAR CARGAS ────────────────────────────────────────────────────
+
+  Dentro do equipamento, você adiciona "Cargas". Cada carga é um motor ou
+  alimentador que vai ser ligado naquele painel.
+
+  Para cada carga, você preenche:
+  • Nome (ex: "Bomba de Água 01")
+  • Potência (ex: 50 CV)
+  • Tensão (ex: 380V)
+  • Tipo de acionamento (ex: Inversor)
+
+─── PASSO 3: SELECIONAR O TÍPICO ─────────────────────────────────────────────────
+
+  No campo "Típico" da carga, você escolhe um típico do catálogo.
+  O sistema FILTRA automaticamente os típicos compatíveis com a potência,
+  tensão e tipo que você escolheu.
+
+─── PASSO 4: AUTO-PREENCHIMENTO ──────────────────────────────────────────────────
+
+  Ao selecionar o típico, o sistema:
+  • Preenche automaticamente os parâmetros elétricos da carga.
+  • Carrega a Lista de Materiais do típico para aquela carga.
+  • Calcula o subtotal da carga baseado nos materiais.
+
+─── PASSO 5: LISTA DE MATERIAIS DO PAINEL (LM) ───────────────────────────────────
+
+  A aba "Lista de Materiais" (LM) do equipamento mostra TODOS os materiais de
+  TODAS as cargas, agrupadas por carga, com quantidades, fabricantes e custos.
+
+  💡 Você pode adicionar materiais EXTRAS na LM que não estavam no típico
+     (ex: um disjuntor geral, bornes, canaletas).
+
+─── PASSO 6: PRECIFICAÇÃO ─────────────────────────────────────────────────────────
+
+  O custo total dos materiais (soma de todos os típicos + extras) vai para a
+  Precificação, onde são aplicados impostos, margens e markup para definir o
+  preço de venda.
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   RESUMO: Típico → Carga → LM de todas as cargas → Custo total → Precificação  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. RELATÓRIO E EXPORTAÇÃO                                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Na tela de listagem de típicos, você pode:
+
+  🔍 FILTRAR por nome ou tipo de acionamento para encontrar rapidamente.
+
+  📥 EXPORTAR para Excel (.xlsx) ou CSV (.csv) — gera um arquivo com todos os
+     típicos, seus parâmetros e custos totais.
+
+  📋 Na Proposta Técnica, a LM pode ser exportada para Excel (com ou sem preços)
+     para ser usada na compra dos materiais.
+
+💡 A exportação da LM é útil para enviar ao setor de compras — eles têm a lista
+   exata de códigos, fabricantes e quantidades para cotar.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  Crie típicos PADRONIZADOS para os motores mais comuns da sua empresa.
+    Ex: se você sempre usa Inversor Siemens para motores acima de 30CV, crie
+    um típico IF-30-380, IF-50-380, IF-75-380... e reuse em todos os projetos.
+
+✅  Mantenha os típicos ATUALIZADOS. Se um componente mudou de preço ou
+    foi descontinuado, edite o típico e use "Recalcular Custos".
+
+✅  Use a ESPECIFICAÇÃO TÉCNICA (descricao_word) para escrever um texto
+    detalhado que vai aparecer na proposta em Word. Assim você não precisa
+    digitar a descrição técnica toda vez.
+
+✅  A corrente de placa (dado real do motor) é melhor que a corrente calculada.
+    Se você tem o dado do fabricante do motor, preencha o campo "Corrente de
+    Placa".
+
+✅  Organize os típicos por tipo de acionamento. Use nomes claros que qualquer
+    engenheiro da equipe entenda de cara.
+
+✅  O botão "Recalcular Custos" atualiza todos os preços dos materiais do
+    típico com base no catálogo atual. Use quando os fornecedores atualizam
+    a lista de preços.
+
+⚠️  Se você DELETAR um típico que está sendo usado em alguma proposta, as
+    cargas que usam ele perdem a referência. Os materiais já alocados não
+    desaparecem (ficam na LM), mas o vínculo com o típico se perde.
+
+⚠️  Típico NÃO inclui mão de obra. A montagem do painel é calculada separadamente
+    nas Composições de Mão de Obra e na Precificação.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  14. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ Típico de Partida     │ Modelo padronizado de componentes para ligar um motor. │
+│                       │                                                         │
+│ Partida Direta (PD)   │ Tipo mais simples: liga o motor direto na rede.        │
+│                       | Para motores pequenos.                                  │
+│                       │                                                         │
+│ Soft-Starter (SS)     │ Dispositivo que liga o motor de forma suave.           │
+│                       │                                                         │
+│ Inversor (IF)         │ Equipamento que controla a velocidade do motor.        │
+│                       │ Também chamado de "frequência".                         │
+│                       │                                                         │
+│ Estrela-Triângulo (ET)│ Tipo de partida que reduz a corrente inicial.          │
+│                       │                                                         │
+│ Carga (Load)           │ Cada motor ou alimentador dentro de um painel.         │
+│                       │                                                         │
+│ BOM                   │ Bill of Materials — a Lista de Materiais do típico.    │
+│                       │                                                         │
+│ LM                    │ Lista de Materiais — a visão completa de todos os       │
+│                       │ materiais de um equipamento na Proposta Técnica.        │
+│                       │                                                         │
+│ CV                    │ Cavalo-Vapor — unidade de potência. 1 CV ≈ 735,5W.     │
+│                       │                                                         │
+│ KVAr                  │ Quilovolt-ampère reativo — potência reativa.            │
+│                       │ Usado em banco de capacitores.                          │
+│                       │                                                         │
+│ ICC                   │ Corrente de Curto-Circuito — corrente máxima que        │
+│                       │ pode ocorrer em uma falta elétrica.                     │
+│                       │                                                         │
+│ FP (cos φ)            │ Fator de Potência — indica a eficiência do uso da      │
+│                       │ energia elétrica. Varia de 0 a 1.                       │
+│                       │                                                         │
+│ FS                    │ Fator de Serviço — quanto o motor pode ser               │
+│                       │ sobrecarregado sem danificar. Padrão: 1,15.              │
+│                       │                                                         │
+│ Rendimento (η)        │ Eficiência do motor — quantos % da energia elétrica    │
+│                       │ vira energia mecânica. Motor bom: > 90%.                 │
+│                       │                                                         │
+│ BT (Baixa Tensão)     │ Tensões até 1000V. Ex: 220V, 380V, 440V.               │
+│                       │                                                         │
+│ MT (Média Tensão)     │ Tensões acima de 1000V. Ex: 13,8KV, 34,5KV.            │
+│                       │                                                         │
+│ CUB-MT                │ Cubículo de Média Tensão — painel para MT.              │
+│                       │                                                         │
+│ Painel / Equipamento  │ O quadro elétrico como um todo (ex: CCM-BT-01).        │
+│                       │ Dentro dele podem ter várias cargas.                    │
+│                       │                                                         │
+│ Catálogo de Materiais │ Banco de dados com todos os componentes disponíveis     │
+│                       │ (disjuntores, cabos, contatores, etc.) com preços.      │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  15. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "O nome automático não está gerando"                               │
+│  SOLUÇÃO:  Preencha pelo menos o Tipo de Acionamento, Potência e Tensão.      │
+│            O sistema precisa desses três para gerar o nome.                    │
+│                                                                                 │
+│  PROBLEMA: "Adicionei o material mas ele não aparece na lista"                │
+│  SOLUÇÃO:  Pode ser que o material não tenha descrição. O sistema só mostra   │
+│            materiais que têm descrição preenchida. Verifique o catálogo.       │
+│                                                                                 │
+│  PROBLEMA: "O custo do típico está diferente da soma dos materiais"           │
+│  SOLUÇÃO:  Clique em "Recalcular Custos" para atualizar os preços a partir    │
+│            do catálogo. Se ainda assim estiver diferente, salve e abra         │
+│            novamente.                                                           │
+│                                                                                 │
+│  PROBLEMA: "Não encontro o típico que criei na hora de selecionar na carga"  │
+│  SOLUÇÃO:  O sistema FILTRA os típicos pela potência, tensão e tipo da        │
+│            carga. Se o típico não aparece, pode ser que os parâmetros não     │
+│            correspondam. Ex: carga é 50CV mas o típico é 75CV.                │
+│                                                                                 │
+│  PROBLEMA: "Quero usar o mesmo típico mas com materiais diferentes"            │
+│  SOLUÇÃO:  Use o botão "Clonar" para copiar o típico e depois edite os        │
+│            materiais na cópia.                                                 │
+│                                                                                 │
+│  PROBLEMA: "O material que eu quero não está no catálogo"                     │
+│  SOLUÇÃO:  Você precisa primeiro cadastrar o material no módulo Materiais.    │
+│            Depois de cadastrado, ele aparece no seletor de materiais do       │
+│            típico.                                                             │
+│                                                                                 │
+│  PROBLEMA: "A corrente calculada está diferente da placa do motor"            │
+│  SOLUÇÃO:  É normal — a fórmula usa valores aproximados (FP, FS, rendimento). │
+│            Se você tem a corrente REAL (da placa), preencha o campo           │
+│            "Corrente de Placa" que ela substitui a calculada.                 │
+│                                                                                 │
+│  PROBLEMA: "Deletou um típico sem querer"                                     │
+│  SOLUÇÃO:  Infelizmente não tem como recuperar. Crie novamente. Para evitar,  │
+│            use "Clonar" em vez de criar do zero quando for fazer variações.   │
+│                                                                                 │
+│  PROBLEMA: "Típico aparece na lista mas não consigo editar"                   │
+│  SOLUÇÃO:  Você pode estar sem permissão de edição (proposta fechada/perdida).│
+│            Ou a tela pode estar em modo somente leitura. Verifique o status   │
+│            da proposta ativa.                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   Os Típicos de Partida são a MEMÓRIA TÉCNICA da sua empresa.                   ║
+║                                                                                  ║
+║   • Eles garantem que TODOS os projetos usem os mesmos componentes              ║
+║   • Eles ECONOMIZAM TEMPO — você não precisa dimensionar do zero cada vez       ║
+║   • Eles EVITAM ERROS — uma vez configurado corretamente, o típico              ║
+║     sempre vai montar a lista certa                                              ║
+║   • Eles PADRONIZAM o conhecimento — se um engenheiro sai da empresa,           ║
+║     os típicos ficam para o próximo                                               ║
+║                                                                                  ║
+║   Invista tempo em criar típicos BEM FEITOS, com os componentes certos          ║
+║   e especificações técnicas detalhadas. Eles vão se pagar muitas vezes           ║
+║   ao longo dos projetos.                                                         ║
+║                                                                                  ║
+║   "Um bom típico é como uma boa receita: segue sempre o mesmo padrão            ║
+║    e o resultado é sempre previsível."                                           ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝

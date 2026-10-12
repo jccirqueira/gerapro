@@ -247,8 +247,8 @@ ${store.canDelete() ? `                    <button class="btn btn-ghost text-dan
 
         const total = this.calculateTotals();
 
-        // 1. Sync with Precificação state
-        if (window.app.precificacao) {
+        // 1. Sync with Precificação state (método pode não existir em versões antigas do módulo)
+        if (window.app && window.app.precificacao && typeof window.app.precificacao.updateExpenseCosts === 'function') {
             window.app.precificacao.updateExpenseCosts(total);
         }
 

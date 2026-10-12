@@ -1,0 +1,636 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   EXPLICAÇÃO SIMPLES — PLC / PAINEL DE AUTOMAÇÃO NO GERAPRO                     ║
+║                                                                                  ║
+║   (para quem não é programador nem engenheiro)                                  ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   ⚠️  IMPORTANTE: Este documento explica o módulo de PLC (Painel de             ║
+║   Automação) dentro da Proposta Técnica. Ele mostra como configurar um          ║
+║   painel de automação, suas entradas e saídas (I/O), e como o sistema           ║
+║   gera automaticamente a lista de materiais e os créditos de impostos.          ║
+║   Se você precisa de ajuda básica do sistema, procure o help (botão ❓).        ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É UM PLC / PAINEL DE AUTOMAÇÃO?                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine uma fábrica. Tem centenas de motores, sensores, válvulas, medidores —
+coisas que precisam ser ligadas e desligadas na hora certa. O PLC (Controlador
+Lógico Programável) é o "cérebro" dessa operação.
+
+Um PLC é um computador especializado que:
+  • Lê sinais de sensores (temperatura, pressão, nível, posição)
+  • Executa um programa lógico (se temperatura > 80°C, desligar motor)
+  • Envia comandos para atuadores (motores, válvulas, alarmes)
+
+O Painel de Automação é a "casa" onde o PLC fica instalado, junto com fontes
+de alimentação, relés, bornes, disjuntores e tudo mais que precisa para
+funcionar.
+
+No GeraPro, você também encontra a REM (Remota de Automação). A diferença:
+  ┌───────────────────┬──────────────────────────────────────────────────────────┐
+  │ PLC               │ Painel principal com CPU própria. Processa a lógica.    │
+  │                   │                                                          │
+  │ REM               │ Caixa remota que só expande as entradas e saídas.        │
+  │                   │ Não tem CPU — depende do PLC principal para funcionar.  │
+  └───────────────────┴──────────────────────────────────────────────────────────┘
+
+Dentro do GeraPro, PLC e REM funcionam de forma praticamente idêntica.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde o PLC se encaixa no fluxo de trabalho?                                  │
+│                                                                                 │
+│  1. Você cria uma Proposta Técnica (botão "+ Proposta Técnica")               │
+│  2. Você adiciona o equipamento PLC ou REM                                    │
+│  3. Configura a Lista de I/O (racks, slots, canais)                           │
+│  4. O sistema GERA AUTOMATICAMENTE a Lista de Materiais                       │
+│  5. Você ajusta os materiais (quantidades, fornecedores, impostos)            │
+│  6. ❗ Os créditos de ICMS/IPI vão automaticamente para a Precificação        │
+│  7. Você fatura o projeto                                                      │
+│                                                                                 │
+│  ✅ Diferente de outros equipamentos, o PLC tem uma integração forte entre     │
+│     a configuração de I/O e os materiais — você configura uma vez e o          │
+│     sistema faz o resto.                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. OS 7 SUB-TABS DO PLC                                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Quando você clica em um PLC na lista de equipamentos, aparecem 7 abas (sub-tabs)
+no topo da tela. Cada uma tem uma função específica:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ ABA                  │ PRA QUE SERVE                                           │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Ficha Técnica        │ Especificações técnicas do painel (tensão, proteção,    │
+│                      │ pintura, comunicação, etc.)                             │
+│                      │                                                          │
+│ Normas               │ Normas técnicas que regem o projeto                     │
+│                      │                                                          │
+│ Lista de I/O         │ ⭐ A aba mais importante. Configura os racks, módulos   │
+│                      │   e canais de entrada e saída do PLC                    │
+│                      │                                                          │
+│ Lista de Materiais   │ Materiais gerados automaticamente a partir da I/O       │
+│                      │                                                          │
+│ Desvios              │ Divergências entre o pedido do cliente e a proposta     │
+│                      │                                                          │
+│ Mão de Obra          │ Horas de engenharia e montagem estimadas                │
+│                      │                                                          │
+│ Despesas             │ Custos extras (frete, viagem, hospedagem, etc.)         │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 DICA: A ordem importa! Primeiro configure a Lista de I/O, depois vá para
+a Lista de Materiais (ela é gerada automaticamente), e só então mexa nos
+outros itens.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. FICHA TÉCNICA — Especificações do Painel                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Aqui você informa as características técnicas do painel. São campos que
+descrevem como o equipamento será construído. Veja os principais:
+
+┌───────────────────────────────┬────────────────────────────────────────────────┐
+│ CAMPO                         │ O QUE SIGNIFICA                                │
+├───────────────────────────────┼────────────────────────────────────────────────┤
+│ Tensão de Comando             │ Tensão elétrica dos circuitos de comando.      │
+│                               │ Mais comum: 24Vcc (corrente contínua)         │
+│                               │                                                 │
+│ Fonte de Comando              │ A fonte de alimentação é interna (dentro do    │
+│                               │ painel) ou externa?                            │
+│                               │                                                 │
+│ Tipo de Montagem              │ Como os módulos são montados: "Em Linha"       │
+│                               │ (um ao lado do outro) ou "Back to Back"        │
+│                               │ (dois lados).                                  │
+│                               │                                                 │
+│ Grau de Proteção (IP)         │ Proteção contra poeira e água.                 │
+│                               │ IP20 → abrigado, sem proteção contra água.     │
+│                               │ IP54 → pode ficar ao tempo, resiste a respingos.│
+│                               │ IP66 → jatos d'água potentes.                  │
+│                               │                                                 │
+│ Cor da Pintura Externa        │ Cor padrão do painel. Ex: RAL 7035 (cinza).    │
+│                               │                                                 │
+│ Entrada / Saída de Cabos      │ Por onde os cabos entram e saem do painel.     │
+│                               │ Inferior (mais comum), Superior ou Lateral.    │
+│                               │                                                 │
+│ Protocolo de Comunicação      │ A "língua" que o PLC fala com outros           │
+│                               │ equipamentos. Ex: Profinet, Modbus TCP,        │
+│                               │ Ethernet IP, DeviceNet.                        │
+│                               │                                                 │
+│ Iluminação Interna            │ O painel tem luz interna para manutenção?      │
+│                               │                                                 │
+│ Tomada de Serviço             │ Tem tomada elétrica dentro do painel?          │
+│                               │                                                 │
+│ Termostato / Desumidificador  │ Controle de temperatura e umidade internos.    │
+│                               │                                                 │
+│ Ventilação Forçada            │ Ventilador para resfriar os componentes.       │
+└───────────────────────────────┴────────────────────────────────────────────────┘
+
+💡 Além desses campos, você pode adicionar características personalizadas
+clicando em "+ Inserir Característica". Útil para informações específicas
+do projeto que não estão nos campos padrão.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. NORMAS — Regras Técnicas do Projeto                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+As normas são requisitos técnicos que o equipamento deve atender. Para PLC,
+as normas padrão são:
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ NORMA                 │ O QUE EXIGE                                            │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ ABNT NBR IEC 61439   │ Conjuntos de manobra e comando de baixa tensão. É a     │
+│                       │ norma geral para painéis elétricos.                     │
+│                       │                                                         │
+│ NR-10                 │ Segurança em instalações elétricas. Exige proteção      │
+│                       │ contra choques, aterramento, sinalização.              │
+│                       │                                                         │
+│ NR-12                 │ Segurança em máquinas. Exige botões de emergência,      │
+│                       │ proteções mecânicas, etc.                               │
+│                       │                                                         │
+│ NBR IEC 60529         │ Classificação de proteção (IP). Define o significado    │
+│                       │ de IP20, IP54, IP66, etc.                               │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+✅ Você pode marcar/desmarcar as normas aplicáveis.
+✅ Dá para adicionar normas personalizadas.
+✅ Se o cliente exigir uma norma específica, basta marcá-la aqui.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. LISTA DE I/O — O Coração do PLC                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esta é a aba MAIS IMPORTANTE do PLC. É aqui que você diz: quantos sensores
+o PLC vai ler? Quantos motores ele vai controlar?
+
+A I/O (Input/Output) é organizada em três níveis:
+
+   RACK → SLOT → CANAL
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  📦 RACK: É o "armário" onde os módulos são encaixados.                       │
+│                                                                                 │
+│  Cada rack tem:                                                                │
+│    • BP (Backplane) — a "espinha dorsal" que conecta tudo.                     │
+│      Ex: 1756-A7 (7 slots), 1756-A13 (13 slots).                              │
+│                                                                                 │
+│    • Fonte — a fonte de alimentação do rack. Ex: 1756-PA72.                   │
+│                                                                                 │
+│    • CPU — o processador do PLC. Ex: 1756-L71.                                │
+│                                                                                 │
+│    • COMM — placa de comunicação (rede). Ex: 1756-EN2T (Ethernet).            │
+│                                                                                 │
+│  Você pode ter vários racks em um mesmo PLC. Basta clicar em "+ Novo Rack".  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  🧩 SLOT: Cada "gaveta" dentro do rack, onde você encaixa um módulo.          │
+│                                                                                 │
+│  Para cada slot, você informa:                                                 │
+│                                                                                 │
+│    • Módulo (PN) — O número de catálogo do módulo. Ex: 1756-IB32.             │
+│                                                                                 │
+│    • Tipo — O que esse módulo faz:                                             │
+│        DI = Entrada Digital (lê sensores ON/OFF)                               │
+│        DO = Saída Digital (liga/desliga motores)                               │
+│        AI = Entrada Analógica (lê temperaturas, pressões)                     │
+│        AO = Saída Analógica (controla válvulas proporcionais)                 │
+│        TC = Termopar (mede temperatura com termopar)                           │
+│        RTD = Pt100 (mede temperatura com RTD)                                  │
+│        COMM = Comunicação (rede, protocolo)                                    │
+│        CNT = Contador (conta pulsos)                                           │
+│        PS = Fonte de Alimentação                                               │
+│                                                                                 │
+│    • Sinal — O tipo de sinal elétrico:                                         │
+│        24VDC, 120VAC, 220VAC (para digitais)                                  │
+│        4-20mA, 0-10V (para analógicos)                                        │
+│        TC-K, TC-J, PT100 (para temperatura)                                    │
+│                                                                                 │
+│    • N°Ch — Número total de canais do módulo. Ex: 32 canais.                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  🔌 CANAL: Cada ponto de conexão individual dentro de um slot.                │
+│                                                                                 │
+│  Para cada canal, você preenche:                                               │
+│                                                                                 │
+│    • Tag — O nome do instrumento no campo. Ex: TT-101, LIT-205.               │
+│                                                                                 │
+│    • Dispositivo de Campo — O que está conectado ali.                          │
+│      Ex: "Sensor de Temperatura", "Válvula Solenoide", "Motor 200CV".         │
+│                                                                                 │
+│    • Borne — O número do terminal elétrico no bornes. Ex: X1:01.              │
+│                                                                                 │
+│    • Status — A situação do canal:                                             │
+│        active = canal em uso                                                   │
+│        spare = reserva para expansão futura                                    │
+│        unused = não utilizado                                                  │
+│        critical = crítico para operação                                        │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+💡 No topo da página você vê 4 cartões de resumo:
+
+   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+   │ DI: 45   │  │ DO: 32   │  │ AI: 12   │  │ AO: 4    │
+   │ (3 spare)│  │ (2 spare)│  │ (1 spare)│  │ (0 spare)│
+   └──────────┘  └──────────┘  └──────────┘  └──────────┘
+
+Eles mostram o total de cada tipo de canal e quantos estão como "spare"
+(reserva). Isso ajuda a dimensionar o painel corretamente.
+
+📋 Funções extras da Lista de I/O:
+
+  • Importar Excel — Carregar uma I/O de uma planilha (.xlsx, .xls ou .csv)
+  • Exportar — Baixar a I/O como CSV ou Excel formatado
+  • Típicos I/O — Configurar padrões de bornes, fusíveis, relés e cabos
+    para cada tipo de sinal (DI, DO, AI, AO). Esses padrões são usados
+    para gerar a lista de materiais automaticamente.
+  • Salvar / Carregar Template — Salvar uma configuração de I/O para
+    reutilizar em outros projetos.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. LISTA DE MATERIAIS (BOM) — Gerada Automaticamente                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Esta é a mágica do sistema. Depois que você configurou a Lista de I/O,
+o GeraPro gera automaticamente a lista de materiais necessários.
+
+O que é gerado automaticamente:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ CATEGORIA            │ ITENS GERADOS                                           │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Estrutura            │ Rack/Backplane (um para cada rack)                      │
+│                      │ CPU (se configurada)                                    │
+│                      │                                                          │
+│ Fontes               │ Fonte de Alimentação do Rack (se configurada)           │
+│                      │                                                          │
+│ Bornes               │ Bornes para cada canal (quantidade conforme Típicos):    │
+│                      │ • Bornes Passante (para fios)                           │
+│                      │ • Bornes Fusível (para proteção)                        │
+│                      │ • Bornes de Relé (para isolação)                        │
+│                      │                                                          │
+│ Relés                │ Relés de interface (para sinais de tensão diferente)     │
+│                      │                                                          │
+│ Cabos                │ Cabo de comando 1,5mm² por rack                          │
+│                      │ Cabo blindado par trançado (para sinais analógicos)     │
+│                      │ Cabo de compensação (para termopares)                   │
+│                      │                                                          │
+│ Eletrodutos          │ Eletroduto corrugado para proteção dos cabos            │
+│                      │                                                          │
+│ Canaletas            │ Canaleta perfurada para organização dos cabos           │
+│                      │                                                          │
+│ Conectores           │ Conectores RJ45 (para módulos de comunicação)           │
+│                      │ Supressores de surto (proteção contra descargas)        │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 IMPORTANTE: A lista é gerada com base:
+   1. Nos racks e slots que você configurou
+   2. Nos Típicos I/O (bornes por canal, fusíveis, relés, etc.)
+   3. No catálogo de materiais cadastrado no sistema
+
+💰 Colunas de ICMS e IPI:
+   Cada item da lista tem colunas de ICMS (%) e IPI (%) que vêm do catálogo
+   de materiais. Esses valores são usados para calcular os créditos de
+   imposto na Precificação — ou seja, você não precisa digitar nada lá.
+
+🔧 Catálogo de Fornecedores:
+   Cada item tem uma coluna "Ref. Catálogo" que permite selecionar o
+   fornecedor e o código do material. Se o item não tiver correspondência
+   automática, você pode escolher manualmente.
+
+🔄 Botão "Recalcular":
+   Se você alterar a I/O, clique em "Recalcular" para atualizar a lista
+   de materiais. ⚠️ Isso substitui as alterações manuais que você tiver
+   feito na lista.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. DESVIOS — Divergências Técnicas                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Às vezes o cliente pede uma coisa, mas a proposta oferece outra diferente.
+Isso é um "desvio". A aba de Desvios serve para documentar essas diferenças.
+
+Cada desvio tem:
+  • Documento — Número do documento de referência (ex: e-mail, ata de reunião)
+  • Solicitado — O que o cliente pediu
+  • Desvio — O que estamos oferecendo de diferente e por quê
+
+Exemplo:
+  ┌────────────┬────────────────────────────────────────────────────────────────┐
+  │ Documento  │ E-mail 12/05/2026                                              │
+  ├────────────┼────────────────────────────────────────────────────────────────┤
+  │ Solicitado │ Cliente pediu PLC Siemens S7-1500                               │
+  ├────────────┼────────────────────────────────────────────────────────────────┤
+  │ Desvio     │ Oferecendo Allen-Bradley ControlLogix (disponibilidade de      │
+  │            │ peças e suporte local)                                          │
+  └────────────┴────────────────────────────────────────────────────────────────┘
+
+Isso é importante porque protege sua empresa: se o cliente reclamar depois,
+está documentado que ele aceitou a mudança.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. MÃO DE OBRA — Horas de Trabalho                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Aqui você estima quantas horas cada profissional vai gastar neste equipamento.
+
+Os profissionais são organizados por áreas:
+
+┌──────────────────────┬──────────────────────────────────────────────────────────┐
+│ ÁREA                 │ PROFISSIONAIS                                           │
+├──────────────────────┼──────────────────────────────────────────────────────────┤
+│ Engenharia de        │ Gerente, Supervisor, Engenheiro, Assistente             │
+│ Aplicação            │                                                          │
+│                      │                                                          │
+│ Engenharia de        │ Gerente Elétrica, Coordenador, Eng. Eletricista,        │
+│ Projetos             │ Projetista                                               │
+│                      │                                                          │
+│ Fábrica de Painéis   │ Montador de Layout, Montador Eletricista, Auxiliar,     │
+│                      │ Barramentista                                            │
+│                      │                                                          │
+│ Service              │ Técnico de Service                                       │
+│                      │                                                          │
+│ Campo                │ Eletricista (Força e Controle), Eletricista             │
+│                      │ (Montagens Eletromecânicas), Auxiliar                   │
+│                      │                                                          │
+│ Montagem             │ Montador, Eletricista, Pintor, Auxiliar                 │
+└──────────────────────┴──────────────────────────────────────────────────────────┘
+
+Cada linha da tabela tem: Área, Função, Horas estimadas, Valor por hora e
+Subtotal (calculado automaticamente).
+
+💡 Você pode usar o botão "Estimar" para calcular automaticamente as horas
+com base em regras de derivação e composições cadastradas no sistema.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. DESPESAS — Custos Extras                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+São custos adicionais que não estão nos materiais nem na mão de obra.
+Exemplos:
+
+┌──────────────────────────────────┬───────────┬──────────────────────────────────┐
+│ DESPESA                          │ VALOR UNIT│ O QUE É                          │
+├──────────────────────────────────┼───────────┼──────────────────────────────────┤
+│ Refeições Diárias                │ R$ 60,00  │ Alimentação dos técnicos em      │
+│                                  │           │ campo                            │
+│ Diárias Hotel / Hospedagem       │ R$ 200,00 │ Hospedagem dos profissionais     │
+│ Passagens Aéreas                 │ R$ 1.500  │ Viagens para obras distantes    │
+│ Frete de Entrega                 │ R$ 500,00 │ Transporte do painel até a obra │
+│ Seguro de Carga                  │ R$ 150,00 │ Seguro contra danos no          │
+│                                  │           │ transporte                       │
+│ Locação de Guindaste             │ R$ 2.500  │ Para movimentar painéis pesados │
+│ Software / Licenças              │ R$ 1.000  │ Licenças temporárias de          │
+│                                  │           │ software do PLC                  │
+│ ART                               │ R$ 500,00 │ Anotação de Responsabilidade     │
+│                                  │           │ Técnica                          │
+│ Canteiro de Obras (Mobilização)  │ R$ 5.000  │ Montagem do canteiro na obra    │
+└──────────────────────────────────┴───────────┴──────────────────────────────────┘
+
+✅ Você pode adicionar outras despesas além das listadas.
+✅ As despesas entram como custo direto na Precificação.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. INTEGRAÇÃO COM A PRECIFICAÇÃO — Como os Números Fluem                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Este é o grande diferencial do sistema para PLC. Veja o fluxo completo:
+
+   ┌─────────────┐       ┌─────────────────┐       ┌─────────────────┐
+   │             │       │                 │       │                 │
+   │  LISTA DE   │──────▶│  LISTA DE       │──────▶│  PRECIFICAÇÃO   │
+   │  I/O        │       │  MATERIAIS      │       │                 │
+   │             │       │                 │       │                 │
+   │ Racks       │       │ Bornes, cabos,  │       │ Créditos ICMS   │
+   │ Slots       │       │ relés, fontes,  │       │ Créditos IPI    │
+   │ Canais      │       │ estrutura, etc. │       │ Créditos PIS/   │
+   │ Tags        │       │ com ICMS e IPI  │       │ COFINS          │
+   │             │       │                 │       │                 │
+   └─────────────┘       └─────────────────┘       └─────────────────┘
+
+PASSO A PASSO:
+
+  1. Você configura os racks, slots e canais na Lista de I/O
+  2. O sistema DERIVA os materiais automaticamente com quantidades,
+     preços, ICMS e IPI
+  3. Na Precificação, ao abrir um PLC, os CRÉDITOS de imposto já vêm
+     PREENCHIDOS com base nos materiais
+  4. O custo dos materiais é abatido pelos créditos (custo líquido)
+  5. O markup (margem, impostos, comissões) é aplicado sobre o custo líquido
+  6. Resultado: preço de venda final com todos os impostos considerados
+
+📌 Exemplo simplificado:
+   • Materiais do PLC: R$ 50.000,00
+   • ICMS dos materiais: 12% → R$ 6.000,00 de crédito
+   • IPI dos materiais: 9,75% → R$ 4.875,00 de crédito
+   • Custo líquido: R$ 50.000 - R$ 6.000 - R$ 4.875 = R$ 39.125,00
+   • O markup é calculado sobre R$ 39.125,00 (não sobre R$ 50.000)
+
+✅ Isso faz o PLC ficar mais competitivo no preço final, porque os
+   créditos de imposto reduzem a base de cálculo.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. DICAS IMPORTANTES                                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+✅  Configure os Típicos I/O ANTES de preencher a I/O. Eles definem quantos
+    bornes, fusíveis e relés cada canal vai ter. Se mudar depois, precisa
+    recalcular.
+
+✅  Use "Salvar Template" para salvar configurações de I/O que você usa
+    com frequência. Ex: um template padrão para PLC de 64 DI + 32 DO.
+
+✅  Depois de gerar a Lista de Materiais, você pode ajustar manualmente
+    as quantidades e fornecedores. Mas se clicar em "Recalcular", todas
+    as alterações manuais são perdidas.
+
+✅  Verifique se os ICMS e IPI dos materiais estão corretos antes de ir
+    para a Precificação. Eles vêm do catálogo, mas podem precisar de ajuste.
+
+✅  Se você alterar a I/O depois de já ter precificado, lembre-se de
+    recalcular a BOM e depois reabrir a Precificação para atualizar
+    os créditos.
+
+⚠️  Sempre marque os canais "spare" (reserva) corretamente. Eles entram
+    no cálculo de materiais (bornes, cabos) mas sinalizam capacidade
+    de expansão para o cliente.
+
+⚠️  Se o PLC tiver módulos de comunicação (COMM), eles também geram
+    materiais (cabos RJ45, conectores). Não esqueça de configurá-los.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────┬─────────────────────────────────────────────────────────┐
+│ TERMO                 │ SIGNIFICADO                                             │
+├───────────────────────┼─────────────────────────────────────────────────────────┤
+│ PLC                   │ Controlador Lógico Programável. "Cérebro" da           │
+│                       │ automação que lê sensores e controla atuadores.         │
+│                       │                                                         │
+│ REM                   │ Remota de Automação. Caixa que expande a capacidade     │
+│                       │ de I/O do PLC, mas sem CPU própria.                    │
+│                       │                                                         │
+│ Rack                  │ Bastidor ou chassi onde os módulos do PLC são           │
+│                       │ encaixados. Pode ter 4, 7, 13 ou mais slots.           │
+│                       │                                                         │
+│ Slot                  │ Cada "encaixe" dentro do rack para um módulo.          │
+│                       │                                                         │
+│ Canal                 │ Cada ponto individual de entrada ou saída em um        │
+│                       │ módulo. Se um módulo tem 32 canais, ele conecta 32     │
+│                       │ sensores ou atuadores diferentes.                      │
+│                       │                                                         │
+│ DI (Digital Input)    │ Entrada Digital — lê sinais liga/desliga.              │
+│                       │ Ex: sensor de presença, botão, chave fim de curso.     │
+│                       │                                                         │
+│ DO (Digital Output)   │ Saída Digital — liga/desliga equipamentos.             │
+│                       │ Ex: motor, solenoide, lâmpada, alarme.                 │
+│                       │                                                         │
+│ AI (Analog Input)     │ Entrada Analógica — lê valores variáveis.              │
+│                       │ Ex: temperatura 4-20mA, pressão 0-10V.                 │
+│                       │                                                         │
+│ AO (Analog Output)    │ Saída Analógica — controla equipamentos proporcionais. │
+│                       │ Ex: válvula que abre 50%, inversor de frequência.      │
+│                       │                                                         │
+│ TC / RTD              │ Termopar / Pt100 — tipos especiais de sensores de      │
+│                       │ temperatura que precisam de módulos específicos.       │
+│                       │                                                         │
+│ Backplane (BP)        │ Placa principal do rack que conecta todos os módulos   │
+│                       │ entre si e com a CPU.                                  │
+│                       │                                                         │
+│ Tag                   │ Identificação única de um instrumento no campo.        │
+│                       │ Ex: TT-101 (Transmissor de Temperatura 101).           │
+│                       │                                                         │
+│ Borne                 │ Conector elétrico onde os fios são fixados. Fica no    │
+│                       │ bornes dentro do painel.                                │
+│                       │                                                         │
+│ BOM                   │ Bill of Materials — Lista de Materiais.                │
+│                       │                                                         │
+│ Típicos I/O           │ Configurações padrão de bornes, fusíveis, relés e      │
+│                       │ cabos para cada tipo de sinal (DI, DO, AI, AO).        │
+│                       │ Usado para gerar a BOM automaticamente.                │
+│                       │                                                         │
+│ Spare                 │ Canal reserva — não está em uso, mas está preparado    │
+│                       │ para expansão futura.                                   │
+│                       │                                                         │
+│ Crédito de Imposto    │ Valor de imposto pago na compra de materiais que       │
+│                       │ pode ser abatido do imposto devido na venda.            │
+│                       │ No PLC, é calculado automaticamente da BOM.             │
+│                       │                                                         │
+│ Derivação             │ Processo de gerar materiais automaticamente a partir   │
+│                       │ da configuração de I/O.                                 │
+└───────────────────────┴─────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  PROBLEMA: "A Lista de Materiais está vazia"                                   │
+│  SOLUÇÃO:  Você precisa primeiro configurar a Lista de I/O com pelo menos      │
+│            um rack e alguns slots. A BOM é gerada a partir da I/O.             │
+│                                                                                 │
+│  PROBLEMA: "Os créditos de ICMS/IPI estão zerados na Precificação"             │
+│  SOLUÇÃO:  Verifique se os materiais na BOM têm ICMS e IPI preenchidos.        │
+│            Esses valores vêm do catálogo de materiais. Se estiverem zero,      │
+│            atualize o cadastro do material ou preencha manualmente.            │
+│                                                                                 │
+│  PROBLEMA: "Mudei a I/O mas a BOM não atualizou"                              │
+│  SOLUÇÃO:  Clique em "Recalcular" na aba de Lista de Materiais. ⚠️ Isso        │
+│            substitui suas alterações manuais.                                   │
+│                                                                                 │
+│  PROBLEMA: "Os Típicos I/O não estão aplicando"                                │
+│  SOLUÇÃO:  Verifique se você configurou os típicos (botão "Típicos I/O")      │
+│            antes de gerar a BOM. Depois de gerar, mude os típicos e clique    │
+│            em "Recalcular".                                                     │
+│                                                                                 │
+│  PROBLEMA: "O total de canais não bate com o resumo"                           │
+│  SOLUÇÃO:  Verifique se você preencheu o campo "N°Ch" (número de canais)      │
+│            em cada slot. O resumo conta os canais, não os slots.               │
+│                                                                                 │
+│  PROBLEMA: "Não consigo editar os campos de custo na Precificação"            │
+│  SOLUÇÃO:  É NORMAL. Os custos dos materiais vêm da BOM. Para alterar,        │
+│            volte na Lista de Materiais e ajuste as quantidades ou custos.      │
+│                                                                                 │
+│  PROBLEMA: "Esqueci de marcar um canal como spare"                            │
+│  SOLUÇÃO:  Volte na Lista de I/O, encontre o canal, mude o status para        │
+│            "spare" e clique em "Recalcular" na BOM.                            │
+│                                                                                 │
+│  PROBLEMA: "O cliente pediu um módulo que não está no catálogo"               │
+│  SOLUÇÃO:  Você pode digitar o número do módulo manualmente no campo          │
+│            "Módulo (PN)" do slot. Na BOM, o item aparece sem referência de    │
+│            catálogo — você pode selecionar manualmente ou adicionar ao        │
+│            catálogo depois.                                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   O PLC é diferente dos outros equipamentos porque tudo começa na Lista         ║
+║   de I/O. Configure os racks, slots e canais com cuidado — o resto do          ║
+║   sistema (materiais, créditos, preço) flui automaticamente a partir daí.      ║
+║                                                                                  ║
+║   Uma I/O bem feita = BOM correta = créditos certos = preço justo.             ║
+║                                                                                  ║
+║   "Gaste tempo na I/O, economize tempo no resto."                               ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
