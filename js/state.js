@@ -1733,6 +1733,17 @@ class Store {
         return ok;
     }
 
+    async updateCrmNota(id, updates) {
+        const prev = (this.state.crmNotas || []).find(n => n.id === id);
+        const newItems = (this.state.crmNotas || []).map(n => n.id === id ? { ...n, ...updates } : n);
+        this.setState({ crmNotas: newItems });
+        const ok = await this._syncUpdate('crmNotas', id, updates);
+        if (!ok && prev) {
+            this.setState({ crmNotas: (this.state.crmNotas || []).map(n => n.id === id ? prev : n) });
+        }
+        return ok;
+    }
+
     // --- CRM Email Templates Methods ---
 
     async addCrmEmailTemplate(template) {

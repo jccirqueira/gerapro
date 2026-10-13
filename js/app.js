@@ -2270,7 +2270,8 @@ const App = {
                 tracks_conversao: 0,
                 is_loss: 0,
                 loss_reasons: [],
-                probability: 0
+                probability: 0,
+                dias_rotting: 7
             };
             this._stages.push(newStage);
             this.render();
@@ -2319,6 +2320,11 @@ const App = {
                                 <label style="font-size:11px;font-weight:600;color:#374151">Probabilidade (%)</label>
                                 <input type="number" id="stage-edit-probability" class="form-control" value="${stage.probability ?? 0}" min="0" max="100" style="font-size:12px">
                                 <span style="font-size:10px;color:#94a3b8">Usado no cálculo de forecast ponderado</span>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;font-weight:600;color:#374151">Dias para Rotting (0 = desativado)</label>
+                                <input type="number" id="stage-edit-dias-rotting" class="form-control" value="${stage.dias_rotting ?? 7}" min="0" style="font-size:12px">
+                                <span style="font-size:10px;color:#94a3b8">Lead fica marcado no Kanban após X dias sem contato</span>
                             </div>
                         </div>
                         <div style="margin-bottom:16px">
@@ -2374,6 +2380,8 @@ const App = {
             const lossReasonsStr = document.getElementById('stage-edit-loss-reasons')?.value || '';
             const lossReasons = lossReasonsStr.split(/[,;]/).map(s => s.trim()).filter(Boolean);
             const probability = parseInt(document.getElementById('stage-edit-probability')?.value) || 0;
+            const diasRotting = parseInt(document.getElementById('stage-edit-dias-rotting')?.value);
+            const dias_rotting = isNaN(diasRotting) ? 7 : diasRotting;
 
             const flags = {};
             document.querySelectorAll('[data-flag]').forEach(el => {
@@ -2386,6 +2394,7 @@ const App = {
                 color,
                 icon,
                 probability,
+                dias_rotting,
                 ...flags,
                 loss_reasons: lossReasons
             });
@@ -2394,7 +2403,7 @@ const App = {
             const statusEl = document.getElementById('crm-stages-status');
             if (statusEl) statusEl.textContent = 'Salvando...';
             await store.updateCrmStage(id, {
-                label, stage_id: stageId, color, icon, probability, ...flags,
+                label, stage_id: stageId, color, icon, probability, dias_rotting, ...flags,
                 loss_reasons: lossReasons
             });
             if (statusEl) statusEl.textContent = 'Salvo!';

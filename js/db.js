@@ -568,7 +568,8 @@ function initSchema() {
             updated_at TEXT,
             created_by TEXT,
             tags TEXT DEFAULT '[]',
-            observacoes TEXT
+            observacoes TEXT,
+            deleted_at TEXT DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS crm_interacoes (
@@ -676,6 +677,7 @@ function initSchema() {
             tracks_conversao INTEGER NOT NULL DEFAULT 0,
             is_loss INTEGER NOT NULL DEFAULT 0,
             loss_reasons TEXT DEFAULT '[]',
+            dias_rotting INTEGER DEFAULT 7,
             created_at TEXT,
             updated_at TEXT
         );
@@ -787,6 +789,9 @@ function initSchema() {
     try { db.exec("ALTER TABLE crm_tarefas ADD COLUMN empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) { /* column may already exist */ }
     // Fase A CRM: referência da sequência que criou a tarefa (dedupe persistente)
     try { db.exec("ALTER TABLE crm_tarefas ADD COLUMN seq_id TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    // Fase C CRM: lixeira (soft delete) + rotting por estágio
+    try { db.exec("ALTER TABLE crm_leads ADD COLUMN deleted_at TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { db.exec("ALTER TABLE crm_stages ADD COLUMN dias_rotting INTEGER DEFAULT 7"); } catch (e) { /* column may already exist */ }
 
     // Migration: add provider and api_key to mail_settings
     try { db.exec("ALTER TABLE mail_settings ADD COLUMN provider TEXT DEFAULT 'smtp'"); } catch (e) { /* column may already exist */ }
@@ -2506,6 +2511,7 @@ function updateCrmStage(id, empresaId, data) {
     }
     if (data.loss_reasons !== undefined) { fields.push('loss_reasons=?'); values.push(JSON.stringify(data.loss_reasons)); }
     if (data.probability !== undefined) { fields.push('probability=?'); values.push(data.probability); }
+    if (data.dias_rotting !== undefined) { fields.push('dias_rotting=?'); values.push(parseInt(data.dias_rotting) || 0); }
     if (fields.length > 0) {
         fields.push('updated_at=?'); values.push(now);
         values.push(id, empresaId);

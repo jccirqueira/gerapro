@@ -22,7 +22,11 @@ const CRM = {
     PRIORIDADES: ['baixa', 'media', 'alta', 'urgente'],
 
     getLeads() {
-        return store.getState().crmLeads || [];
+        return (store.getState().crmLeads || []).filter(l => !l.deleted_at);
+    },
+
+    getLeadsLixeira() {
+        return (store.getState().crmLeads || []).filter(l => !!l.deleted_at);
     },
 
     getInteracoes(leadId) {
@@ -225,6 +229,7 @@ const CRM = {
                         <div style="font-size:12px;opacity:0.9;margin-top:2px;">Gerencie seus leads e oportunidades aqui.</div>
                     </div>
                     <div style="display:flex;gap:10px;">
+                        <button class="btn btn-sm" onclick="window.crm.abrirModalMerge()" title="Encontrar e mesclar leads duplicados"><i class="ph ph-merge"></i> Duplicados</button>
                         <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalNovoLead()">
                             <i class="ph ph-plus"></i> Novo Lead
                         </button>
@@ -238,6 +243,7 @@ const CRM = {
                         <button class="crm-tab" data-view="tarefas"><i class="ph ph-check-square"></i> Tarefas</button>
                         <button class="crm-tab" data-view="calendario"><i class="ph ph-calendar"></i> Calendário</button>
                         <button class="crm-tab" data-view="relatorios"><i class="ph ph-presentation-chart"></i> Relatórios</button>
+                        <button class="crm-tab" data-view="lixeira" title="Leads excluídos podem ser restaurados"><i class="ph ph-trash"></i> Lixeira <span id="crm-lixeira-count" style="display:none;background:#ef4444;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:2px"></span></button>
                     </div>
                 </div>
                 <div class="crm-toolbar" id="crm-toolbar">
@@ -291,6 +297,7 @@ const CRM = {
         else if (this._currentView === 'tarefas') this._renderTarefas();
         else if (this._currentView === 'calendario') this._renderCalendario();
         else if (this._currentView === 'relatorios') this._renderRelatorios();
+        else if (this._currentView === 'lixeira') this._renderLixeira();
     },
 
     _filterLeads(leads, opts = {}) {
@@ -405,6 +412,7 @@ const CRM = {
         else if (this._currentView === 'tarefas') this._renderTarefas();
         else if (this._currentView === 'calendario') this._renderCalendario();
         else if (this._currentView === 'relatorios') this._renderRelatorios();
+        else if (this._currentView === 'lixeira') this._renderLixeira();
     },
 
     _renderDashboard() {
@@ -549,11 +557,16 @@ const CRM = {
             const leads = porStatus[s.id] || [];
             let cards = leads.map(l => this._renderLeadCard(l)).join('');
             if (!cards) cards = '<div class="crm-kanban-empty">Nenhum lead</div>';
+            const soma = leads.reduce((acc, l) => acc + (parseFloat(l.estimativa_valor) || 0), 0);
             columns += `
                 <div class="crm-kanban-col" data-status="${s.id}">
                     <div class="crm-kanban-col-header" style="border-bottom-color:${s.color}">
                         <span class="crm-kanban-col-title">${s.label}</span>
-                        <span class="crm-kanban-col-count">${leads.length}</span>
+                        <span style="display:flex;align-items:center;gap:6px">
+                            ${soma > 0 ? `<span class="crm-kanban-col-sum" title="Soma das estimativas" style="font-size:11px;color:#64748b">${this.formatCurrency(soma)}</span>` : ''}
+                            <span class="crm-kanban-col-count">${leads.length}</span>
+                            <button class="btn btn-sm btn-ghost" title="Novo lead neste estágio" style="padding:0 5px;line-height:1" onclick="event.stopPropagation();window.crm.abrirModalNovoLead('${s.id}')"><i class="ph ph-plus"></i></button>
+                        </span>
                     </div>
                     <div class="crm-kanban-col-body" ondragover="event.preventDefault()" ondrop="window.crm._onDrop(event, '${s.id}')">
                         ${cards}
@@ -574,13 +587,21 @@ const CRM = {
         const wa = this._waHref(waNum);
         const tel = this._telHref(lead.telefone || lead.celular || lead.whatsapp);
         const tags = this._leadTags(lead);
+        // Rotting: dias sem contato > dias_rotting do estágio (Pipedrive-like; default 7, 0 = desativado)
+        const diasRotting = stage ? (stage.dias_rotting !== undefined && stage.dias_rotting !== null ? (parseInt(stage.dias_rotting) || 0) : 7) : 0;
+        const ultimoContato = lead.data_ultimo_contato || lead.updated_at || lead.created_at;
+        const diasSemContato = ultimoContato ? Math.floor((Date.now() - new Date(ultimoContato).getTime()) / 86400000) : 0;
+        const isRotting = diasRotting > 0 && !isTerminal && diasSemContato > diasRotting;
         return `
             <div class="crm-lead-card" draggable="true" data-id="${lead.id}"
                  onclick="window.crm.abrirModalLead('${lead.id}')"
                  ondragstart="window.crm._onDragStart(event, '${lead.id}')">
                 <div class="crm-lead-card-header">
                     <strong>${this._esc(lead.nome)}</strong>
-                    <span class="crm-score ${this.getScoreClass(lead.score)}">${lead.score ?? 0}</span>
+                    <span style="display:flex;align-items:center;gap:4px">
+                        ${isRotting ? `<span title="${diasSemContato} dia(s) sem contato (limite: ${diasRotting}d)" style="background:#fef2f2;color:#dc2626;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px"><i class="ph ph-skull"></i> ${diasSemContato}d</span>` : ''}
+                        <span class="crm-score ${this.getScoreClass(lead.score)}">${lead.score ?? 0}</span>
+                    </span>
                 </div>
                 ${lead.empresa ? `<div class="crm-lead-card-empresa">${this._esc(lead.empresa)}</div>` : ''}
                 ${tags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${tags.slice(0, 3).map(t => `<span style="font-size:10px;background:#eef2ff;color:#4f46e5;padding:1px 6px;border-radius:10px">${this._esc(t)}</span>`).join('')}${tags.length > 3 ? `<span style="font-size:10px;background:#e5e7eb;color:#4b5563;padding:1px 6px;border-radius:10px">+${tags.length - 3}</span>` : ''}</div>` : ''}
@@ -823,13 +844,22 @@ const CRM = {
     async _bulkDelete() {
         const leads = this._selLeads();
         if (leads.length === 0) return;
-        if (!confirm(`Excluir ${leads.length} lead(s) e todos os dados vinculados (notas, tarefas, interações)?\nEsta ação não pode ser desfeita.`)) return;
+        if (!confirm(`Mover ${leads.length} lead(s) para a lixeira?\nOs dados vinculados serão preservados e os leads poderão ser restaurados.`)) return;
+        const now = new Date().toISOString();
+        const ids = leads.map(l => l.id);
         for (const l of leads) {
-            await this._excluirLeadData(l.id);
+            await store.updateCrmLead(l.id, { deleted_at: now, updated_at: now });
         }
         this._selection.clear();
         this.updateBadge();
-        this.showToast(`${leads.length} lead(s) excluído(s).`, 'success');
+        this.showToast(`${ids.length} lead(s) movidos para a lixeira.`, 'info', 6000, {
+            label: 'Desfazer',
+            onClick: async () => {
+                for (const id of ids) await store.updateCrmLead(id, { deleted_at: '', updated_at: new Date().toISOString() });
+                this.updateBadge();
+                this.showToast(`${ids.length} lead(s) restaurado(s).`, 'success');
+            }
+        });
         this._renderTabela();
     },
 
@@ -1716,7 +1746,10 @@ const CRM = {
         win.document.close();
     },
 
-    abrirModalNovoLead() {
+    abrirModalNovoLead(statusInicial) {
+        const stages = this._getStages();
+        const defaultSt = stages.find(s => s.is_default);
+        const statusSel = statusInicial || (defaultSt ? defaultSt.id : 'novo');
         const overlay = document.createElement('div');
         overlay.className = 'crm-modal-overlay';
         overlay.innerHTML = `
@@ -1743,6 +1776,12 @@ const CRM = {
                             <div class="crm-field">
                                 <label>Segmento</label>
                                 <input type="text" id="f-segmento">
+                            </div>
+                            <div class="crm-field">
+                                <label>Estágio</label>
+                                <select id="f-status">
+                                    ${stages.map(s => `<option value="${s.id}" ${s.id === statusSel ? 'selected' : ''}>${s.label}</option>`).join('')}
+                                </select>
                             </div>
                             <div class="crm-field">
                                 <label>Email</label>
@@ -1860,7 +1899,7 @@ const CRM = {
             orcamento_informado: parseFloat(document.getElementById('f-orcamento')?.value) || 0,
             prazo_interesse: document.getElementById('f-prazo')?.value || '',
             observacoes: document.getElementById('f-observacoes')?.value || '',
-            status: defaultSt ? defaultSt.id : 'novo',
+            status: document.getElementById('f-status')?.value || (defaultSt ? defaultSt.id : 'novo'),
             score: 0,
             tags: []
         };
@@ -2522,10 +2561,24 @@ const CRM = {
     },
 
     async _excluirLead(leadId) {
-        if (!confirm('Tem certeza? Todas as interações e tarefas vinculadas também serão removidas.')) return;
-        await this._excluirLeadData(leadId);
+        if (!confirm('Tem certeza? O lead será movido para a lixeira e poderá ser restaurado.')) return;
+        await store.updateCrmLead(leadId, { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() });
         document.querySelector('.crm-modal-overlay')?.remove();
+        this.updateBadge();
         this._renderView();
+        this.showToast('Lead movido para a lixeira.', 'info', 6000, {
+            label: 'Desfazer',
+            onClick: () => this._restaurarLead(leadId, true)
+        });
+    },
+
+    async _restaurarLead(leadId, silencioso = false) {
+        const lead = (store.getState().crmLeads || []).find(l => l.id === leadId);
+        await store.updateCrmLead(leadId, { deleted_at: '', updated_at: new Date().toISOString() });
+        this.updateBadge();
+        this._renderView();
+        if (!silencioso) this.showToast('Lead restaurado.', 'success');
+        else this.showToast(`"${(lead && lead.nome) || 'Lead'}" restaurado.`, 'success');
     },
 
     async _excluirLeadData(leadId) {
@@ -2537,6 +2590,198 @@ const CRM = {
         for (const n of notas) await store.deleteCrmNota(n.id);
         await store.deleteCrmLead(leadId);
         this.updateBadge();
+    },
+
+    // --- Lixeira ---
+
+    _renderLixeira() {
+        const content = document.getElementById('crm-content');
+        if (!content) return;
+        const leads = this.getLeadsLixeira()
+            .sort((a, b) => new Date(b.deleted_at || 0) - new Date(a.deleted_at || 0));
+        if (leads.length === 0) {
+            content.innerHTML = '<div class="crm-empty"><i class="ph ph-trash"></i><p>Lixeira vazia</p><span style="font-size:12px;color:#94a3b8">Leads excluídos aparecem aqui e podem ser restaurados.</span></div>';
+            return;
+        }
+        const rows = leads.map(l => `
+            <tr>
+                <td><strong>${this._esc(l.nome)}</strong></td>
+                <td>${this._esc(l.empresa || '—')}</td>
+                <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;background:${this.getStatusColor(l.status)}22;color:${this.getStatusColor(l.status)}">${this.getStatusLabel(l.status)}</span></td>
+                <td>${this.formatCurrency(l.estimativa_valor || 0)}</td>
+                <td>${l.deleted_at ? new Date(l.deleted_at).toLocaleString() : '—'}</td>
+                <td style="text-align:right;white-space:nowrap">
+                    <button class="btn btn-sm" onclick="window.crm._restaurarLead('${l.id}')" title="Restaurar lead"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar</button>
+                    <button class="btn btn-sm btn-danger" onclick="window.crm._excluirDefinitivamente('${l.id}')" title="Excluir definitivamente"><i class="ph ph-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+        content.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <div><strong>Lixeira</strong><span style="font-size:12px;color:#64748b;margin-left:8px">${leads.length} lead(s) excluído(s)</span></div>
+                <button class="btn btn-sm btn-danger" onclick="window.crm._esvaziarLixeira()"><i class="ph ph-fire"></i> Esvaziar Lixeira</button>
+            </div>
+            <div style="overflow-x:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:2px solid #e2e8f0;color:#64748b;font-size:11px;text-transform:uppercase">
+                            <th style="padding:8px">Nome</th>
+                            <th style="padding:8px">Empresa</th>
+                            <th style="padding:8px">Status</th>
+                            <th style="padding:8px">Estimativa</th>
+                            <th style="padding:8px">Excluído em</th>
+                            <th style="padding:8px"></th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    },
+
+    async _excluirDefinitivamente(leadId) {
+        const lead = (store.getState().crmLeads || []).find(l => l.id === leadId);
+        if (!confirm(`Excluir definitivamente "${lead ? lead.nome : 'este lead'}"?\nTodas as interações, tarefas e notas vinculadas serão removidas. Esta ação não pode ser desfeita.`)) return;
+        await this._excluirLeadData(leadId);
+        this.showToast('Lead excluído definitivamente.', 'success');
+        this._renderLixeira();
+    },
+
+    async _esvaziarLixeira() {
+        const leads = this.getLeadsLixeira();
+        if (leads.length === 0) return;
+        if (!confirm(`Esvaziar a lixeira?\n${leads.length} lead(s) e todos os dados vinculados serão excluídos definitivamente. Esta ação não pode ser desfeita.`)) return;
+        for (const l of leads) {
+            await this._excluirLeadData(l.id);
+        }
+        this.showToast('Lixeira esvaziada.', 'success');
+        this._renderLixeira();
+    },
+
+    // --- Mesclagem de Duplicados ---
+
+    _getGruposDuplicados() {
+        const leads = this.getLeads();
+        // Union-find por e-mail ou nome+empresa normalizados
+        const parent = {};
+        const find = (x) => { while (parent[x] !== x) x = parent[x]; return x; };
+        const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+        leads.forEach(l => { parent[l.id] = l.id; });
+        const norm = (s) => (s || '').toString().toLowerCase().trim();
+        const byEmail = {}, byNomeEmp = {};
+        leads.forEach(l => {
+            const email = norm(l.email);
+            if (email) { if (byEmail[email] !== undefined) union(l.id, byEmail[email]); else byEmail[email] = l.id; }
+            const nome = norm(l.nome), empresa = norm(l.empresa);
+            if (nome && empresa) { const k = nome + '|' + empresa; if (byNomeEmp[k] !== undefined) union(l.id, byNomeEmp[k]); else byNomeEmp[k] = l.id; }
+        });
+        const grupos = {};
+        leads.forEach(l => { const r = find(l.id); (grupos[r] = grupos[r] || []).push(l); });
+        return Object.values(grupos).filter(g => g.length > 1);
+    },
+
+    abrirModalMerge() {
+        const grupos = this._getGruposDuplicados();
+        const overlay = document.createElement('div');
+        overlay.className = 'crm-modal-overlay';
+        const corpo = grupos.length === 0
+            ? '<div class="crm-empty" style="padding:30px"><i class="ph ph-check-circle"></i><p>Nenhum lead duplicado encontrado</p></div>'
+            : grupos.map((g, gi) => {
+                const ordenados = [...g].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+                return `
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px">
+                        <div style="font-size:12px;color:#6b7280;margin-bottom:8px"><i class="ph ph-merge"></i> ${g.length} leads com ${this._dupMotivo(g)}</div>
+                        ${ordenados.map((l, li) => `
+                            <label style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;${li === 0 ? 'background:#f0fdf4;border:1px solid #bbf7d0;' : 'border:1px solid transparent;'}">
+                                <input type="radio" name="merge-primary-${gi}" value="${l.id}" ${li === 0 ? 'checked' : ''} style="margin-top:3px">
+                                <span style="flex:1;min-width:0;font-size:13px">
+                                    <strong>${this._esc(l.nome)}</strong>${l.empresa ? ` <span style="color:#64748b">— ${this._esc(l.empresa)}</span>` : ''}
+                                    <span style="display:block;color:#94a3b8;font-size:11px">${this._esc(l.email || 'sem e-mail')} · ${this.getStatusLabel(l.status)} · score ${l.score ?? 0} · ${this.getNotas(l.id).length} nota(s), ${this.getInteracoes(l.id).length} interação(ões), ${this.getTarefas(l.id).length} tarefa(s)</span>
+                                </span>
+                                ${li === 0 ? '<span style="color:#16a34a;font-size:11px;white-space:nowrap"><i class="ph ph-star"></i> manter</span>' : ''}
+                            </label>
+                        `).join('')}
+                        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+                            <button class="btn btn-sm btn-primary" onclick="window.crm._mesclarLeads(${gi}, ${JSON.stringify(ordenados.map(l => l.id)).replace(/"/g, '&quot;')})"><i class="ph ph-merge"></i> Mesclar neste</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        overlay.innerHTML = `
+            <div class="crm-modal crm-modal-lg">
+                <div class="crm-modal-header">
+                    <h3><i class="ph ph-merge"></i> Mesclar Duplicados</h3>
+                    <button class="crm-modal-close" onclick="this.closest('.crm-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="crm-modal-body" style="max-height:70vh;overflow-y:auto">
+                    <p style="font-size:12px;color:#64748b;margin-bottom:12px">Selecione o lead principal (será mantido). Os demais serão mesclados: campos vazios preenchidos, tags unidas e todo o histórico (notas, tarefas, interações, propostas) migrado para o principal.</p>
+                    ${corpo}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    _dupMotivo(grupo) {
+        const norm = (s) => (s || '').toString().toLowerCase().trim();
+        const emails = new Set(grupo.map(l => norm(l.email)).filter(Boolean));
+        const nomeEmps = new Set(grupo.map(l => norm(l.nome) + '|' + norm(l.empresa)));
+        if (emails.size === 1 && emails.values().next().value) return 'mesmo e-mail';
+        if (nomeEmps.size === 1) return 'mesmo nome + empresa';
+        return 'dados em comum';
+    },
+
+    async _mesclarLeads(gi, ids) {
+        const marcado = document.querySelector(`input[name="merge-primary-${gi}"]:checked`);
+        const primarioId = marcado ? marcado.value : ids[0];
+        const secundarios = ids.filter(id => id !== primarioId);
+        if (secundarios.length === 0) { this.showToast('Selecione pelo menos dois leads para mesclar.', 'warning'); return; }
+        const primario = this.getLeads().find(l => l.id === primarioId);
+        if (!primario) return;
+        if (!confirm(`Mesclar ${secundarios.length} lead(s) em "${primario.nome}"?\nOs dados vazios do principal serão preenchidos e todo o histórico será movido.`)) return;
+        // Campos escalares: preenche vazios do primário com valores dos secundários
+        const campos = ['empresa', 'cargo', 'segmento', 'email', 'telefone', 'celular', 'whatsapp', 'cidade', 'estado', 'cnpj', 'origem', 'interesse', 'prazo_interesse', 'observacoes', 'vendedor_id', 'cliente_id', 'prioridade'];
+        const updates = {};
+        for (const c of campos) {
+            if (primario[c] === '' || primario[c] === null || primario[c] === undefined) {
+                const val = secundarios.map(sid => { const sl = this.getLeads().find(l => l.id === sid); return sl ? sl[c] : null; }).find(v => v !== '' && v !== null && v !== undefined);
+                if (val !== undefined && val !== null) updates[c] = val;
+            }
+        }
+        // Estimativa/orçamento/score: maior valor
+        const maxEst = Math.max(primario.estimativa_valor || 0, ...secundarios.map(sid => { const sl = this.getLeads().find(l => l.id === sid); return sl ? (sl.estimativa_valor || 0) : 0; }));
+        if (maxEst > (primario.estimativa_valor || 0)) updates.estimativa_valor = maxEst;
+        const maxOrc = Math.max(primario.orcamento_informado || 0, ...secundarios.map(sid => { const sl = this.getLeads().find(l => l.id === sid); return sl ? (sl.orcamento_informado || 0) : 0; }));
+        if (maxOrc > (primario.orcamento_informado || 0)) updates.orcamento_informado = maxOrc;
+        const maxScore = Math.max(primario.score || 0, ...secundarios.map(sid => { const sl = this.getLeads().find(l => l.id === sid); return sl ? (sl.score || 0) : 0; }));
+        if (maxScore !== primario.score) updates.score = maxScore;
+        // Tags: união
+        const tags = this._leadTags(primario);
+        for (const sid of secundarios) {
+            const sl = this.getLeads().find(l => l.id === sid);
+            if (sl) for (const t of this._leadTags(sl)) if (!tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t);
+        }
+        updates.tags = tags;
+        updates.updated_at = new Date().toISOString();
+        await store.updateCrmLead(primarioId, updates);
+        // Mover registros filhos
+        let movidos = 0;
+        for (const sid of secundarios) {
+            for (const i of this.getInteracoes(sid)) { await store.updateCrmInteracao(i.id, { lead_id: primarioId }); movidos++; }
+            for (const t of this.getTarefas(sid)) { await store.updateCrmTarefa(t.id, { lead_id: primarioId }); movidos++; }
+            for (const n of this.getNotas(sid)) { await store.updateCrmNota(n.id, { lead_id: primarioId }); movidos++; }
+            for (const p of (store.getState().pipelineItems || []).filter(p => p.origem === 'crm' && p.origemId === sid)) {
+                store.setState({ pipelineItems: (store.getState().pipelineItems || []).map(x => x.id === p.id ? { ...x, origemId: primarioId } : x) });
+                store._syncUpdate('pipelineItems', p.id, { origemId: primarioId });
+                movidos++;
+            }
+            await store.deleteCrmLead(sid);
+        }
+        this.updateBadge();
+        this._renderView();
+        this.showToast(`Leads mesclados em "${primario.nome}". ${movidos} registro(s) movido(s).`, 'success');
+        document.querySelector('.crm-modal-overlay')?.remove();
+        this.abrirModalMerge(); // reabre atualizado (mostra próximos grupos, se houver)
     },
 
     // --- Email Tab ---
@@ -3304,6 +3549,12 @@ const CRM = {
         if (badge) {
             if (total > 0) { badge.style.display = 'inline'; badge.textContent = total > 99 ? '99+' : total; }
             else { badge.style.display = 'none'; }
+        }
+        const lixEiraCount = document.getElementById('crm-lixeira-count');
+        if (lixEiraCount) {
+            const n = this.getLeadsLixeira().length;
+            if (n > 0) { lixEiraCount.style.display = 'inline'; lixEiraCount.textContent = n; }
+            else lixEiraCount.style.display = 'none';
         }
     },
 
