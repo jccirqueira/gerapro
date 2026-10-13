@@ -642,6 +642,30 @@ function initSchema() {
             updated_at TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS crm_automacoes (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            nome TEXT NOT NULL,
+            ativo INTEGER NOT NULL DEFAULT 1,
+            trigger_event TEXT NOT NULL DEFAULT 'lead_created',
+            trigger_value TEXT DEFAULT '',
+            condicao TEXT DEFAULT '',
+            acoes TEXT DEFAULT '[]',
+            created_at TEXT,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS crm_metas (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            periodo TEXT NOT NULL,
+            vendedor_id TEXT DEFAULT '',
+            valor REAL DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_crm_metas_empresa_periodo ON crm_metas(empresa_id, periodo);
+
         CREATE TABLE IF NOT EXISTS crm_email_templates (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -792,6 +816,8 @@ function initSchema() {
     // Fase C CRM: lixeira (soft delete) + rotting por estágio
     try { db.exec("ALTER TABLE crm_leads ADD COLUMN deleted_at TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE crm_stages ADD COLUMN dias_rotting INTEGER DEFAULT 7"); } catch (e) { /* column may already exist */ }
+    // Fase D CRM: menções (@mention) em notas
+    try { db.exec("ALTER TABLE crm_notas ADD COLUMN menoes TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add provider and api_key to mail_settings
     try { db.exec("ALTER TABLE mail_settings ADD COLUMN provider TEXT DEFAULT 'smtp'"); } catch (e) { /* column may already exist */ }
@@ -1012,6 +1038,8 @@ const TABLE_MAP = {
     crmNotas: { pk: 'id', table: 'crm_notas' },
     crmWebhooks: { pk: 'id', table: 'crm_webhooks' },
     crmSequencias: { pk: 'id', table: 'crm_sequencias' },
+    crmAutomacoes: { pk: 'id', table: 'crm_automacoes' },
+    crmMetas: { pk: 'id', table: 'crm_metas' },
     crmEmailTemplates: { pk: 'id', table: 'crm_email_templates' },
     crmStages: { pk: 'id', table: 'crm_stages' },
     manufaturaProjetos: { pk: 'id', table: 'manufatura_projetos' },
@@ -1890,10 +1918,19 @@ function getFullSync(empresaId = 'default') {
         }),
         crmInteracoes: findAll('crmInteracoes', empresaId),
         crmTarefas: findAll('crmTarefas', empresaId),
-        crmNotas: findAll('crmNotas', empresaId),
+        crmNotas: findAll('crmNotas', empresaId).map(n => {
+            if (n.menoes && typeof n.menoes === 'string') { try { n.menoes = JSON.parse(n.menoes); } catch (e) { n.menoes = []; } }
+            return n;
+        }),
         crmEmailTemplates: findAll('crmEmailTemplates', empresaId),
         crmStages: findAll('crmStages', empresaId),
         crmSequencias: findAll('crmSequencias', empresaId),
+        crmAutomacoes: findAll('crmAutomacoes', empresaId).map(a => {
+            if (a.acoes && typeof a.acoes === 'string') { try { a.acoes = JSON.parse(a.acoes); } catch (e) { a.acoes = []; } }
+            if (a.condicao && typeof a.condicao === 'string') { try { a.condicao = JSON.parse(a.condicao); } catch (e) { a.condicao = null; } }
+            return a;
+        }),
+        crmMetas: findAll('crmMetas', empresaId),
         crmWebhooks: findAll('crmWebhooks', empresaId),
         manufaturaProjetos: findAll('manufaturaProjetos', empresaId),
         manufaturaColunas: findAll('manufaturaColunas', empresaId),

@@ -204,6 +204,7 @@ const CRM = {
         this._notifyOverdue(true);
         this._startOverdueTimer();
         this._runAllSequencias().catch(() => {});
+        this._runAutomacoesRotting().catch(() => {});
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             Notification.requestPermission();
         }
@@ -261,6 +262,7 @@ const CRM = {
                         <input type="date" id="crm-filter-dateend" onchange="window.crm._setFilter('dateEnd', this.value)" style="max-width:150px">
                     </div>
                     <button class="btn btn-sm btn-ghost" onclick="window.crm.abrirConfigSequencias()" title="Sequências" style="margin-left:4px;white-space:nowrap"><i class="ph ph-flow-arrow"></i> Sequências</button>
+                    <button class="btn btn-sm btn-ghost" onclick="window.crm.abrirConfigAutomacoes()" title="Automações" style="margin-left:4px;white-space:nowrap"><i class="ph ph-lightning"></i> Automações</button>
                     <button class="btn btn-sm btn-ghost" onclick="window.crm.abrirConfigWebhooks()" title="Webhooks" style="margin-left:4px;white-space:nowrap"><i class="ph ph-plug"></i> Webhooks</button>
                 </div>
                 <div class="crm-content" id="crm-content"></div>
@@ -488,14 +490,20 @@ const CRM = {
                                     <div class="crm-summary-card"><div class="crm-summary-value">${this.formatCurrency(forecastPonderado)}</div><div class="crm-summary-label">Forecast Ponderado</div></div>
                                 </div>
                                 ${(() => {
+                                    const periodo = this._periodoAtual();
                                     const vends = this.getVendedores();
-                                    const metaTotal = vends.reduce((s, v) => s + (parseFloat(v.meta_mensal) || 0), 0);
+                                    const metaTotal = vends.reduce((s, v) => s + this._getMetaMes(v.id, periodo), 0);
                                     if (metaTotal <= 0) return '';
                                     const leadsAll = this._filterLeads(this.getLeads());
-                                    const valorTotal = leadsAll.reduce((s, l) => s + (parseFloat(l.estimativa_valor) || 0), 0);
-                                    const pct = Math.min(valorTotal / metaTotal * 100, 100);
+                                    const realizado = leadsAll.reduce((s, l) => {
+                                        const st = this._getStage(l.status);
+                                        if (!st || !st.tracks_conversao) return s;
+                                        const ref = l.data_conversao || l.updated_at || '';
+                                        return ref.slice(0, 7) === periodo ? s + (parseFloat(l.estimativa_valor) || 0) : s;
+                                    }, 0);
+                                    const pct = Math.min(realizado / metaTotal * 100, 100);
                                     const color = pct >= 100 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#ef4444';
-                                    return `<div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Meta Global: ${this.formatCurrency(metaTotal)}</span><span style="font-weight:600;color:${color}">${pct.toFixed(0)}%</span></div><div class="crm-bar-bg"><div class="crm-bar-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+                                    return `<div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Meta do Mês: ${this.formatCurrency(metaTotal)}</span><span style="font-weight:600;color:${color}">${pct.toFixed(0)}% · ${this.formatCurrency(realizado)}</span></div><div class="crm-bar-bg"><div class="crm-bar-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
                                 })()}
                             </div>
                         </div>
@@ -511,6 +519,34 @@ const CRM = {
                                 <button class="btn btn-sm" onclick="window.crm._currentView='tarefas';window.crm._renderView();document.querySelectorAll('.crm-tab').forEach(t=>t.classList.remove('active'));document.querySelector('.crm-tab[data-view=tarefas]')?.classList.add('active')">Ver Tarefas</button>
                             </div>
                         </div>
+                        ${(() => {
+                            const userNorm = this._normTxt(this._userLogado());
+                            if (!userNorm || userNorm === '—') return '';
+                            const leadsMap = new Map(this.getLeads().map(l => [l.id, l]));
+                            const mencoes = [];
+                            for (const n of (store.getState().crmNotas || [])) {
+                                let menoes = n.menoes;
+                                if (typeof menoes === 'string') { try { menoes = menoes ? JSON.parse(menoes) : []; } catch (e) { menoes = []; } }
+                                if (Array.isArray(menoes) && menoes.some(m => this._normTxt(m.nome) === userNorm) && leadsMap.has(n.lead_id)) {
+                                    mencoes.push({ nota: n, lead: leadsMap.get(n.lead_id) });
+                                }
+                            }
+                            if (mencoes.length === 0) return '';
+                            mencoes.sort((a, b) => new Date(b.nota.created_at || 0) - new Date(a.nota.created_at || 0));
+                            return `
+                        <div class="crm-panel">
+                            <div class="crm-panel-header"><i class="ph ph-at"></i> Menções para Você</div>
+                            <div class="crm-panel-body">
+                                ${mencoes.slice(0, 5).map(m => `
+                                    <div class="crm-alert-item" style="cursor:pointer;align-items:flex-start" onclick="window.crm.abrirModalLead('${m.lead.id}')">
+                                        <span class="crm-alert-icon" style="color:#8b5cf6"><i class="ph ph-at"></i></span>
+                                        <span style="flex:1;min-width:0"><strong>${this._esc(m.lead.nome)}</strong><br><span style="font-size:11px;color:#64748b;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(m.nota.conteudo || '')}</span></span>
+                                        <span style="font-size:10px;color:#94a3b8;white-space:nowrap">${m.nota.created_at ? new Date(m.nota.created_at).toLocaleDateString() : ''}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>`;
+                        })()}
                     </div>
                     <div class="crm-dashboard-col">
                         <div class="crm-panel">
@@ -1547,21 +1583,33 @@ const CRM = {
         const totalConvertidos = leads.filter(l => { const st = this._getStage(l.status); return st && st.tracks_conversao; }).length;
         const totalPerdidos = leads.filter(l => { const st = this._getStage(l.status); return st && st.is_loss; }).length;
         const taxaConversao = total > 0 ? (totalConvertidos / total * 100).toFixed(1) : '0.0';
+        const periodo = this._periodoAtual();
+        const periodoLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
         const vendedorRows = Object.entries(porVendedor).map(([vid, data]) => {
-            const meta = data.meta || 0;
-            const atingido = meta > 0 ? Math.min(data.valorTotal / meta * 100, 100) : 0;
+            const meta = vid === 'sem_vendedor' ? 0 : this._getMetaMes(vid, periodo);
+            const realizado = this._realizadoMesVendedor(data.leads, periodo);
+            const forecast = this._forecastAbertoVendedor(data.leads);
+            const atingido = meta > 0 ? Math.min(realizado / meta * 100, 999) : 0;
             return `
             <tr>
                 <td>${this.getVendedorNome(vid)}</td>
                 <td>${data.total}</td>
                 <td>${data.qualificados}</td>
-                <td>${data.propostas}</td>
-                <td>${data.total > 0 ? (data.propostas / data.total * 100).toFixed(1) + '%' : '0%'}</td>
-                <td>${meta > 0 ? 'R$ ' + meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'}</td>
-                <td>${meta > 0 ? `<div style="display:flex;align-items:center;gap:6px"><div class="crm-bar-bg" style="flex:1;max-width:80px"><div class="crm-bar-fill" style="width:${atingido}%;background:${atingido >= 100 ? '#16a34a' : atingido >= 50 ? '#f59e0b' : '#ef4444'}"></div></div><span style="font-size:11px;font-weight:600">${atingido.toFixed(0)}%</span></div>` : '—'}</td>
+                <td>${this.formatCurrency(realizado)}</td>
+                <td>${this.formatCurrency(forecast)}</td>
+                <td>${vid === 'sem_vendedor' ? '—' : `<div style="display:flex;align-items:center;gap:4px"><input type="number" data-vid="${vid}" value="${meta}" min="0" step="100" onchange="window.crm._onMetaEdit(this)" style="width:100px;font-size:12px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px" title="Meta do mês — edite e clique fora para salvar"></div>`}</td>
+                <td>${meta > 0 ? `<div style="display:flex;align-items:center;gap:6px"><div class="crm-bar-bg" style="flex:1;max-width:80px"><div class="crm-bar-fill" style="width:${Math.min(atingido, 100)}%;background:${atingido >= 100 ? '#16a34a' : atingido >= 50 ? '#f59e0b' : '#ef4444'}"></div></div><span style="font-size:11px;font-weight:600">${atingido.toFixed(0)}%</span></div>` : '—'}</td>
             </tr>
         `}).join('');
+
+        const metaTotalMes = vendedores.reduce((s, v) => s + this._getMetaMes(v.id, periodo), 0);
+        const realizadoTotalMes = leads.filter(l => { const st = this._getStage(l.status); return st && st.tracks_conversao; }).reduce((s, l) => {
+            const ref = l.data_conversao || l.updated_at || '';
+            return ref.slice(0, 7) === periodo ? s + (parseFloat(l.estimativa_valor) || 0) : s;
+        }, 0);
+        const forecastTotalAberto = this._forecastAbertoVendedor(leads);
+        const atingidoGeral = metaTotalMes > 0 ? Math.min(realizadoTotalMes / metaTotalMes * 100, 999) : 0;
 
         content.innerHTML = `
             <div class="crm-dashboard" style="max-width:900px">
@@ -1576,9 +1624,17 @@ const CRM = {
                             <div class="crm-summary-card"><div class="crm-summary-value">${totalPerdidos}</div><div class="crm-summary-label">Perdidos</div></div>
                             <div class="crm-summary-card"><div class="crm-summary-value">${taxaConversao}%</div><div class="crm-summary-label">Taxa Conversão</div></div>
                         </div>
+                        <h3 style="font-size:14px;margin:0 0 8px"><i class="ph ph-target"></i> Meta do Mês — ${periodoLabel}</h3>
+                        <div class="crm-summary-cards" style="margin-bottom:8px">
+                            <div class="crm-summary-card"><div class="crm-summary-value">${this.formatCurrency(realizadoTotalMes)}</div><div class="crm-summary-label">Realizado (mês)</div></div>
+                            <div class="crm-summary-card"><div class="crm-summary-value">${this.formatCurrency(metaTotalMes)}</div><div class="crm-summary-label">Meta (mês)</div></div>
+                            <div class="crm-summary-card"><div class="crm-summary-value">${atingidoGeral.toFixed(0)}%</div><div class="crm-summary-label">Atingido</div></div>
+                            <div class="crm-summary-card"><div class="crm-summary-value">${this.formatCurrency(forecastTotalAberto)}</div><div class="crm-summary-label">Forecast (abertos)</div></div>
+                        </div>
+                        ${metaTotalMes > 0 ? `<div class="crm-bar-bg" style="height:14px;margin-bottom:16px"><div class="crm-bar-fill" style="width:${Math.min(atingidoGeral, 100)}%;background:${atingidoGeral >= 100 ? '#16a34a' : atingidoGeral >= 50 ? '#f59e0b' : '#ef4444'}"></div></div>` : ''}
                         <h3 style="font-size:14px;margin:0 0 8px">Desempenho por Vendedor</h3>
                         <table class="crm-table">
-                            <thead><tr><th>Vendedor</th><th>Total Leads</th><th>Qualificados</th><th>Propostas</th><th>Conversão</th><th>Meta (R$)</th><th>% Atingido</th></tr></thead>
+                            <thead><tr><th>Vendedor</th><th>Total Leads</th><th>Qualificados</th><th>Realizado (mês)</th><th>Forecast (abertos)</th><th>Meta (mês)</th><th>% Atingido</th></tr></thead>
                             <tbody>${vendedorRows || '<tr><td colspan="7" class="crm-text-muted">Nenhum dado</td></tr>'}</tbody>
                         </table>
                     </div>
@@ -1906,6 +1962,7 @@ const CRM = {
         const novo = await store.addCrmLead(lead);
         if (novo) {
             await this.recalcularScore(novo.id);
+            this._executarAutomacoes('lead_created', novo).catch(() => {});
             document.querySelector('.crm-modal-overlay')?.remove();
             this.updateBadge();
             this._renderView();
@@ -2120,7 +2177,7 @@ const CRM = {
                     <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalInteracao('${lead.id}')"><i class="ph ph-plus"></i> Nova Interação</button>
                 </div>
                 <div style="margin-bottom:14px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
-                    <textarea id="crm-nota-conteudo" rows="2" class="form-control" placeholder="Escreva uma nota..." style="width:100%;resize:vertical" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();window.crm._addNota('${lead.id}')}"></textarea>
+                    <textarea id="crm-nota-conteudo" rows="2" class="form-control" placeholder="Escreva uma nota... Use @ para mencionar alguém da equipe" style="width:100%;resize:vertical" oninput="window.crm._onNotaInput(event)" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();window.crm._addNota('${lead.id}')}"></textarea>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
                         <span class="crm-text-muted" style="font-size:11px">Ctrl+Enter para salvar</span>
                         <button class="btn btn-sm btn-primary" onclick="window.crm._addNota('${lead.id}')"><i class="ph ph-note-pencil"></i> Adicionar Nota</button>
@@ -2143,6 +2200,7 @@ const CRM = {
         const evts = [];
         this.getInteracoes(lead.id).forEach(i => {
             const isStatus = i.tipo === 'mudanca_status';
+            const isAuto = i.tipo === 'automacao';
             let extra = '';
             if (!isStatus) {
                 if (i.resultado) extra += `<div style="margin-top:3px"><strong>Resultado:</strong> ${this._esc(i.resultado)}</div>`;
@@ -2155,10 +2213,10 @@ const CRM = {
                 } catch (e) { /* anexos inválidos */ }
             }
             evts.push({
-                categoria: isStatus ? 'sistema' : 'interacao',
+                categoria: (isStatus || isAuto) ? 'sistema' : 'interacao',
                 subtipo: i.tipo,
                 ts: i.data_hora || i.created_at,
-                titulo: isStatus ? 'Alteração de Estágio' : ((i.tipo || 'Interação').charAt(0).toUpperCase() + (i.tipo || 'Interação').slice(1)),
+                titulo: isStatus ? 'Alteração de Estágio' : isAuto ? 'Automação' : ((i.tipo || 'Interação').charAt(0).toUpperCase() + (i.tipo || 'Interação').slice(1)),
                 texto: i.descricao || '',
                 extra,
                 rodape: [i.realizado_por, !isStatus && i.duracao_min ? `${i.duracao_min}min` : ''].filter(Boolean).join(' · '),
@@ -2167,7 +2225,7 @@ const CRM = {
         });
         this.getNotas(lead.id).forEach(n => evts.push({
             categoria: 'nota', subtipo: 'nota', ts: n.created_at,
-            titulo: n.autor || 'Nota', texto: n.conteudo || '', extra: '',
+            titulo: n.autor || 'Nota', texto: n.conteudo || '', textoHtml: this._fmtNotaMencoes(n.conteudo || '', n.menoes), extra: '',
             rodape: '', id: n.id
         }));
         this.getTarefas(lead.id).forEach(t => {
@@ -2212,7 +2270,7 @@ const CRM = {
         if (e.categoria === 'nota') { icon = 'ph-note-pencil'; cor = '#f59e0b'; }
         else if (e.categoria === 'email') { icon = 'ph-envelope'; cor = '#8b5cf6'; }
         else if (e.categoria === 'tarefa') { icon = e.subtipo === 'tarefa_ok' ? 'ph-check-circle' : 'ph-check-square'; cor = e.subtipo === 'tarefa_ok' ? '#16a34a' : '#0ea5e9'; }
-        else if (e.categoria === 'sistema') { icon = e.subtipo === 'proposta' ? 'ph-file-arrow-up' : 'ph-flow-arrow'; cor = '#6b7280'; }
+        else if (e.categoria === 'sistema') { icon = e.subtipo === 'proposta' ? 'ph-file-arrow-up' : e.subtipo === 'automacao' ? 'ph-lightning' : 'ph-flow-arrow'; cor = e.subtipo === 'automacao' ? '#8b5cf6' : '#6b7280'; }
         else if (e.categoria === 'interacao') {
             const mapa = { ligacao: ['ph-phone-call', '#3b82f6'], email: ['ph-envelope', '#3b82f6'], whatsapp: ['ph-whatsapp-logo', '#16a34a'], reuniao: ['ph-users-three', '#8b5cf6'], visita: ['ph-map-pin', '#06b6d4'], proposta: ['ph-file-arrow-up', '#2563eb'], negociacao: ['ph-handshake', '#f59e0b'], followup: ['ph-arrows-clockwise', '#0ea5e9'] };
             const m = mapa[e.subtipo] || ['ph-chats', '#3b82f6'];
@@ -2234,7 +2292,7 @@ const CRM = {
                         <strong style="font-size:12px;color:#1f2937">${this._esc(e.titulo)}</strong>
                         <span style="font-size:11px;color:#94a3b8;white-space:nowrap">${data}</span>
                     </div>
-                    <div style="font-size:12px;color:#374151;white-space:pre-wrap;margin-top:2px">${this._esc(e.texto)}</div>
+                    <div style="font-size:12px;color:#374151;white-space:pre-wrap;margin-top:2px">${e.textoHtml || this._esc(e.texto)}</div>
                     ${e.extra || ''}
                     ${(e.rodape || acao) ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:3px"><span style="font-size:11px;color:#94a3b8">${this._esc(e.rodape || '')}</span>${acao}</div>` : ''}
                 </div>
@@ -2258,14 +2316,22 @@ const CRM = {
     },
 
     _renderModalTabNotas(lead) {
-        const notas = this.getNotas(lead.id);
+        const todas = this.getNotas(lead.id);
+        const filtro = this._notasFiltro || 'todas';
+        const userNorm = this._normTxt(this._userLogado());
+        const ehMencao = (n) => Array.isArray(n.menoes) && n.menoes.some(m => this._normTxt(m.nome) === userNorm);
+        const notas = filtro === 'mencoes' ? todas.filter(ehMencao) : todas;
         return `
             <div class="crm-modal-tab-content">
                 <div style="display:flex;justify-content:space-between;margin-bottom:12px">
-                    <span class="crm-text-muted">${notas.length} nota(s)</span>
+                    <span class="crm-text-muted">${todas.length} nota(s)</span>
+                    <span style="display:flex;gap:4px">
+                        <button class="btn btn-sm" style="${filtro === 'todas' ? 'background:#4f46e5;color:#fff;border-color:#4f46e5' : ''}" onclick="window.crm._setNotasFiltro('${lead.id}','todas')"><i class="ph ph-notes"></i> Todas</button>
+                        <button class="btn btn-sm" style="${filtro === 'mencoes' ? 'background:#4f46e5;color:#fff;border-color:#4f46e5' : ''}" onclick="window.crm._setNotasFiltro('${lead.id}','mencoes')"><i class="ph ph-at"></i> Menções</button>
+                    </span>
                 </div>
-                <div style="margin-bottom:12px">
-                    <textarea id="crm-nota-conteudo" rows="2" class="form-control" placeholder="Escreva uma nota..." style="width:100%;resize:vertical" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();window.crm._addNota('${lead.id}')}"></textarea>
+                <div style="margin-bottom:12px;position:relative">
+                    <textarea id="crm-nota-conteudo" rows="2" class="form-control" placeholder="Escreva uma nota... Use @ para mencionar alguém da equipe" style="width:100%;resize:vertical" oninput="window.crm._onNotaInput(event)" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();window.crm._addNota('${lead.id}')}"></textarea>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
                         <span class="crm-text-muted" style="font-size:11px">Pressione Ctrl+Enter para salvar</span>
                         <button class="btn btn-sm btn-primary" onclick="window.crm._addNota('${lead.id}')"><i class="ph ph-plus"></i> Adicionar Nota</button>
@@ -2276,13 +2342,15 @@ const CRM = {
                         notas.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).map(n => {
                             const data = n.created_at ? new Date(n.created_at).toLocaleString() : '';
                             const autor = n.autor ? this._esc(n.autor) : '';
+                            const mencionado = ehMencao(n);
                             return `
-                            <div class="crm-interacao-card">
+                            <div class="crm-interacao-card" style="${mencionado ? 'border-left:3px solid #8b5cf6;' : ''}">
                                 <div class="crm-interacao-header">
                                     ${autor ? `<span style="font-weight:600;font-size:12px">${autor}</span>` : '<span class="crm-text-muted" style="font-size:12px">Anônimo</span>'}
+                                    ${mencionado ? '<span style="font-size:10px;background:#f5f3ff;color:#7c3aed;padding:1px 8px;border-radius:10px;font-weight:700"><i class="ph ph-at"></i> Mencionado(a)</span>' : ''}
                                     <span class="crm-text-muted">${data}</span>
                                 </div>
-                                <div class="crm-interacao-body" style="white-space:pre-wrap">${this._esc(n.conteudo)}</div>
+                                <div class="crm-interacao-body" style="white-space:pre-wrap">${this._fmtNotaMencoes(n.conteudo, n.menoes)}</div>
                                 <div class="crm-interacao-footer">
                                     <button class="btn btn-sm btn-danger" onclick="window.crm._excluirNota('${n.id}','${lead.id}')"><i class="ph ph-trash"></i></button>
                                 </div>
@@ -2291,6 +2359,11 @@ const CRM = {
                 </div>
             </div>
         `;
+    },
+
+    _setNotasFiltro(leadId, filtro) {
+        this._notasFiltro = filtro;
+        this._refreshModalTab(leadId);
     },
 
     _renderModalTabPropostas(lead) {
@@ -2466,6 +2539,8 @@ const CRM = {
             data_hora: new Date().toISOString(),
             realizado_por: userNome
         });
+        const lead = this.getLeads().find(l => l.id === leadId);
+        if (lead) this._executarAutomacoes('stage_changed', lead, { de: deStatus, para: paraStatus }).catch(() => {});
     },
 
     async _solicitarProposta(leadId) {
@@ -2782,6 +2857,535 @@ const CRM = {
         this.showToast(`Leads mesclados em "${primario.nome}". ${movidos} registro(s) movido(s).`, 'success');
         document.querySelector('.crm-modal-overlay')?.remove();
         this.abrirModalMerge(); // reabre atualizado (mostra próximos grupos, se houver)
+    },
+
+    // --- Fase D: Menções (@mention) em notas ---
+
+    _userLogado() {
+        const u = store.getState().auth?.user;
+        return u?.nome || u?.name || u?.username || store.getState().ui?.userName || '—';
+    },
+
+    _normTxt(s) {
+        return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    },
+
+    _getEquipeMencoes() {
+        const equipe = [];
+        const userNome = this._userLogado();
+        if (userNome && userNome !== '—') equipe.push({ id: null, nome: userNome, papel: 'você' });
+        for (const v of this.getVendedores()) {
+            const nome = v.nome || v.razao_social;
+            if (nome && !equipe.some(e => this._normTxt(e.nome) === this._normTxt(nome))) equipe.push({ id: v.id, nome, papel: 'vendedor(a)' });
+        }
+        return equipe;
+    },
+
+    _parseMencoes(conteudo) {
+        const contNorm = '@' + this._normTxt(conteudo);
+        return this._getEquipeMencoes()
+            .filter(m => contNorm.includes('@' + this._normTxt(m.nome)))
+            .map(m => ({ id: m.id, nome: m.nome }));
+    },
+
+    _fmtNotaMencoes(conteudo, menoes) {
+        let html = this._esc(conteudo);
+        let lista = menoes;
+        if (typeof lista === 'string') { try { lista = JSON.parse(lista); } catch (e) { lista = []; } }
+        if (!Array.isArray(lista) || lista.length === 0) lista = this._parseMencoes(conteudo);
+        for (const mencao of lista) {
+            const escNome = mencao.nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            try {
+                const re = new RegExp('@' + escNome, 'giu');
+                html = html.replace(re, `<span style="background:#eef2ff;color:#4338ca;padding:0 4px;border-radius:4px;font-weight:600">@${this._esc(mencao.nome)}</span>`);
+            } catch (e) { /* regex inválida */ }
+        }
+        return html;
+    },
+
+    _onNotaInput(ev) {
+        const ta = ev.target;
+        const ateCursor = ta.value.slice(0, ta.selectionStart);
+        const m = ateCursor.match(/@([\wÀ-ÿ.-]*)$/);
+        if (!m) { this._esconderMentionDropdown(); return; }
+        const termo = this._normTxt(m[1]);
+        const matches = this._getEquipeMencoes().filter(p => !termo || this._normTxt(p.nome).includes(termo)).slice(0, 6);
+        if (matches.length === 0) { this._esconderMentionDropdown(); return; }
+        let dd = document.getElementById('crm-mention-dropdown');
+        if (!dd) {
+            dd = document.createElement('div');
+            dd.id = 'crm-mention-dropdown';
+            dd.style.cssText = 'position:fixed;z-index:10000;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:220px;max-height:180px;overflow-y:auto;padding:4px';
+            document.body.appendChild(dd);
+        }
+        const rect = ta.getBoundingClientRect();
+        dd.style.left = rect.left + 'px';
+        dd.style.top = Math.min(rect.bottom + 4, window.innerHeight - 190) + 'px';
+        dd.innerHTML = matches.map(p => `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px" onmousedown="event.preventDefault();window.crm._inserirMention(${JSON.stringify(p.nome).replace(/"/g, '&quot;')})" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+                <span style="width:22px;height:22px;border-radius:50%;background:#eef2ff;color:#4338ca;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${this._esc((p.nome || '?').charAt(0).toUpperCase())}</span>
+                <span style="flex:1">${this._esc(p.nome)}</span>
+                <span style="font-size:10px;color:#94a3b8">${this._esc(p.papel)}</span>
+            </div>
+        `).join('');
+    },
+
+    _inserirMention(nome) {
+        const ta = document.getElementById('crm-nota-conteudo');
+        if (!ta) return;
+        const pos = ta.selectionStart;
+        const ateCursor = ta.value.slice(0, pos);
+        const novo = ateCursor.replace(/@([\wÀ-ÿ.-]*)$/, '@' + nome + ' ');
+        ta.value = novo + ta.value.slice(pos);
+        ta.selectionStart = ta.selectionEnd = novo.length;
+        ta.focus();
+        this._esconderMentionDropdown();
+    },
+
+    _esconderMentionDropdown() {
+        const dd = document.getElementById('crm-mention-dropdown');
+        if (dd) dd.remove();
+    },
+
+    // --- Fase D: Automações ---
+
+    _getAutomacoes() {
+        return store.getState().crmAutomacoes || [];
+    },
+
+    _parseAcoes(v) {
+        if (Array.isArray(v)) return v;
+        if (typeof v === 'string' && v) { try { return JSON.parse(v) || []; } catch (e) { return []; } }
+        return [];
+    },
+
+    abrirConfigAutomacoes() {
+        const automacoes = this._getAutomacoes();
+        const overlay = document.createElement('div');
+        overlay.className = 'crm-modal-overlay';
+        overlay.innerHTML = `
+            <div class="crm-modal" style="max-width:760px">
+                <div class="crm-modal-header">
+                    <h3><i class="ph ph-lightning"></i> Automações</h3>
+                    <button class="crm-modal-close" onclick="this.closest('.crm-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="crm-modal-body">
+                    <div style="margin-bottom:16px;font-size:12px;color:var(--color-text-muted)">
+                        Automações executam ações (tags, tarefas, notas, e-mails, webhooks) quando um evento ocorre: lead criado, mudança de estágio ou lead parado há N dias (rotting).
+                    </div>
+                    <div style="margin-bottom:12px">
+                        <button class="btn btn-sm btn-primary" onclick="window.crm._addAutomacaoForm()"><i class="ph ph-plus"></i> Nova Automação</button>
+                    </div>
+                    <div id="crm-automacoes-list">
+                        ${automacoes.length === 0 ? '<div class="crm-empty"><p>Nenhuma automação configurada</p></div>' :
+                            automacoes.map(a => `
+                                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;${a.ativo === 0 ? 'opacity:0.55;' : ''}">
+                                    <div style="flex:1;min-width:0">
+                                        <div style="font-weight:600;font-size:13px">${this._esc(a.nome)} <span style="font-size:10px;background:#f5f3ff;color:#7c3aed;padding:1px 8px;border-radius:10px;margin-left:6px">${this._autoTriggerLabel(a)}</span></div>
+                                        <div style="font-size:11px;color:#64748b;margin-top:2px">${this._autoCondLabel(a.condicao)} → ${this._parseAcoes(a.acoes).length} ação(ões): ${this._parseAcoes(a.acoes).map(ac => this._autoAcaoLabel(ac)).join(', ') || '—'}</div>
+                                    </div>
+                                    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#64748b;white-space:nowrap"><input type="checkbox" ${a.ativo !== 0 ? 'checked' : ''} onchange="window.crm._toggleAutomacao('${a.id}', this.checked)"> ativa</label>
+                                    <button class="btn btn-sm btn-danger" onclick="window.crm._deleteAutomacao('${a.id}')" title="Excluir"><i class="ph ph-trash"></i></button>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    _autoTriggerLabel(a) {
+        if (a.trigger_event === 'stage_changed') return 'ao entrar em ' + this.getStatusLabel(a.trigger_value);
+        if (a.trigger_event === 'rotting') return 'parado há ' + (a.trigger_value || '?') + ' dias';
+        return 'lead criado';
+    },
+
+    _autoCondLabel(cond) {
+        if (!cond || !cond.campo) return 'Sem condição';
+        const campos = { score: 'score', estimativa_valor: 'valor estimado', status: 'estágio', tag: 'tag' };
+        const ops = { gte: '≥', lte: '≤', gt: '>', lt: '<', eq: '=', contem: 'contém' };
+        return `Se ${(campos[cond.campo] || cond.campo)} ${ops[cond.op] || cond.op} ${cond.campo === 'status' ? this.getStatusLabel(cond.valor) : this._esc(cond.valor)}`;
+    },
+
+    _autoAcaoLabel(ac) {
+        const labels = { add_tag: `tag "${ac.tag || ''}"`, assign_vendedor: `atribuir a ${ac.vendedor_id ? this.getVendedorNome(ac.vendedor_id) : '—'}`, create_task: `tarefa "${ac.titulo || ''}"`, add_note: 'nota', send_email: 'e-mail', webhook: 'webhook' };
+        return labels[ac.tipo] || ac.tipo;
+    },
+
+    _addAutomacaoForm() {
+        const vends = this.getVendedores();
+        const templates = store.getState().crmEmailTemplates || [];
+        const overlay = document.createElement('div');
+        overlay.className = 'crm-modal-overlay';
+        overlay.innerHTML = `
+            <div class="crm-modal" style="max-width:640px">
+                <div class="crm-modal-header">
+                    <h3>Nova Automação</h3>
+                    <button class="crm-modal-close" onclick="this.closest('.crm-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="crm-modal-body">
+                    <div class="crm-field" style="margin-bottom:12px">
+                        <label>Nome *</label>
+                        <input type="text" id="auto-nome" placeholder="Ex: Lead novo sem vendedor">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                        <div class="crm-field">
+                            <label>Quando (gatilho) *</label>
+                            <select id="auto-evento" onchange="window.crm._autoEventoChange()">
+                                <option value="lead_created">Lead criado</option>
+                                <option value="stage_changed">Mudança de estágio</option>
+                                <option value="rotting">Lead parado (rotting)</option>
+                            </select>
+                        </div>
+                        <div class="crm-field" id="auto-trigger-extra"></div>
+                    </div>
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px">
+                        <label style="font-size:12px;font-weight:600">Condição (opcional)</label>
+                        <div style="display:grid;grid-template-columns:1fr 90px 1fr;gap:8px;margin-top:6px">
+                            <select id="auto-cond-campo" onchange="window.crm._autoCondChange()">
+                                <option value="">— qualquer —</option>
+                                <option value="score">Score</option>
+                                <option value="estimativa_valor">Valor estimado</option>
+                                <option value="status">Estágio</option>
+                                <option value="tag">Tag</option>
+                            </select>
+                            <select id="auto-cond-op">
+                                <option value="gte">≥</option>
+                                <option value="lte">≤</option>
+                                <option value="gt">&gt;</option>
+                                <option value="lt">&lt;</option>
+                                <option value="eq">=</option>
+                                <option value="contem">contém</option>
+                            </select>
+                            <div id="auto-cond-valor-wrap"><input type="text" id="auto-cond-valor" placeholder="valor" disabled></div>
+                        </div>
+                    </div>
+                    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px">
+                        <label style="font-size:12px;font-weight:600">Ações *</label>
+                        <div style="display:flex;gap:8px;margin:6px 0 10px">
+                            <select id="auto-acao-tipo" style="flex:1">
+                                <option value="add_tag">Adicionar tag</option>
+                                <option value="assign_vendedor">Atribuir vendedor</option>
+                                <option value="create_task">Criar tarefa</option>
+                                <option value="add_note">Adicionar nota</option>
+                                <option value="send_email">Enviar e-mail (template)</option>
+                                <option value="webhook">Notificar webhook</option>
+                            </select>
+                            <button class="btn btn-sm" onclick="window.crm._autoAddAcao()"><i class="ph ph-plus"></i> Adicionar</button>
+                        </div>
+                        <div id="auto-acoes-list"></div>
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                        <button class="btn" onclick="this.closest('.crm-modal-overlay').remove()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="window.crm._saveAutomacao()"><i class="ph ph-floppy-disk"></i> Salvar Automação</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        overlay._refs = { vends, templates };
+        document.body.appendChild(overlay);
+        this._autoEventoChange();
+    },
+
+    _autoEventoChange() {
+        const evento = document.getElementById('auto-evento')?.value;
+        const wrap = document.getElementById('auto-trigger-extra');
+        if (!wrap) return;
+        if (evento === 'stage_changed') {
+            wrap.innerHTML = `<label>Estágio de destino</label><select id="auto-stage">${this._getStages().map(s => `<option value="${s.id}">${s.label}</option>`).join('')}</select>`;
+        } else if (evento === 'rotting') {
+            wrap.innerHTML = `<label>Dias sem contato</label><input type="number" id="auto-dias" min="1" value="7">`;
+        } else {
+            wrap.innerHTML = '';
+        }
+    },
+
+    _autoCondChange() {
+        const campo = document.getElementById('auto-cond-campo')?.value;
+        const wrap = document.getElementById('auto-cond-valor-wrap');
+        const op = document.getElementById('auto-cond-op');
+        if (!wrap) return;
+        if (!campo) { wrap.innerHTML = '<input type="text" id="auto-cond-valor" placeholder="valor" disabled>'; return; }
+        if (campo === 'status') {
+            wrap.innerHTML = `<select id="auto-cond-valor">${this._getStages().map(s => `<option value="${s.id}">${s.label}</option>`).join('')}</select>`;
+            if (op) op.value = 'eq';
+        } else if (campo === 'score' || campo === 'estimativa_valor') {
+            wrap.innerHTML = '<input type="number" id="auto-cond-valor" placeholder="valor">';
+        } else {
+            wrap.innerHTML = '<input type="text" id="auto-cond-valor" placeholder="nome da tag">';
+            if (op) op.value = 'contem';
+        }
+    },
+
+    _autoAddAcao() {
+        const tipo = document.getElementById('auto-acao-tipo')?.value;
+        const list = document.getElementById('auto-acoes-list');
+        if (!tipo || !list) return;
+        const overlay = list.closest('.crm-modal-overlay');
+        const vends = overlay?._refs?.vends || this.getVendedores();
+        const templates = overlay?._refs?.templates || [];
+        const row = document.createElement('div');
+        row.dataset.tipo = tipo;
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px dashed #cbd5e1;border-radius:6px;margin-bottom:6px';
+        const labels = { add_tag: 'Tag', assign_vendedor: 'Vendedor', create_task: 'Tarefa', add_note: 'Nota', send_email: 'E-mail', webhook: 'Webhook' };
+        let campos = '';
+        if (tipo === 'add_tag') campos = `<input type="text" data-k="tag" placeholder="nome da tag" style="flex:1;font-size:12px">`;
+        else if (tipo === 'assign_vendedor') campos = `<select data-k="vendedor_id" style="flex:1;font-size:12px">${vends.map(v => `<option value="${v.id}">${this._esc(v.nome || v.razao_social)}</option>`).join('')}</select>`;
+        else if (tipo === 'create_task') campos = `<input type="text" data-k="titulo" placeholder="título da tarefa" style="flex:1;font-size:12px"><input type="number" data-k="delay_days" value="0" min="0" title="Dias para vencer" style="width:60px;font-size:12px"><select data-k="prioridade" style="width:90px;font-size:12px"><option value="baixa">baixa</option><option value="media" selected>média</option><option value="alta">alta</option></select>`;
+        else if (tipo === 'add_note') campos = `<input type="text" data-k="conteudo" placeholder="conteúdo da nota" style="flex:1;font-size:12px">`;
+        else if (tipo === 'send_email') campos = templates.length === 0 ? '<span style="font-size:11px;color:#dc2626;flex:1">Nenhum template de e-mail cadastrado</span>' : `<select data-k="template_id" style="flex:1;font-size:12px">${templates.map(t => `<option value="${t.id}">${this._esc(t.nome)}</option>`).join('')}</select>`;
+        else if (tipo === 'webhook') campos = `<input type="text" data-k="url" placeholder="https://..." style="flex:1;font-size:12px">`;
+        row.innerHTML = `<span style="font-size:11px;font-weight:600;color:#475569;white-space:nowrap">${labels[tipo] || tipo}:</span>${campos}<button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()" style="padding:2px 6px"><i class="ph ph-x"></i></button>`;
+        list.appendChild(row);
+    },
+
+    async _saveAutomacao() {
+        const nome = document.getElementById('auto-nome')?.value?.trim();
+        const evento = document.getElementById('auto-evento')?.value;
+        if (!nome) { this.showToast('Informe o nome da automação.', 'warning'); return; }
+        let trigger_value = '';
+        if (evento === 'stage_changed') trigger_value = document.getElementById('auto-stage')?.value || '';
+        else if (evento === 'rotting') trigger_value = document.getElementById('auto-dias')?.value || '7';
+        const acoes = [];
+        document.querySelectorAll('#auto-acoes-list > div[data-tipo]').forEach(row => {
+            const acao = { tipo: row.dataset.tipo };
+            row.querySelectorAll('[data-k]').forEach(el => { acao[el.dataset.k] = el.value; });
+            if (acao.delay_days !== undefined) acao.delay_days = parseInt(acao.delay_days) || 0;
+            acoes.push(acao);
+        });
+        if (acoes.length === 0) { this.showToast('Adicione ao menos uma ação.', 'warning'); return; }
+        const condCampo = document.getElementById('auto-cond-campo')?.value;
+        const condValor = document.getElementById('auto-cond-valor')?.value;
+        const condicao = condCampo && condValor ? { campo: condCampo, op: document.getElementById('auto-cond-op')?.value || 'eq', valor: condValor } : null;
+        const item = {
+            id: crypto.randomUUID(),
+            nome,
+            ativo: 1,
+            trigger_event: evento,
+            trigger_value,
+            condicao: JSON.stringify(condicao || ''),
+            acoes: JSON.stringify(acoes),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        store.setState({ crmAutomacoes: [...this._getAutomacoes(), item] });
+        await store._syncCreate('crmAutomacoes', item).catch(() => {});
+        document.querySelector('.crm-modal-overlay')?.remove();
+        this.abrirConfigAutomacoes();
+        this.showToast('Automação criada!', 'success');
+    },
+
+    async _toggleAutomacao(id, ativo) {
+        const auto = this._getAutomacoes().find(a => a.id === id);
+        if (!auto) return;
+        auto.ativo = ativo ? 1 : 0;
+        store.setState({ crmAutomacoes: [...this._getAutomacoes()] });
+        await store._syncUpdate('crmAutomacoes', id, { ativo: auto.ativo }).catch(() => {});
+    },
+
+    async _deleteAutomacao(id) {
+        if (!confirm('Excluir esta automação?')) return;
+        store.setState({ crmAutomacoes: this._getAutomacoes().filter(a => a.id !== id) });
+        await store._syncDelete('crmAutomacoes', id).catch(() => {});
+        document.querySelector('.crm-modal-overlay')?.remove();
+        this.abrirConfigAutomacoes();
+    },
+
+    _condicaoOk(cond, lead) {
+        let c = cond;
+        if (typeof c === 'string') { try { c = c ? JSON.parse(c) : null; } catch (e) { return true; } }
+        if (!c || !c.campo) return true;
+        if (c.campo === 'tag') {
+            const tags = this._leadTags(lead).map(t => this._normTxt(t)).join(',');
+            return c.op === 'contem' ? tags.includes(this._normTxt(c.valor)) : tags === this._normTxt(c.valor);
+        }
+        if (c.campo === 'score' || c.campo === 'estimativa_valor') {
+            const a = parseFloat(lead[c.campo]) || 0, b = parseFloat(c.valor) || 0;
+            if (c.op === 'gt') return a > b;
+            if (c.op === 'gte') return a >= b;
+            if (c.op === 'lt') return a < b;
+            if (c.op === 'lte') return a <= b;
+            return a === b;
+        }
+        if (c.op === 'contem') return this._normTxt(lead[c.campo]).includes(this._normTxt(c.valor));
+        return this._normTxt(lead[c.campo]) === this._normTxt(c.valor);
+    },
+
+    async _executarAutomacoes(evento, lead, ctx = {}) {
+        if (!lead) return;
+        const automacoes = this._getAutomacoes().filter(a => a.ativo !== false && a.ativo !== 0 && a.trigger_event === evento);
+        for (const auto of automacoes) {
+            if (evento === 'stage_changed' && auto.trigger_value && auto.trigger_value !== ctx.para) continue;
+            if (!this._condicaoOk(auto.condicao, lead)) continue;
+            const acoes = this._parseAcoes(auto.acoes);
+            const feitos = [];
+            for (const acao of acoes) {
+                const r = await this._executarAcao(acao, lead, evento);
+                if (r) feitos.push(r);
+            }
+            if (feitos.length > 0) {
+                await store.addCrmInteracao({
+                    lead_id: lead.id,
+                    tipo: 'automacao',
+                    descricao: `Automação "${auto.nome}": ${feitos.join('; ')}`,
+                    data_hora: new Date().toISOString(),
+                    realizado_por: 'Automação'
+                });
+                this.showToast(`Automação "${auto.nome}" executada.`, 'info');
+            }
+        }
+    },
+
+    async _executarAcao(acao, lead, evento = '') {
+        try {
+            if (acao.tipo === 'add_tag' && acao.tag) {
+                const tags = this._leadTags(lead);
+                if (tags.some(t => t.toLowerCase() === acao.tag.toLowerCase())) return null;
+                tags.push(acao.tag);
+                await store.updateCrmLead(lead.id, { tags, updated_at: new Date().toISOString() });
+                return `tag "${acao.tag}" adicionada`;
+            }
+            if (acao.tipo === 'assign_vendedor' && acao.vendedor_id) {
+                await store.updateCrmLead(lead.id, { vendedor_id: acao.vendedor_id, updated_at: new Date().toISOString() });
+                return `atribuído a ${this.getVendedorNome(acao.vendedor_id)}`;
+            }
+            if (acao.tipo === 'create_task' && acao.titulo) {
+                const due = new Date();
+                due.setDate(due.getDate() + (parseInt(acao.delay_days) || 0));
+                await store.addCrmTarefa({
+                    lead_id: lead.id,
+                    titulo: acao.titulo,
+                    tipo: 'automacao',
+                    prioridade: acao.prioridade || 'media',
+                    status: 'pendente',
+                    data_vencimento: due.toISOString().slice(0, 10),
+                    lead_nome: lead.nome,
+                    created_at: new Date().toISOString()
+                });
+                return `tarefa "${acao.titulo}" criada`;
+            }
+            if (acao.tipo === 'add_note' && acao.conteudo) {
+                await store.addCrmNota({ lead_id: lead.id, conteudo: acao.conteudo, autor: 'Automação', menoes: '[]' });
+                return 'nota adicionada';
+            }
+            if (acao.tipo === 'send_email' && acao.template_id) {
+                if (!lead.email) return null;
+                const tpl = (store.getState().crmEmailTemplates || []).find(t => t.id === acao.template_id);
+                if (!tpl) return null;
+                if (!(await this._mailConfigured())) return null;
+                const token = store.getState().auth?.token;
+                const assunto = this._substituirPlaceholders(lead.id, tpl.assunto || '');
+                const corpo = this._substituirPlaceholders(lead.id, tpl.corpo || '').replace(/\n/g, '<br>');
+                await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: [lead.email], assunto, corpo, lead_id: lead.id, attachments: [] })
+                });
+                return `e-mail "${assunto}" enviado`;
+            }
+            if (acao.tipo === 'webhook' && acao.url) {
+                await fetch(acao.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ evento, lead: { id: lead.id, nome: lead.nome, empresa: lead.empresa, status: lead.status, email: lead.email, estimativa_valor: lead.estimativa_valor }, data_hora: new Date().toISOString() })
+                });
+                return 'webhook notificado';
+            }
+        } catch (e) {
+            console.warn('[CRM] Automação ação falhou:', acao.tipo, e);
+        }
+        return null;
+    },
+
+    async _runAutomacoesRotting() {
+        const automacoes = this._getAutomacoes().filter(a => a.ativo !== false && a.ativo !== 0 && a.trigger_event === 'rotting');
+        if (automacoes.length === 0) return;
+        const leads = this.getLeads();
+        for (const auto of automacoes) {
+            const limite = parseInt(auto.trigger_value) || 0;
+            if (limite <= 0) continue;
+            for (const lead of leads) {
+                const st = this._getStage(lead.status);
+                if (st && (st.is_terminal || st.is_loss)) continue;
+                const ref = lead.data_ultimo_contato || lead.updated_at || lead.created_at;
+                if (!ref) continue;
+                const dias = Math.floor((Date.now() - new Date(ref).getTime()) / 86400000);
+                if (dias < limite) continue;
+                const acoes = this._parseAcoes(auto.acoes);
+                const tarefaAcao = acoes.find(a => a.tipo === 'create_task' && a.titulo);
+                if (tarefaAcao && this.getTarefas(lead.id).some(t => t.status !== 'concluida' && t.tipo === 'automacao' && t.titulo === tarefaAcao.titulo)) continue;
+                const feitos = [];
+                for (const acao of acoes) {
+                    const r = await this._executarAcao(acao, lead, 'rotting');
+                    if (r) feitos.push(r);
+                }
+                if (feitos.length > 0) {
+                    await store.addCrmInteracao({
+                        lead_id: lead.id,
+                        tipo: 'automacao',
+                        descricao: `Automação "${auto.nome}" (lead parado ${dias}d): ${feitos.join('; ')}`,
+                        data_hora: new Date().toISOString(),
+                        realizado_por: 'Automação'
+                    });
+                }
+            }
+        }
+    },
+
+    // --- Fase D: Metas mensais ---
+
+    _periodoAtual() {
+        return new Date().toISOString().slice(0, 7);
+    },
+
+    _getMetaMes(vid, periodo) {
+        periodo = periodo || this._periodoAtual();
+        const meta = (store.getState().crmMetas || []).find(m => m.periodo === periodo && (m.vendedor_id || '') === (vid || ''));
+        if (meta) return parseFloat(meta.valor) || 0;
+        const v = this.getVendedores().find(v => v.id === vid);
+        return v ? (parseFloat(v.meta_mensal) || 0) : 0;
+    },
+
+    async _salvarMetaMes(vid, valor) {
+        const periodo = this._periodoAtual();
+        const metas = [...(store.getState().crmMetas || [])];
+        const existente = metas.find(m => m.periodo === periodo && (m.vendedor_id || '') === (vid || ''));
+        if (existente) {
+            existente.valor = valor;
+            store.setState({ crmMetas: metas });
+            await store._syncUpdate('crmMetas', existente.id, { valor }).catch(() => {});
+        } else {
+            const item = { id: crypto.randomUUID(), periodo, vendedor_id: vid || '', valor, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+            store.setState({ crmMetas: [...metas, item] });
+            await store._syncCreate('crmMetas', item).catch(() => {});
+        }
+    },
+
+    async _onMetaEdit(el) {
+        const vid = el.dataset.vid || '';
+        const valor = parseFloat(el.value) || 0;
+        await this._salvarMetaMes(vid, valor);
+        this.showToast('Meta do mês atualizada.', 'success');
+        this._renderView();
+    },
+
+    _realizadoMesVendedor(leads, periodo) {
+        return leads.reduce((s, l) => {
+            const st = this._getStage(l.status);
+            if (!st || !st.tracks_conversao) return s;
+            const ref = l.data_conversao || l.updated_at || '';
+            if (!ref || ref.slice(0, 7) !== periodo) return s;
+            return s + (parseFloat(l.estimativa_valor) || 0);
+        }, 0);
+    },
+
+    _forecastAbertoVendedor(leads) {
+        return leads.reduce((s, l) => {
+            const st = this._getStage(l.status);
+            if (!st || st.is_terminal || st.is_loss) return s;
+            return s + (parseFloat(l.estimativa_valor) || 0) * (st.probability ?? 0) / 100;
+        }, 0);
     },
 
     // --- Email Tab ---
@@ -3440,14 +4044,17 @@ const CRM = {
         const textarea = document.getElementById('crm-nota-conteudo');
         const conteudo = textarea?.value?.trim();
         if (!conteudo) { this.showToast('Escreva o conteúdo da nota.', 'warning'); return; }
-        const userNome = store.getState().auth?.user?.nome || store.getState().auth?.user?.username || '—';
+        const userNome = this._userLogado();
+        const mencoes = this._parseMencoes(conteudo);
         const nota = {
             lead_id: leadId,
             conteudo,
-            autor: userNome
+            autor: userNome,
+            menoes: JSON.stringify(mencoes)
         };
         await store.addCrmNota(nota);
         if (textarea) textarea.value = '';
+        this._esconderMentionDropdown();
         this._refreshModalTab(leadId);
     },
 
