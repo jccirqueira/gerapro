@@ -1727,9 +1727,30 @@ const CRM = {
             if (data.length === 0) { this.showToast('Nenhum lead para exportar.', 'warning'); return; }
             if (typeof XLSX === 'undefined') { this.showToast('Biblioteca XLSX não disponível.', 'warning'); return; }
             const ws = XLSX.utils.json_to_sheet(data);
+            // 1. Congelar primeira linha
+            ws['!ref'] = XLSX.utils.encode_range({s: {c:0, r:0}, e: {c: ws['!ref']?.e.c || Object.keys(data[0]).length-1, r: data.length-1}});
+            ws.freezePane = 'A2';
+            // 2. Uppercase header row (linha 0 em 0-index)
+            if (ws['!rows'] && ws['!rows'][0]) {
+                ws['!rows'][0].c.forEach(cell => {
+                    if (cell.t && cell.t === 's') { cell.v = cell.v ? cell.v.toString().toUpperCase() : ''; }
+                });
+            }
+            // 3. Styles: header (negrito, branco, centralizado) e zebra striping
+            const headerStyle = {
+                font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+                fill: { fgColor: { rgb: '4F46E5' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+            const evenRowStyle = { fill: { fgColor: { rgb: 'E5E7EB' } } };
+            if (!ws['!rows']) ws['!rows'] = [];
+            ws['!rows'][0].s = headerStyle;
+            for (let i = 1; i < data.length; i++) {
+                if (!ws['!rows']) ws['!rows'] = [];
+                if (i % 2 === 0) { ws['!rows'][i].s = evenRowStyle; }
+            }
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Leads');
-            ws['!cols'] = Object.keys(data[0]).map(() => ({ wch: 20 }));
             XLSX.writeFile(wb, `crm_leads_${new Date().toISOString().slice(0, 10)}.xlsx`);
             this.showToast('XLSX exportado com sucesso!', 'success');
         } catch (e) {
