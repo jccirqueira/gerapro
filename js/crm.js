@@ -1692,8 +1692,8 @@ const CRM = {
     _exportCSV(leads) {
         console.log('[CRM] Export CSV');
         try {
-            const data = this._getExportLeads(leads);
-            if (data.length === 0) { alert('Nenhum lead para exportar.'); return; }
+            const data = this._getExportLeads(leads || this.getLeads());
+            if (data.length === 0) { this.showToast('Nenhum lead para exportar.', 'warning'); return; }
             const keys = Object.keys(data[0]);
             const csvRows = [keys.join(';')];
             for (const row of data) {
@@ -1713,26 +1713,28 @@ const CRM = {
             a.click();
             document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(url), 1000);
+            this.showToast('CSV exportado com sucesso!', 'success');
         } catch (e) {
             console.error('[CRM] CSV export error:', e);
-            alert('Erro ao exportar CSV: ' + e.message);
+            this.showToast('Erro ao exportar CSV: ' + e.message, 'error');
         }
     },
 
     _exportXLSX(leads) {
         console.log('[CRM] Export XLSX');
         try {
-            const data = this._getExportLeads(leads);
-            if (data.length === 0) { alert('Nenhum lead para exportar.'); return; }
-            if (typeof XLSX === 'undefined') { alert('Biblioteca XLSX não disponível.'); return; }
+            const data = this._getExportLeads(leads || this.getLeads());
+            if (data.length === 0) { this.showToast('Nenhum lead para exportar.', 'warning'); return; }
+            if (typeof XLSX === 'undefined') { this.showToast('Biblioteca XLSX não disponível.', 'warning'); return; }
             const ws = XLSX.utils.json_to_sheet(data);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Leads');
             ws['!cols'] = Object.keys(data[0]).map(() => ({ wch: 20 }));
             XLSX.writeFile(wb, `crm_leads_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            this.showToast('XLSX exportado com sucesso!', 'success');
         } catch (e) {
             console.error('[CRM] XLSX export error:', e);
-            alert('Erro ao exportar XLSX: ' + e.message);
+            this.showToast('Erro ao exportar XLSX: ' + e.message, 'error');
         }
     },
 
