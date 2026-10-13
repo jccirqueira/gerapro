@@ -4432,7 +4432,7 @@ const server = http.createServer(async (req, res) => {
                 const settings = db.findMailSettings(empresaId);
                 if (settings) {
                     const { pass, api_key, ...safe } = settings;
-                    sendJson(res, 200, { success: true, settings: safe });
+                    sendJson(res, 200, { success: true, settings: { ...safe, has_api_key: !!api_key } });
                 } else {
                     sendJson(res, 200, { success: true, settings: null });
                 }
@@ -4459,7 +4459,7 @@ const server = http.createServer(async (req, res) => {
                 }
                 const result = db.upsertMailSettings(empresaId, data);
                 const { pass, api_key, ...safe } = result;
-                sendJson(res, 200, { success: true, settings: safe });
+                sendJson(res, 200, { success: true, settings: { ...safe, has_api_key: !!api_key } });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
         }

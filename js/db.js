@@ -785,6 +785,8 @@ function initSchema() {
     // CRM migrations
     try { db.exec("ALTER TABLE crm_interacoes ADD COLUMN empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE crm_tarefas ADD COLUMN empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) { /* column may already exist */ }
+    // Fase A CRM: referência da sequência que criou a tarefa (dedupe persistente)
+    try { db.exec("ALTER TABLE crm_tarefas ADD COLUMN seq_id TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add provider and api_key to mail_settings
     try { db.exec("ALTER TABLE mail_settings ADD COLUMN provider TEXT DEFAULT 'smtp'"); } catch (e) { /* column may already exist */ }
@@ -1886,6 +1888,8 @@ function getFullSync(empresaId = 'default') {
         crmNotas: findAll('crmNotas', empresaId),
         crmEmailTemplates: findAll('crmEmailTemplates', empresaId),
         crmStages: findAll('crmStages', empresaId),
+        crmSequencias: findAll('crmSequencias', empresaId),
+        crmWebhooks: findAll('crmWebhooks', empresaId),
         manufaturaProjetos: findAll('manufaturaProjetos', empresaId),
         manufaturaColunas: findAll('manufaturaColunas', empresaId),
         manufaturaGavetas: findAll('manufaturaGavetas', empresaId),

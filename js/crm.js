@@ -13,6 +13,7 @@ const CRM = {
     _filterDateField: 'created_at',
     _filterDateStart: '',
     _filterDateEnd: '',
+    _page: 1,
 
     PRIORIDADES: ['baixa', 'media', 'alta', 'urgente'],
 
@@ -99,8 +100,8 @@ const CRM = {
         return prev || null;
     },
 
-    getLeadsPorStatus() {
-        const leads = this.getLeads();
+    getLeadsPorStatus(leadsParam) {
+        const leads = leadsParam || this.getLeads();
         const map = {};
         this._getStages().forEach(s => { map[s.id] = []; });
         leads.forEach(l => {
@@ -249,6 +250,7 @@ const CRM = {
     },
 
     _setFilter(type, value) {
+        this._page = 1;
         if (type === 'status') this._filterStatus = value;
         else if (type === 'vendedor') this._filterVendedor = value;
         else if (type === 'search') this._searchTerm = value.toLowerCase();
@@ -260,11 +262,12 @@ const CRM = {
         else if (this._currentView === 'kanban') this._renderKanban();
         else if (this._currentView === 'tarefas') this._renderTarefas();
         else if (this._currentView === 'calendario') this._renderCalendario();
+        else if (this._currentView === 'relatorios') this._renderRelatorios();
     },
 
-    _filterLeads(leads) {
+    _filterLeads(leads, opts = {}) {
         let filtered = [...leads];
-        if (this._filterStatus !== 'todos') {
+        if (this._filterStatus !== 'todos' && !opts.skipStatus) {
             filtered = filtered.filter(l => l.status === this._filterStatus);
         }
         if (this._filterVendedor !== 'todos') {
@@ -345,7 +348,7 @@ const CRM = {
             return l.data_proximo_followup.slice(0, 10) <= hoje;
         }).length;
 
-        const porStatus = this.getLeadsPorStatus();
+        const porStatus = this.getLeadsPorStatus(leads);
 
         const funnelBars = this._getStages().map(s => {
             const qtde = porStatus[s.id]?.length || 0;
@@ -361,7 +364,7 @@ const CRM = {
             `;
         }).join('');
 
-        const ultimosLeads = leads.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, 10);
+        const ultimosLeads = [...leads].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).slice(0, 10);
 
         content.innerHTML = `
             <div class="crm-dashboard">
@@ -440,7 +443,9 @@ const CRM = {
     _renderKanban() {
         const content = document.getElementById('crm-content');
         if (!content) return;
-        const porStatus = this.getLeadsPorStatus();
+        // Kanban respeita vendedor/busca/data, mas sempre mostra todos os estágios (colunas)
+        const leadsVisiveis = this._filterLeads(this.getLeads(), { skipStatus: true });
+        const porStatus = this.getLeadsPorStatus(leadsVisiveis);
 
         let columns = '';
         this._getStages().forEach(s => {
@@ -534,6 +539,12 @@ const CRM = {
         if (!content) return;
         const leads = this._filterLeads(this.getLeads());
         const sorted = this._sortLeads(leads);
+        const PAGE_SIZE = 50;
+        const totalRegistros = sorted.length;
+        const totalPages = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE));
+        if (this._page > totalPages) this._page = totalPages;
+        const pageStart = (this._page - 1) * PAGE_SIZE;
+        const pagina = sorted.slice(pageStart, pageStart + PAGE_SIZE);
 
         if (sorted.length === 0) {
             content.innerHTML = '<div class="crm-empty"><i class="ph ph-ghost"></i><p>Nenhum lead encontrado</p></div>';
@@ -566,7 +577,7 @@ const CRM = {
                     </tr>
                 </thead>
                 <tbody>
-                    ${sorted.map(l => `
+                    ${pagina.map(l => `
                         <tr class="crm-table-row-clickable" onclick="window.crm.abrirModalLead('${l.id}')">
                             <td><strong>${this._esc(l.nome)}</strong>${l.empresa ? `<br><span class="crm-text-muted">${this._esc(l.empresa)}</span>` : ''}</td>
                             <td><span class="crm-status-badge" style="background:${this.getStatusColor(l.status)}">${this.getStatusLabel(l.status)}</span></td>
@@ -584,7 +595,20 @@ const CRM = {
                     `).join('')}
                 </tbody>
             </table>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--color-text-muted)">
+                <span>Mostrando ${pageStart + 1}–${Math.min(pageStart + PAGE_SIZE, totalRegistros)} de ${totalRegistros} lead(s)</span>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <button class="btn btn-sm" ${this._page <= 1 ? 'disabled' : ''} onclick="window.crm._irParaPagina(${this._page - 1})"><i class="ph ph-caret-left"></i> Anterior</button>
+                    <span>Página ${this._page} / ${totalPages}</span>
+                    <button class="btn btn-sm" ${this._page >= totalPages ? 'disabled' : ''} onclick="window.crm._irParaPagina(${this._page + 1})">Próxima <i class="ph ph-caret-right"></i></button>
+                </div>
+            </div>
         `;
+    },
+
+    _irParaPagina(p) {
+        this._page = p;
+        this._renderTabela();
     },
 
     _sortLeads(leads) {
@@ -613,6 +637,7 @@ const CRM = {
     },
 
     _toggleSort(field) {
+        this._page = 1;
         if (this._sortField === field) {
             this._sortDir = this._sortDir === 'asc' ? 'desc' : 'asc';
         } else {
@@ -937,8 +962,8 @@ const CRM = {
             nome, url,
             eventos: JSON.stringify(eventos),
             ativo: 1,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
         const webhooks = [...(store.getState().crmWebhooks || []), item];
         store.setState({ crmWebhooks: webhooks });
@@ -1000,7 +1025,13 @@ const CRM = {
         const existingTasks = this.getTarefas(leadId);
         for (const seq of sequencias) {
             if (seq.trigger_event === 'stage_entered' && seq.trigger_value === lead.status) {
-                const alreadyHas = existingTasks.some(t => t.titulo === seq.task_titulo && t.status !== 'concluida' && t._seq_id === seq.id);
+                // Dedupe: seq_id persistido (coluna nova) ou fallback por título
+                // para tarefas antigas/órfãs (sem seq_id ou de sequência removida)
+                const alreadyHas = existingTasks.some(t => {
+                    if (t.seq_id && t.seq_id === seq.id) return true;
+                    const orfa = !t.seq_id || !sequencias.some(x => x.id === t.seq_id);
+                    return orfa && t.tipo === 'sequencia' && t.titulo === seq.task_titulo && t.status !== 'concluida';
+                });
                 if (alreadyHas) continue;
                 const dueDate = new Date();
                 dueDate.setDate(dueDate.getDate() + (parseInt(seq.delay_days) || 0));
@@ -1014,7 +1045,7 @@ const CRM = {
                     status: 'pendente',
                     data_vencimento: dueDate.toISOString().slice(0, 10),
                     lead_nome: lead.nome,
-                    _seq_id: seq.id,
+                    seq_id: seq.id,
                     created_at: new Date().toISOString()
                 };
                 await store.addCrmTarefa(tarefa);
@@ -1023,6 +1054,7 @@ const CRM = {
     },
 
     async _runAllSequencias() {
+        if (this._getSequencias().filter(s => s.ativo !== false).length === 0) return;
         const leads = this.getLeads();
         for (const lead of leads) {
             await this._applySequencias(lead.id);
@@ -1156,8 +1188,8 @@ const CRM = {
             task_descricao,
             task_prioridade,
             ativo: 1,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
         const sequencias = [...(this._getSequencias()), item];
         store.setState({ crmSequencias: sequencias });
@@ -1231,9 +1263,9 @@ const CRM = {
     _renderRelatorios() {
         const content = document.getElementById('crm-content');
         if (!content) return;
-        const leads = this.getLeads();
+        const leads = this._filterLeads(this.getLeads());
         const total = leads.length;
-        const porStatus = this.getLeadsPorStatus();
+        const porStatus = this.getLeadsPorStatus(leads);
         const vendedores = this.getVendedores();
         const porVendedor = {};
         leads.forEach(l => {
@@ -1565,6 +1597,14 @@ const CRM = {
     async _salvarNovoLead() {
         const nome = document.getElementById('f-nome')?.value;
         if (!nome) { alert('Nome é obrigatório'); return; }
+        // Fase A: checagem de duplicidade (e-mail ou nome+empresa) antes de criar
+        const empresaVal = document.getElementById('f-empresa')?.value || '';
+        const emailVal = document.getElementById('f-email')?.value || '';
+        const existente = this.getLeads().find(l =>
+            (emailVal && l.email && l.email.toLowerCase() === emailVal.toLowerCase()) ||
+            (l.nome && l.nome.toLowerCase() === nome.toLowerCase() && empresaVal && l.empresa && l.empresa.toLowerCase() === empresaVal.toLowerCase())
+        );
+        if (existente && !confirm(`Lead já existe: ${existente.nome}${existente.empresa ? ' (' + existente.empresa + ')' : ''}\nCriar mesmo assim como duplicado?`)) return;
         const defaultSt = this._getStages().find(s => s.is_default);
         const lead = {
             nome,
@@ -1657,6 +1697,7 @@ const CRM = {
         else if (tabName === 'email') {
             body.innerHTML = this._renderModalTabEmail(lead);
             this._loadEmailLog(lead.id);
+            this._refreshSmtpBanner();
         }
     },
 
@@ -1890,8 +1931,8 @@ const CRM = {
                     </div>
                 </div>
                 <div style="display:flex;gap:8px">
-                    <button class="btn btn-sm" onclick="window.crm._updateLeadField('${lead.id}','score',parseInt(document.getElementById('crm-score-range').value));window.crm.recalcularScore('${lead.id}').then(s=>{if(s!==undefined)document.getElementById('crm-score-value').textContent=s})">Recalcular Automático</button>
-                    <button class="btn btn-sm btn-primary" onclick="window.crm._updateLeadField('${lead.id}','score',parseInt(document.getElementById('crm-score-range').value))">Salvar Manual</button>
+                    <button class="btn btn-sm" onclick="window.crm._recalcScoreUI('${lead.id}')"><i class="ph ph-arrows-clockwise"></i> Recalcular Automático</button>
+                    <button class="btn btn-sm btn-primary" onclick="window.crm._salvarScoreManual('${lead.id}')"><i class="ph ph-floppy-disk"></i> Salvar Manual</button>
                 </div>
                 <div style="margin-top:16px">
                     <h4 style="font-size:13px;margin:0 0 8px">Critérios de Pontuação</h4>
@@ -2005,7 +2046,6 @@ const CRM = {
         const items = [...(state.pipelineItems || [])];
         const newItem = {
             id: crypto.randomUUID(),
-            empresa_id: 'default',
             cliente: `${lead.nome}${lead.empresa ? ` (${lead.empresa})` : ''}`,
             projeto: `CRM: ${lead.interesse || 'Lead do CRM'}`,
             origem: 'crm',
@@ -2091,8 +2131,10 @@ const CRM = {
         if (!confirm('Tem certeza? Todas as interações e tarefas vinculadas também serão removidas.')) return;
         const interacoes = this.getInteracoes(leadId);
         const tarefas = this.getTarefas(leadId);
+        const notas = this.getNotas(leadId);
         for (const i of interacoes) await store.deleteCrmInteracao(i.id);
         for (const t of tarefas) await store.deleteCrmTarefa(t.id);
+        for (const n of notas) await store.deleteCrmNota(n.id);
         await store.deleteCrmLead(leadId);
         this.updateBadge();
         document.querySelector('.crm-modal-overlay')?.remove();
@@ -2101,11 +2143,48 @@ const CRM = {
 
     // --- Email Tab ---
 
+    async _mailConfigured() {
+        if (this._mailCfg !== undefined) return this._mailCfg;
+        try {
+            const token = store.getState().auth?.token;
+            const res = await fetch('/api/settings/mail', { headers: { 'Authorization': `Bearer ${token}` } });
+            const data = await res.json();
+            const s = data.settings;
+            this._mailCfg = !!(s && (s.provider === 'sendgrid' ? s.has_api_key : s.host));
+        } catch (e) { this._mailCfg = false; }
+        return this._mailCfg;
+    },
+
+    async _refreshSmtpBanner() {
+        const ok = await this._mailConfigured();
+        const warn = document.getElementById('email-smtp-warning');
+        if (warn) warn.style.display = ok ? 'none' : 'block';
+    },
+
+    async _recalcScoreUI(leadId) {
+        const s = await this.recalcularScore(leadId);
+        if (s === undefined) return;
+        const range = document.getElementById('crm-score-range');
+        if (range) range.value = s;
+        const val = document.getElementById('crm-score-value');
+        if (val) val.textContent = s;
+        this.showToast('Score recalculado automaticamente: ' + s, 'success');
+    },
+
+    async _salvarScoreManual(leadId) {
+        const range = document.getElementById('crm-score-range');
+        const score = parseInt(range?.value) || 0;
+        await this._updateLeadField(leadId, 'score', score);
+        this.showToast('Score manual salvo: ' + score, 'success');
+    },
+
     _renderModalTabEmail(lead) {
         const templates = store.getState().crmEmailTemplates || [];
-        const temSMTP = !!document.getElementById('conf-mail-host')?.value; // rough check if configured
         return `
             <div class="crm-modal-tab-content">
+                <div id="email-smtp-warning" style="display:none;margin-bottom:12px;padding:8px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b">
+                    <i class="ph ph-warning-circle"></i> E-mail não configurado. Ajuste SMTP ou SendGrid em <strong>Configurações → E-mail CRM</strong> antes de enviar.
+                </div>
                 <div style="margin-bottom:12px">
                     <label style="font-size:12px;font-weight:600;color:#374151">Template</label>
                     <select id="email-template-select" class="form-control" style="width:100%;font-size:13px" onchange="window.crm._onTemplateChange('${lead.id}')">
@@ -2241,17 +2320,18 @@ const CRM = {
 
     async _enviarEmail(leadId) {
         const lead = this.getLeads().find(l => l.id === leadId);
-        if (!lead) { alert('Lead não encontrado'); return; }
+        if (!lead) { this.showToast('Lead não encontrado.', 'error'); return; }
+        if (!(await this._mailConfigured())) { this.showToast('E-mail não configurado. Ajuste em Configurações → E-mail CRM.', 'warning'); return; }
 
         const toRaw = document.getElementById('email-para')?.value || '';
         const to = toRaw.split(',').map(s => s.trim()).filter(Boolean);
-        if (to.length === 0) { alert('Informe ao menos um destinatário.'); return; }
+        if (to.length === 0) { this.showToast('Informe ao menos um destinatário.', 'warning'); return; }
 
         const ccRaw = document.getElementById('email-cc')?.value || '';
         const cc = ccRaw.split(',').map(s => s.trim()).filter(Boolean);
 
         const assunto = this._substituirPlaceholders(leadId, document.getElementById('email-assunto')?.value || '');
-        if (!assunto) { alert('Informe o assunto.'); return; }
+        if (!assunto) { this.showToast('Informe o assunto.', 'warning'); return; }
 
         let corpo = this._substituirPlaceholders(leadId, document.getElementById('email-corpo')?.value || '');
         corpo = corpo.replace(/\n/g, '<br>');
@@ -2295,7 +2375,7 @@ const CRM = {
             });
             const data = await res.json();
             if (data.success) {
-                alert('E-mail enviado com sucesso!');
+                this.showToast('E-mail enviado com sucesso!', 'success');
                 // Refresh email log
                 this._loadEmailLog(leadId);
                 // Clear form
@@ -2306,10 +2386,10 @@ const CRM = {
                 document.getElementById('email-attachments-list').innerHTML = '';
                 document.getElementById('email-preview').style.display = 'none';
             } else {
-                alert('Erro ao enviar: ' + (data.error || 'Falha desconhecida'));
+                this.showToast('Erro ao enviar: ' + (data.error || 'Falha desconhecida'), 'error');
             }
         } catch (err) {
-            alert('Erro ao enviar: ' + err.message);
+            this.showToast('Erro ao enviar: ' + err.message, 'error');
         } finally {
             if (statusEl) statusEl.textContent = '';
             if (btn) btn.disabled = false;
