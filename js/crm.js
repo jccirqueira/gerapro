@@ -14,6 +14,10 @@ const CRM = {
     _filterDateStart: '',
     _filterDateEnd: '',
     _page: 1,
+    _filterTag: 'todos',
+    _selection: new Set(),
+    _timelineEmails: null,
+    _tlFilter: 'todos',
 
     PRIORIDADES: ['baixa', 'media', 'alta', 'urgente'],
 
@@ -52,6 +56,26 @@ const CRM = {
             vendedores.map(v => `<option value="${v.id}">${v.nome || v.razao_social}</option>`).join('');
         if (filterSelect.querySelector(`option[value="${currentValue}"]`)) {
             filterSelect.value = currentValue;
+        }
+    },
+
+    _refreshTagSelect() {
+        const filterSelect = document.getElementById('crm-filter-tag');
+        const datalist = document.getElementById('crm-tags-datalist');
+        const tags = this._getAllTags();
+        if (filterSelect) {
+            const currentValue = filterSelect.value;
+            filterSelect.innerHTML = '<option value="todos">Todas Tags</option>' +
+                tags.map(t => `<option value="${this._esc(t)}">${this._esc(t)}</option>`).join('');
+            if ([...filterSelect.options].some(o => o.value === currentValue)) {
+                filterSelect.value = currentValue;
+            } else {
+                filterSelect.value = 'todos';
+                this._filterTag = 'todos';
+            }
+        }
+        if (datalist) {
+            datalist.innerHTML = tags.map(t => `<option value="${this._esc(t)}">`).join('');
         }
     },
 
@@ -220,6 +244,8 @@ const CRM = {
                     <div class="crm-filters">
                         <select id="crm-filter-status" onchange="window.crm._setFilter('status', this.value)"><option value="todos">Todos Status</option>${this._getStages().map(s => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
                         <select id="crm-filter-vendedor" onchange="window.crm._setFilter('vendedor', this.value)"><option value="todos">Todos Vendedores</option>${this.getVendedores().map(v => `<option value="${v.id}">${v.nome || v.razao_social}</option>`).join('')}</select>
+                        <select id="crm-filter-tag" onchange="window.crm._setFilter('tag', this.value)"><option value="todos">Todas Tags</option></select>
+                        <datalist id="crm-tags-datalist"></datalist>
                         <input type="text" id="crm-search" placeholder="Buscar lead..." oninput="window.crm._setFilter('search', this.value)">
                         <select id="crm-filter-datefield" onchange="window.crm._setFilter('dateField', this.value)">
                             <option value="created_at">Data Criação</option>
@@ -251,8 +277,10 @@ const CRM = {
 
     _setFilter(type, value) {
         this._page = 1;
+        if (this._selection) this._selection.clear();
         if (type === 'status') this._filterStatus = value;
         else if (type === 'vendedor') this._filterVendedor = value;
+        else if (type === 'tag') this._filterTag = value;
         else if (type === 'search') this._searchTerm = value.toLowerCase();
         else if (type === 'dateField') this._filterDateField = value;
         else if (type === 'dateStart') this._filterDateStart = value;
@@ -273,6 +301,10 @@ const CRM = {
         if (this._filterVendedor !== 'todos') {
             filtered = filtered.filter(l => l.vendedor_id === this._filterVendedor);
         }
+        if (this._filterTag !== 'todos') {
+            const tagSel = this._filterTag;
+            filtered = filtered.filter(l => this._leadTags(l).some(t => t.toLowerCase() === tagSel.toLowerCase()));
+        }
         if (this._searchTerm) {
             const t = this._searchTerm;
             filtered = filtered.filter(l =>
@@ -280,7 +312,8 @@ const CRM = {
                 (l.empresa || '').toLowerCase().includes(t) ||
                 (l.email || '').toLowerCase().includes(t) ||
                 (l.celular || '').includes(t) ||
-                (l.telefone || '').includes(t)
+                (l.telefone || '').includes(t) ||
+                this._leadTags(l).some(tag => tag.toLowerCase().includes(t))
             );
         }
         if (this._filterDateStart || this._filterDateEnd) {
@@ -299,7 +332,71 @@ const CRM = {
         return filtered;
     },
 
+    // --- Tags (Fase B) ---
+
+    _leadTags(lead) {
+        if (!lead) return [];
+        return this._converterTags(lead.tags);
+    },
+
+    _getAllTags() {
+        const set = new Set();
+        this.getLeads().forEach(l => this._leadTags(l).forEach(t => { if (t) set.add(t); }));
+        return [...set].sort((a, b) => a.localeCompare(b));
+    },
+
+    async _addTag(leadId, tag) {
+        tag = String(tag || '').trim();
+        if (!tag) return;
+        const lead = this.getLeads().find(l => l.id === leadId);
+        if (!lead) return;
+        const tags = this._leadTags(lead);
+        if (tags.some(t => t.toLowerCase() === tag.toLowerCase())) { this.showToast('Tag já existe neste lead.', 'info'); return; }
+        await this._updateLeadField(leadId, 'tags', [...tags, tag]);
+        this._refreshTagSelect();
+        this._refreshModalTab(leadId);
+    },
+
+    async _addTagFromInput(leadId) {
+        const input = document.getElementById('crm-tag-input');
+        const tag = input?.value?.trim();
+        if (!tag) return;
+        if (input) input.value = '';
+        await this._addTag(leadId, tag);
+    },
+
+    async _removeTag(leadId, encTag) {
+        const tag = decodeURIComponent(encTag || '');
+        const lead = this.getLeads().find(l => l.id === leadId);
+        if (!lead || !tag) return;
+        const tags = this._leadTags(lead).filter(t => t.toLowerCase() !== tag.toLowerCase());
+        await this._updateLeadField(leadId, 'tags', tags);
+        this._refreshTagSelect();
+        this._refreshModalTab(leadId);
+    },
+
+    // --- Contatos: WhatsApp / Telefone (Fase B) ---
+
+    _fmtPhoneDigits(num) {
+        let d = String(num || '').replace(/\D/g, '');
+        if (!d) return '';
+        d = d.replace(/^0+/, '');
+        if (d.length >= 12 && d.startsWith('55')) return d;
+        return '55' + d;
+    },
+
+    _waHref(num) {
+        const d = this._fmtPhoneDigits(num);
+        return d ? `https://wa.me/${d}` : null;
+    },
+
+    _telHref(num) {
+        const d = this._fmtPhoneDigits(num);
+        return d ? `tel:+${d}` : null;
+    },
+
     _renderView() {
+        this._refreshTagSelect();
         const content = document.getElementById('crm-content');
         if (!content) return;
         if (this._currentView === 'dashboard') this._renderDashboard();
@@ -473,6 +570,10 @@ const CRM = {
         const isTerminal = stage ? stage.is_terminal : false;
         const hasFollowup = lead.data_proximo_followup && !isTerminal;
         const isLate = hasFollowup && lead.data_proximo_followup.slice(0, 10) <= new Date().toISOString().slice(0, 10);
+        const waNum = lead.whatsapp || lead.celular || lead.telefone;
+        const wa = this._waHref(waNum);
+        const tel = this._telHref(lead.telefone || lead.celular || lead.whatsapp);
+        const tags = this._leadTags(lead);
         return `
             <div class="crm-lead-card" draggable="true" data-id="${lead.id}"
                  onclick="window.crm.abrirModalLead('${lead.id}')"
@@ -482,8 +583,10 @@ const CRM = {
                     <span class="crm-score ${this.getScoreClass(lead.score)}">${lead.score ?? 0}</span>
                 </div>
                 ${lead.empresa ? `<div class="crm-lead-card-empresa">${this._esc(lead.empresa)}</div>` : ''}
+                ${tags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${tags.slice(0, 3).map(t => `<span style="font-size:10px;background:#eef2ff;color:#4f46e5;padding:1px 6px;border-radius:10px">${this._esc(t)}</span>`).join('')}${tags.length > 3 ? `<span style="font-size:10px;background:#e5e7eb;color:#4b5563;padding:1px 6px;border-radius:10px">+${tags.length - 3}</span>` : ''}</div>` : ''}
                 <div class="crm-lead-card-info">
-                    ${lead.celular ? `<span><i class="ph ph-phone"></i> ${lead.celular}</span>` : ''}
+                    ${wa ? `<a href="${wa}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Abrir conversa no WhatsApp" style="color:#16a34a;text-decoration:none"><i class="ph ph-whatsapp-logo"></i> ${this._esc(waNum)}</a>` : ''}
+                    ${tel ? `<a href="${tel}" onclick="event.stopPropagation()" title="Ligar" style="color:inherit;text-decoration:none"><i class="ph ph-phone"></i></a>` : ''}
                     ${lead.estimativa_valor > 0 ? `<span><i class="ph ph-currency-circle-dollar"></i> ${this.formatCurrency(lead.estimativa_valor)}</span>` : ''}
                     ${lead.estimativa_valor > 0 && stage && (stage.probability ?? 0) > 0 ? `<span><i class="ph ph-chart-line"></i> ${this.formatCurrency(lead.estimativa_valor * (stage.probability ?? 0) / 100)}</span>` : ''}
                 </div>
@@ -563,9 +666,33 @@ const CRM = {
                 <button class="btn btn-sm" onclick="window.crm._exportCSV()"><i class="ph ph-file-csv"></i> CSV</button>
                 <button class="btn btn-sm" onclick="window.crm._exportXLSX()"><i class="ph ph-table"></i> XLSX</button>
             </div>
+            ${this._selection.size > 0 ? `
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:8px 10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px">
+                <strong style="font-size:12px;color:#4338ca"><i class="ph ph-check-square"></i> ${this._selection.size} selecionado(s)</strong>
+                <select onchange="window.crm._bulkStatus(this.value);this.value=''" style="font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid #c7d2fe">
+                    <option value="">Alterar status...</option>
+                    ${this._getStages().map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+                </select>
+                <select onchange="window.crm._bulkVendedor(this.value);this.value=''" style="font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid #c7d2fe">
+                    <option value="">Alterar vendedor...</option>
+                    ${this.getVendedores().map(v => `<option value="${v.id}">${v.nome || v.razao_social}</option>`).join('')}
+                    <option value="__none__">(sem vendedor)</option>
+                </select>
+                <span style="display:flex;gap:4px;align-items:center">
+                    <input list="crm-tags-datalist" id="crm-bulk-tag" placeholder="Nova tag..." style="font-size:12px;padding:3px 6px;border-radius:4px;border:1px solid #c7d2fe;width:110px" onkeydown="if(event.key==='Enter'){event.preventDefault();window.crm._bulkAddTag()}">
+                    <button class="btn btn-sm" onclick="window.crm._bulkAddTag()" title="Adicionar tag aos selecionados"><i class="ph ph-tag"></i></button>
+                </span>
+                <button class="btn btn-sm" onclick="window.crm._bulkExportCSV()" title="Exportar seleção em CSV"><i class="ph ph-file-csv"></i> CSV</button>
+                <button class="btn btn-sm" onclick="window.crm._bulkExportXLSX()" title="Exportar seleção em XLSX"><i class="ph ph-table"></i> XLSX</button>
+                <button class="btn btn-sm btn-danger" onclick="window.crm._bulkDelete()"><i class="ph ph-trash"></i> Excluir</button>
+                <span style="flex:1"></span>
+                <button class="btn btn-sm" onclick="window.crm._clearSelection()"><i class="ph ph-x"></i> Limpar</button>
+            </div>
+            ` : ''}
             <table class="crm-table">
                 <thead>
                     <tr>
+                        <th style="width:28px"><input type="checkbox" title="Selecionar página" ${pagina.length > 0 && pagina.every(l => this._selection.has(l.id)) ? 'checked' : ''} onclick="window.crm._toggleSelectAll(this.checked)"></th>
                         <th onclick="window.crm._toggleSort('nome')" style="cursor:pointer">Lead${sortIcon('nome')}</th>
                         <th onclick="window.crm._toggleSort('status')" style="cursor:pointer">Status${sortIcon('status')}</th>
                         <th onclick="window.crm._toggleSort('score')" style="cursor:pointer">Score${sortIcon('score')}</th>
@@ -579,7 +706,8 @@ const CRM = {
                 <tbody>
                     ${pagina.map(l => `
                         <tr class="crm-table-row-clickable" onclick="window.crm.abrirModalLead('${l.id}')">
-                            <td><strong>${this._esc(l.nome)}</strong>${l.empresa ? `<br><span class="crm-text-muted">${this._esc(l.empresa)}</span>` : ''}</td>
+                            <td onclick="event.stopPropagation()"><input type="checkbox" ${this._selection.has(l.id) ? 'checked' : ''} onchange="window.crm._toggleSelect('${l.id}', this.checked)"></td>
+                            <td><strong>${this._esc(l.nome)}</strong>${l.empresa ? `<br><span class="crm-text-muted">${this._esc(l.empresa)}</span>` : ''}${this._leadTags(l).length ? `<br><span style="font-size:10px;color:#4f46e5">${this._leadTags(l).slice(0, 4).map(t => '#' + this._esc(t)).join(' ')}</span>` : ''}</td>
                             <td><span class="crm-status-badge" style="background:${this.getStatusColor(l.status)}">${this.getStatusLabel(l.status)}</span></td>
                             <td><span class="crm-score ${this.getScoreClass(l.score)}">${l.score ?? 0}</span></td>
                             <td>${this.getVendedorNome(l.vendedor_id)}</td>
@@ -609,6 +737,112 @@ const CRM = {
     _irParaPagina(p) {
         this._page = p;
         this._renderTabela();
+    },
+
+    // --- Seleção múltipla / ações em massa (Fase B) ---
+
+    _toggleSelect(id, checked) {
+        if (checked) this._selection.add(id);
+        else this._selection.delete(id);
+        this._renderTabela();
+    },
+
+    _toggleSelectAll(checked) {
+        const leads = this._sortLeads(this._filterLeads(this.getLeads()));
+        const PAGE_SIZE = 50;
+        const totalPages = Math.max(1, Math.ceil(leads.length / PAGE_SIZE));
+        if (this._page > totalPages) this._page = totalPages;
+        const pagina = leads.slice((this._page - 1) * PAGE_SIZE, this._page * PAGE_SIZE);
+        if (checked) pagina.forEach(l => this._selection.add(l.id));
+        else pagina.forEach(l => this._selection.delete(l.id));
+        this._renderTabela();
+    },
+
+    _clearSelection() {
+        this._selection.clear();
+        this._renderTabela();
+    },
+
+    _selLeads() {
+        return this.getLeads().filter(l => this._selection.has(l.id));
+    },
+
+    async _bulkStatus(statusId) {
+        if (!statusId) return;
+        const stage = this._getStage(statusId);
+        if (!stage) return;
+        const leads = this._selLeads();
+        if (leads.length === 0) return;
+        const now = new Date().toISOString();
+        for (const l of leads) {
+            const updates = { status: statusId, updated_at: now };
+            if (stage.tracks_qualificacao && !l.data_qualificacao) updates.data_qualificacao = now;
+            if (stage.tracks_conversao) updates.data_conversao = now;
+            await store.updateCrmLead(l.id, updates);
+            if (l.status !== statusId) await this._registrarMudancaStatus(l.id, l.status, statusId);
+            this._applySequencias(l.id).catch(() => {});
+        }
+        this.updateBadge();
+        this.showToast(`${leads.length} lead(s) movido(s) para "${stage.label}".`, 'success');
+        this._renderTabela();
+    },
+
+    async _bulkVendedor(vId) {
+        if (!vId) return;
+        const valor = vId === '__none__' ? '' : vId;
+        const leads = this._selLeads();
+        if (leads.length === 0) return;
+        const now = new Date().toISOString();
+        for (const l of leads) {
+            await store.updateCrmLead(l.id, { vendedor_id: valor, updated_at: now });
+        }
+        this.showToast(`${leads.length} lead(s) atualizado(s) de vendedor.`, 'success');
+        this._renderTabela();
+    },
+
+    async _bulkAddTag() {
+        const input = document.getElementById('crm-bulk-tag');
+        const tag = input?.value?.trim();
+        if (!tag) { this.showToast('Digite uma tag para aplicar.', 'warning'); return; }
+        const leads = this._selLeads();
+        if (leads.length === 0) return;
+        const now = new Date().toISOString();
+        let aplicados = 0;
+        for (const l of leads) {
+            const tags = this._leadTags(l);
+            if (tags.some(t => t.toLowerCase() === tag.toLowerCase())) continue;
+            await store.updateCrmLead(l.id, { tags: [...tags, tag], updated_at: now });
+            aplicados++;
+        }
+        if (input) input.value = '';
+        this._refreshTagSelect();
+        this.showToast(`Tag "${tag}" aplicada a ${aplicados} lead(s).`, 'success');
+        this._renderTabela();
+    },
+
+    async _bulkDelete() {
+        const leads = this._selLeads();
+        if (leads.length === 0) return;
+        if (!confirm(`Excluir ${leads.length} lead(s) e todos os dados vinculados (notas, tarefas, interações)?\nEsta ação não pode ser desfeita.`)) return;
+        for (const l of leads) {
+            await this._excluirLeadData(l.id);
+        }
+        this._selection.clear();
+        this.updateBadge();
+        this.showToast(`${leads.length} lead(s) excluído(s).`, 'success');
+        this._renderTabela();
+    },
+
+    _bulkExportCSV() {
+        const leads = this._selLeads();
+        if (leads.length === 0) return;
+        this._exportCSV(leads);
+    },
+
+    _bulkExportXLSX() {
+        const leads = this._selLeads();
+        if (leads.length === 0) return;
+        this._exportXLSX(leads);
     },
 
     _sortLeads(leads) {
@@ -1341,13 +1575,14 @@ const CRM = {
         `;
     },
 
-    _getExportLeads() {
-        return this._filterLeads(this.getLeads()).map(l => {
+    _getExportLeads(leads) {
+        return (leads && leads.length >= 0 ? leads : this._filterLeads(this.getLeads())).map(l => {
             const st = this._getStage(l.status);
             const prob = st ? (st.probability ?? 0) : 0;
             return {
             Nome: l.nome || '',
             Empresa: l.empresa || '',
+            Tags: this._leadTags(l).join(', '),
             Status: this.getStatusLabel(l.status),
             Score: l.score ?? 0,
             Probabilidade: prob + '%',
@@ -1368,10 +1603,10 @@ const CRM = {
         });
     },
 
-    _exportCSV() {
+    _exportCSV(leads) {
         console.log('[CRM] Export CSV');
         try {
-            const data = this._getExportLeads();
+            const data = this._getExportLeads(leads);
             if (data.length === 0) { alert('Nenhum lead para exportar.'); return; }
             const keys = Object.keys(data[0]);
             const csvRows = [keys.join(';')];
@@ -1398,10 +1633,10 @@ const CRM = {
         }
     },
 
-    _exportXLSX() {
+    _exportXLSX(leads) {
         console.log('[CRM] Export XLSX');
         try {
-            const data = this._getExportLeads();
+            const data = this._getExportLeads(leads);
             if (data.length === 0) { alert('Nenhum lead para exportar.'); return; }
             if (typeof XLSX === 'undefined') { alert('Biblioteca XLSX não disponível.'); return; }
             const ws = XLSX.utils.json_to_sheet(data);
@@ -1642,7 +1877,6 @@ const CRM = {
         const lead = this.getLeads().find(l => l.id === leadId);
         if (!lead) return;
         this._selectedLeadId = leadId;
-        const interacoes = this.getInteracoes(leadId);
         const tarefas = this.getTarefas(leadId);
         const pipelineItems = (store.getState().pipelineItems || []).filter(p => p.origem === 'crm' && p.origemId === leadId);
 
@@ -1663,7 +1897,7 @@ const CRM = {
                 </div>
                 <div class="crm-modal-tabs">
                     <button class="crm-modal-tab active" data-tab="dados" onclick="window.crm._switchModalTab(this, 'dados')"><i class="ph ph-user"></i> Dados</button>
-                    <button class="crm-modal-tab" data-tab="interacoes" onclick="window.crm._switchModalTab(this, 'interacoes')"><i class="ph ph-chats"></i> Interações (${interacoes.length})</button>
+                    <button class="crm-modal-tab" data-tab="interacoes" onclick="window.crm._switchModalTab(this, 'interacoes')"><i class="ph ph-timeline"></i> Timeline</button>
                     <button class="crm-modal-tab" data-tab="tarefas" onclick="window.crm._switchModalTab(this, 'tarefas')"><i class="ph ph-check-square"></i> Tarefas (${tarefas.length})</button>
                     <button class="crm-modal-tab" data-tab="propostas" onclick="window.crm._switchModalTab(this, 'propostas')"><i class="ph ph-file"></i> Propostas (${pipelineItems.length})</button>
                     <button class="crm-modal-tab" data-tab="notas" onclick="window.crm._switchModalTab(this, 'notas')"><i class="ph ph-note-pencil"></i> Notas (${this.getNotas(lead.id).length})</button>
@@ -1687,23 +1921,43 @@ const CRM = {
         if (!lead) return;
         const body = document.getElementById('crm-lead-modal-body');
         if (!body) return;
-        if (tabName === 'dados') body.innerHTML = this._renderModalTabDados(lead);
-        else if (tabName === 'interacoes') body.innerHTML = this._renderModalTabInteracoes(lead);
-        else if (tabName === 'tarefas') body.innerHTML = this._renderModalTabTarefas(lead);
-        else if (tabName === 'propostas') body.innerHTML = this._renderModalTabPropostas(lead);
-        else if (tabName === 'notas') body.innerHTML = this._renderModalTabNotas(lead);
-        else if (tabName === 'score') body.innerHTML = this._renderModalTabScore(lead);
-        else if (tabName === 'acoes') body.innerHTML = this._renderModalTabAcoes(lead);
-        else if (tabName === 'email') {
-            body.innerHTML = this._renderModalTabEmail(lead);
-            this._loadEmailLog(lead.id);
-            this._refreshSmtpBanner();
-        }
+        body.innerHTML = this._renderModalTabContent(tabName, lead);
+        this._afterTabRender(tabName, lead.id);
+    },
+
+    _renderModalTabContent(tabName, lead) {
+        if (tabName === 'interacoes') return this._renderModalTabInteracoes(lead);
+        if (tabName === 'tarefas') return this._renderModalTabTarefas(lead);
+        if (tabName === 'propostas') return this._renderModalTabPropostas(lead);
+        if (tabName === 'notas') return this._renderModalTabNotas(lead);
+        if (tabName === 'score') return this._renderModalTabScore(lead);
+        if (tabName === 'acoes') return this._renderModalTabAcoes(lead);
+        if (tabName === 'email') return this._renderModalTabEmail(lead);
+        return this._renderModalTabDados(lead);
+    },
+
+    _afterTabRender(tabName, leadId) {
+        if (tabName === 'email') { this._loadEmailLog(leadId); this._refreshSmtpBanner(); }
+        else if (tabName === 'interacoes') this._loadTimelineEmails(leadId);
+    },
+
+    _refreshModalTab(leadId) {
+        if (!leadId) return;
+        const body = document.getElementById('crm-lead-modal-body');
+        const lead = this.getLeads().find(l => l.id === leadId);
+        if (!body || !lead) return;
+        const active = document.querySelector('.crm-modal-tab.active')?.dataset.tab || 'dados';
+        body.innerHTML = this._renderModalTabContent(active, lead);
+        this._afterTabRender(active, leadId);
     },
 
     _renderModalTabDados(lead) {
         const leadStage = this._getStage(lead.status);
         const podeAvancar = leadStage ? !leadStage.is_terminal : true;
+        const waNum = lead.whatsapp || lead.celular || lead.telefone;
+        const wa = this._waHref(waNum);
+        const tel = this._telHref(lead.telefone || lead.celular || lead.whatsapp);
+        const tags = this._leadTags(lead);
         return `
             <div class="crm-modal-tab-content">
                 <div class="crm-form-grid">
@@ -1785,6 +2039,26 @@ const CRM = {
                         <textarea rows="3" onchange="window.crm._updateLeadField('${lead.id}','observacoes',this.value)">${this._esc(lead.observacoes || '')}</textarea>
                     </div>
                 </div>
+                <div class="crm-field" style="grid-column:span 2;margin-top:4px">
+                    <label>Contato Rápido</label>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        ${wa ? `<a class="btn btn-sm" href="${wa}" target="_blank" rel="noopener" title="Abrir conversa no WhatsApp"><i class="ph ph-whatsapp-logo" style="color:#16a34a"></i> WhatsApp ${this._esc(waNum)}</a>` : ''}
+                        ${tel ? `<a class="btn btn-sm" href="${tel}" title="Ligar para o lead"><i class="ph ph-phone"></i> Ligar</a>` : ''}
+                        ${lead.email ? `<a class="btn btn-sm" href="mailto:${this._esc(lead.email)}" title="Enviar e-mail"><i class="ph ph-envelope"></i> ${this._esc(lead.email)}</a>` : ''}
+                        ${(!wa && !tel && !lead.email) ? '<span class="crm-text-muted" style="font-size:12px">Nenhum contato preenchido</span>' : ''}
+                    </div>
+                </div>
+                <div class="crm-field" style="grid-column:span 2;margin-top:8px">
+                    <label>Tags</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;min-height:22px">
+                        ${tags.length === 0 ? '<span class="crm-text-muted" style="font-size:12px">Sem tags</span>' :
+                            tags.map(t => `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;background:#eef2ff;color:#4338ca;padding:2px 8px;border-radius:12px">${this._esc(t)}<a href="#" onclick="event.preventDefault();event.stopPropagation();window.crm._removeTag('${lead.id}','${encodeURIComponent(t)}')" title="Remover tag" style="color:#4338ca;text-decoration:none;font-weight:700"><i class="ph ph-x" style="font-size:10px"></i></a></span>`).join('')}
+                    </div>
+                    <div style="display:flex;gap:6px">
+                        <input type="text" id="crm-tag-input" list="crm-tags-datalist" placeholder="Adicionar tag..." style="flex:1;font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:4px" onkeydown="if(event.key==='Enter'){event.preventDefault();window.crm._addTagFromInput('${lead.id}')}">
+                        <button class="btn btn-sm" onclick="window.crm._addTagFromInput('${lead.id}')" title="Adicionar tag"><i class="ph ph-plus"></i></button>
+                    </div>
+                </div>
                 <div style="margin-top:12px;display:flex;gap:8px;justify-content:space-between">
                     <div>
                         <span class="crm-text-muted">Criado em: ${lead.created_at ? new Date(lead.created_at).toLocaleString() : '—'} | Atualizado: ${lead.updated_at ? new Date(lead.updated_at).toLocaleString() : '—'}</span>
@@ -1796,31 +2070,135 @@ const CRM = {
     },
 
     _renderModalTabInteracoes(lead) {
-        const interacoes = this.getInteracoes(lead.id);
+        const eventos = this._getTimelineEvents(lead);
+        const filtrados = this._tlFilter === 'todos' ? eventos : eventos.filter(e => e.categoria === this._tlFilter);
+        const filtros = [['todos', 'Todos'], ['interacao', 'Interações'], ['nota', 'Notas'], ['tarefa', 'Tarefas'], ['email', 'E-mails'], ['sistema', 'Sistema']];
         return `
             <div class="crm-modal-tab-content">
-                <div style="display:flex;justify-content:space-between;margin-bottom:12px">
-                    <span class="crm-text-muted">${interacoes.length} interação(ões)</span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+                    ${filtros.map(f => `<button class="btn btn-sm" style="${this._tlFilter === f[0] ? 'background:#4f46e5;color:#fff;border-color:#4f46e5' : ''}" onclick="window.crm._setTlFilter('${f[0]}')">${f[1]}</button>`).join('')}
+                    <span style="flex:1"></span>
                     <button class="btn btn-sm btn-add" onclick="window.crm.abrirModalInteracao('${lead.id}')"><i class="ph ph-plus"></i> Nova Interação</button>
                 </div>
-                ${interacoes.length === 0 ? '<div class="crm-empty"><p>Nenhuma interação registrada</p></div>' :
-                    interacoes.sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0)).map(i => `
-                        <div class="crm-interacao-card">
-                            <div class="crm-interacao-header">
-                                <span class="crm-interacao-tipo ${i.tipo}">${i.tipo}</span>
-                                <span class="crm-text-muted">${i.data_hora ? new Date(i.data_hora).toLocaleString() : '—'}</span>
-                                ${i.duracao_min ? `<span class="crm-text-muted">${i.duracao_min}min</span>` : ''}
-                            </div>
-                            <div class="crm-interacao-body">${this._esc(i.descricao)}</div>
-                            ${i.resultado ? `<div class="crm-interacao-resultado"><strong>Resultado:</strong> ${this._esc(i.resultado)}</div>` : ''}
-                            ${i.proximo_passo ? `<div class="crm-interacao-proximo"><strong>Próximo passo:</strong> ${this._esc(i.proximo_passo)}${i.proxima_data ? ` até ${new Date(i.proxima_data).toLocaleDateString()}` : ''}</div>` : ''}
-                            ${(() => { try { const a = typeof i.anexos === 'string' ? JSON.parse(i.anexos) : (i.anexos || []); return a.length > 0 ? `<div class="crm-interacao-anexos">${a.map(an => `<a href="/api/crm/download-anexo/${encodeURIComponent(an.caminho)}" target="_blank" class="crm-anexo-link" title="${this._esc(an.nome)} (${an.tamanho || 0} KB)"><i class="ph ph-paperclip"></i> ${this._esc(an.nome)}</a>`).join('')}</div>` : ''; } catch(e) { return ''; } })()}
-                            <div class="crm-interacao-footer">
-                                ${i.realizado_por ? `<span>${this._esc(i.realizado_por)}</span>` : ''}
-                                <button class="btn btn-sm btn-danger" onclick="window.crm._excluirInteracao('${i.id}','${lead.id}')"><i class="ph ph-trash"></i></button>
-                            </div>
-                        </div>
-                    `).reverse().join('')}
+                <div style="margin-bottom:14px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
+                    <textarea id="crm-nota-conteudo" rows="2" class="form-control" placeholder="Escreva uma nota..." style="width:100%;resize:vertical" onkeydown="if(event.ctrlKey&&event.key==='Enter'){event.preventDefault();window.crm._addNota('${lead.id}')}"></textarea>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+                        <span class="crm-text-muted" style="font-size:11px">Ctrl+Enter para salvar</span>
+                        <button class="btn btn-sm btn-primary" onclick="window.crm._addNota('${lead.id}')"><i class="ph ph-note-pencil"></i> Adicionar Nota</button>
+                    </div>
+                </div>
+                ${filtrados.length === 0 ? '<div class="crm-empty"><p>Nenhum evento na timeline</p></div>' : `
+                <div style="border-left:2px solid #e2e8f0;margin-left:12px;padding-left:18px">
+                    ${filtrados.map(e => this._renderTlItem(e, lead.id)).join('')}
+                </div>`}
+            </div>
+        `;
+    },
+
+    _setTlFilter(v) {
+        this._tlFilter = v;
+        this._refreshModalTab(this._selectedLeadId);
+    },
+
+    _getTimelineEvents(lead) {
+        const evts = [];
+        this.getInteracoes(lead.id).forEach(i => {
+            const isStatus = i.tipo === 'mudanca_status';
+            let extra = '';
+            if (!isStatus) {
+                if (i.resultado) extra += `<div style="margin-top:3px"><strong>Resultado:</strong> ${this._esc(i.resultado)}</div>`;
+                if (i.proximo_passo) extra += `<div style="margin-top:3px"><strong>Próximo passo:</strong> ${this._esc(i.proximo_passo)}${i.proxima_data ? ` até ${new Date(i.proxima_data).toLocaleDateString()}` : ''}</div>`;
+                try {
+                    const anexos = typeof i.anexos === 'string' ? JSON.parse(i.anexos) : (i.anexos || []);
+                    if (Array.isArray(anexos) && anexos.length > 0) {
+                        extra += `<div style="margin-top:3px">${anexos.map(an => `<a href="/api/crm/download-anexo/${encodeURIComponent(an.caminho)}" target="_blank" class="crm-anexo-link" style="font-size:11px;margin-right:8px"><i class="ph ph-paperclip"></i> ${this._esc(an.nome)}</a>`).join('')}</div>`;
+                    }
+                } catch (e) { /* anexos inválidos */ }
+            }
+            evts.push({
+                categoria: isStatus ? 'sistema' : 'interacao',
+                subtipo: i.tipo,
+                ts: i.data_hora || i.created_at,
+                titulo: isStatus ? 'Alteração de Estágio' : ((i.tipo || 'Interação').charAt(0).toUpperCase() + (i.tipo || 'Interação').slice(1)),
+                texto: i.descricao || '',
+                extra,
+                rodape: [i.realizado_por, !isStatus && i.duracao_min ? `${i.duracao_min}min` : ''].filter(Boolean).join(' · '),
+                id: i.id
+            });
+        });
+        this.getNotas(lead.id).forEach(n => evts.push({
+            categoria: 'nota', subtipo: 'nota', ts: n.created_at,
+            titulo: n.autor || 'Nota', texto: n.conteudo || '', extra: '',
+            rodape: '', id: n.id
+        }));
+        this.getTarefas(lead.id).forEach(t => {
+            const chipStatus = t.status === 'concluida'
+                ? '<span style="color:#16a34a"><i class="ph ph-check-circle"></i> Concluída</span>'
+                : `<span style="color:#b45309"><i class="ph ph-clock"></i> Vence ${t.data_vencimento ? new Date(t.data_vencimento).toLocaleDateString() : '—'}</span>`;
+            evts.push({
+                categoria: 'tarefa', subtipo: 'tarefa', ts: t.created_at,
+                titulo: 'Tarefa criada', texto: t.titulo || '',
+                extra: `<div style="margin-top:3px;font-size:11px">${chipStatus}</div>`,
+                rodape: t.responsavel || '', id: t.id
+            });
+            if (t.status === 'concluida' && t.data_conclusao) {
+                evts.push({
+                    categoria: 'tarefa', subtipo: 'tarefa_ok', ts: t.data_conclusao,
+                    titulo: 'Tarefa concluída', texto: t.titulo || '',
+                    extra: '', rodape: '', id: t.id
+                });
+            }
+        });
+        const emails = (this._timelineEmails && this._timelineEmails.leadId === lead.id) ? this._timelineEmails.logs : [];
+        emails.forEach(m => evts.push({
+            categoria: 'email', subtipo: 'email', ts: m.created_at,
+            titulo: m.subject || '(sem assunto)',
+            texto: `Para: ${m.to_email || ''}${m.status === 'failed' ? ' · Falhou' : (m.opened_at ? ' · Aberto' : ' · Enviado')}`,
+            extra: '', rodape: m.provider || '', id: m.id
+        }));
+        (store.getState().pipelineItems || [])
+            .filter(p => p.origem === 'crm' && p.origemId === lead.id)
+            .forEach(p => evts.push({
+                categoria: 'sistema', subtipo: 'proposta', ts: p.createdAt || p.created_at,
+                titulo: 'Proposta solicitada',
+                texto: `${p.cliente || ''} — ${String(p.status || '').replace(/_/g, ' ')}`,
+                extra: '', rodape: '', id: p.id
+            }));
+        evts.sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0));
+        return evts;
+    },
+
+    _renderTlItem(e, leadId) {
+        let icon = 'ph-circle'; let cor = '#6b7280';
+        if (e.categoria === 'nota') { icon = 'ph-note-pencil'; cor = '#f59e0b'; }
+        else if (e.categoria === 'email') { icon = 'ph-envelope'; cor = '#8b5cf6'; }
+        else if (e.categoria === 'tarefa') { icon = e.subtipo === 'tarefa_ok' ? 'ph-check-circle' : 'ph-check-square'; cor = e.subtipo === 'tarefa_ok' ? '#16a34a' : '#0ea5e9'; }
+        else if (e.categoria === 'sistema') { icon = e.subtipo === 'proposta' ? 'ph-file-arrow-up' : 'ph-flow-arrow'; cor = '#6b7280'; }
+        else if (e.categoria === 'interacao') {
+            const mapa = { ligacao: ['ph-phone-call', '#3b82f6'], email: ['ph-envelope', '#3b82f6'], whatsapp: ['ph-whatsapp-logo', '#16a34a'], reuniao: ['ph-users-three', '#8b5cf6'], visita: ['ph-map-pin', '#06b6d4'], proposta: ['ph-file-arrow-up', '#2563eb'], negociacao: ['ph-handshake', '#f59e0b'], followup: ['ph-arrows-clockwise', '#0ea5e9'] };
+            const m = mapa[e.subtipo] || ['ph-chats', '#3b82f6'];
+            icon = m[0]; cor = m[1];
+        }
+        const data = e.ts ? new Date(e.ts).toLocaleString('pt-BR') : '';
+        const acao = e.categoria === 'interacao'
+            ? `<button class="btn btn-sm btn-danger" title="Excluir" onclick="window.crm._excluirInteracao('${e.id}','${leadId}')" style="padding:2px 6px"><i class="ph ph-trash"></i></button>`
+            : e.categoria === 'nota'
+                ? `<button class="btn btn-sm btn-danger" title="Excluir" onclick="window.crm._excluirNota('${e.id}','${leadId}')" style="padding:2px 6px"><i class="ph ph-trash"></i></button>`
+                : '';
+        return `
+            <div style="display:flex;gap:10px;margin-bottom:12px" data-tipo="${e.categoria}">
+                <div style="width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid ${cor};color:${cor};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:-32px">
+                    <i class="ph ${icon}" style="font-size:13px"></i>
+                </div>
+                <div style="flex:1;min-width:0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px">
+                    <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+                        <strong style="font-size:12px;color:#1f2937">${this._esc(e.titulo)}</strong>
+                        <span style="font-size:11px;color:#94a3b8;white-space:nowrap">${data}</span>
+                    </div>
+                    <div style="font-size:12px;color:#374151;white-space:pre-wrap;margin-top:2px">${this._esc(e.texto)}</div>
+                    ${e.extra || ''}
+                    ${(e.rodape || acao) ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:3px"><span style="font-size:11px;color:#94a3b8">${this._esc(e.rodape || '')}</span>${acao}</div>` : ''}
+                </div>
             </div>
         `;
     },
@@ -2019,6 +2397,7 @@ const CRM = {
             this.abrirModalDesqualificar(leadId);
             return;
         }
+        const oldStatus = lead.status;
         await store.updateCrmLead(leadId, { status: newStatus, updated_at: new Date().toISOString() });
         if (newStage.tracks_qualificacao && !lead.data_qualificacao) {
             await store.updateCrmLead(leadId, { data_qualificacao: new Date().toISOString() });
@@ -2026,16 +2405,28 @@ const CRM = {
         if (newStage.tracks_conversao) {
             await store.updateCrmLead(leadId, { data_conversao: new Date().toISOString() });
         }
+        if (oldStatus !== newStatus) await this._registrarMudancaStatus(leadId, oldStatus, newStatus);
         this._applySequencias(leadId).catch(() => {});
         this.updateBadge();
-        const body = document.getElementById('crm-lead-modal-body');
-        if (body) body.innerHTML = this._renderModalTabDados(lead);
+        this._refreshModalTab(leadId);
         const headerStatus = document.querySelector('.crm-modal-header .crm-status-badge');
         if (headerStatus) {
             headerStatus.style.background = this.getStatusColor(newStatus);
             headerStatus.textContent = this.getStatusLabel(newStatus);
         }
         this._renderView();
+    },
+
+    async _registrarMudancaStatus(leadId, deStatus, paraStatus) {
+        if (deStatus === paraStatus) return;
+        const userNome = store.getState().auth?.user?.nome || store.getState().auth?.user?.username || store.getState().ui?.userName || 'Usuário';
+        await store.addCrmInteracao({
+            lead_id: leadId,
+            tipo: 'mudanca_status',
+            descricao: `Estágio alterado de "${this.getStatusLabel(deStatus)}" para "${this.getStatusLabel(paraStatus)}"`,
+            data_hora: new Date().toISOString(),
+            realizado_por: userNome
+        });
     },
 
     async _solicitarProposta(leadId) {
@@ -2117,11 +2508,14 @@ const CRM = {
         const detalhe = document.getElementById('crm-motivo-detalhe')?.value || '';
         const overlay = document.getElementById('crm-motivo-perda')?.closest('.crm-modal-overlay');
         const lossStatus = overlay?.dataset?.lossStatus || 'desqualificado';
+        const lead = this.getLeads().find(l => l.id === leadId);
+        const oldStatus = lead ? lead.status : null;
         await store.updateCrmLead(leadId, {
             status: lossStatus,
             motivo_desqualificacao: motivo + (detalhe ? `: ${detalhe}` : ''),
             updated_at: new Date().toISOString()
         });
+        if (oldStatus && oldStatus !== lossStatus) await this._registrarMudancaStatus(leadId, oldStatus, lossStatus);
         this.updateBadge();
         document.querySelector('.crm-modal-overlay')?.remove();
         this._renderView();
@@ -2129,6 +2523,12 @@ const CRM = {
 
     async _excluirLead(leadId) {
         if (!confirm('Tem certeza? Todas as interações e tarefas vinculadas também serão removidas.')) return;
+        await this._excluirLeadData(leadId);
+        document.querySelector('.crm-modal-overlay')?.remove();
+        this._renderView();
+    },
+
+    async _excluirLeadData(leadId) {
         const interacoes = this.getInteracoes(leadId);
         const tarefas = this.getTarefas(leadId);
         const notas = this.getNotas(leadId);
@@ -2137,8 +2537,6 @@ const CRM = {
         for (const n of notas) await store.deleteCrmNota(n.id);
         await store.deleteCrmLead(leadId);
         this.updateBadge();
-        document.querySelector('.crm-modal-overlay')?.remove();
-        this._renderView();
     },
 
     // --- Email Tab ---
@@ -2393,6 +2791,25 @@ const CRM = {
         } finally {
             if (statusEl) statusEl.textContent = '';
             if (btn) btn.disabled = false;
+        }
+    },
+
+    async _loadTimelineEmails(leadId) {
+        try {
+            const token = store.getState().auth?.token;
+            const res = await fetch(`/api/email-log?lead_id=${encodeURIComponent(leadId)}&limit=30`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            this._timelineEmails = { leadId, logs: (data.success && Array.isArray(data.data)) ? data.data : [] };
+        } catch (e) {
+            this._timelineEmails = { leadId, logs: [] };
+        }
+        const body = document.getElementById('crm-lead-modal-body');
+        const active = document.querySelector('.crm-modal-tab.active')?.dataset.tab;
+        if (body && active === 'interacoes' && this._selectedLeadId === leadId) {
+            const lead = this.getLeads().find(l => l.id === leadId);
+            if (lead) body.innerHTML = this._renderModalTabInteracoes(lead);
         }
     },
 
@@ -2764,18 +3181,14 @@ const CRM = {
             }
             await this.recalcularScore(leadId);
             document.querySelector('.crm-modal-overlay')?.remove();
-            const body = document.getElementById('crm-lead-modal-body');
-            const lead = this.getLeads().find(l => l.id === leadId);
-            if (body && lead) body.innerHTML = this._renderModalTabInteracoes(lead);
+            this._refreshModalTab(leadId);
         }
     },
 
     async _excluirInteracao(interacaoId, leadId) {
         if (!confirm('Excluir esta interação?')) return;
         await store.deleteCrmInteracao(interacaoId);
-        const body = document.getElementById('crm-lead-modal-body');
-        const lead = this.getLeads().find(l => l.id === leadId);
-        if (body && lead) body.innerHTML = this._renderModalTabInteracoes(lead);
+        this._refreshModalTab(leadId);
     },
 
     async _addNota(leadId) {
@@ -2789,18 +3202,14 @@ const CRM = {
             autor: userNome
         };
         await store.addCrmNota(nota);
-        textarea.value = '';
-        const body = document.getElementById('crm-lead-modal-body');
-        const lead = this.getLeads().find(l => l.id === leadId);
-        if (body && lead) body.innerHTML = this._renderModalTabNotas(lead);
+        if (textarea) textarea.value = '';
+        this._refreshModalTab(leadId);
     },
 
     async _excluirNota(notaId, leadId) {
         if (!confirm('Excluir esta nota?')) return;
         await store.deleteCrmNota(notaId);
-        const body = document.getElementById('crm-lead-modal-body');
-        const lead = this.getLeads().find(l => l.id === leadId);
-        if (body && lead) body.innerHTML = this._renderModalTabNotas(lead);
+        this._refreshModalTab(leadId);
     },
 
     abrirModalNovaTarefa(leadId) {
@@ -3362,6 +3771,7 @@ const CRM = {
 
         this._importErrors = erros;
         if (body) body.innerHTML = this._renderPassoResultado({ importados, atualizados, pulados, erros, total: this._importData.length });
+        this._refreshTagSelect();
         this._importData = null;
         this._importMapping = {};
         this._renderView();
