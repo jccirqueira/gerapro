@@ -3258,7 +3258,7 @@ const CRM_ENTITIES = ['crmLeads', 'crmInteracoes', 'crmTarefas', 'crmNotas'];
 // === STATIC FILE SERVING ===
 // Allowlist: apenas estes diretórios/arquivos são servidos ao browser.
 // Banco de dados, .git, .env, docs, templates de teste etc. ficam inacessíveis.
-const STATIC_ALLOWED_DIRS = new Set(['css', 'js', 'img', 'prints', 'templates']);
+const STATIC_ALLOWED_DIRS = new Set(['css', 'js', 'img', 'prints', 'templates', 'lib']);
 const STATIC_ALLOWED_ROOT_FILES = new Set(['index.html', 'favicon.svg', 'favicon.ico']);
 const UPLOAD_SERVE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf', '.docx', '.xlsx', '.csv']);
 

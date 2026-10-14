@@ -1720,6 +1720,116 @@ const CRM = {
         }
     },
 
+    /**
+     * Injeta freeze pane (primeira linha congelada) num XLSX gerado pelo SheetJS.
+     * O xlsx-js-style não suporta !freeze no write — este helper faz post-processamento
+     * no zip: descomprime sheet1.xml, insere o <pane> e reconstrói o zip.
+     */
+    async _patchXlsxFreezePane(arrayBuffer) {
+        const orig = new Uint8Array(arrayBuffer);
+        const dv = new DataView(orig.buffer);
+        const entries = [];
+        let pos = 0;
+        // 1. Parse zip entries (local file headers)
+        while (pos < orig.length - 4) {
+            if (dv.getUint32(pos, true) === 0x04034b50) {
+                const method = dv.getUint16(pos + 8, true);
+                const compSize = dv.getUint32(pos + 18, true);
+                const nameLen = dv.getUint16(pos + 26, true);
+                const extraLen = dv.getUint16(pos + 28, true);
+                const nameStart = pos + 30;
+                const name = new TextDecoder().decode(orig.slice(nameStart, nameStart + nameLen));
+                const dataStart = nameStart + nameLen + extraLen;
+                const data = orig.slice(dataStart, dataStart + compSize);
+                let content;
+                if (method === 8) {
+                    const ds = new DecompressionStream('deflate-raw');
+                    content = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer());
+                } else {
+                    content = data;
+                }
+                entries.push({ name, content });
+                pos = dataStart + compSize;
+            } else { pos++; }
+        }
+        // 2. Patch sheet1.xml: injetar <pane> no <sheetView>
+        let patched = false;
+        for (const entry of entries) {
+            if (/xl\/worksheets\/sheet\d+\.xml$/.test(entry.name)) {
+                let xml = new TextDecoder().decode(entry.content);
+                if (!xml.includes('<pane')) {
+                    xml = xml.replace(
+                        /<sheetView([^>]*)\/>/,
+                        '<sheetView$1><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>'
+                    );
+                    entry.content = new TextEncoder().encode(xml);
+                    patched = true;
+                }
+            }
+        }
+        if (!patched) return arrayBuffer; // nada a fazer
+        // 3. Reconstruir zip (armazenado, sem compressão)
+        const crcTable = [];
+        for (let n = 0; n < 256; n++) {
+            let c = n;
+            for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+            crcTable[n] = c;
+        }
+        const crc32 = (buf) => {
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < buf.length; i++) crc = crcTable[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        };
+        const chunks = [], cdEntries = [];
+        let offset = 0;
+        for (const entry of entries) {
+            const nameBytes = new TextEncoder().encode(entry.name);
+            const crc = crc32(entry.content);
+            const size = entry.content.length;
+            // Local file header
+            const local = new Uint8Array(30 + nameBytes.length);
+            const lv = new DataView(local.buffer);
+            lv.setUint32(0, 0x04034b50, true);
+            lv.setUint16(4, 20, true);
+            lv.setUint16(8, 0, true); // store
+            lv.setUint32(14, crc, true);
+            lv.setUint32(18, size, true);
+            lv.setUint32(22, size, true);
+            lv.setUint16(26, nameBytes.length, true);
+            local.set(nameBytes, 30);
+            chunks.push(local, entry.content);
+            // Central directory entry
+            const cd = new Uint8Array(46 + nameBytes.length);
+            const cv = new DataView(cd.buffer);
+            cv.setUint32(0, 0x02014b50, true);
+            cv.setUint16(4, 20, true);
+            cv.setUint16(6, 20, true);
+            cv.setUint16(10, 0, true); // store
+            cv.setUint32(16, crc, true);
+            cv.setUint32(20, size, true);
+            cv.setUint32(24, size, true);
+            cv.setUint16(28, nameBytes.length, true);
+            cv.setUint32(42, offset, true);
+            cd.set(nameBytes, 46);
+            cdEntries.push(cd);
+            offset += local.length + size;
+        }
+        const cdTotal = cdEntries.reduce((s, e) => s + e.length, 0);
+        const eocd = new Uint8Array(22);
+        const ev = new DataView(eocd.buffer);
+        ev.setUint32(0, 0x06054b50, true);
+        ev.setUint16(8, entries.length, true);
+        ev.setUint16(10, entries.length, true);
+        ev.setUint32(12, cdTotal, true);
+        ev.setUint32(16, offset, true);
+        const all = [...chunks, ...cdEntries, eocd];
+        const totalLen = all.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(totalLen);
+        let wp = 0;
+        for (const c of all) { result.set(c, wp); wp += c.length; }
+        return result.buffer;
+    },
+
     _exportXLSX(leads) {
         console.log('[CRM] Export XLSX');
         try {
@@ -1727,40 +1837,61 @@ const CRM = {
             if (data.length === 0) { this.showToast('Nenhum lead para exportar.', 'warning'); return; }
             if (typeof XLSX === 'undefined') { this.showToast('Biblioteca XLSX não disponível.', 'warning'); return; }
             const ws = XLSX.utils.json_to_sheet(data);
-            // 1. Congelar primeira linha
-            ws['!ref'] = XLSX.utils.encode_range({s: {c:0, r:0}, e: {c: Object.keys(data[0]).length-1, r: data.length-1}});
-            ws.freezePane = 'A2';
-            // 2. Uppercase header row (linha 0 em 0-index) — com segurança
-            if (ws['!rows'] && ws['!rows'][0] && ws['!rows'][0].c) {
-                ws['!rows'][0].c.forEach(cell => {
-                    if (cell.t && cell.t === 's') { cell.v = cell.v ? cell.v.toString().toUpperCase() : ''; }
-                });
-            }
-            // 3. Garantir estrutura de linhas e estilos
-            if (!ws['!rows']) ws['!rows'] = [];
-            // Cabecalho (linha 0) com negrito, branco centralizado
+            const range = XLSX.utils.decode_range(ws['!ref']);
+
+            // Estilo do cabeçalho: negrito, texto branco, fundo índigo, centralizado
             const headerStyle = {
                 font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
                 fill: { fgColor: { rgb: '4F46E5' } },
-                alignment: { horizontal: 'center', vertical: 'center' }
+                alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
             };
-            // Linhas pares com fundo claro (zebra)
-            const evenRowStyle = { fill: { fgColor: { rgb: 'E5E7EB' } } };
-            // Aplicar estilo na linha 0 se existir
-            if (ws['!rows'][0]) {
-                ws['!rows'][0].s = headerStyle;
-            }
-            // Aplicar zebra nas linhas a partir de 1
-            for (let i = 1; i < data.length; i++) {
-                if (!ws['!rows'][i]) ws['!rows'][i] = {};
-                if (i % 2 === 1) { // linha 1, 3, 5... (ímpares após o header)
-                    ws['!rows'][i].s = evenRowStyle;
+            // Zebra: fundo cinza claro nas linhas ímpares (1, 3, 5...)
+            const zebraStyle = { fill: { fgColor: { rgb: 'E5E7EB' } } };
+
+            // Aplicar estilos célula a célula (API do xlsx-js-style)
+            for (let r = range.s.r; r <= range.e.r; r++) {
+                for (let c = range.s.c; c <= range.e.c; c++) {
+                    const addr = XLSX.utils.encode_cell({ c, r });
+                    const cell = ws[addr];
+                    if (!cell) continue;
+                    if (r === 0) {
+                        // Cabeçalho: converter texto para maiúsculas + estilo
+                        if (cell.t === 's' && cell.v) cell.v = String(cell.v).toUpperCase();
+                        cell.s = headerStyle;
+                    } else if (r % 2 === 1) {
+                        cell.s = zebraStyle;
+                    }
                 }
             }
+
+            // Larguras de coluna automáticas (baseadas no conteúdo)
+            const keys = Object.keys(data[0]);
+            ws['!cols'] = keys.map(key => ({
+                wch: Math.max(key.length + 2, ...data.slice(0, 200).map(row => String(row[key] ?? '').length + 2), 12)
+            }));
+
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Leads');
-            XLSX.writeFile(wb, `crm_leads_${new Date().toISOString().slice(0, 10)}.xlsx`);
-            this.showToast('XLSX exportado com sucesso!', 'success');
+
+            // Gerar binário, injetar freeze pane via post-processamento e baixar
+            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            this._patchXlsxFreezePane(buf).then(patched => {
+                const blob = new Blob([patched], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `crm_leads_${new Date().toISOString().slice(0, 10)}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                this.showToast('XLSX exportado com sucesso!', 'success');
+            }).catch(err => {
+                console.error('[CRM] XLSX freeze patch error:', err);
+                // Fallback: baixar sem freeze pane
+                XLSX.writeFile(wb, `crm_leads_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                this.showToast('XLSX exportado com sucesso!', 'success');
+            });
         } catch (e) {
             console.error('[CRM] XLSX export error:', e);
             this.showToast('Erro ao exportar XLSX: ' + e.message, 'error');
