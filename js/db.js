@@ -975,6 +975,35 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
+    // Gestão de Projetos — criados automaticamente quando uma proposta é Fechada (ganha)
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS projetos (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            codigo TEXT DEFAULT '',
+            pipeline_item_id TEXT DEFAULT '',
+            origem TEXT DEFAULT 'pipeline',
+            origem_id TEXT DEFAULT '',
+            cliente TEXT DEFAULT '',
+            projeto TEXT DEFAULT '',
+            descricao TEXT DEFAULT '',
+            status TEXT DEFAULT 'em_andamento',
+            fase_atual TEXT DEFAULT '',
+            responsavel TEXT DEFAULT '',
+            vendedor TEXT DEFAULT '',
+            engenheiro_responsavel TEXT DEFAULT '',
+            valor_contrato REAL DEFAULT 0,
+            data_inicio TEXT DEFAULT '',
+            data_prevista_entrega TEXT DEFAULT '',
+            data_entrega_real TEXT DEFAULT '',
+            observacoes TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_empresa ON projetos(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_status ON projetos(empresa_id, status)'); } catch (e) { /* ignore */ }
+
     // Migration: add created_at to usuarios
     try { db.exec("ALTER TABLE usuarios ADD COLUMN created_at TEXT"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_chat_id to usuarios
@@ -1050,7 +1079,8 @@ const TABLE_MAP = {
     manufaturaPerfisTeste: { pk: 'id', table: 'manufatura_perfis_teste' },
     manufaturaResultadosTeste: { pk: 'id', table: 'manufatura_resultados_teste' },
     manufaturaAnexos: { pk: 'id', table: 'manufatura_anexos' },
-    unidadesCliente: { pk: 'id', table: 'unidades_cliente' }
+    unidadesCliente: { pk: 'id', table: 'unidades_cliente' },
+    projetos: { pk: 'id', table: 'projetos' }
 };
 
 // --- System seed data (composicoes + regras, loaded on first run) ---
@@ -1940,7 +1970,8 @@ function getFullSync(empresaId = 'default') {
         manufaturaPerfisTeste: findAll('manufaturaPerfisTeste', empresaId),
         manufaturaResultadosTeste: findAll('manufaturaResultadosTeste', empresaId),
         manufaturaAnexos: findAll('manufaturaAnexos', empresaId),
-        unidadesCliente: findAll('unidadesCliente', empresaId)
+        unidadesCliente: findAll('unidadesCliente', empresaId),
+        projetos: findAll('projetos', empresaId)
     };
 }
 

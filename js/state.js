@@ -105,6 +105,7 @@ const initialState = {
     crmSequencias: [],
     crmEmailTemplates: [],
     crmStages: [],
+    projetos: [],
     activeNetworkArchitecture: null
 };
 
@@ -160,7 +161,7 @@ class Store {
             if (data.success && data.data) {
                 const sd = data.data;
                 console.log('[Load] Got data:', Object.keys(sd).map(k => `${k}:${Array.isArray(sd[k]) ? sd[k].length : '?'}`).join(', '));
-                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente']) {
+                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos']) {
                     if (Array.isArray(sd[key])) this.state[key] = sd[key];
                 }
                 // O servidor usa a entidade 'paineis'; o estado/chave de UI é 'painelTypes'
@@ -1581,6 +1582,48 @@ class Store {
         const ok = await this._syncDelete('crmLeads', id);
         if (!ok && prev) {
             this.setState({ crmLeads: [...(this.state.crmLeads || []), prev] });
+        }
+        return ok;
+    }
+
+    // --- Projeto Methods (Gestão de Projetos) ---
+
+    async addProjeto(projeto) {
+        const now = new Date().toISOString();
+        const item = {
+            ...projeto,
+            id: projeto.id || crypto.randomUUID(),
+            status: projeto.status || 'em_andamento',
+            created_at: projeto.created_at || now,
+            updated_at: now
+        };
+        this.setState({ projetos: [...(this.state.projetos || []), item] });
+        const ok = await this._syncCreate('projetos', item);
+        if (!ok) {
+            this.setState({ projetos: (this.state.projetos || []).filter(p => p.id !== item.id) });
+            return null;
+        }
+        return item;
+    }
+
+    async updateProjeto(id, updates) {
+        const now = new Date().toISOString();
+        const prev = (this.state.projetos || []).find(p => p.id === id);
+        const newItems = (this.state.projetos || []).map(p => p.id === id ? { ...p, ...updates, updated_at: now } : p);
+        this.setState({ projetos: newItems });
+        const ok = await this._syncUpdate('projetos', id, { ...updates, updated_at: now });
+        if (!ok && prev) {
+            this.setState({ projetos: (this.state.projetos || []).map(p => p.id === id ? prev : p) });
+        }
+        return ok;
+    }
+
+    async deleteProjeto(id) {
+        const prev = (this.state.projetos || []).find(p => p.id === id);
+        this.setState({ projetos: (this.state.projetos || []).filter(p => p.id !== id) });
+        const ok = await this._syncDelete('projetos', id);
+        if (!ok && prev) {
+            this.setState({ projetos: [...(this.state.projetos || []), prev] });
         }
         return ok;
     }

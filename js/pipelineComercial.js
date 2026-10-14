@@ -404,6 +404,13 @@ const PipelineComercialModule = {
                     this._logPipelineAction(irmao.id, 'movimentacao', `${actionDesc} (sincronizada com irmão)`);
                 }
             }
+
+            // GANCHO — Proposta ganha ("Fechado") gera automaticamente um Projeto
+            if (newStatus === 'fechado' && window.app.projetos && typeof window.app.projetos.createFromPipeline === 'function') {
+                window.app.projetos.createFromPipeline(item).catch(err => {
+                    console.error('[Projetos] Falha ao criar projeto a partir do pipeline:', err);
+                });
+            }
         } else {
             const orc = (state.orcamentos || []).find(o => String(o.id) === String(id));
             if (orc) {

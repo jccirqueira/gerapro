@@ -1,0 +1,116 @@
+/* =====================================================================
+   GESTÃO DE PROJETOS MODULE — Table of Contents
+   =====================================================================
+   1. Layout
+   2. Summary Cards
+   3. Toolbar
+   4. Table
+   5. Status Badge
+   6. Detail
+   7. Tabs
+   8. Placeholder (Fases futuras)
+   9. Modal
+  10. Empty State
+   ===================================================================== */
+
+/* ── 1. Layout ── */
+.prj-body { flex:1; overflow:auto; padding:16px 20px; }
+.prj-section-title { font-size:11px; font-weight:700; color:#8b919a; text-transform:uppercase; letter-spacing:.6px; margin:18px 0 8px; }
+.prj-section-title:first-child { margin-top:0; }
+
+/* ── 2. Summary Cards ── */
+.prj-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+.prj-card { position:relative; overflow:hidden; background:#fff; border:1px solid #e8eaed; border-radius:10px; padding:14px; transition:transform .15s, box-shadow .15s; }
+.prj-card:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.06); }
+.prj-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+.prj-card:nth-child(1)::before { background:linear-gradient(90deg,#6366f1,#818cf8); }
+.prj-card:nth-child(2)::before { background:linear-gradient(90deg,#3b82f6,#60a5fa); }
+.prj-card:nth-child(3)::before { background:linear-gradient(90deg,#10b981,#34d399); }
+.prj-card:nth-child(4)::before { background:linear-gradient(90deg,#f59e0b,#fbbf24); }
+.prj-card-value { font-size:22px; font-weight:700; color:#1a1d23; line-height:1.2; margin-top:2px; }
+.prj-card-label { font-size:10px; font-weight:600; color:#8b919a; text-transform:uppercase; letter-spacing:.6px; margin-top:4px; }
+
+/* ── 3. Toolbar ── */
+.prj-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.prj-search { position:relative; flex:1; min-width:200px; max-width:340px; }
+.prj-search i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#9ca3af; font-size:14px; pointer-events:none; }
+.prj-search input { width:100%; padding:8px 10px 8px 30px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; background:#fff; outline:none; transition:border-color .15s, box-shadow .15s; }
+.prj-search input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.12); }
+.prj-filter { padding:8px 10px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; background:#fff; color:#374151; outline:none; }
+.prj-count { font-size:12px; color:#8b919a; margin-left:auto; }
+
+/* ── 4. Table ── */
+.prj-table-wrap { background:#fff; border:1px solid #e8eaed; border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.prj-table { width:100%; border-collapse:collapse; font-size:13px; }
+.prj-table th { background:#fafbfc; border-bottom:2px solid #e8eaed; padding:10px 12px; text-align:left; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+.prj-table td { padding:11px 12px; border-bottom:1px solid #f1f3f5; color:#374151; vertical-align:middle; }
+.prj-table tbody tr { transition:background .12s; cursor:pointer; }
+.prj-table tbody tr:hover { background:#f8f9fb; }
+.prj-table tbody tr:nth-child(even) { background:#fcfcfd; }
+.prj-table tbody tr:nth-child(even):hover { background:#f0f1f3; }
+.prj-table tbody tr:last-child td { border-bottom:none; }
+.prj-codigo { font-weight:700; color:#4F46E5; font-size:12px; white-space:nowrap; }
+.prj-cliente { font-weight:600; color:#1a1d23; }
+.prj-sub { font-size:11px; color:#8b919a; margin-top:2px; }
+.prj-valor { font-weight:700; color:#1a1d23; white-space:nowrap; text-align:right; }
+.prj-datas { font-size:11px; color:#6b7280; white-space:nowrap; }
+.prj-actions { white-space:nowrap; text-align:right; }
+.prj-actions button { border:none; background:transparent; cursor:pointer; padding:4px 6px; border-radius:6px; font-size:14px; transition:background .12s; color:#6b7280; }
+.prj-actions button:hover { background:#f1f5f9; color:#1a1d23; }
+.prj-actions button.prj-danger:hover { background:#fef2f2; color:#ef4444; }
+
+/* ── 5. Status Badge ── */
+.prj-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.3px; white-space:nowrap; }
+.prj-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.prj-badge.em_andamento { background:#dbeafe; color:#1d4ed8; }
+.prj-badge.pausado { background:#fef3c7; color:#b45309; }
+.prj-badge.concluido { background:#dcfce7; color:#15803d; }
+.prj-badge.cancelado { background:#fee2e2; color:#b91c1c; }
+
+/* ── 6. Detail ── */
+.prj-detail-head { background:#fff; border:1px solid #e8eaed; border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.prj-detail-top { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.prj-detail-title { font-size:20px; font-weight:800; color:#1a1d23; letter-spacing:-.3px; margin:0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.prj-detail-sub { font-size:12px; color:#6b7280; margin-top:4px; }
+.prj-detail-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.prj-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:14px; }
+.prj-info { background:#f8f9fb; border:1px solid #eef0f3; border-radius:10px; padding:12px 14px; }
+.prj-info-label { font-size:10px; font-weight:700; color:#8b919a; text-transform:uppercase; letter-spacing:.5px; }
+.prj-info-value { font-size:14px; font-weight:600; color:#1a1d23; margin-top:5px; word-break:break-word; }
+.prj-info-value.prj-empty { color:#b0b6bf; font-weight:500; font-style:italic; }
+
+/* ── 7. Tabs ── */
+.prj-tabs { display:flex; gap:4px; border-bottom:1px solid #e8eaed; margin-bottom:14px; flex-wrap:wrap; }
+.prj-tab { padding:9px 16px; font-size:13px; font-weight:600; color:#64748b; background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer; transition:color .15s, border-color .15s, background .15s; border-radius:6px 6px 0 0; display:flex; align-items:center; gap:6px; }
+.prj-tab:hover { color:#4F46E5; background:#f5f5ff; }
+.prj-tab.active { color:#4F46E5; border-bottom-color:#4F46E5; background:transparent; }
+.prj-tab .prj-tab-tag { font-size:9px; font-weight:700; background:#eef2ff; color:#6366f1; padding:1px 6px; border-radius:999px; text-transform:uppercase; letter-spacing:.3px; }
+
+/* ── 8. Placeholder (Fases futuras) ── */
+.prj-placeholder { background:#fff; border:1px dashed #d8dce3; border-radius:12px; padding:46px 24px; text-align:center; }
+.prj-placeholder i { font-size:40px; color:#c7cbd3; }
+.prj-placeholder h3 { font-size:15px; font-weight:700; color:#4b5563; margin:14px 0 6px; }
+.prj-placeholder p { font-size:13px; color:#9ca3af; margin:0 auto; max-width:460px; line-height:1.6; }
+
+/* ── 9. Modal ── */
+.prj-modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+.prj-modal { background:#fff; border-radius:14px; width:560px; max-width:94vw; max-height:90vh; overflow:auto; box-shadow:0 24px 64px rgba(0,0,0,.28); }
+.prj-modal-head { padding:18px 20px; border-bottom:1px solid #eef0f3; display:flex; align-items:center; justify-content:space-between; }
+.prj-modal-head h3 { margin:0; font-size:16px; font-weight:700; color:#1a1d23; display:flex; align-items:center; gap:8px; }
+.prj-modal-body { padding:20px; }
+.prj-modal-foot { padding:16px 20px; border-top:1px solid #eef0f3; display:flex; justify-content:flex-end; gap:8px; }
+.prj-field { margin-bottom:14px; }
+.prj-field label { display:block; font-size:11px; font-weight:600; color:#6b7280; margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px; }
+.prj-field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+/* ── 10. Empty State ── */
+.prj-empty-state { background:#fff; border:1px dashed #d8dce3; border-radius:12px; padding:52px 24px; text-align:center; }
+.prj-empty-state i { font-size:44px; color:#c7cbd3; }
+.prj-empty-state h3 { font-size:16px; font-weight:700; color:#4b5563; margin:14px 0 6px; }
+.prj-empty-state p { font-size:13px; color:#9ca3af; margin:0 auto 18px; max-width:440px; line-height:1.6; }
+
+/* ── Responsivo ── */
+@media (max-width: 900px) {
+    .prj-summary { grid-template-columns:repeat(2,1fr); }
+    .prj-field-row { grid-template-columns:1fr; }
+}

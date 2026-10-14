@@ -808,7 +808,7 @@ const App = {
 
         // Permission check for vendedor level
         if (userLevel === 'vendedor') {
-            const allowedViews = ['dashboard', 'crm', 'pipeline-comercial', 'relatorio-propostas'];
+            const allowedViews = ['dashboard', 'crm', 'pipeline-comercial', 'projetos', 'relatorio-propostas'];
             if (!allowedViews.includes(viewName)) {
                 this.showToast('Acesso restrito ao seu perfil de usuário.', 'error');
                 return;
@@ -874,6 +874,7 @@ const App = {
             'proposta-comercial': 'Proposta Comercial',
             'proposta-completa': 'Proposta Completa',
             'pipeline-comercial': 'Gestão de Propostas',
+            'projetos': 'Gestão de Projetos',
             'relatorio-propostas': 'Relatório de Propostas',
             'relatorio-cadastros': 'Relatório de Cadastros',
             'relatorio-tipicos': 'Relatório de Típicos',
@@ -889,7 +890,7 @@ const App = {
 
         // 4. Trigger specific module loads if necessary
         // Reset viewMode for modules that support it
-        const modulesToReset = ['clientes', 'fornecedores', 'materiais', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'automacao-rede'];
+        const modulesToReset = ['clientes', 'fornecedores', 'materiais', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'automacao-rede', 'projetos'];
         modulesToReset.forEach(m => {
             const moduleName = m.replace(/-([a-z])/g, (g) => g[1].toUpperCase()); // camelCase
             const module = window.app[moduleName] || window[`${moduleName}Module`];
@@ -936,6 +937,9 @@ const App = {
         }
         if (viewName === 'pipeline-comercial' && window.pipelineComercialModule) {
             window.pipelineComercialModule.render();
+        }
+        if (viewName === 'projetos' && window.projetosModule) {
+            window.projetosModule.render();
         }
         if (viewName === 'crm' && window.crm) {
             if (window.crm._notifyOverdue) window.crm._notifyOverdue(true);
@@ -1144,7 +1148,7 @@ const App = {
         if (!nav) return;
 
         if (userLevel === 'vendedor') {
-            const allowed = ['dashboard', 'pipeline-comercial', 'relatorio-propostas'];
+            const allowed = ['dashboard', 'pipeline-comercial', 'projetos', 'relatorio-propostas'];
             for (const child of nav.children) {
                 if (child.tagName === 'A' && child.classList.contains('nav-item')) {
                     const target = child.dataset.target;
