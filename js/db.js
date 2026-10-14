@@ -1004,6 +1004,28 @@ function initSchema() {
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_empresa ON projetos(empresa_id)'); } catch (e) { /* ignore */ }
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_status ON projetos(empresa_id, status)'); } catch (e) { /* ignore */ }
 
+    // Fase 2 — Fases/cronograma dos projetos (visualização Gantt)
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS projeto_fases (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            projeto_id TEXT NOT NULL DEFAULT '',
+            ordem INTEGER DEFAULT 0,
+            nome TEXT NOT NULL DEFAULT '',
+            descricao TEXT DEFAULT '',
+            data_inicio TEXT DEFAULT '',
+            data_fim TEXT DEFAULT '',
+            status TEXT DEFAULT 'pendente',
+            progresso INTEGER DEFAULT 0,
+            responsavel TEXT DEFAULT '',
+            cor TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_empresa ON projeto_fases(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_projeto ON projeto_fases(empresa_id, projeto_id, ordem)'); } catch (e) { /* ignore */ }
+
     // Migration: add created_at to usuarios
     try { db.exec("ALTER TABLE usuarios ADD COLUMN created_at TEXT"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_chat_id to usuarios
@@ -1080,7 +1102,8 @@ const TABLE_MAP = {
     manufaturaResultadosTeste: { pk: 'id', table: 'manufatura_resultados_teste' },
     manufaturaAnexos: { pk: 'id', table: 'manufatura_anexos' },
     unidadesCliente: { pk: 'id', table: 'unidades_cliente' },
-    projetos: { pk: 'id', table: 'projetos' }
+    projetos: { pk: 'id', table: 'projetos' },
+    projetoFases: { pk: 'id', table: 'projeto_fases' }
 };
 
 // --- System seed data (composicoes + regras, loaded on first run) ---
@@ -1971,7 +1994,8 @@ function getFullSync(empresaId = 'default') {
         manufaturaResultadosTeste: findAll('manufaturaResultadosTeste', empresaId),
         manufaturaAnexos: findAll('manufaturaAnexos', empresaId),
         unidadesCliente: findAll('unidadesCliente', empresaId),
-        projetos: findAll('projetos', empresaId)
+        projetos: findAll('projetos', empresaId),
+        projetoFases: findAll('projetoFases', empresaId)
     };
 }
 

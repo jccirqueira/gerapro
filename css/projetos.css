@@ -109,8 +109,90 @@
 .prj-empty-state h3 { font-size:16px; font-weight:700; color:#4b5563; margin:14px 0 6px; }
 .prj-empty-state p { font-size:13px; color:#9ca3af; margin:0 auto 18px; max-width:440px; line-height:1.6; }
 
+/* ══════════════════════════════════════════════════════════════
+   11. Fase 2 — CRONOGRAMA / GANTT
+   ══════════════════════════════════════════════════════════════ */
+
+.prj-gantt-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:#fff; border:1px solid #e5e7eb; border-radius:12px 12px 0 0; padding:12px 16px; }
+.prj-gantt-title { font-size:14px; font-weight:700; color:#1a1d23; display:flex; align-items:center; gap:8px; }
+.prj-gantt-count { font-size:11px; font-weight:600; color:#6366f1; background:#eef2ff; border-radius:20px; padding:2px 9px; }
+.prj-gantt-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+/* Resumo de progresso */
+.prj-gantt-summary { display:flex; align-items:center; gap:20px; flex-wrap:wrap; background:#fff; border:1px solid #e5e7eb; border-top:none; padding:10px 16px; }
+.prj-gantt-progress { flex:1; min-width:200px; }
+.prj-gantt-progress-label { font-size:11.5px; color:#6b7280; margin-bottom:4px; }
+.prj-gantt-progress-label b { color:#1a1d23; }
+.prj-gantt-progress-track { height:7px; background:#eef0f3; border-radius:4px; overflow:hidden; }
+.prj-gantt-progress-track > div { height:100%; background:linear-gradient(90deg,#6366f1,#8b5cf6); border-radius:4px; transition:width .25s; }
+.prj-gantt-legends { display:flex; gap:14px; flex-wrap:wrap; }
+.prj-gantt-leg { display:flex; align-items:center; gap:5px; font-size:11.5px; color:#4b5563; }
+.prj-gantt-leg i { width:9px; height:9px; border-radius:3px; display:inline-block; }
+
+/* Área do Gantt */
+.prj-gantt { background:#fff; border:1px solid #e5e7eb; border-top:none; border-radius:0 0 12px 12px; overflow:hidden; }
+.prj-gantt-scroll { overflow-x:auto; overflow-y:hidden; }
+.prj-gantt-inner { position:relative; min-width:100%; }
+
+/* Cabeçalho */
+.prj-gantt-head { display:flex; position:sticky; top:0; z-index:5; background:#f8fafc; border-bottom:1px solid #e5e7eb; }
+.prj-gantt-head-left { width:260px; flex:0 0 260px; position:sticky; left:0; z-index:6; background:#f8fafc; border-right:1px solid #e5e7eb; padding:8px 12px; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; }
+.prj-gantt-head-track { position:relative; flex:0 0 auto; height:38px; }
+.prj-gantt-month { position:absolute; top:0; height:20px; border-left:1px solid #d8dce3; padding-left:5px; font-size:10.5px; font-weight:700; color:#4b5563; line-height:20px; white-space:nowrap; overflow:hidden; }
+.prj-gantt-days { position:absolute; bottom:0; left:0; right:0; height:18px; }
+.prj-gantt-day { position:absolute; top:0; height:18px; border-left:1px solid #eef0f3; font-size:9px; color:#9ca3af; display:flex; align-items:center; justify-content:center; gap:2px; }
+.prj-gantt-day small { font-size:8px; opacity:.7; }
+.prj-gantt-day.today { background:#fee2e2; color:#b91c1c; font-weight:700; }
+
+/* Linhas */
+.prj-gantt-row { display:flex; border-bottom:1px solid #f1f3f5; }
+.prj-gantt-row:last-child { border-bottom:none; }
+.prj-gantt-row:hover .prj-gantt-row-left { background:#f8faff; }
+.prj-gantt-row-left { width:260px; flex:0 0 260px; position:sticky; left:0; z-index:4; background:#fff; border-right:1px solid #e5e7eb; padding:9px 12px; transition:background .12s; }
+.prj-gantt-name { display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:#1a1d23; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.prj-gantt-name > span:last-child { overflow:hidden; text-overflow:ellipsis; }
+.prj-gantt-dot { width:8px; height:8px; border-radius:50%; flex:0 0 8px; }
+.prj-gantt-meta { font-size:10.5px; color:#8a91a0; margin-top:2px; padding-left:15px; }
+.prj-gantt-meta b { color:#4b5563; }
+.prj-gantt-attr { color:#dc2626; font-weight:700; }
+.prj-gantt-row-actions { display:flex; gap:2px; margin-top:5px; padding-left:15px; opacity:0; transition:opacity .12s; }
+.prj-gantt-row:hover .prj-gantt-row-actions { opacity:1; }
+.prj-gantt-row-actions button { width:22px; height:22px; border:none; background:transparent; border-radius:5px; color:#9ca3af; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; }
+.prj-gantt-row-actions button:hover { background:#eef2ff; color:#4f46e5; }
+.prj-gantt-row-actions button.prj-danger:hover { background:#fee2e2; color:#dc2626; }
+
+/* Trilha */
+.prj-gantt-row-track { position:relative; flex:0 0 auto; height:44px; background-image:repeating-linear-gradient(to right, #f4f5f8 0 1px, transparent 1px 100%); }
+.prj-gantt-bar { position:absolute; top:9px; height:26px; border-radius:6px; cursor:grab; display:flex; align-items:center; overflow:hidden; box-shadow:0 1px 3px rgba(15,23,42,.22); touch-action:none; user-select:none; }
+.prj-gantt-bar:active, .prj-gantt-bar.dragging { cursor:grabbing; box-shadow:0 6px 18px rgba(15,23,42,.35); z-index:3; opacity:.92; }
+.prj-gantt-bar-fill { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.34); border-right:1px solid rgba(255,255,255,.55); }
+.prj-gantt-bar-label { position:relative; padding:0 8px; font-size:10.5px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+.prj-gantt-bar.atrasada { outline:2px solid #dc2626; outline-offset:-2px; }
+.prj-gantt-bar.milestone { border-radius:4px; }
+.prj-gantt-nodate { position:absolute; top:14px; left:8px; font-size:10.5px; color:#c0c4cc; font-style:italic; }
+
+/* Linha do hoje */
+.prj-gantt-today-line { position:absolute; top:38px; bottom:0; width:2px; background:#ef4444; opacity:.55; z-index:2; pointer-events:none; }
+
+.prj-gantt-hint { font-size:11px; color:#9ca3af; padding:8px 4px 0; display:flex; align-items:center; gap:6px; }
+
+/* Mini barra de progresso na lista */
+.prj-mini-prog { display:flex; flex-direction:column; gap:3px; }
+.prj-mini-prog-track { height:6px; background:#eef0f3; border-radius:3px; overflow:hidden; }
+.prj-mini-prog-track > div { height:100%; background:linear-gradient(90deg,#6366f1,#8b5cf6); border-radius:3px; }
+.prj-mini-prog span { font-size:10px; color:#8a91a0; }
+
+/* Modal do modelo de fases */
+.prj-tpl-head, .prj-tpl-row { display:grid; grid-template-columns:26px 1fr 76px 46px 28px; gap:8px; align-items:center; margin-bottom:6px; }
+.prj-tpl-head { font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.4px; }
+.prj-tpl-idx { font-size:11px; color:#9ca3af; text-align:center; }
+.prj-tpl-row button { width:26px; height:26px; border:none; background:transparent; border-radius:6px; color:#c0c4cc; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; }
+.prj-tpl-row button:hover { background:#fee2e2; color:#dc2626; }
+.prj-tpl-row input[type="color"] { padding:2px; height:32px; }
+
 /* ── Responsivo ── */
 @media (max-width: 900px) {
     .prj-summary { grid-template-columns:repeat(2,1fr); }
     .prj-field-row { grid-template-columns:1fr; }
+    .prj-gantt-head-left, .prj-gantt-row-left { width:180px; flex-basis:180px; }
 }
