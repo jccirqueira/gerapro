@@ -173,15 +173,44 @@ const ProjetosModule = {
             return;
         }
         let criados = 0;
+        let jaImportados = 0;
+        const falhas = [];
         for (const item of fechados) {
             const antes = (store.getState().projetos || []).length;
-            const r = await this.createFromPipeline(item, { silent: true });
-            if (r && (store.getState().projetos || []).length > antes) criados++;
+            let r = null;
+            try {
+                r = await this.createFromPipeline(item, { silent: true });
+            } catch (e) {
+                falhas.push(`${item.cliente || item.origemId || item.id}: ${e.message}`);
+                continue;
+            }
+            // r === null => a gravação no servidor falhou (createFromPipeline faz rollback)
+            if (!r) {
+                falhas.push(`${item.cliente || item.origemId || item.id}: não foi possível gravar no servidor`);
+            } else if ((store.getState().projetos || []).length > antes) {
+                criados++;
+            } else {
+                // retornou um projeto já existente (deduplicação por origem_id)
+                jaImportados++;
+            }
         }
-        window.app.toast(
-            criados > 0 ? `${criados} projeto(s) criado(s) a partir das propostas fechadas.` : 'Todos os projetos já estão importados.',
-            criados > 0 ? 'success' : 'info'
-        );
+        if (falhas.length > 0) {
+            window.app.toast(
+                `Falha ao importar ${falhas.length} proposta(s): ${falhas[0]}${falhas.length > 1 ? ' (e outras)' : ''}. ` +
+                `Verifique a conexão e recarregue a página (Ctrl+F5) para atualizar o sistema.`,
+                'error'
+            );
+        }
+        if (criados > 0) {
+            window.app.toast(`${criados} projeto(s) criado(s) a partir das propostas fechadas.`, 'success');
+        } else if (falhas.length === 0) {
+            window.app.toast(
+                jaImportados > 0
+                    ? `${jaImportados} proposta(s) fechada(s) já estavam importadas — nenhum projeto novo.`
+                    : 'Todos os projetos já estão importados.',
+                'info'
+            );
+        }
         this.render();
     },
 
