@@ -503,7 +503,7 @@ const CRM = {
                                     }, 0);
                                     const pct = Math.min(realizado / metaTotal * 100, 100);
                                     const color = pct >= 100 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#ef4444';
-                                    return `<div style="margin-top:10px;padding:8px 10px;background:#f8fafc;border-radius:6px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Meta do Mês: ${this.formatCurrency(metaTotal)}</span><span style="font-weight:600;color:${color}">${pct.toFixed(0)}% · ${this.formatCurrency(realizado)}</span></div><div class="crm-bar-bg"><div class="crm-bar-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
+                                    return `<div class="crm-meta-progress"><div class="crm-meta-progress-header"><span class="crm-meta-progress-label">Meta do Mês: ${this.formatCurrency(metaTotal)}</span><span class="crm-meta-progress-value" style="color:${color}">${pct.toFixed(0)}% · ${this.formatCurrency(realizado)}</span></div><div class="crm-bar-bg"><div class="crm-bar-fill" style="width:${pct}%;background:${color}"></div></div></div>`;
                                 })()}
                             </div>
                         </div>
@@ -511,12 +511,12 @@ const CRM = {
                             <div class="crm-panel-header"><i class="ph ph-bell"></i> Alertas e Ações</div>
                             <div class="crm-panel-body">
                                 ${tarefasHoje > 0 || leadsComFollowup > 0 ? `
-                                    <div style="margin-bottom:8px">
-                                        ${tarefasHoje > 0 ? `<div class="crm-alert-item"><span class="crm-alert-icon" style="color:var(--color-danger)"><i class="ph ph-warning-circle"></i></span> ${tarefasHoje} tarefa(s) pendente(s) para hoje</div>` : ''}
-                                        ${leadsComFollowup > 0 ? `<div class="crm-alert-item"><span class="crm-alert-icon" style="color:var(--color-warning)"><i class="ph ph-bell-ringing"></i></span> ${leadsComFollowup} lead(s) com follow-up atrasado</div>` : ''}
+                                    <div>
+                                        ${tarefasHoje > 0 ? `<div class="crm-alert-item alert-danger"><span class="crm-alert-icon" style="color:#ef4444"><i class="ph ph-warning-circle"></i></span> <span><strong>${tarefasHoje}</strong> tarefa(s) pendente(s) para hoje</span></div>` : ''}
+                                        ${leadsComFollowup > 0 ? `<div class="crm-alert-item alert-warning"><span class="crm-alert-icon" style="color:#f59e0b"><i class="ph ph-bell-ringing"></i></span> <span><strong>${leadsComFollowup}</strong> lead(s) com follow-up atrasado</span></div>` : ''}
                                     </div>
-                                ` : '<div style="color:var(--color-text-muted);padding:8px 0">Nenhum alerta pendente</div>'}
-                                <button class="btn btn-sm" onclick="window.crm._currentView='tarefas';window.crm._renderView();document.querySelectorAll('.crm-tab').forEach(t=>t.classList.remove('active'));document.querySelector('.crm-tab[data-view=tarefas]')?.classList.add('active')">Ver Tarefas</button>
+                                ` : '<div class="crm-alert-item" style="color:#9ca3af;padding:12px"><i class="ph ph-check-circle" style="font-size:18px;color:#10b981"></i> Nenhum alerta pendente</div>'}
+                                <button class="btn btn-sm" style="margin-top:8px" onclick="window.crm._currentView='tarefas';window.crm._renderView();document.querySelectorAll('.crm-tab').forEach(t=>t.classList.remove('active'));document.querySelector('.crm-tab[data-view=tarefas]')?.classList.add('active')">Ver Tarefas</button>
                             </div>
                         </div>
                         ${(() => {
@@ -538,10 +538,13 @@ const CRM = {
                             <div class="crm-panel-header"><i class="ph ph-at"></i> Menções para Você</div>
                             <div class="crm-panel-body">
                                 ${mencoes.slice(0, 5).map(m => `
-                                    <div class="crm-alert-item" style="cursor:pointer;align-items:flex-start" onclick="window.crm.abrirModalLead('${m.lead.id}')">
-                                        <span class="crm-alert-icon" style="color:#8b5cf6"><i class="ph ph-at"></i></span>
-                                        <span style="flex:1;min-width:0"><strong>${this._esc(m.lead.nome)}</strong><br><span style="font-size:11px;color:#64748b;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(m.nota.conteudo || '')}</span></span>
-                                        <span style="font-size:10px;color:#94a3b8;white-space:nowrap">${m.nota.created_at ? new Date(m.nota.created_at).toLocaleDateString() : ''}</span>
+                                    <div class="crm-mention-card" onclick="window.crm.abrirModalLead('${m.lead.id}')">
+                                        <div class="crm-mention-avatar">${this._esc((m.lead.nome || '?').charAt(0).toUpperCase())}</div>
+                                        <div class="crm-mention-content">
+                                            <div class="crm-mention-name">${this._esc(m.lead.nome)}</div>
+                                            <span class="crm-mention-text">${this._esc(m.nota.conteudo || '')}</span>
+                                        </div>
+                                        <span class="crm-mention-date">${m.nota.created_at ? new Date(m.nota.created_at).toLocaleDateString() : ''}</span>
                                     </div>
                                 `).join('')}
                             </div>

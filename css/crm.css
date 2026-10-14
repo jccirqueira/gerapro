@@ -33,23 +33,71 @@
 .crm-filters select:focus, .crm-filters input:focus { outline:none; border-color:var(--blue-500); box-shadow:0 0 0 3px rgba(81,149,246,.15); }
 .crm-content { flex:1; overflow-y:auto; }
 
-/* ── Dashboard ── */
+/* ── Dashboard (estilo Pipedrive) ── */
 .crm-dashboard { padding-bottom:16px; }
-.crm-dashboard-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.crm-dashboard-col { display:flex; flex-direction:column; gap:12px; }
-.crm-panel { background:var(--color-bg-panel); border-radius:var(--radius-md); box-shadow:var(--shadow-xs); overflow:hidden; border:1px solid var(--color-divider); }
-.crm-panel-header { display:flex; align-items:center; gap:8px; padding:12px 16px; font-size:13px; font-weight:var(--font-weight-semibold); border-bottom:1px solid var(--color-divider); background:transparent; color:var(--color-text-primary); }
-.crm-panel-body { padding:16px; }
+.crm-dashboard-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.crm-dashboard-col { display:flex; flex-direction:column; gap:14px; }
+.crm-panel { background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04); overflow:hidden; border:1px solid #e8eaed; transition:box-shadow .2s; }
+.crm-panel:hover { box-shadow:0 4px 12px rgba(0,0,0,.08); }
+.crm-panel-header { display:flex; align-items:center; gap:8px; padding:14px 18px; font-size:13px; font-weight:600; border-bottom:1px solid #f0f1f3; background:#fafbfc; color:#262a33; letter-spacing:-.1px; }
+.crm-panel-header i { color:#6b7280; font-size:15px; }
+.crm-panel-body { padding:18px; }
+
+/* Summary cards — estilo Pipedrive: ícone colorido + valor grande */
 .crm-summary-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-.crm-summary-card { padding:16px 12px; background:var(--neutral-50); border-radius:var(--radius-sm); text-align:center; }
-.crm-summary-value { font-size:22px; font-weight:var(--font-weight-bold); color:var(--color-text-primary); }
-.crm-summary-label { font-size:11px; font-weight:var(--font-weight-semibold); color:var(--color-text-muted); margin-top:4px; text-transform:uppercase; letter-spacing:.4px; }
-.crm-funnel-bar { margin-bottom:10px; }
-.crm-funnel-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; }
-.crm-funnel-label { font-weight:var(--font-weight-medium); color:var(--color-text-primary); }
-.crm-funnel-count { font-weight:var(--font-weight-bold); font-size:13px; }
-.crm-alert-item { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; }
-.crm-alert-icon { font-size:16px; }
+.crm-summary-card { padding:16px 14px; background:#f8f9fb; border-radius:10px; text-align:center; transition:transform .15s, box-shadow .15s; cursor:default; position:relative; overflow:hidden; }
+.crm-summary-card:hover { transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.crm-summary-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:12px 12px 0 0; }
+.crm-summary-card:nth-child(1)::before { background:linear-gradient(90deg,#6366f1,#818cf8); }
+.crm-summary-card:nth-child(2)::before { background:linear-gradient(90deg,#3b82f6,#60a5fa); }
+.crm-summary-card:nth-child(3)::before { background:linear-gradient(90deg,#f59e0b,#fbbf24); }
+.crm-summary-card:nth-child(4)::before { background:linear-gradient(90deg,#10b981,#34d399); }
+.crm-summary-card:nth-child(5)::before { background:linear-gradient(90deg,#ef4444,#f87171); }
+.crm-summary-card:nth-child(6)::before { background:linear-gradient(90deg,#8b5cf6,#a78bfa); }
+.crm-summary-card:nth-child(7)::before { background:linear-gradient(90deg,#06b6d4,#22d3ee); }
+.crm-summary-value { font-size:24px; font-weight:700; color:#1a1d23; line-height:1.2; }
+.crm-summary-label { font-size:10px; font-weight:600; color:#8b919a; margin-top:5px; text-transform:uppercase; letter-spacing:.6px; }
+
+/* Funil — barras coloridas com cantos arredondados */
+.crm-funnel-bar { margin-bottom:12px; }
+.crm-funnel-bar:last-child { margin-bottom:0; }
+.crm-funnel-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:4px; }
+.crm-funnel-label { font-weight:500; color:#4b5563; }
+.crm-funnel-count { font-weight:700; font-size:14px; min-width:24px; text-align:right; }
+.crm-bar-bg { height:10px; background:#f0f1f3; border-radius:6px; overflow:hidden; }
+.crm-bar-fill { height:100%; border-radius:6px; transition:width .5s cubic-bezier(.4,0,.2,1); min-width:2px; }
+
+/* Meta do mês — barra de progresso Pipedrive-like */
+.crm-meta-progress { margin-top:12px; padding:12px 14px; background:linear-gradient(135deg,#f0fdf4,#ecfdf5); border-radius:10px; border:1px solid #d1fae5; }
+.crm-meta-progress-header { display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:8px; }
+.crm-meta-progress-label { font-weight:600; color:#065f46; }
+.crm-meta-progress-value { font-weight:700; }
+
+/* Alertas — borda lateral colorida estilo Pipedrive */
+.crm-alert-item { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; font-size:13px; border-radius:8px; margin-bottom:6px; transition:background .15s; }
+.crm-alert-item:hover { background:#f8f9fb; }
+.crm-alert-item:last-child { margin-bottom:0; }
+.crm-alert-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+.crm-alert-item.alert-danger { background:#fef2f2; border-left:3px solid #ef4444; }
+.crm-alert-item.alert-warning { background:#fffbeb; border-left:3px solid #f59e0b; }
+.crm-alert-item.alert-info { background:#eff6ff; border-left:3px solid #3b82f6; }
+.crm-alert-item.alert-purple { background:#f5f3ff; border-left:3px solid #8b5cf6; }
+
+/* Menções — card com avatar e hover */
+.crm-mention-card { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; transition:background .15s; border-left:3px solid transparent; }
+.crm-mention-card:hover { background:#f5f3ff; border-left-color:#8b5cf6; }
+.crm-mention-avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#8b5cf6,#a78bfa); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+.crm-mention-content { flex:1; min-width:0; }
+.crm-mention-name { font-weight:600; font-size:13px; color:#1a1d23; }
+.crm-mention-text { font-size:11px; color:#6b7280; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+.crm-mention-date { font-size:10px; color:#9ca3af; white-space:nowrap; }
+
+/* Últimos Leads — tabela com hover e zebra */
+.crm-table th { background:#fafbfc; border-bottom:2px solid #e8eaed; }
+.crm-table tbody tr { transition:background .1s; }
+.crm-table tbody tr:hover { background:#f8f9fb; }
+.crm-table tbody tr:nth-child(even) { background:#fcfcfd; }
+.crm-table tbody tr:nth-child(even):hover { background:#f0f1f3; }
 
 /* ── Kanban ── */
 .crm-kanban { display:flex; gap:10px; height:100%; overflow-x:auto; padding-bottom:8px; }
@@ -89,7 +137,7 @@
 
 /* ── Table ── */
 .crm-table { width:100%; border-collapse:collapse; font-size:13px; }
-.crm-table th { padding:10px 12px; text-align:left; font-weight:var(--font-weight-semibold); font-size:11px; color:var(--color-text-secondary); border-bottom:2px solid var(--color-divider-strong); background:transparent; white-space:nowrap; text-transform:uppercase; letter-spacing:.3px; }
+.crm-table th { padding:10px 12px; text-align:left; font-weight:var(--font-weight-semibold); font-size:11px; color:var(--color-text-secondary); border-bottom:2px solid var(--color-divider-strong); white-space:nowrap; text-transform:uppercase; letter-spacing:.3px; }
 .crm-table td { padding:10px 12px; border-bottom:1px solid var(--color-divider); }
 .crm-table-row-clickable { cursor:pointer; transition:background var(--transition-fast); }
 .crm-table-row-clickable:hover { background:var(--neutral-50); }
