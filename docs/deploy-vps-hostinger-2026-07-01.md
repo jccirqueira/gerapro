@@ -96,9 +96,57 @@ pm2 save
 pm2 startup   # Iniciar automaticamente com o sistema
 ```
 
-### Logs:
-- Saída: `/home/gerapro/.pm2/logs/gerapro-out.log`
-- Erros: `/home/gerapro/.pm2/logs/gerapro-error.log`
+### Logs (PM2 do root — o canônico):
+- Saída: `/root/.pm2/logs/gerapro-out.log`
+- Erros: `/root/.pm2/logs/gerapro-error.log`
+
+### ⚠️ CRÍTICO — somente UM PM2 pode gerenciar o GeraPro
+
+Na VPS existem **dois daemons PM2** com `PM2_HOME` diferentes:
+
+| Daemon | Usuário | PM2_HOME | Apps |
+|---|---|---|---|
+| `PM2 v7.0.4` | `root` | `/root/.pm2` | **gerapro**, barbearia-api, cafe1-espaco, cafe2-office |
+| `PM2 v7.0.3` | `gerapro` | `/home/gerapro/.pm2` | coffeecraft-api |
+
+**O canônico é o do `root`** (é o que atende a porta 8082). O app `gerapro` NÃO deve
+estar registrado no PM2 do usuário `gerapro` — se estiver, os dois brigam pela porta
+8082 e o resultado é:
+
+- O processo perdedor entra em loop de `EADDRINUSE` (contador `↺` cresce sem parar);
+- O processo vencedor pode rodar **código antigo**, tornando os deploys silenciosamente
+  inefetivos (o `git pull` atualiza os arquivos, mas quem serve é outro processo);
+- Processos "zumbis" acumulados, às vezes com semanas de vida.
+
+Isso já aconteceu: um processo de **34 dias** servia código anterior à Fase 1 de
+Gestão de Projetos, fazendo o `POST /api/data/projetos` retornar `400
+{"error":"Entidade inválida"}` — o import de propostas fechadas falhava sem aviso.
+
+**Diagnóstico:**
+
+```bash
+# Quem escuta a porta e a qual PM2 pertence
+ss -lptn 'sport = :8082'
+
+# Deve existir apenas UM processo rodando server_new.js
+ps -eo user,pid,ppid,etime,cmd | grep 'gerapro/app/server_new' | grep -v grep
+
+# Lista de apps de cada instância
+pm2 list                                                   # root
+sudo -u gerapro PM2_HOME=/home/gerapro/.pm2 pm2 list       # usuário gerapro
+```
+
+**Correção (remove só o duplicado, sem tocar no coffeecraft-api):**
+
+```bash
+sudo -u gerapro PM2_HOME=/home/gerapro/.pm2 pm2 delete gerapro
+sudo -u gerapro PM2_HOME=/home/gerapro/.pm2 pm2 save
+pm2 restart gerapro        # no PM2 do root
+```
+
+**Verifique após cada deploy** que `pm2 status` mostra uptime crescente (sem `↺`
+crescendo) e que `curl -s -o /dev/null -w '%{http_code}' http://localhost:8082/`
+responde `200`.
 
 ## 6. Nginx — Proxy Reverso
 
