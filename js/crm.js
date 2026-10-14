@@ -2154,14 +2154,14 @@ const CRM = {
                     </div>
                 </div>
                 <div class="crm-modal-tabs">
-                    <button class="crm-modal-tab active" data-tab="dados" onclick="window.crm._switchModalTab(this, 'dados')" style="color:white;background:#4F46E5;border-radius:6px"><i class="ph ph-user"></i> Dados</button>
-                    <button class="crm-modal-tab" data-tab="interacoes" onclick="window.crm._switchModalTab(this, 'interacoes')" style="color:#1e293b;background:#f1f5f9;border-radius:6px"><i class="ph ph-timeline"></i> Timeline</button>
-                    <button class="crm-modal-tab" data-tab="tarefas" onclick="window.crm._switchModalTab(this, 'tarefas')" style="color:#1e293b;background:#f1f5f9;border-radius:6px"><i class="ph ph-check-square"></i> Tarefas (${tarefas.length})</button>
-                    <button class="crm-modal-tab" data-tab="propostas" onclick="window.crm._switchModalTab(this, 'propostas')" style="color:#1e293b;background:#f1f5f9;border-radius:6px"><i class="ph ph-file"></i> Propostas (${pipelineItems.length})</button>
-                    <button class="crm-modal-tab" data-tab="notas" onclick="window.crm._switchModalTab(this, 'notas')" style="color:#1e293b;background:#f1f5f9;border-radius:6px"><i class="ph ph-note-pencil"></i> Notas (${this.getNotas(lead.id).length})</button>
-                    <button class="crm-modal-tab" data-tab="score" onclick="window.crm._switchModalTab(this, 'score')" style="color:#1e293b;background:#f1f5f9;border-radius:6px"><i class="ph ph-star"></i> Score</button>
-                    <button class="crm-modal-tab" data-tab="acoes" onclick="window.crm._switchModalTab(this, 'acoes')" style="color:white;background:#4F46E5;border-radius:6px"><i class="ph ph-lightning"></i> Ações</button>
-                    <button class="crm-modal-tab" data-tab="email" onclick="window.crm._switchModalTab(this, 'email')" style="color:#1e293b;background:#f1f5f9;border-radius:6px"><i class="ph ph-envelope"></i> E-mail</button>
+                    <button class="crm-modal-tab active" data-tab="dados" onclick="window.crm._switchModalTab(this, 'dados')"><i class="ph ph-user"></i> Dados</button>
+                    <button class="crm-modal-tab" data-tab="interacoes" onclick="window.crm._switchModalTab(this, 'interacoes')"><i class="ph ph-timeline"></i> Timeline</button>
+                    <button class="crm-modal-tab" data-tab="tarefas" onclick="window.crm._switchModalTab(this, 'tarefas')"><i class="ph ph-check-square"></i> Tarefas (${tarefas.length})</button>
+                    <button class="crm-modal-tab" data-tab="propostas" onclick="window.crm._switchModalTab(this, 'propostas')"><i class="ph ph-file"></i> Propostas (${pipelineItems.length})</button>
+                    <button class="crm-modal-tab" data-tab="notas" onclick="window.crm._switchModalTab(this, 'notas')"><i class="ph ph-note-pencil"></i> Notas (${this.getNotas(lead.id).length})</button>
+                    <button class="crm-modal-tab" data-tab="score" onclick="window.crm._switchModalTab(this, 'score')"><i class="ph ph-star"></i> Score</button>
+                    <button class="crm-modal-tab" data-tab="acoes" onclick="window.crm._switchModalTab(this, 'acoes')"><i class="ph ph-lightning"></i> Ações</button>
+                    <button class="crm-modal-tab" data-tab="email" onclick="window.crm._switchModalTab(this, 'email')"><i class="ph ph-envelope"></i> E-mail</button>
                 </div>
                 <div class="crm-modal-body" id="crm-lead-modal-body">
                     ${this._renderModalTabDados(lead)}
