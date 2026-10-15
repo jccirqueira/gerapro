@@ -81,6 +81,31 @@ const CP_COT_TRANSICOES = {
     cancelada: []
 };
 
+/* Status do Pedido de Compras. */
+const CP_PED_STATUS = {
+    rascunho: 'Rascunho',
+    enviado: 'Enviado',
+    em_entrega: 'Em Entrega',
+    parcial: 'Parcialmente Recebido',
+    recebido: 'Recebido',
+    cancelado: 'Cancelado'
+};
+
+/* Transições manuais permitidas do pedido (ações do sistema — ex. baixa
+   parcial via NF — são feitas fora deste validador, como no cotação). */
+const CP_PED_TRANSICOES = {
+    rascunho: ['enviado', 'cancelado'],
+    enviado: ['em_entrega', 'rascunho', 'cancelado'],
+    em_entrega: ['parcial', 'recebido', 'cancelado'],
+    parcial: ['recebido', 'em_entrega', 'cancelado'],
+    recebido: [],
+    cancelado: []
+};
+
+/* Limite de aprovação por valor (R$). Pedidos acima disso exigem
+   `aprovado_por` preenchido. Configurável por empresa no futuro. */
+const CP_APROVACAO_LIMITE = 50000;
+
 /* Aliases de cabeçalho da TABELA DE PREÇOS do fornecedor.
    Template: Código | Descrição | Preço Unitário | Prazo (dias) */
 const CP_PRECO_ALIASES = {
@@ -115,6 +140,10 @@ const ComprasModule = {
     _cotStaging: null,      // cotação em construção ({ cotacao, itens })
     _cotModal: null,        // { requisicao_id, usados:Set, sugeridos:Set }
     _cotAviso: null,        // retorno do último import de preços
+    activePedido: null,     // id do pedido aberto (viewMode === 'pedido')
+    pedSub: 'lista',        // sub-view da aba Pedidos: 'lista' | 'detalhe'
+    _pedStaging: null,      // pedido em construção ({ pedido, itens })
+    _pedModal: null,        // contexto do modal de gerar pedido ({ requisicao_id, fornecedores })
 
     /* ================================================================
        CICLO DE VIDA
@@ -168,7 +197,15 @@ const ComprasModule = {
             preencherCatalogo: this.preencherCatalogo.bind(this),
             marcarVencedor: this.marcarVencedor.bind(this),
             marcarMenorPreco: this.marcarMenorPreco.bind(this),
-            alternarSubCot: this.alternarSubCot.bind(this)
+            alternarSubCot: this.alternarSubCot.bind(this),
+            gerarPedido: this.gerarPedido.bind(this),
+            openPedido: this.openPedido.bind(this),
+            voltarDoPedido: this.voltarDoPedido.bind(this),
+            mudarStatusPedido: this.mudarStatusPedido.bind(this),
+            aprovarPedido: this.aprovarPedido.bind(this),
+            exportPedidoXLSX: this.exportPedidoXLSX.bind(this),
+            imprimirPedido: this.imprimirPedido.bind(this),
+            removerPedido: this.removerPedido.bind(this)
         };
 
         store.subscribe((state) => {
@@ -179,6 +216,10 @@ const ComprasModule = {
                     // staging própria da cotação; só reage se ela for removida
                     const existe = (state.comprasCotacoes || []).some(c => c.id === this.activeCotacao);
                     if (!existe) this.voltarDaCotacao();
+                } else if (this.viewMode === 'pedido' && this.activePedido) {
+                    // staging própria do pedido; só reage se ele for removido
+                    const existe = (state.comprasPedidos || []).some(p => p.id === this.activePedido);
+                    if (!existe) this.voltarDoPedido();
                 } else if (this.viewMode === 'detail' && this.activeId) {
                     const exists = (state.comprasRequisicoes || []).some(r => r.id === this.activeId);
                     if (!exists) this.backToList();
@@ -237,6 +278,7 @@ const ComprasModule = {
         this._active = true;
         if (this.viewMode === 'nova') this.renderNova();
         else if (this.viewMode === 'cotacao' && this._cotStaging) this.renderCotacao();
+        else if (this.viewMode === 'pedido' && this._pedStaging) this.renderPedido();
         else if (this.viewMode === 'detail' && this.activeId) this.renderDetail();
         else this.renderList();
     },
@@ -1763,6 +1805,7 @@ const ComprasModule = {
         const podeLiberar = podeEditar && (r.status === 'rascunho' || r.status === 'em_conferencia');
         const emConferencia = r.status === 'rascunho' || r.status === 'em_conferencia';
         const cotacoes = this._cotacoesDaRequisicao(r.id);
+        const pedidos = this._pedidosDaRequisicao(r.id);
 
         container.innerHTML = `
             <div style="height:calc(100vh - 120px);display:flex;flex-direction:column;background:rgb(250,250,250);margin:-20px;position:relative;">
@@ -1832,13 +1875,19 @@ const ComprasModule = {
                             <i class="ph ph-tag"></i> Cotações
                             <span class="cp-tab-tag">${cotacoes.length}</span>
                         </button>
+                        <button class="cp-tab ${this.activeTab === 'pedidos' ? 'active' : ''}" onclick="app.compras.switchTab('pedidos')">
+                            <i class="ph ph-file-arrow-down"></i> Pedidos
+                            <span class="cp-tab-tag">${pedidos.length}</span>
+                        </button>
                     </div>
 
                     ${this.activeTab === 'itens'
                         ? this._detalheItensHTML(r, itens, resumo, emConferencia)
                         : this.activeTab === 'cotacoes'
                             ? this._detalheCotacoesHTML(r, itens, cotacoes, podeEditar)
-                            : this._detalheResumoHTML(r, itens, resumo)}
+                            : this.activeTab === 'pedidos'
+                                ? this._detalhePedidosHTML(r, itens, pedidos, podeEditar)
+                                : this._detalheResumoHTML(r, itens, resumo)}
                 </div>
             </div>
         `;
@@ -1944,6 +1993,22 @@ const ComprasModule = {
         return (store.getState().comprasCotacoes || []).find(c => c.id === id) || null;
     },
 
+    _pedidosDaRequisicao(reqId) {
+        return (store.getState().comprasPedidos || [])
+            .filter(p => p.requisicao_id === reqId)
+            .sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || '')));
+    },
+
+    _pedido(id) {
+        return (store.getState().comprasPedidos || []).find(p => p.id === id) || null;
+    },
+
+    _itensDoPedido(pedidoId) {
+        return (store.getState().comprasPedidoItens || [])
+            .filter(pi => pi.pedido_id === pedidoId)
+            .sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || '')));
+    },
+
     _itensDaCotacao(cotId) {
         return (store.getState().comprasCotacaoItens || []).filter(i => i.cotacao_id === cotId);
     },
@@ -1986,6 +2051,177 @@ const ComprasModule = {
             if (m) max = Math.max(max, parseInt(m[1], 10));
         });
         return 'COT-' + String(max + 1).padStart(4, '0');
+    },
+
+    _nextCodigoPedido(pedidos) {
+        let max = 0;
+        pedidos.forEach(p => {
+            const m = String(p.codigo || '').match(/(\d+)$/);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        return 'PC-' + String(max + 1).padStart(4, '0');
+    },
+
+    /* ================================================================
+       FASE 3 — PEDIDO DE COMPRAS
+       ================================================================ */
+
+    /* Progresso do fechamento: quantos itens da requisição já têm pedido.
+       Um item conta como "pedidado" se existe um compras_pedido_itens ativo
+       (pedido não cancelado) apontando para o seu requisicao_item_id. */
+    _coberturaPedidos(reqId) {
+        const itens = this._itensDaRequisicao(reqId);
+        const pedidos = this._pedidosDaRequisicao(reqId).filter(p => p.status !== 'cancelado');
+        const pedidoIds = new Set(pedidos.map(p => p.id));
+        const itensPedidos = (store.getState().comprasPedidoItens || [])
+            .filter(pi => pedidoIds.has(pi.pedido_id));
+        const cobertos = new Set(itensPedidos.map(pi => pi.requisicao_item_id).filter(Boolean));
+        const total = itens.length;
+        const fechada = total > 0 && itens.every(i => cobertos.has(i.id));
+        return { total, pedidos: cobertos.size, fechada };
+    },
+
+    /* Gera pedidos a partir dos itens vencedores, agrupando por fornecedor.
+       1 requisição → N pedidos (um por fornecedor com vitórias).
+       Itens já pedidos são pulados — gerar de novo só abre o que falta. */
+    async gerarPedido(reqId) {
+        if (!store.canEdit()) return;
+        const r = this._req(reqId);
+        if (!r) return;
+        if (r.status !== 'em_cotacao' && r.status !== 'em_pedido') {
+            window.app.toast('A requisição precisa estar em Cotação ou Pedido para gerar pedidos.', 'error');
+            return;
+        }
+
+        // Itens já cobertos por pedido ativo não são gerados de novo
+        const pedidosAtivos = this._pedidosDaRequisicao(reqId).filter(p => p.status !== 'cancelado');
+        const idsPedidosAtivos = new Set(pedidosAtivos.map(p => p.id));
+        const cotacaoItensPedidos = new Set(
+            (store.getState().comprasPedidoItens || [])
+                .filter(pi => idsPedidosAtivos.has(pi.pedido_id))
+                .map(pi => pi.cotacao_item_id)
+                .filter(Boolean)
+        );
+
+        const cotacoes = this._cotacoesDaRequisicao(reqId)
+            .filter(c => c.status !== 'cancelada' && c.status !== 'descartada');
+
+        // Agrupa vencedores por fornecedor (pulando os já pedidos)
+        const porFornecedor = new Map(); // fornecedorId -> [{ cotacaoItem, cotacao }]
+        for (const c of cotacoes) {
+            const itensCot = this._itensDaCotacao(c.id);
+            for (const ci of itensCot) {
+                if (ci.vencedor !== 1 && ci.vencedor !== '1') continue;
+                if (cotacaoItensPedidos.has(ci.id)) continue;
+                if (!porFornecedor.has(c.fornecedor_id)) porFornecedor.set(c.fornecedor_id, []);
+                porFornecedor.get(c.fornecedor_id).push({ cotacaoItem: ci, cotacao: c });
+            }
+        }
+
+        if (!porFornecedor.size) {
+            const cob = this._coberturaPedidos(reqId);
+            window.app.toast(cob.fechada
+                ? 'Todos os itens desta requisição já têm pedido gerado.'
+                : 'Nenhum item novo tem vencedor marcado. Use "Menor preço" ou marque manualmente na matriz.', 'info');
+            return;
+        }
+
+        const agora = new Date().toISOString();
+        const pedidosExistentes = store.getState().comprasPedidos || [];
+        let proximoNumero = this._nextCodigoPedido(pedidosExistentes);
+        const novosPedidos = [];
+
+        this._seeding = true;
+        for (const [fornecedorId, vencedores] of porFornecedor) {
+            const cotacaoId = vencedores[0].cotacao.id;
+            const pedidoId = crypto.randomUUID();
+            const numero = proximoNumero;
+            proximoNumero = 'PC-' + String(parseInt(proximoNumero.split('-')[1], 10) + 1).padStart(4, '0');
+
+            // Cria pedido
+            const pedido = {
+                id: pedidoId,
+                empresa_id: r.empresa_id,
+                codigo: numero,
+                requisicao_id: reqId,
+                cotacao_id: cotacaoId,
+                fornecedor_id: fornecedorId,
+                data_pedido: agora,
+                data_prevista_entrega: '',
+                data_recebimento: '',
+                status: 'rascunho',
+                condicao_pagamento: vencedores[0].cotacao.condicao_pagamento || '',
+                prazo_entrega: vencedores[0].cotacao.prazo_entrega || '',
+                transportadora: '',
+                frete: 0,
+                desconto: 0,
+                total: 0,
+                solicitante: r.solicitante || '',
+                aprovado_por: '',
+                aprovado_em: '',
+                observacoes: '',
+                created_at: agora,
+                updated_at: agora
+            };
+            await store.addComprasPedidos(pedido);
+            novosPedidos.push(pedido);
+
+            // Cria itens do pedido
+            let totalPedido = 0;
+            for (const { cotacaoItem } of vencedores) {
+                const totalItem = this._cotItemTotal(cotacaoItem);
+                totalPedido += totalItem;
+                const pi = {
+                    id: crypto.randomUUID(),
+                    empresa_id: r.empresa_id,
+                    pedido_id: pedidoId,
+                    requisicao_item_id: cotacaoItem.requisicao_item_id,
+                    cotacao_item_id: cotacaoItem.id,
+                    material_id: cotacaoItem.material_id || '',
+                    codigo: cotacaoItem.codigo || '',
+                    descricao: cotacaoItem.descricao || '',
+                    fabricante: cotacaoItem.fabricante || '',
+                    unidade: cotacaoItem.unidade || '',
+                    qtd: parseFloat(cotacaoItem.qtd) || 0,
+                    qtd_recebida: 0,
+                    custo_unitario: parseFloat(cotacaoItem.custo_unitario) || 0,
+                    ipi: parseFloat(cotacaoItem.ipi) || 0,
+                    icms: parseFloat(cotacaoItem.icms) || 0,
+                    desconto: parseFloat(cotacaoItem.desconto) || 0,
+                    lead_time_previsto: cotacaoItem.prazo_entrega || '',
+                    total: totalItem,
+                    created_at: agora,
+                    updated_at: agora
+                };
+                await store.addComprasPedidoItens(pi);
+            }
+
+            // Atualiza total do pedido
+            await store.updateComprasPedidos(pedidoId, { total: totalPedido });
+            pedido.total = totalPedido;
+        }
+        this._seeding = false;
+
+        // Atualiza status da requisição para em_pedido
+        if (r.status !== 'em_pedido') {
+            await store.updateComprasRequisicoes(reqId, { status: 'em_pedido' });
+        }
+
+        // Fechamento automático: quando todos os itens têm pedido, congela o
+        // total_real e sinaliza a requisição como fechada para cotação.
+        const cob = this._coberturaPedidos(reqId);
+        const totalReal = novosPedidos.reduce((s, p) => s + (p.total || 0), 0);
+        if (cob.fechada) {
+            await store.updateComprasRequisicoes(reqId, {
+                total_real: Math.round((r.total_real || 0) + totalReal)
+            });
+        }
+
+        window.app.toast(`${novosPedidos.length} pedido(s) gerado(s): ${novosPedidos.map(p => p.codigo).join(', ')}.`, 'success');
+        if (cob.fechada) {
+            window.app.toast(`Requisição fechada: todos os ${cob.total} itens têm pedido.`, 'success');
+        }
+        this.renderDetail();
     },
 
     /* Total do item: Qtd × Unit × (1+IPI%) × (1−Desc%). ICMS é só referência —
@@ -2035,6 +2271,11 @@ const ComprasModule = {
 
         const cotar = podeEditar && (r.status === 'liberada' || r.status === 'em_cotacao');
         const comparando = cotacoes.length > 0 && this.cotSub === 'comparar';
+        // Botão "Gerar Pedido" só quando há vencedores e status permite
+        const temVencedores = cotacoes.some(c => this._itensDaCotacao(c.id).some(i => i.vencedor === 1 || i.vencedor === '1'));
+        const cob = temVencedores ? this._coberturaPedidos(r.id) : null;
+        const pendentes = cob ? cob.total - cob.pedidos : 0;
+        const podeGerarPedido = podeEditar && temVencedores && !cob.fechada && (r.status === 'em_cotacao' || r.status === 'em_pedido');
 
         return `
             <div class="cp-toolbar" style="justify-content:space-between;">
@@ -2046,6 +2287,12 @@ const ComprasModule = {
                     <button class="btn btn-sm ${comparando ? 'btn-primary' : 'btn-ghost'}" onclick="app.compras.alternarSubCot('${comparando ? 'lista' : 'comparar'}')">
                         <i class="ph ph-squares-four"></i> ${comparando ? 'Voltar à lista' : 'Comparar preços'}
                     </button>` : ''}
+                    ${podeGerarPedido ? `
+                    <button class="btn btn-sm btn-primary" onclick="app.compras.gerarPedido('${r.id}')">
+                        <i class="ph ph-file-arrow-down"></i> Gerar Pedido${pendentes > 0 ? ` (${pendentes} pendente${pendentes > 1 ? 's' : ''})` : ''}
+                    </button>` : ''}
+                    ${cob && cob.fechada ? `
+                    <span class="cp-badge" style="background:#dcfce7;color:#166534;"><i class="ph ph-check-circle"></i> Todos os itens pedidos</span>` : ''}
                 </div>
                 ${cotar ? `
                 <button class="btn btn-sm btn-primary" onclick="app.compras.novaCotacao('${r.id}')">
@@ -2061,6 +2308,86 @@ const ComprasModule = {
                 : comparando
                     ? this._matrizHTML(r, itens, cotacoes)
                     : this._listaCotacoesHTML(cotacoes, podeEditar)}
+        `;
+    },
+
+    /* ------------------------------------------------------------
+       ABA "PEDIDOS" NO DETALHE DA REQUISIÇÃO
+       ------------------------------------------------------------ */
+
+    _detalhePedidosHTML(r, itens, pedidos, podeEditar) {
+        if (r.status === 'rascunho' || r.status === 'em_conferencia') {
+            return `
+                <div class="cp-banner warn">
+                    <i class="ph ph-lock"></i>
+                    <div><b>Pedidos bloqueados.</b> Libere a requisição para compras antes de gerar pedidos.</div>
+                </div>
+            `;
+        }
+        if (!pedidos.length) {
+            return `
+                <div class="cp-empty-state">
+                    <i class="ph ph-file-arrow-down"></i>
+                    <h3>Nenhum pedido ainda</h3>
+                    <p>Marque os vencedores na aba Cotações e clique em "Gerar Pedido" para criar um pedido por fornecedor.</p>
+                </div>
+            `;
+        }
+
+        const cob = this._coberturaPedidos(r.id);
+        const pct = cob.total ? Math.round((cob.pedidos / cob.total) * 100) : 0;
+
+        return `
+            ${cob.fechada ? `
+            <div class="cp-banner ok">
+                <i class="ph ph-check-circle"></i>
+                <div><b>Requisição fechada.</b> Todos os ${cob.total} itens têm pedido gerado — não há nada pendente para pedir.</div>
+            </div>` : `
+            <div class="cp-progresso">
+                <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#4b5563;margin-bottom:4px;">
+                    <span><i class="ph ph-file-arrow-down"></i> Itens com pedido</span>
+                    <span>${cob.pedidos}/${cob.total} (${pct}%)</span>
+                </div>
+                <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">
+                    <div style="height:100%;width:${pct}%;background:${cob.fechada ? '#16a34a' : '#2563eb'};transition:width .3s;"></div>
+                </div>
+            </div>`}
+
+            <div class="cp-toolbar" style="justify-content:space-between;">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <span style="font-size:12.5px;font-weight:700;color:#4b5563;">
+                        <i class="ph ph-file-arrow-down"></i> ${pedidos.length} pedido(s)
+                    </span>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">
+                ${pedidos.map(p => {
+                    const f = this._fornecedor(p.fornecedor_id);
+                    const itensP = this._itensDoPedido(p.id);
+                    const recebidos = itensP.filter(i => parseFloat(i.qtd_recebida) > 0).length;
+                    return `
+                    <div style="background:white;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);padding:16px;cursor:pointer;transition:box-shadow 0.2s;" onclick="app.compras.openPedido('${p.id}')">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+                            <div>
+                                <div style="font-size:16px;font-weight:800;color:#111827;margin-bottom:4px;">${this._esc(p.codigo)}</div>
+                                <div style="font-size:13px;color:#6b7280;">${this._esc(this._nomeFornecedor(f))}</div>
+                            </div>
+                            <span class="cp-badge cp-ped-${this._esc(p.status)}">${this._esc(CP_PED_STATUS[p.status] || p.status)}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #f3f4f6;">
+                            <div style="font-size:12px;color:#6b7280;">
+                                <i class="ph ph-calendar"></i> ${this._fmtDate(p.data_pedido)}
+                            </div>
+                            <div style="font-size:18px;font-weight:800;color:#111827;">${window.app.formatCurrency(p.total || 0)}</div>
+                        </div>
+                        ${recebidos ? `
+                        <div style="margin-top:8px;font-size:11px;color:#6b7280;">
+                            <i class="ph ph-check-circle"></i> ${recebidos}/${itensP.length} item(ns) recebido(s)
+                        </div>` : ''}
+                    </div>`;
+                }).join('')}
+            </div>
         `;
     },
 
@@ -2530,6 +2857,420 @@ const ComprasModule = {
             this.activeId = null;
         }
         this.render();
+    },
+
+    /* ================================================================
+       FASE 3 — VIEW DO PEDIDO
+       ================================================================ */
+
+    openPedido(id) {
+        const p = this._pedido(id);
+        if (!p) { this.voltarDoPedido(); return; }
+        const itens = this._itensDoPedido(id);
+        this._pedStaging = { pedido: { ...p }, itens: itens.map(i => ({ ...i })) };
+        this.activePedido = id;
+        this.viewMode = 'pedido';
+        this.render();
+    },
+
+    voltarDoPedido() {
+        const reqId = this._pedStaging ? this._pedStaging.pedido.requisicao_id : null;
+        const volta = (reqId && this._req(reqId)) ? reqId : (this._req(this.activeId) ? this.activeId : null);
+        this._pedStaging = null;
+        this.activePedido = null;
+        if (volta) {
+            this.viewMode = 'detail';
+            this.activeId = volta;
+            this.activeTab = 'pedidos';
+        } else {
+            this.viewMode = 'list';
+            this.activeId = null;
+        }
+        this.render();
+    },
+
+    renderPedido() {
+        const container = document.getElementById('view-compras');
+        if (!container) return;
+        const st = this._pedStaging;
+        if (!st) { this.voltarDoPedido(); return; }
+
+        const p = st.pedido;
+        const r = this._req(p.requisicao_id);
+        const f = this._fornecedor(p.fornecedor_id);
+        const podeEditar = store.canEdit();
+        const trans = podeEditar ? (CP_PED_TRANSICOES[p.status] || []) : [];
+        const precisaAprovacao = p.total > CP_APROVACAO_LIMITE && !p.aprovado_por;
+
+        container.innerHTML = `
+            <div style="height:calc(100vh - 120px);display:flex;flex-direction:column;background:rgb(250,250,250);margin:-20px;position:relative;">
+                <div class="module-header-sticky" style="color:white;padding:20px 30px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:10;">
+                    <div style="display:flex;align-items:center;gap:14px;">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.voltarDoPedido()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-arrow-left"></i> Voltar
+                        </button>
+                        <div>
+                            <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="ph ph-file-arrow-down"></i> ${this._esc(p.codigo)}
+                                <span class="cp-badge cp-ped-${this._esc(p.status)}" style="background:rgba(255,255,255,.16);color:#fff;">${this._esc(CP_PED_STATUS[p.status] || p.status)}</span>
+                            </h2>
+                            <div style="font-size:12px;opacity:0.9;margin-top:2px;">${this._esc(this._nomeFornecedor(f))} · ${this._esc(r ? r.codigo : '')}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.exportPedidoXLSX('${p.id}')" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-file-xls"></i> Exportar
+                        </button>
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.imprimirPedido('${p.id}')" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-printer"></i> PDF / Imprimir
+                        </button>
+                        ${p.status !== 'recebido' && p.status !== 'cancelado' ? `
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.removerPedido('${p.id}')" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-trash"></i> Excluir
+                        </button>` : ''}
+                    </div>
+                </div>
+
+                <div class="cp-body">
+                    <div class="cp-detail-head">
+                        <div class="cp-grid">
+                            <div class="cp-info"><div class="cp-info-label">Fornecedor</div><div class="cp-info-value">${this._esc(this._nomeFornecedor(f))}</div></div>
+                            <div class="cp-info"><div class="cp-info-label">CNPJ</div><div class="cp-info-value ${f && f.cnpj ? '' : 'cp-empty'}">${f && f.cnpj ? this._esc(f.cnpj) : '—'}</div></div>
+                            <div class="cp-info"><div class="cp-info-label">Data do Pedido</div><div class="cp-info-value">${this._fmtDate(p.data_pedido)}</div></div>
+                            <div class="cp-info"><div class="cp-info-label">Condição de Pagamento</div><div class="cp-info-value ${p.condicao_pagamento ? '' : 'cp-empty'}">${this._esc(p.condicao_pagamento) || '—'}</div></div>
+                            <div class="cp-info"><div class="cp-info-label">Prazo de Entrega</div><div class="cp-info-value ${p.prazo_entrega ? '' : 'cp-empty'}">${this._esc(p.prazo_entrega) || '—'}</div></div>
+                            <div class="cp-info"><div class="cp-info-label">Total</div><div class="cp-info-value">${window.app.formatCurrency(p.total || 0)}</div></div>
+                            ${precisaAprovacao ? `
+                            <div class="cp-info"><div class="cp-info-label">Aprovação</div><div class="cp-info-value" style="color:#dc2626;"><i class="ph ph-warning"></i> Acima de ${window.app.formatCurrency(CP_APROVACAO_LIMITE)}</div></div>
+                            ` : p.aprovado_por ? `
+                            <div class="cp-info"><div class="cp-info-label">Aprovado por</div><div class="cp-info-value">${this._esc(p.aprovado_por)} · ${this._fmtDate(p.aprovado_em)}</div></div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="cp-toolbar" style="justify-content:space-between;">
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <span style="font-size:12.5px;font-weight:700;color:#4b5563;">
+                                <i class="ph ph-list"></i> ${st.itens.length} item(ns)
+                            </span>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            ${precisaAprovacao ? `
+                            <button class="btn btn-sm btn-primary" onclick="app.compras.aprovarPedido('${p.id}')">
+                                <i class="ph ph-check-circle"></i> Aprovar
+                            </button>` : ''}
+                            ${trans.map(s => `<button class="btn btn-sm btn-ghost" onclick="app.compras.mudarStatusPedido('${s}')">${this._esc(CP_PED_STATUS[s])}</button>`).join('')}
+                        </div>
+                    </div>
+
+                    <div style="background:white;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">
+                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                            <thead>
+                                <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
+                                    <th style="padding:10px 12px;text-align:left;font-weight:700;color:#374151;">Código</th>
+                                    <th style="padding:10px 12px;text-align:left;font-weight:700;color:#374151;">Descrição</th>
+                                    <th style="padding:10px 12px;text-align:center;font-weight:700;color:#374151;">Qtd</th>
+                                    <th style="padding:10px 12px;text-align:center;font-weight:700;color:#374151;">Un</th>
+                                    <th style="padding:10px 12px;text-align:right;font-weight:700;color:#374151;">Unitário</th>
+                                    <th style="padding:10px 12px;text-align:right;font-weight:700;color:#374151;">IPI %</th>
+                                    <th style="padding:10px 12px;text-align:right;font-weight:700;color:#374151;">Desc %</th>
+                                    <th style="padding:10px 12px;text-align:right;font-weight:700;color:#374151;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${st.itens.map((pi, idx) => `
+                                <tr style="border-bottom:1px solid #f3f4f6;${idx % 2 === 0 ? 'background:white;' : 'background:#fafafa;'}">
+                                    <td style="padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;color:#6b7280;">${this._esc(pi.codigo) || '—'}</td>
+                                    <td style="padding:10px 12px;">${this._esc(pi.descricao).slice(0, 60)}</td>
+                                    <td style="padding:10px 12px;text-align:center;font-weight:600;">${this._fmtQtd(pi.qtd)}</td>
+                                    <td style="padding:10px 12px;text-align:center;color:#6b7280;">${this._esc(pi.unidade) || '—'}</td>
+                                    <td style="padding:10px 12px;text-align:right;">${window.app.formatCurrency(pi.custo_unitario || 0)}</td>
+                                    <td style="padding:10px 12px;text-align:right;color:#6b7280;">${pi.ipi || 0}%</td>
+                                    <td style="padding:10px 12px;text-align:right;color:#6b7280;">${pi.desconto || 0}%</td>
+                                    <td style="padding:10px 12px;text-align:right;font-weight:700;">${window.app.formatCurrency(pi.total || 0)}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#f9fafb;border-top:2px solid #e5e7eb;">
+                                    <td colspan="7" style="padding:12px;text-align:right;font-weight:700;color:#374151;">Total do Pedido</td>
+                                    <td style="padding:12px;text-align:right;font-weight:800;font-size:15px;color:#111827;">${window.app.formatCurrency(p.total || 0)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    /* ================================================================
+       FASE 3 — AÇÕES DO PEDIDO
+       ================================================================ */
+
+    async mudarStatusPedido(status) {
+        if (!store.canEdit()) return;
+        const st = this._pedStaging;
+        if (!st) return;
+        const p = st.pedido;
+        const trans = CP_PED_TRANSICOES[p.status] || [];
+        if (!trans.includes(status)) {
+            window.app.toast(`Transição inválida: ${CP_PED_STATUS[p.status]} → ${CP_PED_STATUS[status]}.`, 'error');
+            return;
+        }
+
+        // Validação: pedido acima do limite exige aprovação antes de sair de rascunho
+        if (p.status === 'rascunho' && status === 'enviado' && p.total > CP_APROVACAO_LIMITE && !p.aprovado_por) {
+            window.app.toast('Pedido acima do limite de aprovação. Aprove antes de enviar.', 'error');
+            return;
+        }
+
+        this._seeding = true;
+        const updates = { status };
+        if (status === 'recebido' && !p.data_recebimento) {
+            updates.data_recebimento = new Date().toISOString();
+        }
+        await store.updateComprasPedidos(p.id, updates);
+        st.pedido = { ...st.pedido, ...updates };
+        this._seeding = false;
+        this.renderPedido();
+    },
+
+    async aprovarPedido(pedidoId) {
+        if (!store.canEdit()) return;
+        const p = this._pedido(pedidoId);
+        if (!p) return;
+        if (p.total <= CP_APROVACAO_LIMITE) {
+            window.app.toast('Pedido dentro do limite — não requer aprovação.', 'info');
+            return;
+        }
+        const aprovadoPor = prompt(`Aprovar pedido ${p.codigo} (${window.app.formatCurrency(p.total)}).\nInforme o nome de quem aprova:`);
+        if (!aprovadoPor || !aprovadoPor.trim()) return;
+        this._seeding = true;
+        await store.updateComprasPedidos(pedidoId, { aprovado_por: aprovadoPor.trim(), aprovado_em: new Date().toISOString() });
+        this._seeding = false;
+        if (this._pedStaging && this._pedStaging.pedido.id === pedidoId) {
+            this._pedStaging.pedido.aprovado_por = aprovadoPor.trim();
+            this._pedStaging.pedido.aprovado_em = new Date().toISOString();
+            this.renderPedido();
+        } else {
+            this.renderDetail();
+        }
+        window.app.toast(`Pedido ${p.codigo} aprovado por ${aprovadoPor.trim()}.`, 'success');
+    },
+
+    async removerPedido(pedidoId) {
+        if (!store.canDelete()) return;
+        const p = this._pedido(pedidoId);
+        if (!p) return;
+        if (p.status === 'recebido' || p.status === 'cancelado') {
+            window.app.toast('Pedido já finalizado — não pode ser excluído.', 'error');
+            return;
+        }
+        const confirmar = confirm(`Excluir o pedido ${p.codigo}? Esta ação remove o pedido e todos os seus itens.`);
+        if (!confirmar) return;
+
+        this._seeding = true;
+        const itens = this._itensDoPedido(pedidoId);
+        await Promise.all(itens.map(pi => store.removeComprasPedidoItens(pi.id)));
+        await store.removeComprasPedidos(pedidoId);
+        this._seeding = false;
+
+        // Volta para a requisição
+        this.voltarDoPedido();
+        window.app.toast(`Pedido ${p.codigo} excluído.`, 'success');
+    },
+
+    async exportPedidoXLSX(pedidoId) {
+        const p = this._pedido(pedidoId);
+        if (!p) return;
+        const itens = this._itensDoPedido(pedidoId);
+        const f = this._fornecedor(p.fornecedor_id);
+        const r = this._req(p.requisicao_id);
+
+        const XLSX = window.XLSX;
+        if (!XLSX) { window.app.toast('Biblioteca XLSX não disponível.', 'error'); return; }
+
+        // Linhas no mesmo formato da requisição: metadados + tabela de itens
+        const linhas = [
+            { 'Campo': 'PEDIDO DE COMPRAS', 'Valor': '', 'Detalhe': '', 'Extra': '' },
+            { 'Campo': 'Código', 'Valor': p.codigo, 'Detalhe': 'Status', 'Extra': CP_PED_STATUS[p.status] || p.status },
+            { 'Campo': 'Fornecedor', 'Valor': this._nomeFornecedor(f), 'Detalhe': 'CNPJ', 'Extra': f && f.cnpj ? f.cnpj : '—' },
+            { 'Campo': 'Requisição', 'Valor': r ? r.codigo : '—', 'Detalhe': 'Data do Pedido', 'Extra': this._fmtDate(p.data_pedido) },
+            { 'Campo': 'Condição de Pagamento', 'Valor': p.condicao_pagamento || '—', 'Detalhe': 'Prazo de Entrega', 'Extra': p.prazo_entrega || '—' },
+            { 'Campo': 'Aprovado por', 'Valor': p.aprovado_por || '—', 'Detalhe': 'Aprovado em', 'Extra': p.aprovado_em ? this._fmtDate(p.aprovado_em) : '—' }
+        ];
+
+        // Cabeçalho da tabela de itens em MAIÚSCULAS (padrão do projeto)
+        const hdr = { 'Campo': 'CÓDIGO', 'Valor': 'DESCRIÇÃO', 'Detalhe': 'QTD', 'Extra': 'UN' };
+        const colunas = ['Unitário', 'IPI %', 'ICMS %', 'Desc %', 'Lead Time', 'Total'];
+        colunas.forEach(c => { hdr[c] = c.toUpperCase(); });
+        linhas.push(hdr);
+
+        itens.forEach(pi => {
+            const linha = {
+                'Campo': pi.codigo || '—',
+                'Valor': pi.descricao || '—',
+                'Detalhe': pi.qtd,
+                'Extra': pi.unidade || '—',
+                'Unitário': pi.custo_unitario || 0,
+                'IPI %': pi.ipi || 0,
+                'ICMS %': pi.icms || 0,
+                'Desc %': pi.desconto || 0,
+                'Lead Time': pi.lead_time_previsto || '—',
+                'Total': pi.total || 0
+            };
+            linhas.push(linha);
+        });
+
+        linhas.push({ 'Campo': '', 'Valor': '', 'Detalhe': '', 'Extra': '', 'Unitário': '', 'IPI %': '', 'ICMS %': '', 'Desc %': '', 'Lead Time': 'TOTAL', 'Total': p.total || 0 });
+
+        const ws = XLSX.utils.json_to_sheet(linhas);
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        const headerStyle = {
+            font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '4F46E5' } },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+        };
+        const zebraStyle = { fill: { fgColor: { rgb: 'F3F4F6' } } };
+        const moneyFmt = '#,##0.00';
+        const totalStyle = { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: 'E0E7FF' } } };
+
+        for (let row = range.s.r; row <= range.e.r; row++) {
+            const linha = linhas[row - range.s.r] || {};
+            const ehTitulo = row === 0;
+            const ehTotal = linha['Lead Time'] === 'TOTAL';
+            const ehCabecalhoTabela = linha['Campo'] === 'CÓDIGO';
+            for (let c = range.s.c; c <= range.e.c; c++) {
+                const addr = XLSX.utils.encode_cell({ c, r: row });
+                const cell = ws[addr];
+                if (!cell) continue;
+                let base;
+                if (ehTitulo || ehCabecalhoTabela || ehTotal) {
+                    if (cell.t === 's' && cell.v) cell.v = String(cell.v).toUpperCase();
+                    base = ehTotal ? totalStyle : headerStyle;
+                } else {
+                    base = row % 2 === 1 ? zebraStyle : null;
+                }
+                if (typeof cell.v === 'number') {
+                    cell.s = { ...(base || {}), numFmt: moneyFmt };
+                } else if (base) {
+                    cell.s = base;
+                }
+            }
+        }
+
+        ws['!cols'] = [{ wch: 20 }, { wch: 44 }, { wch: 10 }, { wch: 6 },
+                       { wch: 12 }, { wch: 8 }, { wch: 9 }, { wch: 8 }, { wch: 12 }, { wch: 14 }];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Pedido');
+
+        const nomeArquivo = `${String(p.codigo || 'PC').replace(/[^\w-]/g, '')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        this._patchXlsxFreezePane(buf).then(patched => {
+            const blob = new Blob([patched], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = nomeArquivo;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            window.app.toast(`Pedido ${p.codigo} exportado em XLSX.`, 'success');
+        }).catch(err => {
+            console.error('[Compras] XLSX freeze patch error:', err);
+            XLSX.writeFile(wb, nomeArquivo);
+            window.app.toast(`Pedido ${p.codigo} exportado.`, 'success');
+        });
+    },
+
+    /* Impressão do PC via navegador — o usuário escolhe "Salvar como PDF"
+       na caixa de impressão. Layout limpo A4, sem chrome da aplicação. */
+    imprimirPedido(pedidoId) {
+        const p = this._pedido(pedidoId);
+        if (!p) return;
+        const itens = this._itensDoPedido(pedidoId);
+        const f = this._fornecedor(p.fornecedor_id);
+        const r = this._req(p.requisicao_id);
+        const esc = (v) => this._esc(v);
+        const fmt = (v) => window.app.formatCurrency(parseFloat(v) || 0);
+
+        const win = window.open('', '_blank', 'width=900,height=700');
+        if (!win) { window.app.toast('Permita pop-ups para imprimir o pedido.', 'error'); return; }
+
+        win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+        <title>PC ${esc(p.codigo)}</title>
+        <style>
+            * { box-sizing:border-box; margin:0; padding:0; }
+            body { font-family:'Segoe UI',Arial,sans-serif; font-size:12px; color:#111; padding:28px; }
+            h1 { font-size:17px; letter-spacing:.5px; text-transform:uppercase; border-bottom:2px solid #111; padding-bottom:8px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:baseline; }
+            h1 .pc-codigo { font-size:15px; }
+            .meta { display:grid; grid-template-columns:1fr 1fr; gap:4px 28px; margin-bottom:16px; }
+            .meta div { font-size:11.5px; }
+            .meta b { display:inline-block; min-width:130px; color:#444; }
+            table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+            th { background:#111; color:#fff; text-transform:uppercase; font-size:10.5px; letter-spacing:.4px; padding:7px 8px; text-align:left; }
+            th.num, td.num { text-align:right; }
+            th.ctr, td.ctr { text-align:center; }
+            td { border-bottom:1px solid #ddd; padding:6px 8px; vertical-align:top; }
+            tr:nth-child(even) td { background:#f6f6f6; }
+            .totais { display:flex; justify-content:flex-end; }
+            .totais table { width:auto; min-width:300px; }
+            .totais td { border:none; padding:3px 8px; }
+            .totais .grande { font-size:14px; font-weight:800; }
+            .assinaturas { display:flex; gap:60px; margin-top:56px; justify-content:center; }
+            .assinaturas div { flex:0 0 240px; text-align:center; border-top:1px solid #111; padding-top:6px; font-size:11px; }
+            .obs { margin-top:14px; font-size:11px; color:#444; white-space:pre-wrap; }
+            @media print { body { padding:0; } }
+        </style></head><body>
+        <h1><span>Pedido de Compras</span> <span class="pc-codigo">${esc(p.codigo)}</span></h1>
+        <div class="meta">
+            <div><b>Fornecedor:</b> ${esc(this._nomeFornecedor(f))}</div>
+            <div><b>CNPJ:</b> ${esc(f && f.cnpj ? f.cnpj : '—')}</div>
+            <div><b>Requisição:</b> ${esc(r ? r.codigo : '—')}</div>
+            <div><b>Data do Pedido:</b> ${esc(this._fmtDate(p.data_pedido))}</div>
+            <div><b>Condição de Pagamento:</b> ${esc(p.condicao_pagamento || '—')}</div>
+            <div><b>Prazo de Entrega:</b> ${esc(p.prazo_entrega || '—')}</div>
+            <div><b>Solicitante:</b> ${esc(p.solicitante || '—')}</div>
+            <div><b>Aprovado por:</b> ${esc(p.aprovado_por || '—')}</div>
+        </div>
+        <table>
+            <thead><tr>
+                <th style="width:110px;">Código</th><th>Descrição</th>
+                <th class="ctr" style="width:52px;">Qtd</th><th class="ctr" style="width:44px;">Un</th>
+                <th class="num" style="width:95px;">Unitário</th>
+                <th class="num" style="width:56px;">IPI %</th><th class="num" style="width:60px;">Desc %</th>
+                <th class="num" style="width:105px;">Total</th>
+            </tr></thead>
+            <tbody>
+            ${itens.map(pi => `<tr>
+                <td>${esc(pi.codigo || '—')}</td>
+                <td>${esc(pi.descricao || '—')}</td>
+                <td class="ctr">${esc(this._fmtQtd(pi.qtd))}</td>
+                <td class="ctr">${esc(pi.unidade || '—')}</td>
+                <td class="num">${fmt(pi.custo_unitario)}</td>
+                <td class="num">${esc(pi.ipi || 0)}</td>
+                <td class="num">${esc(pi.desconto || 0)}</td>
+                <td class="num">${fmt(pi.total)}</td>
+            </tr>`).join('')}
+            </tbody>
+        </table>
+        <div class="totais"><table>
+            <tr><td>Subtotal dos itens</td><td class="num grande">${fmt(itens.reduce((s, i) => s + (parseFloat(i.total) || 0), 0))}</td></tr>
+            ${parseFloat(p.frete) ? `<tr><td>Frete</td><td class="num">${fmt(p.frete)}</td></tr>` : ''}
+            ${parseFloat(p.desconto) ? `<tr><td>Desconto</td><td class="num">− ${fmt(p.desconto)}</td></tr>` : ''}
+            <tr><td><b>TOTAL DO PEDIDO</b></td><td class="num grande">${fmt(p.total)}</td></tr>
+        </table></div>
+        ${p.observacoes ? `<div class="obs"><b>Observações:</b> ${esc(p.observacoes)}</div>` : ''}
+        <div class="assinaturas">
+            <div>Comprador(a)</div>
+            <div>Aprovação</div>
+            <div>Fornecedor</div>
+        </div>
+        <script>window.onload = function () { setTimeout(function () { window.print(); }, 250); };</script>
+        </body></html>`);
+        win.document.close();
     },
 
     renderCotacao() {

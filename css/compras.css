@@ -165,6 +165,7 @@
 .cp-banner.warn i { color:#d97706; }
 .cp-banner.err { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
 .cp-banner.err i { color:#dc2626; }
+.cp-progresso { background:white; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:14px; }
 
 /* Resumo dos 3 estados */
 .cp-legend { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
