@@ -107,6 +107,7 @@ const initialState = {
     crmStages: [],
     projetos: [],
     projetoFases: [],
+    projetoCustos: [],
     activeNetworkArchitecture: null
 };
 
@@ -162,7 +163,7 @@ class Store {
             if (data.success && data.data) {
                 const sd = data.data;
                 console.log('[Load] Got data:', Object.keys(sd).map(k => `${k}:${Array.isArray(sd[k]) ? sd[k].length : '?'}`).join(', '));
-                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases']) {
+                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases','projetoCustos']) {
                     if (Array.isArray(sd[key])) this.state[key] = sd[key];
                 }
                 // O servidor usa a entidade 'paineis'; o estado/chave de UI é 'painelTypes'
@@ -1668,6 +1669,54 @@ class Store {
         const ok = await this._syncDelete('projetoFases', id);
         if (!ok && prev) {
             this.setState({ projetoFases: [...(this.state.projetoFases || []), prev] });
+        }
+        return ok;
+    }
+
+    // --- Projeto Custos Methods (Gestão de Projetos — Fase 3: DRE Estimado × Real) ---
+
+    async addProjetoCusto(custo) {
+        const now = new Date().toISOString();
+        const item = {
+            ...custo,
+            id: custo.id || crypto.randomUUID(),
+            tipo: custo.tipo || 'real',
+            categoria: custo.categoria || 'outras',
+            // valor sempre positivo: a categoria define o sinal na DRE
+            valor: Math.abs(Number(custo.valor) || 0),
+            data: custo.data || '',
+            origem: custo.origem || 'manual',
+            created_at: custo.created_at || now,
+            updated_at: now
+        };
+        this.setState({ projetoCustos: [...(this.state.projetoCustos || []), item] });
+        const ok = await this._syncCreate('projetoCustos', item);
+        if (!ok) {
+            this.setState({ projetoCustos: (this.state.projetoCustos || []).filter(c => c.id !== item.id) });
+            return null;
+        }
+        return item;
+    }
+
+    async updateProjetoCusto(id, updates) {
+        const now = new Date().toISOString();
+        if (updates.valor != null) updates.valor = Math.abs(Number(updates.valor) || 0);
+        const prev = (this.state.projetoCustos || []).find(c => c.id === id);
+        const newItems = (this.state.projetoCustos || []).map(c => c.id === id ? { ...c, ...updates, updated_at: now } : c);
+        this.setState({ projetoCustos: newItems });
+        const ok = await this._syncUpdate('projetoCustos', id, { ...updates, updated_at: now });
+        if (!ok && prev) {
+            this.setState({ projetoCustos: (this.state.projetoCustos || []).map(c => c.id === id ? prev : c) });
+        }
+        return ok;
+    }
+
+    async deleteProjetoCusto(id) {
+        const prev = (this.state.projetoCustos || []).find(c => c.id === id);
+        this.setState({ projetoCustos: (this.state.projetoCustos || []).filter(c => c.id !== id) });
+        const ok = await this._syncDelete('projetoCustos', id);
+        if (!ok && prev) {
+            this.setState({ projetoCustos: [...(this.state.projetoCustos || []), prev] });
         }
         return ok;
     }

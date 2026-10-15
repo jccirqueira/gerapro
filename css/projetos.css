@@ -11,6 +11,8 @@
    8. Placeholder (Fases futuras)
    9. Modal
   10. Empty State
+  11. Fase 2 - Cronograma / Gantt
+  12. Fase 3 - DRE Estimado x Real
    ===================================================================== */
 
 /* ── 1. Layout ── */
@@ -190,9 +192,79 @@
 .prj-tpl-row button:hover { background:#fee2e2; color:#dc2626; }
 .prj-tpl-row input[type="color"] { padding:2px; height:32px; }
 
+/* ══════════════════════════════════════════════════════════════
+   12. Fase 3 — DRE ESTIMADO × REAL
+   ══════════════════════════════════════════════════════════════ */
+
+.prj-dre-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; background:#fff; border:1px solid #e5e7eb; border-radius:12px 12px 0 0; padding:12px 16px; }
+.prj-dre-title { font-size:14px; font-weight:700; color:#1a1d23; display:flex; align-items:center; gap:8px; }
+.prj-dre-count { font-size:11px; font-weight:600; color:#6366f1; background:#eef2ff; border-radius:20px; padding:2px 9px; }
+.prj-dre-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+/* Cards de resumo */
+.prj-dre-cards { margin-top:10px; }
+.prj-dre-card .prj-card-sub { font-size:11px; color:#8b919a; margin-top:5px; }
+.prj-dre-card .prj-card-sub b { color:#4b5563; }
+
+/* Tabela comparativa */
+.prj-dre-table-wrap { margin-top:14px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow-x:auto; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.prj-dre-table { width:100%; border-collapse:collapse; font-size:13px; min-width:620px; }
+.prj-dre-table th { background:#f8fafc; border-bottom:2px solid #e5e7eb; padding:10px 12px; text-align:left; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+.prj-dre-table td { padding:9px 12px; border-bottom:1px solid #f1f3f5; color:#374151; }
+.prj-dre-table th.prj-num, .prj-dre-table td.prj-num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+/* Cabeçalho de grupo (Receita, Deduções, Custos, Operacionais) */
+.prj-dre-grupo td { background:#f1f5f9; font-size:11px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.5px; padding:8px 12px; border-bottom:1px solid #e2e8f0; }
+
+/* Linha de conta */
+.prj-dre-conta { display:flex; align-items:center; gap:7px; color:#374151; }
+.prj-dre-conta i { color:#94a3b8; font-size:14px; }
+.prj-dre-sinal { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:4px; font-size:11px; font-weight:800; background:#f1f5f9; color:#64748b; }
+.prj-dre-row:hover { background:#fafbff; }
+
+/* Subtotais encadeados */
+.prj-dre-subtotal td { background:#f8fafc; font-weight:800; color:#1a1d23; border-top:1px solid #cbd5e1; border-bottom:1px solid #e2e8f0; }
+.prj-dre-subtotal.destaque td { background:#4F46E5; color:#fff; border-top:2px solid #4338CA; border-bottom:none; }
+.prj-dre-subtotal.destaque .prj-dre-delta.neutro { color:rgba(255,255,255,.65); }
+.prj-dre-subtotal.destaque .prj-dre-delta small { color:rgba(255,255,255,.75); }
+
+/* Variação (Real − Estimado) */
+.prj-dre-delta { font-weight:600; white-space:nowrap; }
+.prj-dre-delta small { font-weight:600; opacity:.85; margin-left:3px; font-size:11px; }
+.prj-dre-delta.bom { color:#15803d; }
+.prj-dre-delta.ruim { color:#b91c1c; }
+.prj-dre-delta.neutro { color:#c0c4cc; font-weight:500; }
+
+/* Selos de tipo */
+.prj-dre-tipo { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.3px; white-space:nowrap; }
+.prj-dre-tipo.estimado { background:#eef2ff; color:#4338CA; }
+.prj-dre-tipo.real { background:#dcfce7; color:#15803d; }
+
+/* Lista de lançamentos */
+.prj-dre-lanc-wrap { background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow-x:auto; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.prj-dre-lanc { width:100%; border-collapse:collapse; font-size:12.5px; min-width:600px; }
+.prj-dre-lanc th { background:#fafbfc; border-bottom:2px solid #e8eaed; padding:9px 12px; text-align:left; font-size:10.5px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+.prj-dre-lanc td { padding:9px 12px; border-bottom:1px solid #f1f3f5; color:#374151; vertical-align:middle; }
+.prj-dre-lanc tbody tr:last-child td { border-bottom:none; }
+.prj-dre-lanc tbody tr:hover { background:#f8f9fb; }
+.prj-dre-lanc td.prj-num { text-align:right; font-weight:600; color:#1a1d23; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.prj-dre-lanc .prj-actions button { opacity:.55; transition:opacity .12s; }
+.prj-dre-lanc .prj-actions button:hover { opacity:1; }
+
+/* Estado vazio da DRE */
+.prj-dre-empty { background:#fff; border:1px dashed #d8dce3; border-radius:12px; padding:34px 24px; text-align:center; }
+.prj-dre-empty i { font-size:34px; color:#c7cbd3; }
+.prj-dre-empty p { font-size:13px; color:#9ca3af; margin:10px auto 0; max-width:460px; line-height:1.6; }
+.prj-dre-empty b { color:#6b7280; }
+
 /* ── Responsivo ── */
 @media (max-width: 900px) {
     .prj-summary { grid-template-columns:repeat(2,1fr); }
     .prj-field-row { grid-template-columns:1fr; }
     .prj-gantt-head-left, .prj-gantt-row-left { width:180px; flex-basis:180px; }
+    .prj-dre-table, .prj-dre-lanc { font-size:11.5px; }
+    .prj-dre-table th, .prj-dre-table td,
+    .prj-dre-lanc th, .prj-dre-lanc td { padding:8px 7px; }
+    .prj-dre-toolbar { flex-direction:column; align-items:stretch; }
+    .prj-dre-controls { justify-content:flex-start; }
 }

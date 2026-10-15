@@ -42,6 +42,50 @@ const FASES_PADRAO = [
 
 const GANTT_ZOOM = { auto: 0, dia: 22, semana: 8, mes: 3 };
 
+/* ================================================================
+   FASE 3 — DRE ESTIMADO × REAL (entidade projeto_custos)
+   Cada lançamento aponta para uma categoria. `valor` é sempre
+   positivo — o sinal da linha é definido por `sinal` aqui.
+   `maiorMelhor`: se o REAL maior que o ESTIMADO é bom (receita)
+   ou ruim (custos/despesas) — usado para colorir a variação.
+   ================================================================ */
+const DRE_CATEGORIAS = [
+    { key: 'receita',          label: 'Receita Bruta',          sinal: '+', grupo: 'receita',      maiorMelhor: true,  icone: 'ph-trend-up' },
+    { key: 'impostos',         label: 'Impostos sobre Vendas',  sinal: '−', grupo: 'deducoes',     maiorMelhor: false, icone: 'ph-percent' },
+    { key: 'material',         label: 'Materiais',              sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-cube' },
+    { key: 'mo',               label: 'Mão de Obra',            sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-users-three' },
+    { key: 'despesas_diretas', label: 'Despesas Diretas',       sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-wrench' },
+    { key: 'subcontratacao',   label: 'Subcontratação',         sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-handshake' },
+    { key: 'custos_fixos',     label: 'Custos Fixos / Admin.',  sinal: '−', grupo: 'operacionais', maiorMelhor: false, icone: 'ph-buildings' },
+    { key: 'comissao',         label: 'Comissão de Vendas',     sinal: '−', grupo: 'operacionais', maiorMelhor: false, icone: 'ph-badge-percent' },
+    { key: 'viagens',          label: 'Viagens e Hospedagem',   sinal: '−', grupo: 'operacionais', maiorMelhor: false, icone: 'ph-airplane-tilt' },
+    { key: 'frete',            label: 'Frete e Logística',      sinal: '−', grupo: 'operacionais', maiorMelhor: false, icone: 'ph-truck' },
+    { key: 'outras',           label: 'Outras Despesas',        sinal: '−', grupo: 'operacionais', maiorMelhor: false, icone: 'ph-dots-three' }
+];
+
+const DRE_GRUPOS = {
+    receita:      'Receita',
+    deducoes:     '(−) Deduções sobre Vendas',
+    custos:       '(−) Custos Diretos',
+    operacionais: '(−) Despesas Operacionais'
+};
+
+/* Subtotais encadeados da DRE, na ordem em que aparecem */
+const DRE_SUBTOTAIS = [
+    { grupo: 'deducoes',     label: 'RECEITA LÍQUIDA', campos: ['receitaBruta', '-deducoes'] },
+    { grupo: 'custos',       label: 'LUCRO BRUTO',     campos: ['receitaLiquida', '-custosDiretos'] },
+    { grupo: 'operacionais', label: 'LUCRO LÍQUIDO',   campos: ['lucroBruto', '-despesasOpers'], destaque: true }
+];
+
+/* Percentuais usados para semear o ESTIMADO — espelham os defaults
+   de precificacao.js (getDefaultPricingData). Editáveis depois. */
+const DRE_SEED_PADRAO = {
+    impostos:     21.25,  // ICMS 12% + PIS/COFINS 9,25% (Lucro Real)
+    impostosSN:   4,      // DAS — Simples Nacional
+    custos_fixos: 8,
+    comissao:     5
+};
+
 const ProjetosModule = {
     _active: false,
     viewMode: 'list',       // 'list' | 'detail'
@@ -79,7 +123,13 @@ const ProjetosModule = {
             resetTemplate: this.resetTemplate.bind(this),
             barDown: this.barDown.bind(this),
             setZoom: this.setZoom.bind(this),
-            _addTplRow: this._addTplRow.bind(this)
+            _addTplRow: this._addTplRow.bind(this),
+            // Fase 3 — DRE Estimado × Real
+            openCustoModal: this.openCustoModal.bind(this),
+            saveCusto: this.saveCusto.bind(this),
+            removeCusto: this.removeCusto.bind(this),
+            seedEstimado: this.seedEstimado.bind(this),
+            exportDreXLSX: this.exportDreXLSX.bind(this)
         };
 
         store.subscribe((state) => {
@@ -484,7 +534,7 @@ const ProjetosModule = {
                             <i class="ph ph-calendar-blank"></i> Cronograma
                         </button>
                         <button class="prj-tab ${this.activeTab === 'dre' ? 'active' : ''}" onclick="app.projetos.switchTab('dre')">
-                            <i class="ph ph-currency-circle-dollar"></i> DRE <span class="prj-tab-tag">Fase 3</span>
+                            <i class="ph ph-currency-circle-dollar"></i> DRE
                         </button>
                     </div>
 
@@ -499,12 +549,7 @@ const ProjetosModule = {
             return this._cronogramaHTML(p);
         }
         if (this.activeTab === 'dre') {
-            return `
-                <div class="prj-placeholder">
-                    <i class="ph ph-currency-circle-dollar"></i>
-                    <h3>DRE do Projeto</h3>
-                    <p>Esta aba mostrará a <strong>Demonstração do Resultado</strong> comparando <strong>Estimado × Real</strong>: receita, deduções, custos diretos, despesas operacionais e lucro, com exportação para XLSX.</p>
-                </div>`;
+            return this._dreHTML(p);
         }
         return `
             <div class="prj-detail-head" style="margin-bottom:0;">
@@ -523,6 +568,572 @@ const ProjetosModule = {
         const tipo = { ptc: 'Proposta Técnica', proposta_comercial: 'Proposta Comercial', tecnica_comercial: 'Proposta Completa', orcamento: 'Orçamento' }[p.origem] || 'Pipeline';
         const base = p.origem_id ? (window.app.formatProposalCode ? window.app.formatProposalCode(p.origem_id) : p.origem_id) : '';
         return base ? `${tipo} — <span style="color:#4F46E5">${this._esc(base)}</span>` : tipo;
+    },
+
+    /* ================================================================
+       FASE 3 — DRE ESTIMADO × REAL (entidade projeto_custos)
+       ================================================================ */
+
+    _custosDoProjeto(projetoId, tipo) {
+        const custos = (store.getState().projetoCustos || [])
+            .filter(c => c.projeto_id === projetoId && (!tipo || c.tipo === tipo));
+        custos.sort((a, b) => String(a.data || '').localeCompare(String(b.data || ''))
+            || String(a.created_at || '').localeCompare(String(b.created_at || '')));
+        return custos;
+    },
+
+    /* Soma o valor de cada categoria para um lado ('estimado' | 'real') */
+    _drePorCategoria(projetoId, tipo) {
+        const totais = {};
+        DRE_CATEGORIAS.forEach(c => { totais[c.key] = 0; });
+        this._custosDoProjeto(projetoId, tipo).forEach(c => {
+            const k = DRE_CATEGORIAS.some(x => x.key === c.categoria) ? c.categoria : 'outras';
+            totais[k] += Math.abs(Number(c.valor) || 0);
+        });
+        return totais;
+    },
+
+    /* Soma um subtotal a partir de campos do mapa calculado ('-campo' subtrai) */
+    _dreAvaliar(c, campos) {
+        return campos.reduce((s, f) => {
+            const neg = f.startsWith('-');
+            const v = Number(c[neg ? f.slice(1) : f]) || 0;
+            return s + (neg ? -v : v);
+        }, 0);
+    },
+
+    /* Subtotais encadeados da DRE a partir do mapa de categorias */
+    _dreCalculo(t) {
+        const receitaBruta   = t.receita || 0;
+        const deducoes       = t.impostos || 0;
+        const receitaLiquida = receitaBruta - deducoes;
+        const custosDiretos  = (t.material || 0) + (t.mo || 0) + (t.despesas_diretas || 0) + (t.subcontratacao || 0);
+        const lucroBruto     = receitaLiquida - custosDiretos;
+        const despesasOpers  = (t.custos_fixos || 0) + (t.comissao || 0) + (t.viagens || 0) + (t.frete || 0) + (t.outras || 0);
+        const lucroLiquido   = lucroBruto - despesasOpers;
+        const margem         = receitaLiquida > 0 ? (lucroLiquido / receitaLiquida) * 100 : 0;
+        return { receitaBruta, deducoes, receitaLiquida, custosDiretos, lucroBruto, despesasOpers, lucroLiquido, margem };
+    },
+
+    /* Coluna de variação — cor verde quando o desvio é favorável */
+    _dreDeltaHTML(est, real, maiorMelhor) {
+        const delta = real - est;
+        if (Math.abs(delta) < 0.005) return `<span class="prj-dre-delta neutro">—</span>`;
+        const bom = maiorMelhor ? delta > 0 : delta < 0;
+        const pct = Math.abs(est) > 0.005
+            ? `<small> (${delta > 0 ? '+' : '−'}${Math.abs((delta / Math.abs(est)) * 100).toFixed(1)}%)</small>`
+            : '';
+        return `<span class="prj-dre-delta ${bom ? 'bom' : 'ruim'}">${delta > 0 ? '+' : '−'}${window.app.formatCurrency(Math.abs(delta))}${pct}</span>`;
+    },
+
+    _dreHTML(p) {
+        const fc     = window.app.formatCurrency;
+        const est    = this._drePorCategoria(p.id, 'estimado');
+        const real   = this._drePorCategoria(p.id, 'real');
+        const cEst   = this._dreCalculo(est);
+        const cReal  = this._dreCalculo(real);
+        const total  = this._custosDoProjeto(p.id).length;
+        const temAlgum = total > 0;
+
+        // Cards de resudo — base calculada no lado REAL
+        const cards = [
+            { label: 'RECEITA LÍQUIDA', valor: cReal.receitaLiquida, est: cEst.receitaLiquida, cor: '#4F46E5' },
+            { label: 'CUSTOS DIRETOS',  valor: cReal.custosDiretos,  est: cEst.custosDiretos,  cor: '#F59E0B' },
+            { label: 'DESPESAS OPER.',  valor: cReal.despesasOpers,  est: cEst.despesasOpers,  cor: '#EF4444' },
+            { label: 'LUCRO LÍQUIDO',   valor: cReal.lucroLiquido,   est: cEst.lucroLiquido,   cor: cReal.lucroLiquido >= 0 ? '#10B981' : '#EF4444', margem: cReal.margem }
+        ].map(c => `
+            <div class="prj-card prj-dre-card">
+                <div class="prj-card-label">${c.label}</div>
+                <div class="prj-card-value" style="color:${c.cor}">${fc(c.valor)}</div>
+                <div class="prj-card-sub">estimado ${fc(c.est)}${c.margem != null ? ` · <b>${c.margem.toFixed(1)}%</b> margem` : ''}</div>
+            </div>`).join('');
+
+        // Linhas do corpo, agrupadas, com subtotal encadeado ao fim de cada grupo
+        let rows = '';
+        Object.keys(DRE_GRUPOS).forEach(grupo => {
+            rows += `<tr class="prj-dre-grupo"><td colspan="4">${DRE_GRUPOS[grupo]}</td></tr>`;
+            DRE_CATEGORIAS.filter(c => c.grupo === grupo).forEach(cat => {
+                const e = est[cat.key] || 0, r = real[cat.key] || 0;
+                rows += `
+                    <tr class="prj-dre-row">
+                        <td class="prj-dre-conta"><i class="ph ${cat.icone}"></i><span class="prj-dre-sinal">${cat.sinal}</span>${cat.label}</td>
+                        <td class="prj-num">${fc(e)}</td>
+                        <td class="prj-num">${fc(r)}</td>
+                        <td class="prj-num">${this._dreDeltaHTML(e, r, cat.maiorMelhor)}</td>
+                    </tr>`;
+            });
+            const sub = DRE_SUBTOTAIS.find(s => s.grupo === grupo);
+            if (sub) {
+                const vEst  = this._dreAvaliar(cEst, sub.campos);
+                const vReal = this._dreAvaliar(cReal, sub.campos);
+                rows += `
+                    <tr class="prj-dre-subtotal ${sub.destaque ? 'destaque' : ''}">
+                        <td>${sub.label}</td>
+                        <td class="prj-num">${fc(vEst)}</td>
+                        <td class="prj-num">${fc(vReal)}</td>
+                        <td class="prj-num">${this._dreDeltaHTML(vEst, vReal, grupo === 'receita' || sub.destaque)}</td>
+                    </tr>`;
+            }
+        });
+
+        // Lançamentos individuais
+        const lancamentos = !temAlgum ? `
+            <div class="prj-dre-empty">
+                <i class="ph ph-receipt"></i>
+                <p>Nenhum lançamento registrado ainda.<br>
+                Use <b>Gerar Estimado</b> para criar as estimativas a partir do orçamento, ou <b>Novo Lançamento</b> para lançar custos reais.</p>
+            </div>` : `
+            <div class="prj-dre-lanc-wrap">
+                <table class="prj-table prj-dre-lanc">
+                    <thead>
+                        <tr><th>Data</th><th>Conta</th><th>Descrição</th><th>Tipo</th><th class="prj-num">Valor</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        ${this._custosDoProjeto(p.id).map(c => {
+                            const cat = DRE_CATEGORIAS.find(x => x.key === c.categoria)
+                                || DRE_CATEGORIAS[DRE_CATEGORIAS.length - 1];
+                            return `
+                            <tr>
+                                <td class="prj-datas">${this._fmtDate(c.data) || '—'}</td>
+                                <td><i class="ph ${cat.icone}"></i>&nbsp;${cat.label}</td>
+                                <td>${this._esc(c.descricao) || '<span class="prj-empty">—</span>'}</td>
+                                <td><span class="prj-dre-tipo ${c.tipo}">${c.tipo === 'estimado' ? 'Estimado' : 'Real'}</span></td>
+                                <td class="prj-num">${fc(c.valor)}</td>
+                                <td class="prj-actions">
+                                    <button title="Editar" onclick="app.projetos.openCustoModal('${p.id}','${c.id}')"><i class="ph ph-pencil-simple"></i></button>
+                                    <button class="prj-danger" title="Excluir" onclick="app.projetos.removeCusto('${c.id}')"><i class="ph ph-trash"></i></button>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+
+        return `
+            <div class="prj-dre">
+                <div class="prj-dre-toolbar">
+                    <div class="prj-dre-title">
+                        <i class="ph ph-currency-circle-dollar"></i> DRE — Estimado × Real
+                        <span class="prj-dre-count">${total} lançamento(s)</span>
+                    </div>
+                    <div class="prj-dre-controls">
+                        <button class="btn btn-ghost btn-sm" onclick="app.projetos.seedEstimado('${p.id}')" title="Cria as estimativas a partir do valor do contrato e dos percentuais tributários">
+                            <i class="ph ph-sparkle"></i> Gerar Estimado
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="app.projetos.openCustoModal('${p.id}')">
+                            <i class="ph ph-plus"></i> Novo Lançamento
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="app.projetos.exportDreXLSX('${p.id}')">
+                            <i class="ph ph-file-xls"></i> XLSX
+                        </button>
+                    </div>
+                </div>
+
+                <div class="prj-summary prj-dre-cards">${cards}</div>
+
+                <div class="prj-dre-table-wrap">
+                    <table class="prj-table prj-dre-table">
+                        <thead>
+                            <tr>
+                                <th>Conta</th>
+                                <th class="prj-num">Estimado</th>
+                                <th class="prj-num">Real</th>
+                                <th class="prj-num">Variação (Real − Estimado)</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+
+                <div class="prj-section-title" style="margin-top:20px;">Lançamentos</div>
+                ${lancamentos}
+            </div>`;
+    },
+
+    /* --- CRUD de lançamentos ------------------------------------------------ */
+
+    openCustoModal(projetoId, custoId) {
+        const c = custoId ? (store.getState().projetoCustos || []).find(x => x.id === custoId) : null;
+        document.querySelectorAll('.prj-modal-overlay').forEach(el => el.remove());
+
+        const overlay = document.createElement('div');
+        overlay.className = 'prj-modal-overlay';
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+        overlay.innerHTML = `
+            <div class="prj-modal">
+                <div class="prj-modal-head">
+                    <h3><i class="ph ${c ? 'ph-pencil-simple' : 'ph-plus'}"></i> ${c ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
+                    <button class="btn btn-ghost btn-sm" onclick="this.closest('.prj-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="prj-modal-body">
+                    <div class="prj-field">
+                        <label>Conta (linha da DRE) *</label>
+                        <select id="pc-cat" class="form-control">
+                            ${Object.keys(DRE_GRUPOS).map(g => `
+                                <optgroup label="${DRE_GRUPOS[g]}">
+                                    ${DRE_CATEGORIAS.filter(x => x.grupo === g).map(x =>
+                                        `<option value="${x.key}" ${(c?.categoria || 'outras') === x.key ? 'selected' : ''}>${x.sinal} ${x.label}</option>`).join('')}
+                                </optgroup>`).join('')}
+                        </select>
+                    </div>
+                    <div class="prj-field-row">
+                        <div class="prj-field">
+                            <label>Tipo</label>
+                            <select id="pc-tipo" class="form-control">
+                                <option value="real" ${(c?.tipo || 'real') === 'real' ? 'selected' : ''}>Real (lançamento)</option>
+                                <option value="estimado" ${c?.tipo === 'estimado' ? 'selected' : ''}>Estimado (orçamento)</option>
+                            </select>
+                        </div>
+                        <div class="prj-field">
+                            <label>Valor (R$) *</label>
+                            <input type="text" id="pc-valor" class="form-control" value="${c ? window.app.formatCurrencyRaw(c.valor) : ''}" placeholder="0,00" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="prj-field">
+                        <label>Data</label>
+                        <input type="date" id="pc-data" class="form-control" value="${this._esc(c?.data || '')}">
+                    </div>
+                    <div class="prj-field" style="margin-bottom:0;">
+                        <label>Descrição</label>
+                        <input type="text" id="pc-desc" class="form-control" value="${this._esc(c?.descricao || '')}" placeholder="Ex.: nota fiscal de materiais, viagem à usina...">
+                    </div>
+                </div>
+                <div class="prj-modal-foot">
+                    <button class="btn btn-ghost" onclick="this.closest('.prj-modal-overlay').remove()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="app.projetos.saveCusto('${projetoId}', '${c?.id || ''}')">
+                        <i class="ph ph-check"></i> ${c ? 'Salvar' : 'Lançar'}
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        const inp = document.getElementById('pc-valor');
+        if (inp) inp.focus();
+    },
+
+    async saveCusto(projetoId, custoId) {
+        const val = (fid) => document.getElementById(fid)?.value ?? '';
+        const valor = window.app.parseCurrency(val('pc-valor'));
+        if (!Number.isFinite(valor) || Math.abs(valor) < 0.005) {
+            window.app.toast('Informe um valor para o lançamento.', 'warning');
+            return;
+        }
+        const payload = {
+            projeto_id: projetoId,
+            categoria: val('pc-cat') || 'outras',
+            tipo: val('pc-tipo') || 'real',
+            valor: Math.abs(valor),
+            data: val('pc-data') || '',
+            descricao: val('pc-desc').trim()
+        };
+        document.querySelectorAll('.prj-modal-overlay').forEach(el => el.remove());
+
+        try {
+            if (custoId) {
+                const ok = await store.updateProjetoCusto(custoId, payload);
+                if (ok) window.app.toast('Lançamento atualizado.', 'success');
+            } else {
+                const criado = await store.addProjetoCusto({ id: crypto.randomUUID(), ...payload });
+                if (criado) window.app.toast('Lançamento registrado.', 'success');
+            }
+            this.renderDetail();
+        } catch (e) {
+            window.app.toast('Erro ao salvar lançamento: ' + e.message, 'error');
+        }
+    },
+
+    async removeCusto(custoId) {
+        const c = (store.getState().projetoCustos || []).find(x => x.id === custoId);
+        if (!c) return;
+        const cat = DRE_CATEGORIAS.find(x => x.key === c.categoria) || DRE_CATEGORIAS[DRE_CATEGORIAS.length - 1];
+        if (!confirm(`Excluir o lançamento de ${cat.label} (${c.tipo === 'estimado' ? 'Estimado' : 'Real'}) no valor de ${window.app.formatCurrency(c.valor)}?`)) return;
+        try {
+            const ok = await store.deleteProjetoCusto(custoId);
+            if (ok) window.app.toast('Lançamento excluído.', 'success');
+            this.renderDetail();
+        } catch (e) {
+            window.app.toast('Erro ao excluir lançamento: ' + e.message, 'error');
+        }
+    },
+
+    /**
+     * Semear o lado ESTIMADO a partir do orçamento.
+     * Não destrói lançamentos existentes: só cria as categorias que ainda não foram
+     * estimadas. Materiais/Mão de Obra não são deriváveis sem o orçamento detalhado,
+     * então criamos as linhas zeradas apenas para o usuário preencher.
+     */
+    async seedEstimado(projetoId) {
+        const projeto = (store.getState().projetos || []).find(x => x.id === projetoId);
+        if (!projeto) return;
+
+        const jaTem = new Set(this._custosDoProjeto(projetoId, 'estimado').map(c => c.categoria));
+        const receita = Number(projeto.valor_contrato) || 0;
+        const regime = store.getState().company?.regimeTributario || 'Lucro Real';
+        const pImpostos = regime === 'Simples Nacional' ? DRE_SEED_PADRAO.impostosSN : DRE_SEED_PADRAO.impostos;
+
+        const novos = [];
+        if (!jaTem.has('receita') && receita > 0) {
+            novos.push({ categoria: 'receita', valor: receita, descricao: 'Valor do contrato' });
+        }
+        [
+            ['impostos',     pImpostos,                    `Estimativa de impostos — ${regime}`],
+            ['custos_fixos', DRE_SEED_PADRAO.custos_fixos, 'Rateio de custos fixos'],
+            ['comissao',     DRE_SEED_PADRAO.comissao,     'Comissão de vendas']
+        ].forEach(([cat, pct, desc]) => {
+            if (!jaTem.has(cat) && receita > 0 && pct > 0) {
+                novos.push({
+                    categoria: cat,
+                    valor: receita * pct / 100,
+                    descricao: `${desc} (${String(pct).replace('.', ',')}% sobre a receita)`
+                });
+            }
+        });
+        ['material', 'mo'].forEach(cat => {
+            if (!jaTem.has(cat)) novos.push({ categoria: cat, valor: 0, descricao: '' });
+        });
+
+        if (novos.length === 0) {
+            window.app.toast('O estimado já está completo — nenhuma linha nova a criar.', 'info');
+            return;
+        }
+
+        let falhas = 0;
+        for (const n of novos) {
+            const r = await store.addProjetoCusto({
+                id: crypto.randomUUID(),
+                projeto_id: projetoId,
+                tipo: 'estimado',
+                origem: 'orcamento',
+                data: projeto.data_inicio || '',
+                ...n
+            });
+            if (!r) falhas++;
+        }
+        if (falhas > 0) {
+            window.app.toast(`Falha ao gravar ${falhas} linha(s) de estimado no servidor.`, 'error');
+        } else {
+            window.app.toast(`${novos.length} linha(s) de estimado criada(s). Ajuste os valores conforme o orçamento.`, 'success');
+        }
+        this.renderDetail();
+    },
+
+    /* --- Exportação --------------------------------------------------------- */
+
+    /** DRE em XLSX — cabeçalho formatado, linhas zebradas e primeira linha congelada. */
+    exportDreXLSX(projetoId) {
+        const p = (store.getState().projetos || []).find(x => x.id === projetoId);
+        if (!p) return;
+        try {
+            if (typeof XLSX === 'undefined') {
+                window.app.toast('Biblioteca XLSX não disponível.', 'warning');
+                return;
+            }
+            const est   = this._drePorCategoria(projetoId, 'estimado');
+            const real  = this._drePorCategoria(projetoId, 'real');
+            const cEst  = this._dreCalculo(est);
+            const cReal = this._dreCalculo(real);
+            const num   = (v) => Math.round((Number(v) || 0) * 100) / 100;
+            const pctDe = (e, r) => {
+                const d = r - e;
+                return Math.abs(e) > 0.005 ? Math.round((d / Math.abs(e)) * 1000) / 10 : '';
+            };
+
+            const linhas = [];
+            Object.keys(DRE_GRUPOS).forEach(grupo => {
+                linhas.push({ Conta: DRE_GRUPOS[grupo], Estimado: '', Real: '', 'Variação (R$)': '', 'Variação (%)': '' });
+                DRE_CATEGORIAS.filter(c => c.grupo === grupo).forEach(cat => {
+                    const e = est[cat.key] || 0, r = real[cat.key] || 0;
+                    linhas.push({
+                        Conta: `${cat.sinal} ${cat.label}`,
+                        Estimado: num(e),
+                        Real: num(r),
+                        'Variação (R$)': num(r - e),
+                        'Variação (%)': pctDe(e, r)
+                    });
+                });
+                const sub = DRE_SUBTOTAIS.find(s => s.grupo === grupo);
+                if (sub) {
+                    const vE = this._dreAvaliar(cEst, sub.campos);
+                    const vR = this._dreAvaliar(cReal, sub.campos);
+                    linhas.push({ Conta: sub.label, Estimado: num(vE), Real: num(vR), 'Variação (R$)': num(vR - vE), 'Variação (%)': pctDe(vE, vR) });
+                }
+            });
+            linhas.push({ Conta: 'MARGEM (% sobre receita líquida)', Estimado: num(cEst.margem), Real: num(cReal.margem), 'Variação (R$)': '', 'Variação (%)': '' });
+
+            const ws = XLSX.utils.json_to_sheet(linhas);
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const headerStyle = {
+                font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+                fill: { fgColor: { rgb: '4F46E5' } },
+                alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+            };
+            const zebraStyle   = { fill: { fgColor: { rgb: 'F3F4F6' } } };
+            const groupStyle   = { font: { bold: true, sz: 11, color: { rgb: '374151' } }, fill: { fgColor: { rgb: 'E0E7FF' } } };
+            const totalStyle   = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4B5563' } } };
+            const moneyFmt     = '#,##0.00';
+
+            for (let r = range.s.r; r <= range.e.r; r++) {
+                const linha  = linhas[r - range.s.r] || {};
+                const conta  = String(linha.Conta || '');
+                const ehGrupo = Object.values(DRE_GRUPOS).includes(conta);
+                const ehTotal = /^(RECEITA LÍQUIDA|LUCRO BRUTO|LUCRO LÍQUIDO|MARGEM)/.test(conta);
+                for (let c = range.s.c; c <= range.e.c; c++) {
+                    const addr = XLSX.utils.encode_cell({ c, r });
+                    const cell = ws[addr];
+                    if (!cell) continue;
+                    let base;
+                    if (r === 0) {
+                        if (cell.t === 's' && cell.v) cell.v = String(cell.v).toUpperCase();
+                        base = headerStyle;
+                    } else if (ehTotal) {
+                        base = totalStyle;
+                    } else if (ehGrupo) {
+                        base = groupStyle;
+                    } else {
+                        base = r % 2 === 1 ? zebraStyle : null;
+                    }
+                    // O xlsx-js-style lê o formato numérico de `style.numFmt` (dentro de cell.s).
+                    // `cell.z` é ignorado quando a célula já tem estilo, então o formato é
+                    // injetado numa cópia do estilo da própria célula.
+                    if (c > 0 && typeof cell.v === 'number') {
+                        cell.s = { ...(base || {}), numFmt: moneyFmt };
+                    } else if (base) {
+                        cell.s = base;
+                    }
+                }
+            }
+            ws['!cols'] = [{ wch: 36 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 13 }];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'DRE');
+
+            const nomeArquivo = `DRE_${String(p.codigo || 'projeto').replace(/[^\w-]/g, '')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            this._patchXlsxFreezePane(buf).then(patched => {
+                const blob = new Blob([patched], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nomeArquivo;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                window.app.toast('DRE exportada em XLSX.', 'success');
+            }).catch(err => {
+                console.error('[Projetos] XLSX freeze patch error:', err);
+                XLSX.writeFile(wb, nomeArquivo);
+                window.app.toast('DRE exportada em XLSX.', 'success');
+            });
+        } catch (e) {
+            console.error('[Projetos] DRE XLSX error:', e);
+            window.app.toast('Erro ao exportar DRE: ' + e.message, 'error');
+        }
+    },
+
+    /**
+     * Injeta freeze pane (primeira linha congelada) num XLSX gerado pelo SheetJS.
+     * O xlsx-js-style não suporta !freeze no write — este helper faz post-processamento
+     * no zip: descomprime as folhas, insere o <pane> e reconstrói o zip.
+     */
+    async _patchXlsxFreezePane(arrayBuffer) {
+        const orig = new Uint8Array(arrayBuffer);
+        const dv = new DataView(orig.buffer);
+        const entries = [];
+        let pos = 0;
+        while (pos < orig.length - 4) {
+            if (dv.getUint32(pos, true) === 0x04034b50) {
+                const method = dv.getUint16(pos + 8, true);
+                const compSize = dv.getUint32(pos + 18, true);
+                const nameLen = dv.getUint16(pos + 26, true);
+                const extraLen = dv.getUint16(pos + 28, true);
+                const nameStart = pos + 30;
+                const name = new TextDecoder().decode(orig.slice(nameStart, nameStart + nameLen));
+                const dataStart = nameStart + nameLen + extraLen;
+                const data = orig.slice(dataStart, dataStart + compSize);
+                let content;
+                if (method === 8) {
+                    const ds = new DecompressionStream('deflate-raw');
+                    content = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer());
+                } else {
+                    content = data;
+                }
+                entries.push({ name, content });
+                pos = dataStart + compSize;
+            } else { pos++; }
+        }
+        let patched = false;
+        for (const entry of entries) {
+            if (/xl\/worksheets\/sheet\d+\.xml$/.test(entry.name)) {
+                let xml = new TextDecoder().decode(entry.content);
+                if (!xml.includes('<pane')) {
+                    xml = xml.replace(
+                        /<sheetView([^>]*)\/>/,
+                        '<sheetView$1><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>'
+                    );
+                    entry.content = new TextEncoder().encode(xml);
+                    patched = true;
+                }
+            }
+        }
+        if (!patched) return arrayBuffer;
+        const crcTable = [];
+        for (let n = 0; n < 256; n++) {
+            let c = n;
+            for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+            crcTable[n] = c;
+        }
+        const crc32 = (buf) => {
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < buf.length; i++) crc = crcTable[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        };
+        const chunks = [], cdEntries = [];
+        let offset = 0;
+        for (const entry of entries) {
+            const nameBytes = new TextEncoder().encode(entry.name);
+            const crc = crc32(entry.content);
+            const size = entry.content.length;
+            const local = new Uint8Array(30 + nameBytes.length);
+            const lv = new DataView(local.buffer);
+            lv.setUint32(0, 0x04034b50, true);
+            lv.setUint16(4, 20, true);
+            lv.setUint16(8, 0, true);
+            lv.setUint32(14, crc, true);
+            lv.setUint32(18, size, true);
+            lv.setUint32(22, size, true);
+            lv.setUint16(26, nameBytes.length, true);
+            local.set(nameBytes, 30);
+            chunks.push(local, entry.content);
+            const cd = new Uint8Array(46 + nameBytes.length);
+            const cv = new DataView(cd.buffer);
+            cv.setUint32(0, 0x02014b50, true);
+            cv.setUint16(4, 20, true);
+            cv.setUint16(6, 20, true);
+            cv.setUint16(10, 0, true);
+            cv.setUint32(16, crc, true);
+            cv.setUint32(20, size, true);
+            cv.setUint32(24, size, true);
+            cv.setUint16(28, nameBytes.length, true);
+            cv.setUint32(42, offset, true);
+            cd.set(nameBytes, 46);
+            cdEntries.push(cd);
+            offset += local.length + size;
+        }
+        const cdTotal = cdEntries.reduce((s, e) => s + e.length, 0);
+        const eocd = new Uint8Array(22);
+        const ev = new DataView(eocd.buffer);
+        ev.setUint32(0, 0x06054b50, true);
+        ev.setUint16(8, entries.length, true);
+        ev.setUint16(10, entries.length, true);
+        ev.setUint32(12, cdTotal, true);
+        ev.setUint32(16, offset, true);
+        const all = [...chunks, ...cdEntries, eocd];
+        const totalLen = all.reduce((s, c) => s + c.length, 0);
+        const result = new Uint8Array(totalLen);
+        let wp = 0;
+        for (const c of all) { result.set(c, wp); wp += c.length; }
+        return result.buffer;
     },
 
     /* ================================================================
@@ -1252,14 +1863,21 @@ const ProjetosModule = {
         const p = (store.getState().projetos || []).find(x => x.id === id);
         if (!p) return;
         if (!confirm(`Excluir o projeto ${p.codigo}${p.cliente ? ' (' + p.cliente + ')' : ''}?`)) return;
-        // Cascade: remove as fases do cronograma junto com o projeto
+        // Cascade: remove fases do cronograma e lançamentos da DRE junto com o projeto
         const fases = this._fasesDoProjeto(id);
         for (const f of fases) {
             await store.deleteProjetoFase(f.id);
         }
+        const custos = this._custosDoProjeto(id);
+        for (const c of custos) {
+            await store.deleteProjetoCusto(c.id);
+        }
         await store.deleteProjeto(id);
-        window.app.toast(fases.length > 0
-            ? `Projeto excluído (junto com ${fases.length} fase(s) do cronograma).`
+        const removidos = [];
+        if (fases.length) removidos.push(`${fases.length} fase(s)`);
+        if (custos.length) removidos.push(`${custos.length} lançamento(s) da DRE`);
+        window.app.toast(removidos.length
+            ? `Projeto excluído (junto com ${removidos.join(' e ')}).`
             : 'Projeto excluído.', 'info');
         if (this.activeId === id) this.backToList();
         else this.render();

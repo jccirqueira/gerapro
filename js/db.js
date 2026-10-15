@@ -1026,6 +1026,27 @@ function initSchema() {
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_empresa ON projeto_fases(empresa_id)'); } catch (e) { /* ignore */ }
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_projeto ON projeto_fases(empresa_id, projeto_id, ordem)'); } catch (e) { /* ignore */ }
 
+    // Fase 3 — Custos dos projetos (DRE Estimado × Real)
+    // tipo: 'estimado' | 'real' ; categoria: chave da linha da DRE (ver DRE_CATEGORIAS em projetos.js)
+    // valor é sempre POSITIVO — o sinal da linha é dado pela categoria (receita soma, demais deduzem)
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS projeto_custos (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            projeto_id TEXT NOT NULL DEFAULT '',
+            tipo TEXT DEFAULT 'real',
+            categoria TEXT DEFAULT 'outras',
+            descricao TEXT DEFAULT '',
+            valor REAL DEFAULT 0,
+            data TEXT DEFAULT '',
+            origem TEXT DEFAULT 'manual',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_empresa ON projeto_custos(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_projeto ON projeto_custos(empresa_id, projeto_id, tipo)'); } catch (e) { /* ignore */ }
+
     // Migration: add created_at to usuarios
     try { db.exec("ALTER TABLE usuarios ADD COLUMN created_at TEXT"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_chat_id to usuarios
@@ -1103,7 +1124,8 @@ const TABLE_MAP = {
     manufaturaAnexos: { pk: 'id', table: 'manufatura_anexos' },
     unidadesCliente: { pk: 'id', table: 'unidades_cliente' },
     projetos: { pk: 'id', table: 'projetos' },
-    projetoFases: { pk: 'id', table: 'projeto_fases' }
+    projetoFases: { pk: 'id', table: 'projeto_fases' },
+    projetoCustos: { pk: 'id', table: 'projeto_custos' }
 };
 
 // --- System seed data (composicoes + regras, loaded on first run) ---
@@ -1995,7 +2017,8 @@ function getFullSync(empresaId = 'default') {
         manufaturaAnexos: findAll('manufaturaAnexos', empresaId),
         unidadesCliente: findAll('unidadesCliente', empresaId),
         projetos: findAll('projetos', empresaId),
-        projetoFases: findAll('projetoFases', empresaId)
+        projetoFases: findAll('projetoFases', empresaId),
+        projetoCustos: findAll('projetoCustos', empresaId)
     };
 }
 
