@@ -106,6 +106,15 @@ const CP_PED_TRANSICOES = {
    `aprovado_por` preenchido. Configurável por empresa no futuro. */
 const CP_APROVACAO_LIMITE = 50000;
 
+/* Status da NF recebida. A conferência (qtd × preço vs pedido) é
+   automática ao salvar; o usuário só estorna depois. */
+const CP_NF_STATUS = {
+    recebida: 'Recebida',
+    conferida: 'Conferida',
+    divergente: 'Divergente',
+    estornada: 'Estornada'
+};
+
 /* Aliases de cabeçalho da TABELA DE PREÇOS do fornecedor.
    Template: Código | Descrição | Preço Unitário | Prazo (dias) */
 const CP_PRECO_ALIASES = {
@@ -144,6 +153,8 @@ const ComprasModule = {
     pedSub: 'lista',        // sub-view da aba Pedidos: 'lista' | 'detalhe'
     _pedStaging: null,      // pedido em construção ({ pedido, itens })
     _pedModal: null,        // contexto do modal de gerar pedido ({ requisicao_id, fornecedores })
+    activeNota: null,       // id da NF aberta (viewMode === 'nota')
+    _notaStaging: null,     // NF em construção ({ nota, itens }) — itens vinculados ao pedido
 
     /* ================================================================
        CICLO DE VIDA
@@ -205,7 +216,14 @@ const ComprasModule = {
             aprovarPedido: this.aprovarPedido.bind(this),
             exportPedidoXLSX: this.exportPedidoXLSX.bind(this),
             imprimirPedido: this.imprimirPedido.bind(this),
-            removerPedido: this.removerPedido.bind(this)
+            removerPedido: this.removerPedido.bind(this),
+            abrirNovaNF: this.abrirNovaNF.bind(this),
+            abrirNF: this.abrirNF.bind(this),
+            voltarDaNF: this.voltarDaNF.bind(this),
+            setNotaCampo: this.setNotaCampo.bind(this),
+            setNotaItemCampo: this.setNotaItemCampo.bind(this),
+            salvarNota: this.salvarNota.bind(this),
+            estornarNota: this.estornarNota.bind(this)
         };
 
         store.subscribe((state) => {
@@ -220,6 +238,10 @@ const ComprasModule = {
                     // staging própria do pedido; só reage se ele for removido
                     const existe = (state.comprasPedidos || []).some(p => p.id === this.activePedido);
                     if (!existe) this.voltarDoPedido();
+                } else if (this.viewMode === 'nota' && this.activeNota) {
+                    // staging própria da NF; só reage se ela for removida
+                    const existe = (state.comprasNotas || []).some(n => n.id === this.activeNota);
+                    if (!existe) this.voltarDaNF();
                 } else if (this.viewMode === 'detail' && this.activeId) {
                     const exists = (state.comprasRequisicoes || []).some(r => r.id === this.activeId);
                     if (!exists) this.backToList();
@@ -250,6 +272,12 @@ const ComprasModule = {
         this._cotStaging = null;
         this._cotModal = null;
         this._cotAviso = null;
+        this.activePedido = null;
+        this.pedSub = 'lista';
+        this._pedStaging = null;
+        this._pedModal = null;
+        this.activeNota = null;
+        this._notaStaging = null;
     },
 
     /* Badge: prioriza itens ainda não resolvidos; senão, pendências de fluxo. */
@@ -279,6 +307,7 @@ const ComprasModule = {
         if (this.viewMode === 'nova') this.renderNova();
         else if (this.viewMode === 'cotacao' && this._cotStaging) this.renderCotacao();
         else if (this.viewMode === 'pedido' && this._pedStaging) this.renderPedido();
+        else if (this.viewMode === 'nota' && this._notaStaging) this.renderNota();
         else if (this.viewMode === 'detail' && this.activeId) this.renderDetail();
         else this.renderList();
     },
@@ -298,6 +327,11 @@ const ComprasModule = {
         this.activeCotacao = null;
         this._cotStaging = null;
         this.cotSub = 'lista';
+        this.activePedido = null;
+        this._pedStaging = null;
+        this.pedSub = 'lista';
+        this.activeNota = null;
+        this._notaStaging = null;
         this.render();
     },
 
@@ -2106,6 +2140,10 @@ const ComprasModule = {
         const cotacoes = this._cotacoesDaRequisicao(reqId)
             .filter(c => c.status !== 'cancelada' && c.status !== 'descartada');
 
+        // compras_cotacao_itens não guarda código/descrição — eles vêm do
+        // item da requisição (LM). Sem isto o pedido sairia sem código.
+        const itensReqPorId = new Map(this._itensDaRequisicao(reqId).map(i => [i.id, i]));
+
         // Agrupa vencedores por fornecedor (pulando os já pedidos)
         const porFornecedor = new Map(); // fornecedorId -> [{ cotacaoItem, cotacao }]
         for (const c of cotacoes) {
@@ -2171,17 +2209,18 @@ const ComprasModule = {
             for (const { cotacaoItem } of vencedores) {
                 const totalItem = this._cotItemTotal(cotacaoItem);
                 totalPedido += totalItem;
+                const ri = itensReqPorId.get(cotacaoItem.requisicao_item_id) || {};
                 const pi = {
                     id: crypto.randomUUID(),
                     empresa_id: r.empresa_id,
                     pedido_id: pedidoId,
                     requisicao_item_id: cotacaoItem.requisicao_item_id,
                     cotacao_item_id: cotacaoItem.id,
-                    material_id: cotacaoItem.material_id || '',
-                    codigo: cotacaoItem.codigo || '',
-                    descricao: cotacaoItem.descricao || '',
-                    fabricante: cotacaoItem.fabricante || '',
-                    unidade: cotacaoItem.unidade || '',
+                    material_id: cotacaoItem.material_id || ri.material_id || '',
+                    codigo: ri.codigo || '',
+                    descricao: ri.descricao || '',
+                    fabricante: ri.fabricante || '',
+                    unidade: ri.unidade || '',
                     qtd: parseFloat(cotacaoItem.qtd) || 0,
                     qtd_recebida: 0,
                     custo_unitario: parseFloat(cotacaoItem.custo_unitario) || 0,
@@ -2918,6 +2957,10 @@ const ComprasModule = {
                         </div>
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        ${podeEditar && p.status !== 'cancelado' ? `
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.abrirNovaNF('${p.id}')" style="color:white;border:1px solid rgba(255,255,255,0.3);" title="Lançar nota fiscal de recebimento">
+                            <i class="ph ph-receipt"></i> Lançar NF
+                        </button>` : ''}
                         <button class="btn btn-sm btn-ghost" onclick="app.compras.exportPedidoXLSX('${p.id}')" style="color:white;border:1px solid rgba(255,255,255,0.3);">
                             <i class="ph ph-file-xls"></i> Exportar
                         </button>
@@ -2998,6 +3041,8 @@ const ComprasModule = {
                             </tfoot>
                         </table>
                     </div>
+
+                    ${this._notasDoPedidoHTML(p, podeEditar)}
                 </div>
             </div>
         `;
@@ -4235,6 +4280,821 @@ const ComprasModule = {
         }
         const dt = new Date(s);
         return isNaN(dt.getTime()) ? s : dt.toLocaleDateString('pt-BR');
+    },
+
+    /* ================================================================
+       FASE 4 — RECEBIMENTO / NF
+       ----------------------------------------------------------------
+       N NFs por pedido (entregas parciais). Cada NF baixa
+       compras_pedido_itens.qtd_recebida, faz conferência automática de
+       qtd × preço contra o pedido, grava price_history(origin='compra')
+       e espelha o custo real na DRE do projeto (projeto_custos).
+       ================================================================ */
+
+    /* -------- leituras -------- */
+
+    _notasDoPedido(pedidoId) {
+        return (store.getState().comprasNotas || [])
+            .filter(n => n.pedido_id === pedidoId)
+            .sort((a, b) => String(a.numero || '').localeCompare(String(b.numero || '')));
+    },
+
+    _nota(id) {
+        return (store.getState().comprasNotas || []).find(n => n.id === id) || null;
+    },
+
+    _itensDaNota(notaId) {
+        return (store.getState().comprasNotaItens || []).filter(i => i.nota_id === notaId);
+    },
+
+    _nextCodigoNF(notas) {
+        let max = 0;
+        notas.forEach(n => {
+            const m = String(n.numero || '').match(/(\d+)$/);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        return 'NF-' + String(max + 1).padStart(4, '0');
+    },
+
+    /* Qtd do pedido_item ainda disponível para receber nesta NF
+       (desconta o que já veio em NFs anteriores não estornadas — item de
+       NF estornada não conta, senão o saldo nunca voltaria). */
+    _qtdJaRecebida(pedidoItemId, excetoNotaId) {
+        const notas = new Map((store.getState().comprasNotas || []).map(n => [n.id, n]));
+        return (store.getState().comprasNotaItens || [])
+            .filter(ni => {
+                if (ni.pedido_item_id !== pedidoItemId) return false;
+                if (ni.nota_id === excetoNotaId) return false;
+                const n = notas.get(ni.nota_id);
+                return !n || n.status !== 'estornada';
+            })
+            .reduce((s, ni) => s + (parseFloat(ni.qtd_recebida) || 0), 0);
+    },
+
+    /* -------- conferência automática --------
+       Compara cada item da NF com o pedido_item correspondente:
+       - qtd: NF não pode exceder o saldo do pedido
+       - preço: unitário deve bater com o do pedido (tolerância 0,005)
+       Retorna { status, divergencias: [] }. */
+    _conferirNota(itensNF) {
+        const divergencias = [];
+        for (const ni of itensNF) {
+            const pi = (store.getState().comprasPedidoItens || []).find(p => p.id === ni.pedido_item_id);
+            if (!pi) continue;
+            const qtdNF = parseFloat(ni.qtd_recebida) || 0;
+            const unitNF = parseFloat(ni.custo_unitario) || 0;
+            const qtdPed = parseFloat(pi.qtd) || 0;
+            const unitPed = parseFloat(pi.custo_unitario) || 0;
+            const jaRecebido = this._qtdJaRecebida(ni.pedido_item_id, ni.nota_id);
+
+            if (qtdNF > (qtdPed - jaRecebido) + 0.0001) {
+                divergencias.push(`${pi.codigo || pi.descricao}: qtd ${this._fmtQtd(qtdNF)} > saldo ${this._fmtQtd(qtdPed - jaRecebido)}`);
+            }
+            if (Math.abs(unitNF - unitPed) > 0.005) {
+                divergencias.push(`${pi.codigo || pi.descricao}: unitário ${window.app.formatCurrency(unitNF)} ≠ pedido ${window.app.formatCurrency(unitPed)}`);
+            }
+        }
+        return { status: divergencias.length ? 'divergente' : 'conferida', divergencias };
+    },
+
+    /* -------- nova NF a partir do pedido -------- */
+
+    abrirNovaNF(pedidoId) {
+        if (!store.canEdit()) return;
+        const p = this._pedido(pedidoId);
+        if (!p) return;
+        if (p.status === 'cancelado') {
+            window.app.toast('Pedido cancelado — não é possível lançar NF.', 'error');
+            return;
+        }
+
+        const notas = this._notasDoPedido(pedidoId);
+        const numero = this._nextCodigoNF(store.getState().comprasNotas || []);
+        const agora = new Date().toISOString();
+        const itensPedido = this._itensDoPedido(pedidoId);
+
+        // Itens ainda com saldo para receber
+        const itens = itensPedido
+            .map(pi => ({
+                id: crypto.randomUUID(),
+                pedido_item_id: pi.id,
+                material_id: pi.material_id || '',
+                codigo: pi.codigo || '',
+                descricao: pi.descricao || '',
+                unidade: pi.unidade || '',
+                qtd_recebida: Math.max(0, (parseFloat(pi.qtd) || 0) - this._qtdJaRecebida(pi.id, null)),
+                custo_unitario: parseFloat(pi.custo_unitario) || 0,
+                _pedido: { ...pi }
+            }))
+            .filter(ni => ni.qtd_recebida > 0);
+
+        if (!itens.length) {
+            window.app.toast('Todos os itens deste pedido já foram recebidos.', 'info');
+            return;
+        }
+
+        const total = itens.reduce((s, ni) => s + ni.qtd_recebida * (parseFloat(ni.custo_unitario) || 0), 0);
+        this._notaStaging = {
+            nota: {
+                id: crypto.randomUUID(),
+                pedido_id: pedidoId,
+                fornecedor_id: p.fornecedor_id,
+                numero,
+                serie: '',
+                chave_acesso: '',
+                data_emissao: agora.slice(0, 10),
+                data_recebimento: agora.slice(0, 10),
+                data_entrada: agora.slice(0, 10),
+                valor_produtos: total,
+                valor_frete: 0,
+                valor_desconto: 0,
+                valor_total: total,
+                icms: 0, ipi: 0, pis: 0, cofins: 0,
+                transportadora: '',
+                volumes: 0,
+                observacoes: '',
+                _novo: true
+            },
+            itens
+        };
+        this.activeNota = null;
+        this.viewMode = 'nota';
+        this.render();
+    },
+
+    abrirNF(notaId) {
+        const n = this._nota(notaId);
+        if (!n) { this.voltarDaNF(); return; }
+        const itens = this._itensDaNota(notaId).map(ni => ({ ...ni, _pedido: (store.getState().comprasPedidoItens || []).find(p => p.id === ni.pedido_item_id) || null }));
+        this._notaStaging = { nota: { ...n }, itens };
+        this.activeNota = notaId;
+        this.viewMode = 'nota';
+        this.render();
+    },
+
+    voltarDaNF() {
+        const pedidoId = this._notaStaging ? this._notaStaging.nota.pedido_id : null;
+        this._notaStaging = null;
+        this.activeNota = null;
+        if (pedidoId && this._pedido(pedidoId)) {
+            this.openPedido(pedidoId);
+        } else if (this._req(this.activeId)) {
+            this.viewMode = 'detail';
+            this.render();
+        } else {
+            this.viewMode = 'list';
+            this.render();
+        }
+    },
+
+    setNotaCampo(campo, valor) {
+        if (!this._notaStaging) return;
+        const num = ['valor_frete', 'valor_desconto', 'icms', 'ipi', 'pis', 'cofins', 'volumes'];
+        this._notaStaging.nota[campo] = num.includes(campo) ? (parseFloat(valor) || 0) : valor;
+        this._atualizaTotaisNota();
+    },
+
+    setNotaItemCampo(idx, campo, valor) {
+        const st = this._notaStaging;
+        if (!st || !st.itens[idx]) return;
+        const numerico = campo === 'qtd_recebida' || campo === 'custo_unitario';
+        st.itens[idx][campo] = numerico ? (parseFloat(valor) || 0) : valor;
+        this._atualizaTotaisNota();
+    },
+
+    _somaNota() {
+        const st = this._notaStaging;
+        if (!st) return 0;
+        return st.itens.reduce((s, ni) => s + (parseFloat(ni.qtd_recebida) || 0) * (parseFloat(ni.custo_unitario) || 0), 0);
+    },
+
+    /* Só atualiza números no DOM — re-render derrubaria o foco. */
+    _atualizaTotaisNota() {
+        const st = this._notaStaging;
+        if (!st) return;
+        const el = document.getElementById('cp-nf-produtos');
+        const tot = document.getElementById('cp-nf-total');
+        if (el) el.textContent = window.app.formatCurrency(this._somaNota());
+        if (tot) tot.textContent = window.app.formatCurrency(this._notaTotalGeral());
+    },
+
+    _notaTotalGeral() {
+        const st = this._notaStaging;
+        if (!st) return 0;
+        return this._somaNota() + (parseFloat(st.nota.valor_frete) || 0) - (parseFloat(st.nota.valor_desconto) || 0);
+    },
+
+    /* -------- gravação: NF + itens + baixa + price_history + DRE -------- */
+
+    async salvarNota() {
+        const st = this._notaStaging;
+        if (!st || !store.canEdit()) return;
+        const n = st.nota;
+
+        if (!st.itens.length) {
+            window.app.toast('A NF precisa de ao menos um item.', 'error');
+            return;
+        }
+        // Entrega parcial: item com qtd 0 fica de fora da NF (o saldo do
+        // pedido permanece aberto p/ a próxima entrega). Só exige ≥1 item.
+        const comQtd = st.itens.filter(ni => (parseFloat(ni.qtd_recebida) || 0) > 0);
+        if (!comQtd.length) {
+            window.app.toast('Informe ao menos uma quantidade recebida.', 'error');
+            return;
+        }
+        const negativo = st.itens.find(ni => parseFloat(ni.qtd_recebida) < 0 || parseFloat(ni.custo_unitario) < 0);
+        if (negativo) {
+            window.app.toast('Quantidade e custo não podem ser negativos.', 'error');
+            return;
+        }
+        // Estouro de saldo: não deixa baixar mais do que o pedido permite
+        const estouro = st.itens.find(ni => {
+            const pi = ni._pedido;
+            if (!pi) return false;
+            return (parseFloat(ni.qtd_recebida) || 0) > ((parseFloat(pi.qtd) || 0) - this._qtdJaRecebida(pi.id, n.id)) + 0.0001;
+        });
+        if (estouro) {
+            window.app.toast(`Quantidade acima do saldo do pedido em "${estouro.codigo || estouro.descricao}".`, 'error');
+            return;
+        }
+
+        const conferencia = this._conferirNota(comQtd);
+        const agora = new Date().toISOString();
+        const produtos = this._somaNota();
+        const totalGeral = this._notaTotalGeral();
+        const ehNova = !n.numero || n._novo || !this._nota(n.id);
+
+        const payloadNota = {
+            id: n.id,
+            empresa_id: (this._pedido(n.pedido_id) || {}).empresa_id || 'default',
+            pedido_id: n.pedido_id,
+            fornecedor_id: n.fornecedor_id,
+            numero: n.numero,
+            serie: n.serie || '',
+            chave_acesso: n.chave_acesso || '',
+            data_emissao: n.data_emissao || '',
+            data_recebimento: n.data_recebimento || agora,
+            data_entrada: n.data_entrada || agora,
+            valor_produtos: Math.round(produtos * 100) / 100,
+            valor_frete: parseFloat(n.valor_frete) || 0,
+            valor_desconto: parseFloat(n.valor_desconto) || 0,
+            valor_total: Math.round(totalGeral * 100) / 100,
+            icms: parseFloat(n.icms) || 0,
+            ipi: parseFloat(n.ipi) || 0,
+            pis: parseFloat(n.pis) || 0,
+            cofins: parseFloat(n.cofins) || 0,
+            transportadora: n.transportadora || '',
+            volumes: parseFloat(n.volumes) || 0,
+            conferida: conferencia.status === 'conferida' ? 1 : 0,
+            conferida_por: conferencia.status === 'conferida' ? ((store.getState().auth || {}).user || {}).name || '' : '',
+            conferida_em: conferencia.status === 'conferida' ? agora : '',
+            status: conferencia.status,
+            observacoes: n.observacoes || '',
+            created_at: n.created_at || agora,
+            updated_at: agora
+        };
+
+        this._seeding = true;
+
+        // 1. NF
+        let notaSalva;
+        if (ehNova) {
+            notaSalva = await store.addComprasNotas(payloadNota);
+        } else {
+            notaSalva = await store.updateComprasNotas(n.id, payloadNota);
+        }
+        if (!notaSalva) {
+            this._seeding = false;
+            window.app.toast('Erro ao gravar a NF no servidor.', 'error');
+            return;
+        }
+
+        // 2. Itens da NF — só os que têm quantidade (entrega parcial).
+        // Itens zerados numa edição são removidos da NF.
+        const idsManter = new Set(comQtd.map(x => x.id));
+        const idsRemover = st.itens.filter(x => !idsManter.has(x.id)).map(x => x.id);
+        if (idsRemover.length) {
+            await this._emLote(idsRemover, id => store.deleteComprasNotaItens(id), 10);
+        }
+        const itensPayload = comQtd.map(ni => ({
+            id: ni.id,
+            empresa_id: payloadNota.empresa_id,
+            nota_id: n.id,
+            pedido_item_id: ni.pedido_item_id || '',
+            material_id: ni.material_id || '',
+            codigo: ni.codigo || '',
+            descricao: ni.descricao || '',
+            unidade: ni.unidade || '',
+            qtd_recebida: parseFloat(ni.qtd_recebida) || 0,
+            custo_unitario: parseFloat(ni.custo_unitario) || 0,
+            lote: ni.lote || '',
+            data_validade: ni.data_validade || '',
+            total: Math.round((parseFloat(ni.qtd_recebida) || 0) * (parseFloat(ni.custo_unitario) || 0) * 100) / 100,
+            created_at: ni.created_at || agora,
+            updated_at: agora
+        }));
+        const resItens = await this._emLote(itensPayload, ni => {
+            const existe = (store.getState().comprasNotaItens || []).some(x => x.id === ni.id);
+            return existe ? store.updateComprasNotaItens(ni.id, ni) : store.addComprasNotaItens(ni);
+        }, 10);
+        const falhasItens = resItens.filter(x => !x).length;
+
+        this._seeding = false;
+
+        if (falhasItens) {
+            window.app.toast(`${falhasItens} item(ns) da NF não puderam ser gravados.`, 'error');
+            return;
+        }
+
+        // 3. Baixa no pedido + status automático
+        await this._baixaPedido(n.id, comQtd);
+
+        // 4. price_history(origin='compra') + custo do material
+        await this._registrarPrecosComprados(n, comQtd);
+
+        // 5. Custo real na DRE do projeto
+        await this._lancarCustoProjeto(payloadNota, n);
+
+        this._notaStaging = null;
+        this.activeNota = n.id;
+        this.openPedido(n.pedido_id);
+
+        if (conferencia.status === 'divergente') {
+            window.app.toast(`NF ${n.numero} gravada como DIVERGENTE: ${conferencia.divergencias[0]}`, 'error');
+        } else {
+            window.app.toast(`NF ${n.numero} recebida e conferida · ${window.app.formatCurrency(totalGeral)}.`, 'success');
+        }
+    },
+
+    /* Baixa qtd_recebida nos pedido_itens e recalcula o status do pedido.
+       Ação de sistema — fora do validador manual de transições. */
+    async _baixaPedido(notaId, itensNF) {
+        const st = this._notaStaging;
+        const pedidoId = st ? st.nota.pedido_id : (this._nota(notaId) || {}).pedido_id;
+        if (!pedidoId) return;
+
+        this._seeding = true;
+        for (const ni of itensNF) {
+            const pi = (store.getState().comprasPedidoItens || []).find(p => p.id === ni.pedido_item_id);
+            if (!pi) continue;
+            const jaRecebido = this._qtdJaRecebida(ni.pedido_item_id, notaId);
+            const novo = Math.round((jaRecebido + (parseFloat(ni.qtd_recebida) || 0)) * 1000) / 1000;
+            await store.updateComprasPedidoItens(pi.id, { qtd_recebida: novo });
+        }
+        this._seeding = false;
+        await this._atualizaStatusPedido(pedidoId);
+    },
+
+    /* Status do pedido derivado do recebimento (não passa por CP_PED_TRANSICOES).
+       Cobre também o REVERSO: estornar tudo devolve o pedido a "Em Entrega". */
+    async _atualizaStatusPedido(pedidoId) {
+        const p = this._pedido(pedidoId);
+        if (!p || p.status === 'cancelado') return;
+        const itens = this._itensDoPedido(pedidoId);
+        if (!itens.length) return;
+        const todosRecebidos = itens.every(pi => (parseFloat(pi.qtd_recebida) || 0) >= (parseFloat(pi.qtd) || 0) - 0.0001);
+        const algumRecebido = itens.some(pi => (parseFloat(pi.qtd_recebida) || 0) > 0);
+
+        let novo = p.status;
+        if (todosRecebidos) {
+            novo = 'recebido';
+        } else if (algumRecebido) {
+            // Recebimento parcial — independe da etapa anterior
+            novo = 'parcial';
+        } else if (p.status === 'recebido' || p.status === 'parcial') {
+            // Estornou tudo — volta para a etapa anterior ao recebimento
+            novo = 'em_entrega';
+        }
+
+        if (novo !== p.status) {
+            this._seeding = true;
+            const updates = { status: novo };
+            if (novo === 'recebido' && !p.data_recebimento) updates.data_recebimento = new Date().toISOString();
+            if (novo !== 'recebido') updates.data_recebimento = '';
+            await store.updateComprasPedidos(pedidoId, updates);
+            this._seeding = false;
+        }
+        await this._atualizaRequisicao(pedidoId);
+    },
+
+    /* Fecha o ciclo da requisição: agrega `qtd_recebida` nos itens da LM
+       (1 req item → N pedidos) e marca a requisição como `recebida` quando
+       todos os pedidos não cancelados estão recebidos. Também espelha o
+       `total_real` somando as NFs não estornadas. */
+    async _atualizaRequisicao(pedidoId) {
+        const p = this._pedido(pedidoId);
+        if (!p) return;
+        const r = this._req(p.requisicao_id);
+        if (!r) return;
+
+        // 1. Agrega a baixa em cada item da requisição
+        const pedIds = new Set(this._pedidosDaRequisicao(r.id).map(x => x.id));
+        const porReqItem = new Map();
+        (store.getState().comprasPedidoItens || [])
+            .filter(pi => pedIds.has(pi.pedido_id) && pi.requisicao_item_id)
+            .forEach(pi => {
+                porReqItem.set(pi.requisicao_item_id,
+                    (porReqItem.get(pi.requisicao_item_id) || 0) + (parseFloat(pi.qtd_recebida) || 0));
+            });
+
+        this._seeding = true;
+        for (const ri of this._itensDaRequisicao(r.id)) {
+            const novo = Math.round((porReqItem.get(ri.id) || 0) * 1000) / 1000;
+            if ((parseFloat(ri.qtd_recebida) || 0) !== novo) {
+                await store.updateComprasRequisicaoItens(ri.id, { qtd_recebida: novo });
+            }
+        }
+
+        // 2. Status de fechamento + total real (só quando já está em_pedido)
+        if (r.status === 'em_pedido' || r.status === 'recebida') {
+            const peds = this._pedidosDaRequisicao(r.id).filter(x => x.status !== 'cancelado');
+            const todosRecebidos = peds.length > 0 && peds.every(x => x.status === 'recebido');
+            const totalReal = Math.round((store.getState().comprasNotas || [])
+                .filter(n => n.status !== 'estornada' && pedIds.has(n.pedido_id))
+                .reduce((s, n) => s + (parseFloat(n.valor_total) || 0), 0) * 100) / 100;
+            const novoStatus = todosRecebidos ? 'recebida' : 'em_pedido';
+            if (novoStatus !== r.status || (parseFloat(r.total_real) || 0) !== totalReal) {
+                await store.updateComprasRequisicoes(r.id, { status: novoStatus, total_real: totalReal });
+            }
+        }
+        this._seeding = false;
+    },
+
+    /* Grava o custo real de cada material comprado no price_history
+       (origin='compra') e atualiza materiais.custo. */
+    async _registrarPrecosComprados(nota, itensNF) {
+        const materiais = store.getState().materiais || [];
+        const fornecedor = this._fornecedor(nota.fornecedor_id);
+        const rotulo = `${nota.numero || 'NF'} · ${this._nomeFornecedor(fornecedor)}`.trim();
+
+        for (const ni of itensNF) {
+            if (!ni.material_id) continue;
+            const mat = materiais.find(m => m.id === ni.material_id);
+            if (!mat) continue;
+            const custo = parseFloat(ni.custo_unitario) || 0;
+            if (custo <= 0) continue;
+            // Só grava se o custo mudou — evita histórico idêntico a cada NF
+            if (Math.abs((parseFloat(mat.custo) || 0) - custo) <= 0.005) continue;
+            this._seeding = true;
+            await store.updateMaterial(ni.material_id, { custo }, {
+                origin: 'compra',
+                title: rotulo,
+                // Registra o preço PAGO na NF (não o valor anterior do catálogo)
+                custoHistorico: custo
+            });
+            this._seeding = false;
+        }
+    },
+
+    /* Espelha o total da NF na DRE do projeto vinculado à requisição. */
+    /* Match exato de um rótulo contra o número da NF — "NF-0001 · Forn"
+       pertence à NF-0001, mas "NF-00011 · ..." NÃO (evita colaterais). */
+    _mesmaNF(texto, numero) {
+        if (!numero || !texto) return false;
+        const t = String(texto);
+        return t === numero || t.startsWith(numero + ' ·') || t.startsWith(numero + ' ');
+    },
+
+    async _lancarCustoProjeto(payloadNota, nota) {
+        const p = this._pedido(nota.pedido_id);
+        if (!p) return;
+        const r = this._req(p.requisicao_id);
+        if (!r || !r.projeto_id) return;
+        const total = payloadNota.valor_total || 0;
+        if (!(total > 0)) return;
+
+        const fornecedor = this._fornecedor(nota.fornecedor_id);
+        const descricao = `${nota.numero || 'NF'} · ${this._nomeFornecedor(fornecedor)}`.trim();
+        const agora = new Date().toISOString();
+        const data = payloadNota.data_entrada || agora.slice(0, 10);
+
+        // Editar uma NF não pode duplicar o custo na DRE — atualiza o
+        // lançamento já existente desta mesma NF.
+        const existente = (store.getState().projetoCustos || []).find(c =>
+            c.projeto_id === r.projeto_id &&
+            c.origem === 'compra' &&
+            c.categoria === 'material' &&
+            this._mesmaNF(c.descricao, nota.numero));
+
+        this._seeding = true;
+        if (existente) {
+            await store.updateProjetoCusto(existente.id, { valor: total, data, updated_at: agora });
+        } else {
+            await store.addProjetoCusto({
+                id: crypto.randomUUID(),
+                empresa_id: payloadNota.empresa_id,
+                projeto_id: r.projeto_id,
+                tipo: 'real',
+                categoria: 'material',
+                descricao,
+                valor: total,
+                data,
+                origem: 'compra',
+                created_at: agora,
+                updated_at: agora
+            });
+        }
+        this._seeding = false;
+    },
+
+    /* Estorna a NF: devolve a baixa do pedido, remove o custo da DRE,
+       reverte o price_history desta compra e recalcula o status do pedido. */
+    async estornarNota(notaId) {
+        if (!store.canEdit()) return;
+        const n = this._nota(notaId);
+        if (!n) return;
+        if (n.status === 'estornada') { window.app.toast('NF já estornada.', 'info'); return; }
+        const ok = await window.app.confirm(`Estornar a NF ${n.numero}? A baixa no pedido será devolvida e os efeitos (custo/DRE) revertidos.`);
+        if (!ok) return;
+
+        const itens = this._itensDaNota(notaId);
+
+        this._seeding = true;
+
+        // 1. Devolve a baixa no pedido
+        for (const ni of itens) {
+            const pi = (store.getState().comprasPedidoItens || []).find(p => p.id === ni.pedido_item_id);
+            if (!pi) continue;
+            const atual = parseFloat(pi.qtd_recebida) || 0;
+            const devolve = parseFloat(ni.qtd_recebida) || 0;
+            await store.updateComprasPedidoItens(pi.id, { qtd_recebida: Math.max(0, Math.round((atual - devolve) * 1000) / 1000) });
+        }
+
+        // 2. Reverte o price_history desta NF e restaura o custo anterior
+        await this._reverterPrecosComprados(n, itens);
+
+        // 3. Remove o custo desta NF da DRE do projeto
+        const custosProj = (store.getState().projetoCustos || [])
+            .filter(c => c.origem === 'compra' && c.descricao && this._mesmaNF(c.descricao, n.numero));
+        for (const c of custosProj) await store.deleteProjetoCusto(c.id);
+
+        // 4. Marca a NF como estornada (os itens ficam para auditoria)
+        await store.updateComprasNotas(notaId, { status: 'estornada', conferida: 0, updated_at: new Date().toISOString() });
+
+        this._seeding = false;
+        await this._atualizaStatusPedido(n.pedido_id);
+        this.openPedido(n.pedido_id);
+        window.app.toast(`NF ${n.numero} estornada — baixa e custos revertidos.`, 'success');
+    },
+
+    /* Remove do price_history as entradas gravadas por esta NF e volta o
+       material para o custo que ele tinha antes da compra. O valor anterior
+       vem de `custo_anterior` (gravado no save); para entradas antigas,
+       cai para a entrada imediatamente mais antiga do histórico. */
+    async _reverterPrecosComprados(nota, itensNF) {
+        const materiais = store.getState().materiais || [];
+        for (const ni of itensNF) {
+            if (!ni.material_id) continue;
+            const mat = materiais.find(m => m.id === ni.material_id);
+            if (!mat) continue;
+            const hist = mat.priceHistory || [];
+            const entradas = hist.filter(e => e.origin === 'compra' && this._mesmaNF(e.title, nota.numero));
+            if (!entradas.length) continue;
+
+            // hist é ordenado por data DESC → a última entrada desta NF é a
+            // mais antiga, cujo `custo_anterior` é o valor pré-NF.
+            const ultima = entradas[entradas.length - 1];
+            let alvo = (ultima.custo_anterior === null || ultima.custo_anterior === undefined)
+                ? null : parseFloat(ultima.custo_anterior);
+            if (alvo === null || isNaN(alvo)) {
+                const primeira = hist.indexOf(entradas[0]);
+                if (primeira > 0) alvo = parseFloat(hist[primeira - 1].custo) || 0;
+            }
+            const restantes = hist.filter(e => !entradas.includes(e));
+
+            // Sem valor anterior conhecido: só limpa o histórico (mantém o custo)
+            const updates = (alvo === null || isNaN(alvo)) ? {} : { custo: alvo };
+            await store.updateMaterial(ni.material_id, updates, {
+                origin: 'restore',
+                title: `Estorno ${nota.numero}`,
+                ...(updates.custo !== undefined ? { custoHistorico: alvo } : {}),
+                priceHistoryOverride: restantes
+            });
+        }
+    },
+
+    /* -------- views -------- */
+
+    _notasDoPedidoHTML(p, podeEditar) {
+        const notas = this._notasDoPedido(p.id);
+        const recebido = this._itensDoPedido(p.id).reduce((s, pi) => s + (parseFloat(pi.qtd_recebida) || 0), 0);
+        const totalQtd = this._itensDoPedido(p.id).reduce((s, pi) => s + (parseFloat(pi.qtd) || 0), 0);
+
+        return `
+            <div class="cp-section-title" style="margin-top:20px;">
+                <span class="cp-step">3</span> Notas Fiscais recebidas
+                ${podeEditar && p.status !== 'cancelado' ? `
+                <button class="btn btn-sm btn-primary" style="margin-left:auto;" onclick="app.compras.abrirNovaNF('${p.id}')">
+                    <i class="ph ph-receipt"></i> Lançar NF
+                </button>` : ''}
+            </div>
+
+            <div class="cp-progresso" style="margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#4b5563;margin-bottom:4px;">
+                    <span><i class="ph ph-truck"></i> Recebido</span>
+                    <span>${this._fmtQtd(recebido)}/${this._fmtQtd(totalQtd)} (${totalQtd ? Math.round((recebido / totalQtd) * 100) : 0}%)</span>
+                </div>
+                <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">
+                    <div style="height:100%;width:${totalQtd ? Math.min(100, (recebido / totalQtd) * 100) : 0}%;background:${recebido >= totalQtd ? '#16a34a' : '#f59e0b'};transition:width .3s;"></div>
+                </div>
+            </div>
+
+            ${notas.length ? `
+            <div class="cp-cot-list">${notas.map(n => {
+                const st = n.status || 'recebida';
+                return `
+                <div class="cp-cot-card cp-cot-${st === 'divergente' ? 'cancelada' : (st === 'conferida' ? 'vencedora' : 'aberta')}">
+                    <div class="cp-cot-head">
+                        <div style="min-width:0;">
+                            <div class="cp-cot-numero">
+                                ${this._esc(n.numero)}
+                                <span class="cp-badge cp-badge-cot">${this._esc(CP_NF_STATUS[st] || st)}</span>
+                            </div>
+                            <div class="cp-cot-forn">${this._esc(n.serie || '—')}${n.chave_acesso ? ' · chave ' + this._esc(n.chave_acesso.slice(0, 20)) + '…' : ''}</div>
+                        </div>
+                        <div class="cp-cot-vals">
+                            <div class="cp-cot-total">${window.app.formatCurrency(n.valor_total || 0)}</div>
+                            <div class="cp-sub">Entrada ${this._fmtDate(n.data_entrada)}</div>
+                        </div>
+                    </div>
+                    <div class="cp-cot-actions">
+                        <button class="btn btn-sm btn-primary" onclick="app.compras.abrirNF('${n.id}')">
+                            <i class="ph ph-eye"></i> Ver NF
+                        </button>
+                        ${podeEditar && st !== 'estornada' ? `
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.estornarNota('${n.id}')">
+                            <i class="ph ph-arrow-u-up-left"></i> Estornar
+                        </button>` : ''}
+                    </div>
+                </div>`;
+            }).join('')}</div>` : `
+            <div class="cp-empty-state">
+                <i class="ph ph-receipt"></i>
+                <h3>Nenhuma NF lançada</h3>
+                <p>Quando a mercadoria chegar, lance a nota fiscal para baixar as quantidades do pedido, conferir preço e registrar o custo real.</p>
+            </div>`}
+        `;
+    },
+
+    renderNota() {
+        const container = document.getElementById('view-compras');
+        if (!container) return;
+        const st = this._notaStaging;
+        if (!st) { this.voltarDaNF(); return; }
+
+        const n = st.nota;
+        const p = this._pedido(n.pedido_id);
+        const r = p ? this._req(p.requisicao_id) : null;
+        const f = this._fornecedor(n.fornecedor_id);
+        const podeEditar = store.canEdit() && (!n.status || n.status !== 'estornada');
+        const conferencia = st.itens.length ? this._conferirNota(st.itens) : { status: 'conferida', divergencias: [] };
+        const divergente = conferencia.status === 'divergente';
+        const ehNova = n._novo || !this._nota(n.id);
+
+        container.innerHTML = `
+            <div style="height:calc(100vh - 120px);display:flex;flex-direction:column;background:rgb(250,250,250);margin:-20px;position:relative;">
+                <div class="module-header-sticky" style="color:white;padding:20px 30px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:10;">
+                    <div style="display:flex;align-items:center;gap:14px;">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.voltarDaNF()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-arrow-left"></i> Voltar
+                        </button>
+                        <div>
+                            <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="ph ph-receipt"></i> ${this._esc(n.numero)}
+                                <span class="cp-badge">${this._esc(CP_NF_STATUS[n.status || 'recebida'] || n.status || 'Recebida')}</span>
+                            </h2>
+                            <div style="font-size:12px;opacity:0.9;margin-top:2px;">${this._esc(this._nomeFornecedor(f))} · ${this._esc(p ? p.codigo : '')}${r ? ' · ' + this._esc(r.codigo) : ''}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        ${podeEditar ? `
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.salvarNota()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-floppy-disk"></i> Salvar NF
+                        </button>` : ''}
+                    </div>
+                </div>
+
+                <div class="cp-body">
+                    ${divergente ? `
+                    <div class="cp-banner err">
+                        <i class="ph ph-warning-octagon"></i>
+                        <div>
+                            <b>NF divergente do pedido.</b>
+                            <div style="margin-top:6px;">${conferencia.divergencias.map(d => `• ${this._esc(d)}`).join('<br>')}</div>
+                        </div>
+                    </div>` : (ehNova ? '' : `
+                    <div class="cp-banner ok">
+                        <i class="ph ph-check-circle"></i>
+                        <div><b>Conferida.</b> Quantidades e preços batem com o pedido.</div>
+                    </div>`)}
+
+                    <div class="cp-panel">
+                        <div class="cp-section-title" style="margin-top:0;"><span class="cp-step">1</span> Dados da nota</div>
+                        <div class="cp-form-grid">
+                            <div class="cp-field"><label>Número</label>
+                                <input type="text" class="form-control" value="${this._esc(n.numero || '')}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('numero', this.value)"></div>
+                            <div class="cp-field"><label>Série</label>
+                                <input type="text" class="form-control" value="${this._esc(n.serie || '')}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('serie', this.value)"></div>
+                            <div class="cp-field" style="grid-column:span 2;"><label>Chave de acesso</label>
+                                <input type="text" class="form-control" value="${this._esc(n.chave_acesso || '')}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('chave_acesso', this.value)"></div>
+                            <div class="cp-field"><label>Data de emissão</label>
+                                <input type="date" class="form-control" value="${this._esc(String(n.data_emissao || '').slice(0, 10))}" ${podeEditar ? '' : 'readonly'} onchange="app.compras.setNotaCampo('data_emissao', this.value)"></div>
+                            <div class="cp-field"><label>Data de recebimento</label>
+                                <input type="date" class="form-control" value="${this._esc(String(n.data_recebimento || '').slice(0, 10))}" ${podeEditar ? '' : 'readonly'} onchange="app.compras.setNotaCampo('data_recebimento', this.value)"></div>
+                            <div class="cp-field"><label>Data de entrada</label>
+                                <input type="date" class="form-control" value="${this._esc(String(n.data_entrada || '').slice(0, 10))}" ${podeEditar ? '' : 'readonly'} onchange="app.compras.setNotaCampo('data_entrada', this.value)"></div>
+                            <div class="cp-field"><label>Transportadora</label>
+                                <input type="text" class="form-control" value="${this._esc(n.transportadora || '')}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('transportadora', this.value)"></div>
+                            <div class="cp-field"><label>Frete (R$)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(n.valor_frete) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('valor_frete', this.value)"></div>
+                            <div class="cp-field"><label>Desconto (R$)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(n.valor_desconto) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('valor_desconto', this.value)"></div>
+                            <div class="cp-field"><label>ICMS (R$)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(n.icms) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('icms', this.value)"></div>
+                            <div class="cp-field"><label>Volumes</label>
+                                <input type="number" step="1" min="0" class="form-control" value="${parseFloat(n.volumes) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('volumes', this.value)"></div>
+                        </div>
+                        <div class="cp-field" style="margin-top:12px;"><label>Observações</label>
+                            <textarea class="form-control" rows="2" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('observacoes', this.value)">${this._esc(n.observacoes || '')}</textarea></div>
+                    </div>
+
+                    <div class="cp-section-title"><span class="cp-step">2</span> Itens recebidos × pedido</div>
+                    <div class="cp-conf-wrap">
+                        <div class="cp-conf-scroll">
+                            <table class="cp-table cp-price">
+                                <thead>
+                                    <tr>
+                                        <th>#</th><th>Item do pedido</th>
+                                        <th style="text-align:right">Qtd pedida</th>
+                                        <th style="text-align:right">Já recebido</th>
+                                        <th style="text-align:right">Qtd nesta NF</th>
+                                        <th>Un.</th>
+                                        <th style="text-align:right">Custo unit. (R$)</th>
+                                        <th style="text-align:right">Custo pedido</th>
+                                        <th style="text-align:right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${st.itens.length ? st.itens.map((ni, i) => this._notaItemLinhaHTML(ni, i, podeEditar)).join('')
+                                                      : '<tr><td colspan="9" style="padding:22px;text-align:center;color:#9ca3af;">Sem itens com saldo para receber.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="cp-footbar">
+                        <div class="cp-footbar-info">
+                            Produtos <b id="cp-nf-produtos">${window.app.formatCurrency(this._somaNota())}</b>
+                            · Frete <b>${window.app.formatCurrency(parseFloat(n.valor_frete) || 0)}</b>
+                            · Desconto <b>− ${window.app.formatCurrency(parseFloat(n.valor_desconto) || 0)}</b>
+                            · Total <b id="cp-nf-total" style="color:#4F46E5;">${window.app.formatCurrency(this._notaTotalGeral())}</b>
+                            <div class="cp-sub" style="margin-top:3px;">A conferência compara qtd e custo unitário de cada item com o pedido.</div>
+                        </div>
+                        <div class="cp-footbar-actions">
+                            <button class="btn btn-ghost" onclick="app.compras.voltarDaNF()">Voltar</button>
+                            ${podeEditar ? `<button class="btn btn-primary" onclick="app.compras.salvarNota()">
+                                <i class="ph ph-floppy-disk"></i> Salvar NF
+                            </button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    _notaItemLinhaHTML(ni, i, podeEditar) {
+        const pi = ni._pedido;
+        const qtdPed = pi ? (parseFloat(pi.qtd) || 0) : 0;
+        const jaRec = pi ? this._qtdJaRecebida(pi.id, ni.nota_id) : 0;
+        const saldo = Math.max(0, qtdPed - jaRec);
+        const qtd = parseFloat(ni.qtd_recebida) || 0;
+        const unit = parseFloat(ni.custo_unitario) || 0;
+        const excede = pi && qtd > saldo + 0.0001;
+        const difPreco = pi && Math.abs(unit - (parseFloat(pi.custo_unitario) || 0)) > 0.005;
+        const dis = podeEditar ? '' : 'disabled';
+
+        return `<tr style="${excede || difPreco ? 'background:#fef2f2;' : ''}">
+            <td>${i + 1}</td>
+            <td style="min-width:200px;">
+                <div class="cp-codigo">${this._esc(ni.codigo) || 'sem código'}</div>
+                <div class="cp-mat-desc">${this._esc(ni.descricao)}</div>
+            </td>
+            <td style="width:90px;text-align:right;">${this._fmtQtd(qtdPed)}</td>
+            <td style="width:90px;text-align:right;color:#6b7280;">${this._fmtQtd(jaRec)}</td>
+            <td style="width:120px;text-align:right;">
+                <input type="number" min="0" step="0.001" max="${saldo}" class="form-control cp-price-in" ${dis}
+                    value="${qtd || ''}" oninput="app.compras.setNotaItemCampo(${i},'qtd_recebida',this.value)">
+                ${excede ? `<div class="cp-sub" style="color:#dc2626;">acima do saldo</div>` : ''}
+            </td>
+            <td style="width:48px;text-align:center;font-weight:600;">${this._esc(ni.unidade)}</td>
+            <td style="width:140px;text-align:right;">
+                <input type="number" min="0" step="0.0001" class="form-control cp-price-in" ${dis}
+                    value="${unit || ''}" oninput="app.compras.setNotaItemCampo(${i},'custo_unitario',this.value)">
+                ${difPreco ? `<div class="cp-sub" style="color:#dc2626;">≠ pedido</div>` : ''}
+            </td>
+            <td style="width:110px;text-align:right;color:#6b7280;">${pi ? window.app.formatCurrency(parseFloat(pi.custo_unitario) || 0) : '—'}</td>
+            <td style="width:120px;text-align:right;font-weight:700;">${window.app.formatCurrency(qtd * unit)}</td>
+        </tr>`;
     },
 
     _fmtQtd(v) {

@@ -195,7 +195,8 @@ function initSchema() {
             markup REAL,
             date TEXT,
             title TEXT,
-            origin TEXT
+            origin TEXT,
+            custo_anterior REAL
         );
 
         CREATE TABLE IF NOT EXISTS paineis (
@@ -1310,6 +1311,11 @@ function initSchema() {
     // Migration: reset markup to 0 for all existing materials
     try { db.exec("UPDATE materiais SET markup = 0 WHERE markup IS NULL OR markup > 0"); } catch (e) { /* ignore */ }
 
+    // Migration: custo_anterior guarda o valor vigente ANTES da entrada
+    // (ex.: preço do catálogo antes da NF da Fase 4) — permite estornar
+    // o preço com exatidão. Em entradas antigas fica NULL.
+    try { db.exec("ALTER TABLE price_history ADD COLUMN custo_anterior REAL"); } catch (e) { /* column may already exist */ }
+
     // Migration: add tensaoComando to tipicos table
     try { db.exec("ALTER TABLE tipicos ADD COLUMN tensaoComando TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
@@ -1791,9 +1797,10 @@ function savePriceHistory(materialId, entries) {
 // Versão sem transação — usar apenas quando já dentro de uma transação externa.
 function _replacePriceHistoryRows(materialId, entries) {
     db.prepare('DELETE FROM price_history WHERE material_id = ?').run(materialId);
-    const ins = db.prepare('INSERT INTO price_history (material_id, custo, markup, date, title, origin) VALUES (?, ?, ?, ?, ?, ?)');
+    const ins = db.prepare('INSERT INTO price_history (material_id, custo, markup, date, title, origin, custo_anterior) VALUES (?, ?, ?, ?, ?, ?, ?)');
     for (const entry of entries) {
-        ins.run(materialId, entry.custo, entry.markup, entry.date, entry.title, entry.origin || 'manual');
+        ins.run(materialId, entry.custo, entry.markup, entry.date, entry.title, entry.origin || 'manual',
+            entry.custo_anterior === undefined || entry.custo_anterior === null ? null : entry.custo_anterior);
     }
 }
 

@@ -305,17 +305,18 @@ Quando a Engenharia de Projetos virar módulo nativo, a LM passará a ser gerada
 
 ---
 
-### Fase 4 — Recebimento / NF ⭐ (fecha o ciclo)
+### Fase 4 — Recebimento / NF ⭐ (fecha o ciclo) ✅ **concluída e validada**
 
 **Entregáveis**
-- **Lançar NF** por pedido (N NFs por pedido → entregas parciais)
-- Itens da NF com baixa parcial em `compras_pedido_itens.qtd_recebida`
-- **Conferência automática** quantidade e preço × pedido → divergência sinalizada
-- Status da NF: `recebida → conferida | divergente`
-- **Gravação em `price_history`** com `origin='compra'` (custo real do fornecedor) e atualização opcional de `materiais.custo`
-- **Integração com a DRE do Projeto**: cria `projeto_custos` (`tipo='real'`, `categoria='material'`, `origem='compra'`) no projeto vinculado
+- **Lançar NF** por pedido (N NFs por pedido → entregas parciais; item com qtd 0 fica de fora da NF)
+- Itens da NF com baixa parcial em `compras_pedido_itens.qtd_recebida` (recalculada em cada save, ignorando NFs estornadas)
+- **Conferência automática** quantidade e preço × pedido → divergência sinalizada (tolerância de preço 0,005)
+- Status da NF: `recebida → conferida | divergente | estornada`
+- **Gravação em `price_history`** com `origin='compra'` (custo real do fornecedor) + `custo_anterior` para estorno exato
+- **Integração com a DRE do Projeto**: `projeto_custos` (`tipo='real'`, `categoria='material'`, `origem='compra'`) — **atualizado** na edição da NF (não duplica)
+- **Fechamento do ciclo**: pedido vira `recebido`/`parcial`; requisição vira `recebida` quando todos os pedidos recebem (`total_real` + `qtd_recebida` agregado nos itens da LM)
 
-**Critério de aceite:** NF recebida baixa o pedido corretamente; divergência detectada; `price_history` populada; DRE do projeto reflete o custo real de material.
+**Critério de aceite:** ✅ NF recebida baixa o pedido corretamente (parcial e total); divergência detectada (banner + badge); `price_history` populada com `origin='compra'`; DRE reflete o custo real (2 NFs = 2 lançamentos, edição não duplica); estorno reverte baixa/preço/DRE exatamente. Validado no browser com 0 erros de console.
 
 ---
 

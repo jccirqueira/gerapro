@@ -1031,9 +1031,14 @@ class Store {
         return item;
     }
 
-    async updateMaterial(id, updates) {
+    async updateMaterial(id, updates, opts = {}) {
         const now = new Date().toISOString();
         const prev = (this.state.materiais || []).find(m => m.id === id);
+        const origin = opts.origin || 'manual';
+        const title = opts.title || updates.lastUpdateTitle || 'Alteração Manual';
+        // Histórico gerado por esta alteração — precisa ir junto no sync,
+        // senão o price_history do servidor não é atualizado.
+        let historico = null;
         const newItems = (this.state.materiais || []).map(m => {
             if (m.id !== id) return m;
 
@@ -1045,23 +1050,37 @@ class Store {
                 ...m,
                 ...updates,
                 lastUpdateDate: now,
-                lastUpdateTitle: updates.lastUpdateTitle || 'Alteração Manual'
+                lastUpdateTitle: title
             };
 
-            if (priceChanged) {
+            if (opts.priceHistoryOverride) {
+                // Substituição direta (ex.: estorno de NF remove entradas)
+                result.priceHistory = opts.priceHistoryOverride;
+            } else if (priceChanged) {
                 result.priceHistory = [...(m.priceHistory || []), {
-                    custo: parseFloat(m.custo) || 0,
+                    // `opts.custoHistorico` grava o valor que está ENTRANDO (ex.:
+                    // preço real da NF na Fase 4). Sem ele mantém o valor anterior,
+                    // como nas gravações já existentes de materiais.
+                    custo: opts.custoHistorico !== undefined ? parseFloat(opts.custoHistorico) || 0 : (parseFloat(m.custo) || 0),
                     markup: parseFloat(m.markup) || 0,
                     date: now,
-                    title: updates.lastUpdateTitle || 'Alteração Manual',
-                    origin: 'manual'
+                    title: title,
+                    origin: origin,
+                    // Valor vigente antes desta entrada — usado para estornar
+                    // (Fase 4: preço do catálogo antes da NF).
+                    custo_anterior: opts.custoAnterior !== undefined
+                        ? (parseFloat(opts.custoAnterior) || 0)
+                        : (parseFloat(m.custo) || 0)
                 }];
             }
+            if (result.priceHistory) historico = result.priceHistory;
 
             return result;
         });
         this.setState({ materiais: newItems });
-        const ok = await this._syncUpdate('materiais', id, updates);
+        const payload = { ...updates, lastUpdateTitle: title, lastUpdateDate: now };
+        if (historico) payload.priceHistory = historico;
+        const ok = await this._syncUpdate('materiais', id, payload);
         if (!ok && prev) {
             this.setState({ materiais: (this.state.materiais || []).map(m => m.id === id ? prev : m) });
         }
