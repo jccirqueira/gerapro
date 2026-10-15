@@ -245,8 +245,88 @@
 .cp-item-st.cancelado { background:#fee2e2; color:#b91c1c; }
 
 /* Responsividade dos grids de formulário */
+/* ══════════════════════════════════════════════════════════════
+   15. COTAÇÕES (Fase 2) — lista, matriz de comparação, grade de preços
+   ══════════════════════════════════════════════════════════════ */
+
+/* Cores da cotação (badge + acento do card) */
+.cp-badge.cp-cot-aberta    { background:#f1f5f9; color:#475569; }
+.cp-badge.cp-cot-enviada   { background:#dbeafe; color:#1d4ed8; }
+.cp-badge.cp-cot-recebida  { background:#e0e7ff; color:#4338ca; }
+.cp-badge.cp-cot-vencedora { background:#dcfce7; color:#15803d; }
+.cp-badge.cp-cot-descartada{ background:#fef3c7; color:#b45309; }
+.cp-badge.cp-cot-cancelada { background:#fee2e2; color:#b91c1c; }
+
+/* Lista de cotações da requisição */
+.cp-cot-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:12px; }
+.cp-cot-card { background:#fff; border:1px solid #e8eaed; border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.04); display:flex; flex-direction:column; gap:10px; border-left:3px solid #cbd5e1; }
+.cp-cot-card.cp-cot-aberta    { border-left-color:#94a3b8; }
+.cp-cot-card.cp-cot-enviada   { border-left-color:#3b82f6; }
+.cp-cot-card.cp-cot-recebida  { border-left-color:#6366f1; }
+.cp-cot-card.cp-cot-vencedora { border-left-color:#16a34a; }
+.cp-cot-card.cp-cot-descartada{ border-left-color:#f59e0b; }
+.cp-cot-card.cp-cot-cancelada { border-left-color:#dc2626; opacity:.72; }
+.cp-cot-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.cp-cot-numero { font-size:15px; font-weight:800; color:#1a1d23; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cp-cot-forn { font-size:12.5px; color:#6b7280; margin-top:4px; }
+.cp-cot-vals { text-align:right; flex:0 0 auto; }
+.cp-cot-total { font-size:17px; font-weight:800; color:#4F46E5; white-space:nowrap; }
+.cp-cot-meta { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11.5px; color:#6b7280; background:#f8f9fb; border:1px solid #eef0f3; border-radius:8px; padding:8px 10px; }
+.cp-cot-meta i { color:#9ca3af; }
+.cp-cot-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
+
+/* Matriz de comparação */
+.cp-mat-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.cp-leg .cp-dot-best { background:#16a34a; }
+.cp-leg .cp-dot-prazo { background:#3b82f6; }
+.cp-leg .cp-dot-win   { background:#4F46E5; }
+
+.cp-matriz { min-width:640px; }
+.cp-matriz thead th { position:sticky; top:0; background:#f8f9fb; z-index:2; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; border-bottom:1px solid #e8eaed; padding:10px; }
+.cp-matriz .cp-mat-item { width:260px; min-width:220px; background:#fff; border-right:1px solid #eef0f3; }
+.cp-matriz .cp-mat-forn { min-width:150px; text-align:center; }
+.cp-mat-forn-nome { font-size:12.5px; font-weight:700; color:#1a1d23; text-transform:none; letter-spacing:0; }
+.cp-mat-forn-sub { font-size:10.5px; color:#8b919a; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; margin-top:4px; text-transform:none; letter-spacing:0; }
+.cp-matriz .cp-mat-win { width:140px; text-align:center; }
+.cp-mat-desc { font-size:12.5px; color:#374151; line-height:1.4; margin-top:2px; }
+.cp-win-name { display:inline-block; font-size:11.5px; font-weight:700; color:#15803d; background:#dcfce7; border-radius:999px; padding:3px 9px; }
+
+/* Célula da matriz — clicável para marcar o vencedor */
+.cp-cell { position:relative; text-align:center; padding:9px 8px; border-left:1px solid #f1f3f6; cursor:pointer; transition:background .12s; vertical-align:top; }
+.cp-cell:hover { background:#f5f5ff; }
+.cp-cell-price { font-size:13px; font-weight:700; color:#1a1d23; white-space:nowrap; }
+.cp-cell-unit { font-size:10.5px; color:#8b919a; margin-top:2px; white-space:nowrap; }
+.cp-cell-pz { font-size:10.5px; color:#64748b; margin-top:3px; display:flex; align-items:center; justify-content:center; gap:3px; }
+.cp-cell-pz.best { color:#1d4ed8; font-weight:700; }
+.cp-cell-none { color:#c7cbd3; font-weight:600; }
+.cp-cell-na { color:#d1d5db; text-align:center; cursor:default; }
+.cp-cell-na:hover { background:transparent; }
+.cp-cell-vazio { background:#fcfcfd; }
+.cp-cell-best { background:#f0fdf4; box-shadow:inset 0 0 0 1px #bbf7d0; }
+.cp-cell-best .cp-cell-price { color:#15803d; }
+.cp-cell-pzbest { box-shadow:inset 0 0 0 1px #bfdbfe; }
+.cp-cell-win { background:#eef2ff; box-shadow:inset 0 0 0 2px #4F46E5; }
+.cp-cell-win .cp-cell-price { color:#4338ca; }
+.cp-cell-flag { position:absolute; top:3px; right:4px; color:#4F46E5; font-size:12px; line-height:1; }
+.cp-cell-total { background:#f8f9fb; border-top:1px solid #e8eaed; cursor:default; }
+.cp-cell-total:hover { background:#f8f9fb; }
+.cp-matriz tfoot td { background:#f8f9fb; font-size:12.5px; }
+
+/* Grade de preços da cotação */
+.cp-price { min-width:900px; }
+.cp-price thead th { position:sticky; top:0; background:#f8f9fb; z-index:2; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; border-bottom:1px solid #e8eaed; padding:9px 8px; }
+.cp-price-in { width:100%; padding:5px 7px; font-size:12.5px; text-align:right; }
+.cp-price-in[disabled] { background:#f8fafc; color:#94a3b8; }
+.cp-price tbody tr:nth-child(even) { background:#fafbfc; }
+.cp-price tbody tr:hover { background:#f5f5ff; }
+
+/* Rodapé de status / transições da cotação */
+.cp-cot-status { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px dashed #e8eaed; }
+.cp-cot-status-label { font-size:11px; font-weight:700; color:#8b919a; text-transform:uppercase; letter-spacing:.5px; }
+
 @media (max-width: 860px) {
     .cp-summary { grid-template-columns:repeat(2,1fr); }
     .cp-field-row, .cp-field-row-3 { grid-template-columns:1fr; }
     .cp-form-grid .cp-span-2 { grid-column:span 1; }
+    .cp-cot-list { grid-template-columns:1fr; }
 }

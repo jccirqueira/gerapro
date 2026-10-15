@@ -7,6 +7,9 @@ import { store } from './state.js';
    Fase 1: ENTRADA DA LM — upload do arquivo da Engenharia, pareamento
            contra o Banco de Materiais, alerta de material não cadastrado
            e gate formal de "Liberar para Compras".
+   Fase 2: COTAÇÕES — 1 requisição → N cotações (uma por fornecedor),
+           matriz de comparação item × fornecedor, marcação de vencedor
+           item a item, import da tabela de preços e campos de negociação.
 
    Fluxo completo (fases seguintes): REQUISIÇÃO → COTAÇÃO → PEDIDO → NF.
    ===================================================================== */
@@ -47,8 +50,52 @@ const CP_ALIASES = {
    Abaixo disso o item é tratado como NÃO CADASTRADO. */
 const CP_LIMIAR = 55;
 
+/* Pontuação mínima para ACEITAR O VÍNCULO AUTOMÁTICO quando a descrição tem
+   medida comparável (corrente/tensão/potência). É mais restritiva que o
+   limiar de sugestão: se a medida divergir, o score cai abaixo daqui e o
+   item fica NÃO CADASTRADO (alerta de cadastro) em vez de apontar para o
+   material errado. Medida igual só dá ~55 pts sozinha; precisa do restante
+   da descrição bater para fechar acima de 80. */
+const CP_LIMIAR_SUGESTAO = 80;
+
 /* Uma requisição aberta é deduplicada destas. */
 const CP_ABERTAS = ['rascunho', 'em_conferencia', 'liberada', 'em_cotacao', 'em_pedido'];
+
+/* Status da Cotação de preços junto a um fornecedor. */
+const CP_COT_STATUS = {
+    aberta: 'Aberta',
+    enviada: 'Enviada',
+    recebida: 'Recebida',
+    vencedora: 'Vencedora',
+    descartada: 'Descartada',
+    cancelada: 'Cancelada'
+};
+
+/* Transições permitidas a partir de cada status da cotação. */
+const CP_COT_TRANSICOES = {
+    aberta: ['enviada', 'cancelada'],
+    enviada: ['recebida', 'cancelada'],
+    recebida: ['vencedora', 'descartada', 'enviada', 'cancelada'],
+    vencedora: ['recebida', 'descartada'],
+    descartada: ['recebida'],
+    cancelada: []
+};
+
+/* Aliases de cabeçalho da TABELA DE PREÇOS do fornecedor.
+   Template: Código | Descrição | Preço Unitário | Prazo (dias) */
+const CP_PRECO_ALIASES = {
+    codigo: CP_ALIASES.codigo,
+    preco: ['preco', 'preco unitario', 'preco unit', 'preco de venda', 'valor',
+            'valor unitario', 'valor unit', 'vl unit', 'vlr unit', 'custo',
+            'custo unitario', 'unit price', 'price', 'vunit', 'tabela'],
+    prazo: ['prazo', 'prazo entrega', 'prazo de entrega', 'entrega', 'lead time',
+            'dias', 'dias uteis', 'leadtime'],
+    ipi: ['ipi'], icms: ['icms'],
+    // 'desc' NÃO pode estar aqui: a regra de prefixo faria 'desc' casar com
+    // "Descrição" (que não é campo desta lista) e jogaria os dígitos da
+    // descrição na coluna de desconto. 'desconto' cobre "Desc" por prefixo.
+    desconto: ['desconto', 'desconto %', 'desc %', 'dsc', 'percentual desconto']
+};
 
 const ComprasModule = {
     _active: false,
@@ -63,6 +110,11 @@ const ComprasModule = {
     _idx: null,             // índice do catálogo para o pareamento
     _matModal: null,        // { idx, material (sugestão) }
     _loteErros: null,       // mensagens do último bloqueio de liberação
+    activeCotacao: null,    // id da cotação aberta (viewMode === 'cotacao')
+    cotSub: 'lista',        // sub-view da aba Cotações: 'lista' | 'comparar'
+    _cotStaging: null,      // cotação em construção ({ cotacao, itens })
+    _cotModal: null,        // { requisicao_id, usados:Set, sugeridos:Set }
+    _cotAviso: null,        // retorno do último import de preços
 
     /* ================================================================
        CICLO DE VIDA
@@ -97,13 +149,36 @@ const ComprasModule = {
             liberarRequisicao: this.liberarRequisicao.bind(this),
             cancelarRequisicao: this.cancelarRequisicao.bind(this),
             remove: this.remove.bind(this),
-            exportXLSX: this.exportXLSX.bind(this)
+            exportXLSX: this.exportXLSX.bind(this),
+            novaCotacao: this.novaCotacao.bind(this),
+            criarCotacao: this.criarCotacao.bind(this),
+            trocarModalCot: this.trocarModalCot.bind(this),
+            salvarFornecedorRapido: this.salvarFornecedorRapido.bind(this),
+            fecharModalCot: this.fecharModalCot.bind(this),
+            openCotacao: this.openCotacao.bind(this),
+            voltarDaCotacao: this.voltarDaCotacao.bind(this),
+            setCotCampo: this.setCotCampo.bind(this),
+            setCotItemCampo: this.setCotItemCampo.bind(this),
+            salvarCotacao: this.salvarCotacao.bind(this),
+            mudarStatusCot: this.mudarStatusCot.bind(this),
+            removerCotacao: this.removerCotacao.bind(this),
+            importarPrecos: this.importarPrecos.bind(this),
+            handleCotImportFile: this.handleCotImportFile.bind(this),
+            baixarModeloPrecos: this.baixarModeloPrecos.bind(this),
+            preencherCatalogo: this.preencherCatalogo.bind(this),
+            marcarVencedor: this.marcarVencedor.bind(this),
+            marcarMenorPreco: this.marcarMenorPreco.bind(this),
+            alternarSubCot: this.alternarSubCot.bind(this)
         };
 
         store.subscribe((state) => {
             if (this._active && !this._seeding) {
                 if (this.viewMode === 'nova') {
                     // staging próprio: não re-render, para não perder foco de digitação
+                } else if (this.viewMode === 'cotacao' && this.activeCotacao) {
+                    // staging própria da cotação; só reage se ela for removida
+                    const existe = (state.comprasCotacoes || []).some(c => c.id === this.activeCotacao);
+                    if (!existe) this.voltarDaCotacao();
                 } else if (this.viewMode === 'detail' && this.activeId) {
                     const exists = (state.comprasRequisicoes || []).some(r => r.id === this.activeId);
                     if (!exists) this.backToList();
@@ -129,6 +204,11 @@ const ComprasModule = {
         this.projetoFilter = '';
         this._staging = null;
         this._matModal = null;
+        this.activeCotacao = null;
+        this.cotSub = 'lista';
+        this._cotStaging = null;
+        this._cotModal = null;
+        this._cotAviso = null;
     },
 
     /* Badge: prioriza itens ainda não resolvidos; senão, pendências de fluxo. */
@@ -156,6 +236,7 @@ const ComprasModule = {
     render() {
         this._active = true;
         if (this.viewMode === 'nova') this.renderNova();
+        else if (this.viewMode === 'cotacao' && this._cotStaging) this.renderCotacao();
         else if (this.viewMode === 'detail' && this.activeId) this.renderDetail();
         else this.renderList();
     },
@@ -172,11 +253,21 @@ const ComprasModule = {
         this.activeId = null;
         this.activeTab = 'itens';
         this._matModal = null;
+        this.activeCotacao = null;
+        this._cotStaging = null;
+        this.cotSub = 'lista';
         this.render();
     },
 
     switchTab(tab) {
+        if (tab !== this.activeTab && tab === 'cotacoes') this.cotSub = 'lista';
         this.activeTab = tab;
+        this.renderDetail();
+    },
+
+    /* Sub-view dentro da aba Cotações: lista de cotações × matriz de comparação. */
+    alternarSubCot(sub) {
+        this.cotSub = sub;
         this.renderDetail();
     },
 
@@ -687,16 +778,19 @@ const ComprasModule = {
        MAPEAMENTO DE COLUNAS E PARSING
        ================================================================ */
 
-    _mapearColunas(headers) {
+    /* Mapeia cabeçalhos da planilha para campos. Por padrão usa os aliases
+       da LM; passe `aliases`/`campos` para reaproveitar em outros fluxos
+       (ex.: a tabela de preços do fornecedor). */
+    _mapearColunas(headers, aliases = CP_ALIASES, campos = ['codigo', 'descricao', 'fabricante', 'unidade', 'qtd']) {
         const mapa = {};
         headers.forEach((h) => {
             const n = this._norm(h);
             if (!n) return;
-            for (const campo of ['codigo', 'descricao', 'fabricante', 'unidade', 'qtd']) {
+            for (const campo of campos) {
                 if (mapa[campo] !== undefined) continue;
-                const aliases = CP_ALIASES[campo];
-                if (aliases.includes(n)) { mapa[campo] = h; break; }
-                if (n.length >= 3 && aliases.some(a => n.startsWith(a) || a.startsWith(n))) { mapa[campo] = h; break; }
+                const lista = aliases[campo] || [];
+                if (lista.includes(n)) { mapa[campo] = h; break; }
+                if (n.length >= 3 && lista.some(a => n.startsWith(a) || a.startsWith(n))) { mapa[campo] = h; break; }
             }
         });
         return mapa;
@@ -820,6 +914,34 @@ const ComprasModule = {
         return out;
     },
 
+    /* Extrai medidas comparáveis de um texto normalizado (LM ou catálogo):
+       corrente em A, tensão em V e potência em kW/HP. É o que separa um
+       "disjuntor 6A" de um "4A" — texto idêntico, especificação diferente.
+       Só lê o que está ANTES da unidade (6A, 400V, 1,5kW), ignora códigos
+       e números soltos como NH02 ou 60947-2. */
+    _medidas(texto) {
+        const s = ' ' + this._norm(texto) + ' ';
+        const out = { amp: [], volt: [], kw: [] };
+        const NUM = '(\\d+(?:[\\.,]\\d+)?)';
+        const pares = (re, alvo) => {
+            let m; while ((m = re.exec(s)) !== null) alvo.push(parseFloat(m[1].replace(',', '.')));
+        };
+        // Corrente: 6A vale; 5kA NÃO (precisa separar — "6A, ... 5kA" tem as
+        // duas, e tratar kA como A faz 6A casar com 4A via o "5kA" comum).
+        // Corrente: o "a" precisa vir COLADO no número (6a, 320a) — senão o
+        // "disparo de 5 a 10 x In" de um disjuntor vira "5A" e casa com
+        // qualquer 5A. E não pode ser "ka" (5kA é potência de curto-circuito).
+        pares(new RegExp(NUM + 'a(?![a-z0-9])(?![k])', 'g'), out.amp);
+        pares(new RegExp(NUM + '\\s*v(?![a-z0-9])', 'g'), out.volt);
+        pares(new RegExp(NUM + '\\s*kw(?![a-z0-9])', 'g'), out.kw);
+        // Corrente "real" (>=1A): descarta falso positivo como o "5 a 10 x In"
+        // de um disjuntor, que viraria "5A" e casaria com qualquer 5A.
+        out.amp = out.amp.filter(a => a >= 1);
+        const hp = new RegExp(NUM + '\\s*(?:cv|hp)(?![a-z0-9])', 'g');
+        let m; while ((m = hp.exec(s)) !== null) out.kw.push(parseFloat(m[1].replace(',', '.')) * 0.7457);
+        return out;
+    },
+
     _score(item, m) {
         const descItem = this._norm(item.descricao);
         const kw = descItem.split(' ').filter(w => w.length >= 4);
@@ -841,6 +963,20 @@ const ComprasModule = {
         if (fab) {
             const alvo = this._norm(m.fabricante) + ' ' + this._norm(m.grupoSiemens);
             if (alvo.includes(fab)) score += 25;
+        }
+
+        // Medidas (corrente/tensão/potência): se AMBAS têm e divergem, o texto
+        // é parecido mas a especificação é outra — penaliza pesado para não
+        // vincular um material errado em silêncio. Se bate, reforça (o texto
+        // sozinho pode ser genérico demais para passar do limiar).
+        const mi = this._medidas(item.descricao), mm = this._medidas(m.descricao);
+        const div = (a, b) => a.length && b.length && !a.some(x => b.some(y => Math.abs(x - y) < 0.001));
+        if (div(mi.amp, mm.amp) || div(mi.volt, mm.volt) || div(mi.kw, mm.kw)) {
+            score -= 45;
+        } else if ((mi.amp.length && mm.amp.length && !div(mi.amp, mm.amp)) ||
+                   (mi.volt.length && mm.volt.length && !div(mi.volt, mm.volt)) ||
+                   (mi.kw.length && mm.kw.length && !div(mi.kw, mm.kw))) {
+            score += 25;
         }
         return Math.round(score * 10) / 10;
     },
@@ -865,7 +1001,17 @@ const ComprasModule = {
             if (s > melhorScore) { melhorScore = s; melhor = i; }
         }
         if (melhor >= 0 && melhorScore >= CP_LIMIAR) {
-            return { material: idx.materiais[melhor], confianca: Math.min(0.95, melhorScore / 100), duplicados: 0, score: melhorScore };
+            // Medida divergente (corrente/tensão/potência) zera o vínculo:
+            // texto parecido, especificação outra. Vira NÃO CADASTRADO p/ alertar.
+            const mi = this._medidas(item.descricao), mm = this._medidas(idx.materiais[melhor].descricao);
+            const div = (a, b) => a.length && b.length && !a.some(x => b.some(y => Math.abs(x - y) < 0.001));
+            if (div(mi.amp, mm.amp) || div(mi.volt, mm.volt) || div(mi.kw, mm.kw)) {
+                return { material: null, confianca: 0, duplicados: 0, score: melhorScore };
+            }
+            const lim = mi.amp.length || mi.volt.length || mi.kw.length ? CP_LIMIAR_SUGESTAO : CP_LIMIAR;
+            if (melhorScore >= lim) {
+                return { material: idx.materiais[melhor], confianca: Math.min(0.95, melhorScore / 100), duplicados: 0, score: melhorScore };
+            }
         }
         return { material: null, confianca: 0, duplicados: 0, score: melhorScore };
     },
@@ -1616,6 +1762,7 @@ const ComprasModule = {
         const podeRemover = store.canDelete();
         const podeLiberar = podeEditar && (r.status === 'rascunho' || r.status === 'em_conferencia');
         const emConferencia = r.status === 'rascunho' || r.status === 'em_conferencia';
+        const cotacoes = this._cotacoesDaRequisicao(r.id);
 
         container.innerHTML = `
             <div style="height:calc(100vh - 120px);display:flex;flex-direction:column;background:rgb(250,250,250);margin:-20px;position:relative;">
@@ -1681,11 +1828,17 @@ const ComprasModule = {
                         <button class="cp-tab ${this.activeTab === 'resumo' ? 'active' : ''}" onclick="app.compras.switchTab('resumo')">
                             <i class="ph ph-chart-bar"></i> Resumo
                         </button>
+                        <button class="cp-tab ${this.activeTab === 'cotacoes' ? 'active' : ''}" onclick="app.compras.switchTab('cotacoes')">
+                            <i class="ph ph-tag"></i> Cotações
+                            <span class="cp-tab-tag">${cotacoes.length}</span>
+                        </button>
                     </div>
 
                     ${this.activeTab === 'itens'
                         ? this._detalheItensHTML(r, itens, resumo, emConferencia)
-                        : this._detalheResumoHTML(r, itens, resumo)}
+                        : this.activeTab === 'cotacoes'
+                            ? this._detalheCotacoesHTML(r, itens, cotacoes, podeEditar)
+                            : this._detalheResumoHTML(r, itens, resumo)}
                 </div>
             </div>
         `;
@@ -1772,6 +1925,1214 @@ const ComprasModule = {
                 </div>
             </div>
         `;
+    },
+
+    /* ================================================================
+       COTAÇÕES (Fase 2) — 1 requisição → N cotações, uma por fornecedor
+       ----------------------------------------------------------------
+       A cotação tem staging próprio (digitação sem re-render); a matriz
+       de comparação lê o store, então só é aberta depois de salvar.
+       ================================================================ */
+
+    _cotacoesDaRequisicao(reqId) {
+        return (store.getState().comprasCotacoes || [])
+            .filter(c => c.requisicao_id === reqId)
+            .sort((a, b) => String(a.numero || '').localeCompare(String(b.numero || '')));
+    },
+
+    _cotacao(id) {
+        return (store.getState().comprasCotacoes || []).find(c => c.id === id) || null;
+    },
+
+    _itensDaCotacao(cotId) {
+        return (store.getState().comprasCotacaoItens || []).filter(i => i.cotacao_id === cotId);
+    },
+
+    _fornecedor(id) {
+        return (store.getState().fornecedores || []).find(f => f.id === id) || null;
+    },
+
+    _nomeFornecedor(f) {
+        if (!f) return 'Fornecedor não identificado';
+        return f.nomeFantasia || f.razaoSocial || 'Sem nome';
+    },
+
+    /* Fornecedores sugeridos vêm do HISTÓRICO (cotações vencedoras ou pedidos
+       destes materiais) — nunca de cadastro manual, senão viraria circular. */
+    _fornecedoresSugeridos(itens) {
+        const matIds = new Set(itens.map(i => i.material_id).filter(Boolean));
+        const cont = new Map();
+        const inc = (fid) => { if (fid) cont.set(fid, (cont.get(fid) || 0) + 1); };
+
+        (store.getState().comprasCotacoes || []).forEach(c => {
+            if (c.status !== 'vencedora') return;
+            this._itensDaCotacao(c.id).forEach(ci => {
+                if ((ci.vencedor === 1 || ci.vencedor === '1') && matIds.has(ci.material_id)) inc(c.fornecedor_id);
+            });
+        });
+
+        const pedidos = store.getState().comprasPedidos || [];
+        const pIds = new Set((store.getState().comprasPedidoItens || [])
+            .filter(pi => matIds.has(pi.material_id)).map(pi => pi.pedido_id));
+        pedidos.forEach(p => { if (pIds.has(p.id)) inc(p.fornecedor_id); });
+
+        return new Set([...cont.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]));
+    },
+
+    _nextCodigoCot(cotacoes) {
+        let max = 0;
+        cotacoes.forEach(c => {
+            const m = String(c.numero || '').match(/(\d+)$/);
+            if (m) max = Math.max(max, parseInt(m[1], 10));
+        });
+        return 'COT-' + String(max + 1).padStart(4, '0');
+    },
+
+    /* Total do item: Qtd × Unit × (1+IPI%) × (1−Desc%). ICMS é só referência —
+       ele já vem embutido no preço de tabela do fornecedor.
+       IPI e desconto são PERCENTUAIS 0–100: fora da faixa é erro de
+       digitação/coluna e não pode nem inflar nem inverter o total. */
+    _cotItemTotal(ci) {
+        const qtd = parseFloat(ci.qtd) || 0;
+        const unit = parseFloat(ci.custo_unitario) || 0;
+        if (unit <= 0 || qtd <= 0) return 0;
+        const faixa = v => Math.min(100, Math.max(0, parseFloat(v) || 0));
+        const ipi = faixa(ci.ipi);
+        const desc = faixa(ci.desconto);
+        return qtd * unit * (1 + ipi / 100) * (1 - desc / 100);
+    },
+
+    _cotSomaItens() {
+        const st = this._cotStaging;
+        if (!st) return 0;
+        return st.itens.reduce((s, ci) => s + this._cotItemTotal(ci), 0);
+    },
+
+    _cotGeral() {
+        const st = this._cotStaging;
+        if (!st) return 0;
+        return this._cotSomaItens() + (parseFloat(st.cotacao.frete) || 0);
+    },
+
+    /* ------------------------------------------------------------
+       ABA "COTAÇÕES" NO DETALHE DA REQUISIÇÃO
+       ------------------------------------------------------------ */
+
+    _detalheCotacoesHTML(r, itens, cotacoes, podeEditar) {
+        if (r.status === 'rascunho' || r.status === 'em_conferencia') {
+            return `
+                <div class="cp-banner warn">
+                    <i class="ph ph-lock"></i>
+                    <div><b>Cotações bloqueadas.</b> Libere a requisição para compras antes de enviar pedidos de preço a fornecedores.</div>
+                </div>
+                ${cotacoes.length ? this._listaCotacoesHTML(cotacoes, false)
+                                  : this._cotacoesVaziasHTML(false)}
+            `;
+        }
+        if (!itens.length) {
+            return `<div class="cp-empty-state"><i class="ph ph-tag"></i><h3>Sem itens</h3><p>Esta requisição não contém itens para cotar.</p></div>`;
+        }
+
+        const cotar = podeEditar && (r.status === 'liberada' || r.status === 'em_cotacao');
+        const comparando = cotacoes.length > 0 && this.cotSub === 'comparar';
+
+        return `
+            <div class="cp-toolbar" style="justify-content:space-between;">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <span style="font-size:12.5px;font-weight:700;color:#4b5563;">
+                        <i class="ph ph-tag"></i> ${cotacoes.length} cotação(ões)
+                    </span>
+                    ${cotacoes.length ? `
+                    <button class="btn btn-sm ${comparando ? 'btn-primary' : 'btn-ghost'}" onclick="app.compras.alternarSubCot('${comparando ? 'lista' : 'comparar'}')">
+                        <i class="ph ph-squares-four"></i> ${comparando ? 'Voltar à lista' : 'Comparar preços'}
+                    </button>` : ''}
+                </div>
+                ${cotar ? `
+                <button class="btn btn-sm btn-primary" onclick="app.compras.novaCotacao('${r.id}')">
+                    <i class="ph ph-plus"></i> Nova cotação
+                </button>` : ''}
+            </div>
+
+            ${!cotar && cotacoes.length && r.status !== 'cancelada' ? `
+            <div class="cp-cat-hint">A requisição está em <b>${this._esc(CP_STATUS[r.status] || r.status)}</b> — a leitura continua disponível, mas criar novas cotações exige Liberada/Em Cotação.</div>` : ''}
+
+            ${!cotacoes.length
+                ? this._cotacoesVaziasHTML(cotar)
+                : comparando
+                    ? this._matrizHTML(r, itens, cotacoes)
+                    : this._listaCotacoesHTML(cotacoes, podeEditar)}
+        `;
+    },
+
+    _cotacoesVaziasHTML(podeCriar) {
+        return `
+            <div class="cp-empty-state">
+                <i class="ph ph-tag"></i>
+                <h3>Nenhuma cotação ainda</h3>
+                <p>Abra uma cotação por fornecedor e compare preço, prazo e condição de pagamento lado a lado antes de gerar o pedido.</p>
+                ${podeCriar ? `<button class="btn btn-primary" style="margin-top:14px;" onclick="app.compras.novaCotacao('${this.activeId}')">
+                    <i class="ph ph-plus"></i> Nova cotação
+                </button>` : ''}
+            </div>
+        `;
+    },
+
+    _listaCotacoesHTML(cotacoes, podeEditar) {
+        return `<div class="cp-cot-list">${cotacoes.map(c => {
+            const f = this._fornecedor(c.fornecedor_id);
+            const itensCot = this._itensDaCotacao(c.id);
+            const cotados = itensCot.filter(i => parseFloat(i.custo_unitario) > 0).length;
+            const vencendo = itensCot.filter(i => i.vencedor === 1 || i.vencedor === '1').length;
+            return `
+            <div class="cp-cot-card cp-cot-${this._esc(c.status)}">
+                <div class="cp-cot-head">
+                    <div style="min-width:0;">
+                        <div class="cp-cot-numero">
+                            ${this._esc(c.numero)}
+                            <span class="cp-badge cp-badge-cot cp-cot-${this._esc(c.status)}">${this._esc(CP_COT_STATUS[c.status] || c.status)}</span>
+                        </div>
+                        <div class="cp-cot-forn">${this._esc(this._nomeFornecedor(f))}${f && f.cnpj ? ' · CNPJ ' + this._esc(f.cnpj) : ''}</div>
+                    </div>
+                    <div class="cp-cot-vals">
+                        <div class="cp-cot-total">${window.app.formatCurrency(c.total || 0)}</div>
+                        <div class="cp-sub">${cotados}/${itensCot.length} item(ns) com preço${vencendo ? ` · <b style="color:#15803d;">${vencendo} vencendo</b>` : ''}</div>
+                    </div>
+                </div>
+                <div class="cp-cot-meta">
+                    <span><i class="ph ph-clock"></i> ${this._esc(c.prazo_entrega) || 'Prazo —'}</span>
+                    <span><i class="ph ph-calendar-check"></i> ${this._esc(c.condicao_pagamento) || 'Condição —'}</span>
+                    <span><i class="ph ph-hourglass"></i> ${this._esc(c.validade_proposta) || 'Validade —'}</span>
+                    <span><i class="ph ph-truck"></i> Frete ${window.app.formatCurrency(c.frete || 0)}</span>
+                    ${c.data_resposta ? `<span><i class="ph ph-check-circle"></i> Resposta ${this._fmtDate(c.data_resposta)}</span>` : ''}
+                </div>
+                <div class="cp-cot-actions">
+                    <button class="btn btn-sm btn-primary" onclick="app.compras.openCotacao('${c.id}')">
+                        <i class="ph ph-pencil-simple"></i> Abrir cotação
+                    </button>
+                    ${podeEditar && c.status !== 'cancelada' ? `
+                    <button class="btn btn-sm btn-ghost" onclick="app.compras.removerCotacao('${c.id}')">
+                        <i class="ph ph-trash"></i> Excluir
+                    </button>` : ''}
+                </div>
+            </div>`;
+        }).join('')}</div>`;
+    },
+
+    /* Matriz de comparação: itens × fornecedores, célula clicável para
+       marcar o vencedor do item. */
+    _matrizHTML(req, itens, cotacoes) {
+        const cells = new Map();
+        cotacoes.forEach(c => this._itensDaCotacao(c.id).forEach(ci => {
+            if (!cells.has(ci.requisicao_item_id)) cells.set(ci.requisicao_item_id, new Map());
+            cells.get(ci.requisicao_item_id).set(c.id, ci);
+        }));
+
+        const melhorTotal = new Map(), melhorPrazo = new Map(), vitorias = new Map();
+        cotacoes.forEach(c => vitorias.set(c.id, 0));
+
+        itens.forEach(it => {
+            const row = cells.get(it.id);
+            if (!row) return;
+            let mt = null, mp = null;
+            cotacoes.forEach(c => {
+                const ci = row.get(c.id);
+                if (!ci) return;
+                const tot = this._cotItemTotal(ci);
+                if (tot > 0 && (mt === null || tot < mt)) mt = tot;
+                const pz = this._num(ci.prazo_entrega || c.prazo_entrega);
+                if (pz > 0 && (mp === null || pz < mp)) mp = pz;
+                if (ci.vencedor === 1 || ci.vencedor === '1') vitorias.set(c.id, (vitorias.get(c.id) || 0) + 1);
+            });
+            if (mt !== null) melhorTotal.set(it.id, mt);
+            if (mp !== null) melhorPrazo.set(it.id, mp);
+        });
+
+        const algumPreco = itens.some(it => {
+            const row = cells.get(it.id);
+            return row && [...row.values()].some(ci => this._cotItemTotal(ci) > 0);
+        });
+        const lider = [...vitorias.entries()].sort((a, b) => b[1] - a[1])[0];
+
+        return `
+            <div class="cp-legend">
+                <span class="cp-leg"><span class="cp-dot cp-dot-best"></span> Menor total do item</span>
+                <span class="cp-leg"><span class="cp-dot cp-dot-prazo"></span> Menor prazo</span>
+                <span class="cp-leg"><span class="cp-dot cp-dot-win"></span> Vencedor marcado</span>
+                <span class="cp-leg" style="margin-left:auto;color:#8b919a;">Clique na célula para marcar o vencedor</span>
+            </div>
+
+            ${!algumPreco ? `
+            <div class="cp-banner warn">
+                <i class="ph ph-question"></i>
+                <div><b>Nenhum preço informado ainda.</b> Abra cada cotação e lance os preços do fornecedor — ou importe a tabela de preços dele — antes de comparar.</div>
+            </div>` : ''}
+
+            <div class="cp-mat-actions">
+                <button class="btn btn-sm btn-primary" onclick="app.compras.marcarMenorPreco('${req.id}')">
+                    <i class="ph ph-lightning"></i> Marcar menor preço automaticamente
+                </button>
+            </div>
+
+            <div class="cp-conf-wrap" style="margin-top:10px;">
+                <div class="cp-conf-scroll">
+                    <table class="cp-table cp-matriz">
+                        <thead>
+                            <tr>
+                                <th class="cp-mat-item">Item da LM</th>
+                                ${cotacoes.map(c => {
+                                    const f = this._fornecedor(c.fornecedor_id);
+                                    return `<th class="cp-mat-forn">
+                                        <div class="cp-mat-forn-nome">${this._esc(this._nomeFornecedor(f))}</div>
+                                        <div class="cp-mat-forn-sub">${this._esc(c.numero)}
+                                            <span class="cp-badge cp-badge-cot cp-cot-${this._esc(c.status)}">${this._esc(CP_COT_STATUS[c.status] || c.status)}</span>
+                                        </div>
+                                    </th>`;
+                                }).join('')}
+                                <th class="cp-mat-win">Vencedor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itens.map(it => {
+                                const row = cells.get(it.id) || new Map();
+                                const mt = melhorTotal.get(it.id);
+                                const mp = melhorPrazo.get(it.id);
+                                const venc = cotacoes.find(c => {
+                                    const ci = row.get(c.id);
+                                    return ci && (ci.vencedor === 1 || ci.vencedor === '1');
+                                });
+                                return `<tr>
+                                    <td class="cp-mat-item">
+                                        <div class="cp-codigo">${this._esc(it.codigo) || 'sem código'}</div>
+                                        <div class="cp-mat-desc">${this._esc(it.descricao)}</div>
+                                        <div class="cp-sub">${this._fmtQtd(it.qtd)} ${this._esc(it.unidade)}</div>
+                                    </td>
+                                    ${cotacoes.map(c => {
+                                        const ci = row.get(c.id);
+                                        if (!ci) return `<td class="cp-cell cp-cell-na">—</td>`;
+                                        const tot = this._cotItemTotal(ci);
+                                        const unit = parseFloat(ci.custo_unitario) || 0;
+                                        const pz = this._num(ci.prazo_entrega || c.prazo_entrega);
+                                        const best = tot > 0 && mt !== null && Math.abs(tot - mt) < 0.005;
+                                        const pzBest = pz > 0 && mp !== null && pz === mp;
+                                        const venceu = ci.vencedor === 1 || ci.vencedor === '1';
+                                        const cls = ['cp-cell', tot > 0 ? '' : 'cp-cell-vazio',
+                                                     best ? 'cp-cell-best' : '', pzBest ? 'cp-cell-pzbest' : '',
+                                                     venceu ? 'cp-cell-win' : ''].filter(Boolean).join(' ');
+                                        const nome = this._esc(this._nomeFornecedor(this._fornecedor(c.fornecedor_id)));
+                                        return `<td class="${cls}" onclick="app.compras.marcarVencedor('${it.id}','${c.id}')"
+                                              title="${nome} — ${window.app.formatCurrency(tot)}${pz ? ' · ' + pz + ' dias' : ''}">
+                                            ${venceu ? '<span class="cp-cell-flag"><i class="ph ph-trophy"></i></span>' : ''}
+                                            <div class="cp-cell-price">${tot > 0 ? window.app.formatCurrency(tot) : '<span class="cp-cell-none">sem preço</span>'}</div>
+                                            ${unit > 0 ? `<div class="cp-cell-unit">${window.app.formatCurrency(unit)} / ${this._esc(it.unidade)}</div>` : ''}
+                                            ${pz > 0 ? `<div class="cp-cell-pz${pzBest ? ' best' : ''}"><i class="ph ph-clock"></i> ${pz}d</div>` : ''}
+                                        </td>`;
+                                    }).join('')}
+                                    <td class="cp-mat-win">${venc
+                                        ? `<span class="cp-win-name">${this._esc(this._nomeFornecedor(this._fornecedor(venc.fornecedor_id)))}</span>`
+                                        : '<span class="cp-cell-none">—</span>'}</td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td class="cp-mat-item"><b>Total da proposta</b><div class="cp-sub">itens + frete</div></td>
+                                ${cotacoes.map(c => {
+                                    const soma = this._itensDaCotacao(c.id).reduce((s, ci) => s + this._cotItemTotal(ci), 0) + (parseFloat(c.frete) || 0);
+                                    return `<td class="cp-cell cp-cell-total${soma > 0 ? '' : ' cp-cell-vazio'}"><b>${soma > 0 ? window.app.formatCurrency(soma) : '—'}</b></td>`;
+                                }).join('')}
+                                <td class="cp-mat-win"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="cp-cat-hint" style="margin-top:12px;">
+                <b>Total do item</b> = Qtd × Valor unitário × (1 + IPI%) × (1 − Desconto%). O ICMS aparece apenas como referência.
+                ${lider && lider[1] ? `<br><b>Contagem de vitórias:</b> ${this._esc(this._nomeFornecedor(this._fornecedor(lider[0])))} vence ${lider[1]} de ${itens.length} item(ns).` : ''}
+            </div>
+        `;
+    },
+
+    /* ------------------------------------------------------------
+       CRIAÇÃO DA COTAÇÃO
+       ------------------------------------------------------------ */
+
+    novaCotacao(requisicaoId) {
+        const r = this._req(requisicaoId);
+        if (!r) return;
+        if (r.status !== 'liberada' && r.status !== 'em_cotacao') {
+            window.app.toast('Libere a requisição para compras antes de criar cotações.', 'error');
+            return;
+        }
+        const itens = this._itensDaRequisicao(requisicaoId);
+        if (!itens.length) { window.app.toast('A requisição não tem itens para cotar.', 'error'); return; }
+
+        this._cotModal = {
+            requisicao_id: requisicaoId,
+            usados: new Set(this._cotacoesDaRequisicao(requisicaoId).map(c => c.fornecedor_id)),
+            sugeridos: this._fornecedoresSugeridos(itens),
+            pre: ''
+        };
+        this._renderCotModal();
+    },
+
+    _renderCotModal() {
+        const m = this._cotModal;
+        if (!m) return;
+        const r = this._req(m.requisicao_id);
+        const fornecedores = (store.getState().fornecedores || [])
+            .slice().sort((a, b) => this._nomeFornecedor(a).localeCompare(this._nomeFornecedor(b), 'pt-BR'));
+
+        document.querySelectorAll('.cp-modal-overlay').forEach(el => el.remove());
+        const overlay = document.createElement('div');
+        overlay.className = 'cp-modal-overlay';
+        overlay.onclick = (e) => { if (e.target === overlay) this.fecharModalCot(); };
+        overlay.innerHTML = `
+            <div class="cp-modal">
+                <div class="cp-modal-head">
+                    <div>
+                        <h3><i class="ph ph-tag"></i> Nova cotação de preços</h3>
+                        <div class="cp-modal-sub">${this._esc(r ? r.codigo : '')} · ${fornecedores.length} fornecedor(es) cadastrado(s)</div>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="app.compras.fecharModalCot()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="cp-modal-body">
+                    ${fornecedores.length === 0 ? `
+                    <div class="cp-banner warn">
+                        <i class="ph ph-question"></i>
+                        <div><b>Nenhum fornecedor cadastrado.</b> Cadastre o primeiro para começar a cotar.</div>
+                    </div>` : `
+                    <div class="cp-field"><label>Fornecedor <span style="color:#dc2626;">*</span></label>
+                        <select id="cp-cot-fornecedor" class="form-control">
+                            <option value="">— Selecione —</option>
+                            ${fornecedores.map(f => {
+                                const usado = m.usados.has(f.id);
+                                const rotulo = this._nomeFornecedor(f) + (f.cnpj ? ' · ' + f.cnpj : '') +
+                                    (usado ? ' — já cotado nesta requisição' : '') + (m.sugeridos.has(f.id) ? ' ✓ histórico' : '');
+                                return `<option value="${f.id}"${m.pre === f.id ? ' selected' : ''}${usado ? ' disabled' : ''}>${this._esc(rotulo)}</option>`;
+                            }).join('')}
+                        </select>
+                        ${m.sugeridos.size ? `<div class="cp-sub" style="margin-top:6px;"><i class="ph ph-lightning"></i> Já compraram/cotaram estes materiais.</div>` : ''}
+                    </div>`}
+
+                    <div class="cp-field-row-3">
+                        <div class="cp-field"><label>Prazo de entrega</label>
+                            <input type="text" class="form-control" id="cp-cot-prazo" placeholder="Ex.: 15 dias"></div>
+                        <div class="cp-field"><label>Condição de pagamento</label>
+                            <input type="text" class="form-control" id="cp-cot-condicao" placeholder="Ex.: 30/60 dias"></div>
+                        <div class="cp-field"><label>Validade da proposta</label>
+                            <input type="text" class="form-control" id="cp-cot-validade" placeholder="Ex.: 15 dias"></div>
+                    </div>
+
+                    <div class="cp-cat-hint" style="margin-top:16px;margin-bottom:0;">
+                        Será criada <b>uma cotação para este fornecedor</b>, com ${this._itensDaRequisicao(m.requisicao_id).length} item(ns)
+                        já vinculados. Os preços entram na própria cotação, por import ou manualmente.
+                    </div>
+                </div>
+                <div class="cp-modal-foot" style="justify-content:space-between;">
+                    <button class="btn btn-ghost" onclick="app.compras.trocarModalCot('fornecedor')">
+                        <i class="ph ph-plus"></i> Cadastrar fornecedor
+                    </button>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-ghost" onclick="app.compras.fecharModalCot()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="app.compras.criarCotacao()"><i class="ph ph-check"></i> Criar cotação</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    /* Formulário de cadastro rápido do fornecedor — mesmo modal, volta ao
+       picker já com o novo selecionado (risco "só N fornecedores no cadastro"). */
+    trocarModalCot(qual) {
+        if (qual !== 'fornecedor') return;
+        if (!this._cotModal) return;
+        const r = this._req(this._cotModal.requisicao_id);
+        document.querySelectorAll('.cp-modal-overlay').forEach(el => el.remove());
+
+        const overlay = document.createElement('div');
+        overlay.className = 'cp-modal-overlay';
+        overlay.onclick = (e) => { if (e.target === overlay) this.fecharModalCot(); };
+        overlay.innerHTML = `
+            <div class="cp-modal">
+                <div class="cp-modal-head">
+                    <div>
+                        <h3><i class="ph ph-buildings"></i> Cadastrar fornecedor</h3>
+                        <div class="cp-modal-sub">${this._esc(r ? r.codigo : '')} — cadastro rápido para cotar agora</div>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="app.compras.fecharModalCot()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="cp-modal-body">
+                    <div class="cp-field-row">
+                        <div class="cp-field"><label>Razão social *</label>
+                            <input type="text" class="form-control" id="cp-fn-razao" placeholder="Ex.: WEG S.A."></div>
+                        <div class="cp-field"><label>Nome fantasia</label>
+                            <input type="text" class="form-control" id="cp-fn-fantasia" placeholder="Ex.: WEG"></div>
+                    </div>
+                    <div class="cp-field-row">
+                        <div class="cp-field"><label>CNPJ</label>
+                            <input type="text" class="form-control" id="cp-fn-cnpj" placeholder="00.000.000/0001-00"></div>
+                        <div class="cp-field"><label>Cidade / UF</label>
+                            <input type="text" class="form-control" id="cp-fn-cidade" placeholder="Ex.: Jaraguá do Sul / SC"></div>
+                    </div>
+                    <div class="cp-field-row">
+                        <div class="cp-field"><label>Contato</label>
+                            <input type="text" class="form-control" id="cp-fn-contato" placeholder="Nome do atendente"></div>
+                        <div class="cp-field"><label>Telefone</label>
+                            <input type="text" class="form-control" id="cp-fn-telefone" placeholder="(47) 3333-0000"></div>
+                    </div>
+                    <div class="cp-field"><label>E-mail</label>
+                        <input type="email" class="form-control" id="cp-fn-email" placeholder="cotacoes@fornecedor.com.br"></div>
+                </div>
+                <div class="cp-modal-foot" style="justify-content:space-between;">
+                    <button class="btn btn-ghost" onclick="app.compras._renderCotModal()">Voltar</button>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-ghost" onclick="app.compras.fecharModalCot()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="app.compras.salvarFornecedorRapido()"><i class="ph ph-floppy-disk"></i> Salvar fornecedor</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    },
+
+    async salvarFornecedorRapido() {
+        const g = id => String((document.getElementById(id) || {}).value || '').trim();
+        const razao = g('cp-fn-razao');
+        if (!razao) { window.app.toast('Informe a razão social.', 'error'); return; }
+
+        const novo = {
+            id: crypto.randomUUID(),
+            razaoSocial: razao,
+            nomeFantasia: g('cp-fn-fantasia'),
+            cnpj: g('cp-fn-cnpj'),
+            cidade: g('cp-fn-cidade'),
+            contatoNome: g('cp-fn-contato'),
+            telefone: g('cp-fn-telefone'),
+            email: g('cp-fn-email'),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        const criado = await store.addFornecedor(novo);
+        if (!criado) { window.app.toast('Não foi possível cadastrar o fornecedor.', 'error'); return; }
+        if (this._cotModal) this._cotModal.pre = criado.id;
+        window.app.toast('Fornecedor cadastrado.', 'success');
+        this._renderCotModal();
+    },
+
+    fecharModalCot() {
+        document.querySelectorAll('.cp-modal-overlay').forEach(el => el.remove());
+        this._cotModal = null;
+    },
+
+    async criarCotacao() {
+        const m = this._cotModal;
+        if (!m) return;
+        const sel = document.getElementById('cp-cot-fornecedor');
+        const fornecedorId = sel ? sel.value : '';
+        if (!fornecedorId) { window.app.toast('Selecione o fornecedor.', 'error'); return; }
+        if (m.usados.has(fornecedorId)) {
+            window.app.toast('Este fornecedor já tem cotação nesta requisição.', 'error');
+            return;
+        }
+
+        const g = id => String((document.getElementById(id) || {}).value || '').trim();
+        const itensReq = this._itensDaRequisicao(m.requisicao_id);
+        const numero = this._nextCodigoCot(store.getState().comprasCotacoes || []);
+        const agora = new Date().toISOString();
+        const r = this._req(m.requisicao_id);
+
+        const payload = {
+            id: crypto.randomUUID(),
+            requisicao_id: m.requisicao_id,
+            fornecedor_id: fornecedorId,
+            numero,
+            data_solicitacao: agora,
+            data_resposta: '',
+            status: 'aberta',
+            prazo_entrega: g('cp-cot-prazo'),
+            condicao_pagamento: g('cp-cot-condicao'),
+            validade_proposta: g('cp-cot-validade'),
+            frete: 0,
+            total: 0,
+            observacoes: '',
+            created_at: agora,
+            updated_at: agora
+        };
+
+        this._seeding = true;
+        const criada = await store.addComprasCotacoes(payload);
+        if (!criada) {
+            this._seeding = false;
+            window.app.toast('Não foi possível criar a cotação.', 'error');
+            return;
+        }
+
+        // Preço de catálogo NÃO entra como cotação — ele é só dica na grade,
+        // senão dois fornecedores pareceriam ter o mesmo preço.
+        const itensPayload = itensReq.map(it => ({
+            id: crypto.randomUUID(),
+            cotacao_id: criada.id,
+            requisicao_item_id: it.id,
+            material_id: it.material_id || '',
+            qtd: parseFloat(it.qtd) || 0,
+            custo_unitario: 0,
+            ipi: 0, icms: 0, desconto: 0,
+            prazo_entrega: '',
+            total: 0,
+            vencedor: 0,
+            observacoes: '',
+            created_at: agora,
+            updated_at: agora
+        }));
+        const res = await this._emLote(itensPayload, p => store.addComprasCotacaoItens(p), 10);
+        const falhas = res.filter(x => !x).length;
+
+        // 1ª cotação da requisição → avança para "Em Cotação"
+        if (r && r.status === 'liberada') await store.updateComprasRequisicoes(r.id, { status: 'em_cotacao' });
+        this._seeding = false;
+        this.fecharModalCot();
+
+        if (falhas) window.app.toast(`Cotação ${numero} criada, mas ${falhas} item(ns) falharam ao gravar.`, 'error');
+        else window.app.toast(`Cotação ${numero} criada para ${this._nomeFornecedor(this._fornecedor(fornecedorId))}.`, 'success');
+        this.openCotacao(criada.id);
+    },
+
+    /* ------------------------------------------------------------
+       VIEW — DETALHE DA COTAÇÃO
+       ------------------------------------------------------------ */
+
+    openCotacao(id) {
+        const c = this._cotacao(id);
+        if (!c) { this.voltarDaCotacao(); return; }
+        const reqItens = new Map(this._itensDaRequisicao(c.requisicao_id).map(i => [i.id, i]));
+        const itens = this._itensDaCotacao(id).map(ci => ({ ...ci, _req: reqItens.get(ci.requisicao_item_id) || null }));
+        this._cotStaging = { cotacao: { ...c }, itens };
+        this.activeCotacao = id;
+        this.viewMode = 'cotacao';
+        this._cotAviso = null;
+        this.render();
+    },
+
+    voltarDaCotacao() {
+        const reqId = this._cotStaging ? this._cotStaging.cotacao.requisicao_id : null;
+        const volta = (reqId && this._req(reqId)) ? reqId : (this._req(this.activeId) ? this.activeId : null);
+        this._cotStaging = null;
+        this.activeCotacao = null;
+        if (volta) {
+            this.viewMode = 'detail';
+            this.activeId = volta;
+            this.activeTab = 'cotacoes';
+        } else {
+            this.viewMode = 'list';
+            this.activeId = null;
+        }
+        this.render();
+    },
+
+    renderCotacao() {
+        const container = document.getElementById('view-compras');
+        if (!container) return;
+        const st = this._cotStaging;
+        if (!st) { this.voltarDaCotacao(); return; }
+
+        const c = st.cotacao;
+        const r = this._req(c.requisicao_id);
+        const f = this._fornecedor(c.fornecedor_id);
+        const podeEditar = store.canEdit();
+        const trans = podeEditar ? (CP_COT_TRANSICOES[c.status] || []) : [];
+        const semPreco = !st.itens.some(ci => this._cotItemTotal(ci) > 0);
+
+        container.innerHTML = `
+            <div style="height:calc(100vh - 120px);display:flex;flex-direction:column;background:rgb(250,250,250);margin:-20px;position:relative;">
+                <div class="module-header-sticky" style="color:white;padding:20px 30px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:10;">
+                    <div style="display:flex;align-items:center;gap:14px;">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.voltarDaCotacao()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-arrow-left"></i> Voltar
+                        </button>
+                        <div>
+                            <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="ph ph-tag"></i> ${this._esc(c.numero)}
+                                <span class="cp-badge cp-badge-cot cp-cot-${this._esc(c.status)}" style="background:rgba(255,255,255,.16);color:#fff;">${this._esc(CP_COT_STATUS[c.status] || c.status)}</span>
+                            </h2>
+                            <div style="font-size:12px;opacity:0.9;margin-top:2px;">${this._esc(this._nomeFornecedor(f))} · ${this._esc(r ? r.codigo : '')}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <input type="file" id="cp-cot-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="app.compras.handleCotImportFile(this)">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.importarPrecos()" style="color:white;border:1px solid rgba(255,255,255,0.3);" title="Importar a tabela de preços do fornecedor">
+                            <i class="ph ph-upload-simple"></i> Importar preços
+                        </button>
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.baixarModeloPrecos()" style="color:white;border:1px solid rgba(255,255,255,0.3);" title="Planilha modelo já com os itens desta cotação">
+                            <i class="ph ph-download-simple"></i> Modelo
+                        </button>
+                        ${podeEditar ? `
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.salvarCotacao()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-floppy-disk"></i> Salvar
+                        </button>` : ''}
+                        ${podeEditar && c.status !== 'cancelada' ? `
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.removerCotacao('${c.id}')" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-trash"></i> Excluir
+                        </button>` : ''}
+                    </div>
+                </div>
+
+                <div class="cp-body">
+                    ${this._cotAviso ? `
+                    <div class="cp-banner ${this._cotAviso.ok ? 'ok' : 'warn'}">
+                        <i class="ph ${this._cotAviso.ok ? 'ph-check-circle' : 'ph-question'}"></i>
+                        <div><b>Import de preços — ${this._esc(this._cotAviso.nome)}:</b>
+                            ${this._cotAviso.ok} preço(s) aplicado(s) em ${this._cotAviso.total} linha(s).
+                            ${this._cotAviso.falha ? ` <b>${this._cotAviso.falha} código(s) sem correspondência</b> nesta cotação.` : ''}
+                        </div>
+                    </div>` : ''}
+
+                    ${semPreco ? `
+                    <div class="cp-banner warn">
+                        <i class="ph ph-currency-circle-dollar"></i>
+                        <div><b>Cotação sem preços.</b> Lance os valores manualmente, importe a tabela do fornecedor ou use o modelo já preenchido com os itens.</div>
+                    </div>` : ''}
+
+                    <div class="cp-panel">
+                        <div class="cp-section-title" style="margin-top:0;"><span class="cp-step">1</span> Negociação</div>
+                        <div class="cp-form-grid">
+                            <div class="cp-field"><label>Fornecedor</label>
+                                <input type="text" class="form-control" value="${this._esc(this._nomeFornecedor(f))}" readonly></div>
+                            <div class="cp-field"><label>Prazo de entrega</label>
+                                <input type="text" class="form-control" value="${this._esc(c.prazo_entrega || '')}" placeholder="Ex.: 15 dias úteis" oninput="app.compras.setCotCampo('prazo_entrega', this.value)"></div>
+                            <div class="cp-field"><label>Condição de pagamento</label>
+                                <input type="text" class="form-control" value="${this._esc(c.condicao_pagamento || '')}" placeholder="Ex.: 30/60 dias" oninput="app.compras.setCotCampo('condicao_pagamento', this.value)"></div>
+                            <div class="cp-field"><label>Validade da proposta</label>
+                                <input type="text" class="form-control" value="${this._esc(c.validade_proposta || '')}" placeholder="Ex.: 15 dias" oninput="app.compras.setCotCampo('validade_proposta', this.value)"></div>
+                            <div class="cp-field"><label>Frete (R$)</label>
+                                <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(c.frete) || 0}" oninput="app.compras.setCotCampo('frete', this.value)"></div>
+                            <div class="cp-field"><label>Data da resposta</label>
+                                <input type="date" class="form-control" value="${this._esc(String(c.data_resposta || '').slice(0, 10))}" onchange="app.compras.setCotCampo('data_resposta', this.value)"></div>
+                        </div>
+                        <div class="cp-field" style="margin-top:12px;"><label>Observações</label>
+                            <textarea class="form-control" rows="2" placeholder="Restrições, marcações, observações do fornecedor..." oninput="app.compras.setCotCampo('observacoes', this.value)">${this._esc(c.observacoes || '')}</textarea></div>
+
+                        <div class="cp-cot-status">
+                            <span class="cp-cot-status-label">Situação:</span>
+                            ${trans.length
+                                ? trans.map(s => `<button class="btn btn-sm btn-ghost" onclick="app.compras.mudarStatusCot('${s}')">${this._esc(CP_COT_STATUS[s])}</button>`).join('')
+                                : '<span class="cp-sub">Status final — nenhuma transição disponível.</span>'}
+                        </div>
+                    </div>
+
+                    <div class="cp-section-title"><span class="cp-step">2</span> Preços por item
+                        ${podeEditar ? `<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="app.compras.preencherCatalogo()" title="Preenche os campos vazios com o preço do catálogo">
+                            <i class="ph ph-copy"></i> Usar catálogo
+                        </button>` : ''}
+                    </div>
+
+                    <div class="cp-conf-wrap">
+                        <div class="cp-conf-scroll">
+                            <table class="cp-table cp-price">
+                                <thead>
+                                    <tr>
+                                        <th>#</th><th>Item da LM</th><th style="text-align:right">Qtd</th><th>Un.</th>
+                                        <th style="text-align:right">Unitário (R$)</th><th style="text-align:right">IPI %</th>
+                                        <th style="text-align:right">ICMS %</th><th style="text-align:right">Desc. %</th>
+                                        <th>Prazo</th><th style="text-align:right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${st.itens.length ? st.itens.map((ci, i) => this._precoLinhaHTML(ci, i, podeEditar)).join('')
+                                                      : '<tr><td colspan="10" style="padding:22px;text-align:center;color:#9ca3af;">Sem itens vinculados.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="cp-footbar">
+                        <div class="cp-footbar-info">
+                            Itens <b id="cp-cot-itens">${window.app.formatCurrency(this._cotSomaItens())}</b>
+                            · Frete <b>${window.app.formatCurrency(parseFloat(c.frete) || 0)}</b>
+                            · Total <b id="cp-cot-geral" style="color:#4F46E5;">${window.app.formatCurrency(this._cotGeral())}</b>
+                            <div class="cp-sub" style="margin-top:3px;">Total do item = Qtd × Unitário × (1 + IPI%) × (1 − Desconto%)</div>
+                        </div>
+                        <div class="cp-footbar-actions">
+                            <button class="btn btn-ghost" onclick="app.compras.voltarDaCotacao()">Voltar</button>
+                            ${podeEditar ? `<button class="btn btn-primary" onclick="app.compras.salvarCotacao()">
+                                <i class="ph ph-floppy-disk"></i> Salvar cotação
+                            </button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    _precoLinhaHTML(ci, i, podeEditar) {
+        const ri = ci._req;
+        const cat = ri ? (parseFloat(ri.custo_catalogo) || 0) : 0;
+        const dis = podeEditar ? '' : 'disabled';
+        const inpNum = (campo, val, ph) => `<input type="number" min="0" step="0.0001" class="form-control cp-price-in" ${dis}
+            value="${val ? val : ''}" placeholder="${ph}" oninput="app.compras.setCotItemCampo(${i},'${campo}',this.value)">`;
+        const inpTxt = (campo, val, ph) => `<input type="text" class="form-control cp-price-in" ${dis}
+            value="${this._esc(val || '')}" placeholder="${ph}" oninput="app.compras.setCotItemCampo(${i}','${campo}',this.value)">`;
+
+        return `<tr>
+            <td>${i + 1}</td>
+            <td style="min-width:220px;">
+                <div class="cp-codigo">${this._esc(ri ? ri.codigo : '') || 'sem código'}</div>
+                <div class="cp-mat-desc">${this._esc(ri ? ri.descricao : 'Item da requisição removido')}</div>
+            </td>
+            <td style="width:92px;text-align:right;">${inpNum('qtd', ci.qtd, '')}</td>
+            <td style="width:52px;text-align:center;font-weight:600;">${this._esc(ri ? ri.unidade : '')}</td>
+            <td style="width:150px;text-align:right;">
+                ${inpNum('custo_unitario', ci.custo_unitario, cat ? String(this._fmtQtd(cat)) : '0,00')}
+                ${cat ? `<div class="cp-sub">catálogo ${window.app.formatCurrency(cat)}</div>` : ''}
+            </td>
+            <td style="width:82px;text-align:right;">${inpNum('ipi', ci.ipi, '0')}</td>
+            <td style="width:82px;text-align:right;">${inpNum('icms', ci.icms, '0')}</td>
+            <td style="width:82px;text-align:right;">${inpNum('desconto', ci.desconto, '0')}</td>
+            <td style="width:104px;">${inpTxt('prazo_entrega', ci.prazo_entrega, 'dias')}</td>
+            <td style="width:130px;text-align:right;white-space:nowrap;"><b data-cot-tot="${i}">${window.app.formatCurrency(this._cotItemTotal(ci))}</b></td>
+        </tr>`;
+    },
+
+    setCotCampo(campo, valor) {
+        if (!this._cotStaging) return;
+        this._cotStaging.cotacao[campo] = valor;
+        this._atualizaTotaisCot();
+    },
+
+    setCotItemCampo(idx, campo, valor) {
+        const st = this._cotStaging;
+        if (!st || !st.itens[idx]) return;
+        const numerico = campo === 'qtd' || campo === 'custo_unitario' || campo === 'ipi' || campo === 'icms' || campo === 'desconto';
+        st.itens[idx][campo] = numerico ? (valor === '' ? 0 : (parseFloat(valor) || 0)) : valor;
+        this._atualizaTotaisCot();
+    },
+
+    /* Atualiza só os totais — re-render completo derrubaria o foco do input. */
+    _atualizaTotaisCot() {
+        const st = this._cotStaging;
+        if (!st) return;
+        st.itens.forEach((ci, i) => {
+            const el = document.querySelector(`[data-cot-tot="${i}"]`);
+            if (el) el.textContent = window.app.formatCurrency(this._cotItemTotal(ci));
+        });
+        const itens = document.getElementById('cp-cot-itens');
+        if (itens) itens.textContent = window.app.formatCurrency(this._cotSomaItens());
+        const geral = document.getElementById('cp-cot-geral');
+        if (geral) geral.textContent = window.app.formatCurrency(this._cotGeral());
+    },
+
+    /* Preenche os campos VAZIOS com o preço do catálogo (dica de partida,
+       não substitui o preço do fornecedor). */
+    preencherCatalogo() {
+        const st = this._cotStaging;
+        if (!st || !store.canEdit()) return;
+        let n = 0;
+        st.itens.forEach(ci => {
+            if (parseFloat(ci.custo_unitario) > 0) return;
+            const ri = ci._req;
+            const cat = ri ? (parseFloat(ri.custo_catalogo) || 0) : 0;
+            if (cat > 0) { ci.custo_unitario = cat; n++; }
+        });
+        if (!n) { window.app.toast('Nenhum item com preço de catálogo para preencher.', 'warning'); return; }
+        this.renderCotacao();
+        window.app.toast(`${n} preço(s) preenchido(s) com o catálogo. Revise antes de salvar.`, 'success');
+    },
+
+    async salvarCotacao() {
+        const st = this._cotStaging;
+        if (!st || !store.canEdit()) return;
+        const c = st.cotacao;
+
+        if (c.status === 'recebida' && !st.itens.some(ci => this._cotItemTotal(ci) > 0)) {
+            window.app.toast('Informe ao menos um preço antes de marcar a cotação como recebida.', 'error');
+            return;
+        }
+        const negativo = st.itens.find(ci => parseFloat(ci.custo_unitario) < 0 || parseFloat(ci.qtd) < 0);
+        if (negativo) { window.app.toast('Quantidade e preço não podem ser negativos.', 'error'); return; }
+        // Percentuais fora de 0–100 = erro de digitação (coluna importada trocada,
+        // casas decimais a mais). Bloqueia antes de gravar total distorcido.
+        const foraDeFaixa = st.itens.find(ci => {
+            const ipi = parseFloat(ci.ipi) || 0, desc = parseFloat(ci.desconto) || 0;
+            return ipi < 0 || ipi > 100 || desc < 0 || desc > 100;
+        });
+        if (foraDeFaixa) {
+            window.app.toast('IPI e Desconto devem estar entre 0% e 100% — confira as colunas importadas.', 'error');
+            return;
+        }
+
+        const geral = this._cotGeral();
+        const agora = new Date().toISOString();
+
+        this._seeding = true;
+        const okCot = await store.updateComprasCotacoes(c.id, {
+            prazo_entrega: String(c.prazo_entrega || ''),
+            condicao_pagamento: String(c.condicao_pagamento || ''),
+            validade_proposta: String(c.validade_proposta || ''),
+            frete: parseFloat(c.frete) || 0,
+            total: geral,
+            observacoes: String(c.observacoes || ''),
+            data_resposta: String(c.data_resposta || ''),
+            status: c.status
+        });
+
+        const atualizacoes = st.itens.map(ci => ({
+            id: ci.id,
+            qtd: parseFloat(ci.qtd) || 0,
+            custo_unitario: parseFloat(ci.custo_unitario) || 0,
+            ipi: parseFloat(ci.ipi) || 0,
+            icms: parseFloat(ci.icms) || 0,
+            desconto: parseFloat(ci.desconto) || 0,
+            prazo_entrega: String(ci.prazo_entrega || ''),
+            total: this._cotItemTotal(ci),
+            observacoes: ci.observacoes || '',
+            updated_at: agora
+        }));
+        const res = await this._emLote(atualizacoes, p => store.updateComprasCotacaoItens(p.id, p), 10);
+        const falhas = res.filter(x => !x).length;
+        this._seeding = false;
+
+        if (!okCot || falhas) {
+            window.app.toast(`Falha ao salvar: ${!okCot ? 'cotação' : ''}${!okCot && falhas ? ' e ' : ''}${falhas ? falhas + ' item(ns)' : ''}.`, 'error');
+        } else {
+            const semPreco = !st.itens.some(ci => this._cotItemTotal(ci) > 0);
+            window.app.toast(semPreco
+                ? 'Cotação salva — ainda sem preços informados.'
+                : `Cotação ${c.numero} salva · total ${window.app.formatCurrency(geral)}.`, 'success');
+        }
+        this.openCotacao(c.id);
+    },
+
+    async mudarStatusCot(status) {
+        const st = this._cotStaging;
+        if (!st || !store.canEdit()) return;
+        const atual = st.cotacao.status;
+        if (!(CP_COT_TRANSICOES[atual] || []).includes(status)) {
+            window.app.toast(`Transição inválida: ${CP_COT_STATUS[atual]} → ${CP_COT_STATUS[status]}.`, 'error');
+            return;
+        }
+        if (status === 'recebida' && !st.itens.some(ci => this._cotItemTotal(ci) > 0)) {
+            window.app.toast('Informe ao menos um preço antes de marcar a cotação como recebida.', 'error');
+            return;
+        }
+        const updates = { status };
+        if (status === 'recebida' && !st.cotacao.data_resposta) updates.data_resposta = new Date().toISOString();
+        const ok = await store.updateComprasCotacoes(st.cotacao.id, updates);
+        if (!ok) { window.app.toast('Não foi possível alterar o status.', 'error'); return; }
+        this.openCotacao(st.cotacao.id);
+    },
+
+    async removerCotacao(id) {
+        const c = this._cotacao(id);
+        if (!c || !store.canDelete()) return;
+        const temVencedor = this._itensDaCotacao(id).some(i => i.vencedor === 1 || i.vencedor === '1');
+        const ok = await window.app.confirm(
+            `Excluir a cotação ${c.numero} (${this._nomeFornecedor(this._fornecedor(c.fornecedor_id))})?` +
+            (temVencedor ? ' Ela tem itens marcados como vencedores, que serão desmarcados.' : ' Os itens da cotação também serão removidos.')
+        );
+        if (!ok) return;
+
+        this._seeding = true;
+        const itens = this._itensDaCotacao(id);
+        await this._emLote(itens, i => store.deleteComprasCotacaoItens(i.id), 10);
+        const delOk = await store.deleteComprasCotacoes(id);
+        this._seeding = false;
+
+        if (!delOk) { window.app.toast('Não foi possível excluir a cotação.', 'error'); this.openCotacao(id); return; }
+
+        if (this.viewMode === 'cotacao' && this.activeCotacao === id) {
+            const restantes = this._cotacoesDaRequisicao(c.requisicao_id);
+            if (!restantes.length && c.requisicao_id) {
+                const r = this._req(c.requisicao_id);
+                if (r && r.status === 'em_cotacao') await store.updateComprasRequisicoes(r.id, { status: 'liberada' });
+            }
+            this.voltarDaCotacao();
+        } else {
+            this.renderDetail();
+        }
+        window.app.toast(`Cotação ${c.numero} excluída.`, 'success');
+    },
+
+    /* ------------------------------------------------------------
+       IMPORT DA TABELA DE PREÇOS DO FORNECEDOR
+       ----------------------------------------------------------------
+       Reaproveita o mapeamento de cabeçalho da LM, mas aplica no ALVO
+       cotação_item (não no catálogo): o custo do material só muda no
+       recebimento da NF (Fase 4).
+       ------------------------------------------------------------ */
+
+    importarPrecos() {
+        const inp = document.getElementById('cp-cot-input');
+        if (inp) inp.click();
+    },
+
+    handleCotImportFile(input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        input.value = '';
+        if (!this._cotStaging) return;
+        const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+        const campos = ['codigo', 'preco', 'prazo', 'ipi', 'icms', 'desconto'];
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                let linhas = [];
+                if (isExcel) {
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    let melhor = null;
+                    wb.SheetNames.forEach(nome => {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets[nome], { defval: '' });
+                        if (!rows.length) return;
+                        const mapa = this._mapearColunas(Object.keys(rows[0]), CP_PRECO_ALIASES, campos);
+                        if (mapa.codigo && mapa.preco && (!melhor || Object.keys(mapa).length > melhor.n)) {
+                            melhor = { rows, mapa, n: Object.keys(mapa).length };
+                        }
+                    });
+                    if (!melhor) {
+                        window.app.toast('Cabeçalho não reconhecido. Baixe o Modelo e use Código | Preço Unitário.', 'error');
+                        return;
+                    }
+                    linhas = melhor.rows.map(row => this._linhaPrecos(row, melhor.mapa));
+                } else {
+                    linhas = this._csvPrecos(e.target.result, campos);
+                    if (!linhas.length) {
+                        window.app.toast('CSV sem cabeçalho reconhecido (Código e Preço Unitário).', 'error');
+                        return;
+                    }
+                }
+                this._aplicarPrecos(linhas, file.name);
+            } catch (err) {
+                console.error('[Compras] import preços:', err);
+                window.app.toast('Erro ao processar o arquivo: ' + err.message, 'error');
+            }
+        };
+        if (isExcel) reader.readAsArrayBuffer(file);
+        else reader.readAsText(file);
+    },
+
+    _linhaPrecos(row, mapa) {
+        const val = (campo) => mapa[campo] !== undefined ? row[mapa[campo]] : '';
+        return {
+            codigo: val('codigo'),
+            preco: this._num(val('preco')),
+            prazo: String(val('prazo') ?? '').replace(/[^\d]/g, ''),
+            ipi: this._num(val('ipi')),
+            icms: this._num(val('icms')),
+            desconto: this._num(val('desconto'))
+        };
+    },
+
+    _csvPrecos(texto, campos) {
+        const linhas = String(texto).split(/\r?\n/).filter(l => l.trim());
+        if (linhas.length < 2) return [];
+        const sep = (linhas[0].split(';').length > linhas[0].split(',').length) ? ';' : ',';
+        const quebrar = (l) => {
+            const out = []; let cur = ''; let asp = false;
+            for (let i = 0; i < l.length; i++) {
+                const ch = l[i];
+                if (ch === '"') { asp = !asp; continue; }
+                if (ch === sep && !asp) { out.push(cur); cur = ''; continue; }
+                cur += ch;
+            }
+            out.push(cur);
+            return out.map(s => s.trim());
+        };
+        const cab = quebrar(linhas[0]);
+        const mapa = this._mapearColunas(cab, CP_PRECO_ALIASES, campos);
+        if (!mapa.codigo || !mapa.preco) return [];
+        // `mapa` guarda o NOME do cabeçalho; em CSV as células são um array
+        // posicional — precisa converter nome → posição antes de ler.
+        const pos = {};
+        Object.keys(mapa).forEach(c => { pos[c] = cab.indexOf(mapa[c]); });
+        return linhas.slice(1).map(l => {
+            const cel = quebrar(l);
+            const obj = {};
+            Object.keys(pos).forEach(c => {
+                const p = pos[c];
+                obj[c] = p >= 0 && cel[p] !== undefined ? cel[p] : '';
+            });
+            return this._linhaPrecos(obj, { codigo: 'codigo', preco: 'preco', prazo: 'prazo', ipi: 'ipi', icms: 'icms', desconto: 'desconto' });
+        });
+    },
+
+    _aplicarPrecos(linhas, nomeArquivo) {
+        const st = this._cotStaging;
+        if (!st) return;
+
+        const materiais = new Map((store.getState().materiais || []).map(m => [m.id, m]));
+        const porChave = new Map();
+        st.itens.forEach((ci, i) => {
+            const ri = ci._req;
+            const chaves = [];
+            if (ri && ri.codigo) chaves.push(this._norm(ri.codigo));
+            const m = ci.material_id ? materiais.get(ci.material_id) : null;
+            if (m) {
+                if (m.codigoInterno) chaves.push(this._norm(m.codigoInterno));
+                if (m.codigoFabricante) chaves.push(this._norm(m.codigoFabricante));
+            }
+            chaves.filter(Boolean).forEach(k => { if (!porChave.has(k)) porChave.set(k, i); });
+        });
+
+        let ok = 0;
+        const vistos = new Set();
+        linhas.forEach(l => {
+            const k = this._norm(l.codigo);
+            if (!k || vistos.has(k)) return;
+            const i = porChave.get(k);
+            if (i === undefined) return;
+            vistos.add(k);
+            const ci = st.itens[i];
+            if (l.preco > 0) { ci.custo_unitario = l.preco; ok++; }
+            if (l.prazo) ci.prazo_entrega = l.prazo;
+            // Só aplica percentuais plausíveis — coluna mapeada errado dispara
+            // valor absurdo e o total estoura (guarda extra além da validação).
+            if (l.ipi > 0 && l.ipi <= 100) ci.ipi = l.ipi;
+            if (l.icms > 0 && l.icms <= 100) ci.icms = l.icms;
+            if (l.desconto > 0 && l.desconto <= 100) ci.desconto = l.desconto;
+        });
+
+        const falha = linhas.length - ok;
+        this._cotAviso = { ok, falha: falha > 0 ? falha : 0, total: linhas.length, nome: nomeArquivo };
+        this.renderCotacao();
+        window.app.toast(ok
+            ? `${ok} preço(s) importado(s).`
+            : 'Nenhum código do arquivo corresponde a esta cotação.', ok ? 'success' : 'error');
+    },
+
+    /* Planilha para o fornecedor preencher — já sai com os itens da cotação. */
+    baixarModeloPrecos() {
+        const st = this._cotStaging;
+        if (!st) return;
+        try {
+            if (typeof XLSX === 'undefined') { window.app.toast('Biblioteca XLSX não disponível.', 'warning'); return; }
+            const linhas = [['Código', 'Descrição', 'Unidade', 'Quantidade', 'Preço Unitário', 'Prazo (dias)', 'IPI %', 'ICMS %', 'Desconto %']];
+            st.itens.forEach(ci => {
+                const ri = ci._req;
+                linhas.push([
+                    ri ? ri.codigo : '', ri ? ri.descricao : '', ri ? ri.unidade : '',
+                    ci.qtd, '', '', '', '', ''
+                ]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(linhas);
+            ws['!cols'] = [{ wch: 20 }, { wch: 58 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 9 }, { wch: 9 }, { wch: 11 }];
+
+            const headerStyle = {
+                font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+                fill: { fgColor: { rgb: '4F46E5' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let c = range.s.c; c <= range.e.c; c++) {
+                const cell = ws[XLSX.utils.encode_cell({ c, r: 0 })];
+                if (cell) {
+                    if (cell.t === 's' && cell.v) cell.v = String(cell.v).toUpperCase();
+                    cell.s = headerStyle;
+                }
+            }
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Preços');
+            XLSX.writeFile(wb, `${st.cotacao.numero || 'cotacao'}_precos.xlsx`);
+            window.app.toast('Modelo de preços baixado.', 'success');
+        } catch (e) {
+            console.error('[Compras] modelo preços:', e);
+            window.app.toast('Erro ao gerar o modelo: ' + e.message, 'error');
+        }
+    },
+
+    /* ------------------------------------------------------------
+       VENCEDOR ITEM A ITEM
+       ------------------------------------------------------------ */
+
+    async marcarVencedor(reqItemId, cotacaoId) {
+        if (!store.canEdit()) return;
+        const alvo = (store.getState().comprasCotacaoItens || [])
+            .find(ci => ci.requisicao_item_id === reqItemId && ci.cotacao_id === cotacaoId);
+        if (!alvo) return;
+        if (this._cotItemTotal(alvo) <= 0) {
+            window.app.toast('Informe o preço desta cotação antes de marcá-la como vencedora.', 'error');
+            return;
+        }
+        const eraVencedor = alvo.vencedor === 1 || alvo.vencedor === '1';
+        const todos = (store.getState().comprasCotacaoItens || []).filter(ci => ci.requisicao_item_id === reqItemId);
+
+        this._seeding = true;
+        await Promise.all(todos.map(ci => {
+            const novo = (ci.id === alvo.id && !eraVencedor) ? 1 : 0;
+            if ((ci.vencedor === 1 ? 1 : 0) === novo) return Promise.resolve(true);
+            return store.updateComprasCotacaoItens(ci.id, { vencedor: novo });
+        }));
+        await this._atualizaStatusVencedores(reqItemId, todos.map(t => t.cotacao_id));
+        this._seeding = false;
+        this.renderDetail();
+    },
+
+    async marcarMenorPreco(reqId) {
+        if (!store.canEdit()) return;
+        const itens = this._itensDaRequisicao(reqId);
+        const cotacoes = this._cotacoesDaRequisicao(reqId)
+            .filter(c => c.status !== 'cancelada' && c.status !== 'descartada');
+
+        const vencedores = new Map();   // reqItemId -> cotacaoItem id
+        for (const it of itens) {
+            let melhor = null;
+            for (const c of cotacoes) {
+                const ci = this._itensDaCotacao(c.id).find(x => x.requisicao_item_id === it.id);
+                if (!ci) continue;
+                const tot = this._cotItemTotal(ci);
+                if (tot > 0 && (melhor === null || tot < melhor.tot)) melhor = { id: ci.id, cot: c.id, tot };
+            }
+            if (melhor) vencedores.set(it.id, melhor);
+        }
+        if (!vencedores.size) {
+            window.app.toast('Nenhum item tem preço informado — abra as cotações e lance os preços.', 'error');
+            return;
+        }
+
+        const decididos = new Set(vencedores.keys());
+        const todos = (store.getState().comprasCotacaoItens || []).filter(ci => decididos.has(ci.requisicao_item_id));
+        const cotIds = [...new Set([...vencedores.values()].map(v => v.cot))];
+
+        this._seeding = true;
+        // Exclusividade: só o escolhido pelo menor-preço fica vencedor;
+        // os demais itens do MESMO requisicao_item_id são desmarcados (senão
+        // um vencedor manual anterior conviveria com o novo).
+        await Promise.all(todos.map(ci => {
+            const escolhido = vencedores.get(ci.requisicao_item_id);
+            const novo = (escolhido && escolhido.id === ci.id) ? 1 : 0;
+            if ((ci.vencedor === 1 ? 1 : 0) === novo) return Promise.resolve(true);
+            return store.updateComprasCotacaoItens(ci.id, { vencedor: novo });
+        }));
+        await this._atualizaStatusVencedores(null, cotIds);
+        this._seeding = false;
+        this.renderDetail();
+        window.app.toast(`Menor preço marcado em ${vencedores.size} de ${itens.length} item(ns).`, 'success');
+    },
+
+    /* Status automático: cotação com ≥1 vitória vira "Vencedora"; ao perder
+       todas, volta para "Recebida" (ou "Aberta" se ainda sem preço).
+       Ação de sistema — não passa pelo validador de transições do usuário. */
+    async _atualizaStatusVencedores(reqItemId, cotIds) {
+        const ids = new Set(cotIds && cotIds.length
+            ? cotIds
+            : [...new Set((store.getState().comprasCotacaoItens || [])
+                .filter(ci => !reqItemId || ci.requisicao_item_id === reqItemId)
+                .map(ci => ci.cotacao_id))]);
+
+        await Promise.all([...ids].map(async cid => {
+            const c = this._cotacao(cid);
+            if (!c || c.status === 'cancelada' || c.status === 'descartada') return;
+            const itens = this._itensDaCotacao(cid);
+            const venc = itens.some(i => i.vencedor === 1 || i.vencedor === '1');
+            const temPreco = itens.some(i => this._cotItemTotal(i) > 0);
+
+            let novo = c.status;
+            if (venc && c.status !== 'vencedora') novo = 'vencedora';
+            else if (!venc && c.status === 'vencedora') novo = temPreco ? 'recebida' : 'aberta';
+            if (novo !== c.status) await store.updateComprasCotacoes(cid, { status: novo });
+        }));
     },
 
     _frequentes(itens, materiais) {
