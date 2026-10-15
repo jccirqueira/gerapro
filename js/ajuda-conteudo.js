@@ -1869,6 +1869,43 @@
         texto: 'Dicas:\n- Use documentos com texto selecionável (não digitalizados) para melhor extração\n- Nomeie os documentos com rótulos descritivos para identificar cada origem\n- A similaridade textual é usada para sugerir correspondências entre itens\n- Revise sempre as correspondências sugeridas antes de exportar\n\n Limitações:\n- Máximo 15MB por arquivo\n- A extração depende da clareza e estrutura do documento original\n- Itens com descrições muito diferentes podem não ser pareados automaticamente\n- Documentos escaneados podem precisar de OCR (suporte automático para PDFs imagem)'
       }
     ]
+  },
+
+  compras: {
+    titulo: 'Compras',
+    icone: 'ph-shopping-cart',
+    descricao: 'Fluxo completo de compras: requisição a partir da LM da Engenharia, cotação com vários fornecedores, pedido de compra e entrada de nota fiscal.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral do Fluxo',
+        texto: 'O módulo Compras executa o fluxo real de aquisição de uma indústria de painéis elétricos:\n\nLM da Engenharia → REQUISIÇÃO → COTAÇÃO → PEDIDO DE COMPRAS → NF RECEBIDA\n\nO gatilho é a Lista de Materiais (LM/BOM) entregue pelo engenheiro responsável pelo projeto. A requisição é conferida, os itens são cotados junto a fornecedores e, com o vencedor definido, são gerados os Pedidos de Compras. O recebimento da mercadoria se dá pelo lançamento da Nota Fiscal, que dá baixa no pedido e alimenta o histórico de preços do Banco de Materiais.\n\nEscalar: uma requisição pode gerar N pedidos (um por fornecedor) e um pedido pode receber N notas fiscais (entregas parciais).'
+      },
+      {
+        id: 'requisicao',
+        titulo: 'Requisição de Compras (LM)',
+        texto: 'A Requisição nasce do upload da LM enviada pela Engenharia. Cabeçalho com projeto, revisão, solicitante e o arquivo de origem anexado (com hash para detectar reenvio).\n\nO sistema lê as colunas do arquivo e faz o pareamento automático contra o Banco de Materiais:\n- Código interno ou do fabricante (exato, escopo da empresa)\n- Pontuação textual na descrição quando não há código\n- Sem correspondência: item sinalizado como NÃO CADASTRADO\n\nNenhum item sem pareamento impede a liberação — o sistema exige que todos os itens estejam resolvidos antes de liberar a requisiição para compras. Isso separa formalmente a Engenharia (que emite) de Compras (que executa), registrando quem liberou e quando.',
+        campos: [
+          { nome: 'Código', descricao: 'REQ-0001 sequencial por empresa.' },
+          { nome: 'Projeto', descricao: 'Projeto de destino (Gestão de Projetos).' },
+          { nome: 'Revisão', descricao: 'Nº da revisão do documento de LM.' },
+          { nome: 'Status', descricao: 'rascunho, em_conferencia, liberada, em_cotacao, em_pedido, recebida, cancelada.' },
+          { nome: 'Material não cadastrado', descricao: 'Item sem correspondência no catálogo — bloqueia a liberação até ser resolvido.' }
+        ]
+      },
+      {
+        id: 'conferencia',
+        titulo: 'Conferência dos Itens',
+        texto: 'A grade de conferência mostra três estados:\n\n✓ Casado (verde) — código exato no catálogo.\n? Sugestão (âmbar) — pontuação textual; o usuário confirma.\n✗ Não cadastrado (vermelho) — precisa de cadastro.\n\nPara o item vermelho, use o botão \"Cadastrar material\": o formulário abre pré-preenchido com código, descrição, fabricante, unidade e custo vindos da LM. Ao salvar, o item é vinculado e o contador de pendências é atualizado.\n\nImportante: o catálogo não possui restrição de unicidade nos códigos, por isso o pareamento é sempre limitado à empresa atual.',
+        passos: [
+          'Abra Compras e clique em Nova Requisição.',
+          'Baixe o template da LM e preencha a planilha da Engenharia.',
+          'Envie o arquivo e confira o resumo de pareamento.',
+          'Resolva os itens em âmbar e vermelho.',
+          'Clique em Liberar para Compras.'
+        ]
+      }
+    ]
   }
 };
 
@@ -1877,6 +1914,7 @@ window.AJUDA_CATEGORIAS = [
   { label: 'Cadastros', modules: ['clientes', 'fornecedores'] },
   { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'precificacao', 'orcamentos', 'importacaoET', 'comparacaoDocumentos'] },
   { label: 'Engenharia', modules: ['materiais', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'cargas', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'calculos-eletricos', 'calculos-mecanicos', 'lm', 'automacao-rede', 'manufatura'] },
+  { label: 'Operações', modules: ['compras'] },
   { label: 'Relatórios', modules: ['relatorio-propostas', 'relatorio-cadastros', 'relatorio-tipicos', 'relatorio-manufatura'] },
   { label: 'Configurações', modules: ['importacao', 'configuracoes'] }
 ];

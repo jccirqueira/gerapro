@@ -3831,7 +3831,7 @@ const server = http.createServer(async (req, res) => {
 
         const entityMatch = pathname.match(/^\/api\/data\/(\w+)$/);
         const entityMatchWithId = pathname.match(/^\/api\/data\/(\w+)\/(.+)$/);
-        const validEntities = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmEmailTemplates','crmStages','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases','projetoCustos'];
+        const validEntities = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmEmailTemplates','crmStages','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases','projetoCustos','comprasRequisicoes','comprasRequisicaoItens','comprasCotacoes','comprasCotacaoItens','comprasPedidos','comprasPedidoItens','comprasNotas','comprasNotaItens'];
 
         if (entityMatch && req.method === 'POST') {
             const tokenUser = getTokenUser(req);
@@ -4964,6 +4964,55 @@ const server = http.createServer(async (req, res) => {
                 res.setHeader('Content-Type', anexo.tipo_arquivo || 'application/octet-stream');
                 res.setHeader('Content-Disposition', `attachment; filename="${anexo.nome_arquivo}"`);
                 res.end(content);
+            } catch (err) { sendJson(res, 500, { error: err.message }); }
+            return;
+        }
+
+        // === COMPRAS — ANEXO DA LM (Lista de Materiais vinda da Engenharia) ===
+        // O arquivo da LM é um documento versionado da requisição: guardamos nome,
+        // caminho e hash (sha-256) para detectar reenvio idêntico.
+
+        if (pathname === '/api/compras/lm/upload' && req.method === 'POST') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const body = await readBody(req);
+                if (!body.fileData) { sendJson(res, 400, { error: 'Arquivo ausente' }); return; }
+                const empresaId = tokenUser.empresa_id || 'default';
+
+                const lmDir = path.join(__dirname, 'data', 'anexos_compras', empresaId);
+                if (!fs.existsSync(lmDir)) fs.mkdirSync(lmDir, { recursive: true });
+
+                const safeName = String(body.nome_arquivo || 'lm').replace(/[^a-zA-Z0-9._-]/g, '_');
+                const fileName = Date.now() + '_' + safeName;
+                fs.writeFileSync(path.join(lmDir, fileName), Buffer.from(body.fileData, 'base64'));
+
+                sendJson(res, 200, { success: true, caminho: fileName, nome: safeName });
+            } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
+            return;
+        }
+
+        if (pathname === '/api/compras/lm/arquivo' && req.method === 'GET') {
+            const tokenUser = getTokenUser(req);
+            if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
+            try {
+                const reqId = String(parsedUrl.query.id || '');
+                const requisicao = db.findById('comprasRequisicoes', reqId);
+                // Escopo sempre pelo token: nunca confiar no empresa_id do registro.
+                const empresaId = tokenUser.empresa_id || 'default';
+                if (!requisicao || requisicao.empresa_id !== empresaId || !requisicao.arquivo_path) {
+                    sendJson(res, 404, { error: 'Arquivo não encontrado' }); return;
+                }
+                const lmDir = path.join(__dirname, 'data', 'anexos_compras', empresaId);
+                const filePath = path.join(lmDir, requisicao.arquivo_path);
+                if (!filePath.startsWith(lmDir + path.sep) || !fs.existsSync(filePath)) {
+                    sendJson(res, 404, { error: 'Arquivo não encontrado' }); return;
+                }
+                // Nome saneado: evita injeção de header via nome enviado pelo cliente.
+                const downloadName = String(requisicao.arquivo_nome || 'lm').replace(/[^\w.\- ]/g, '_');
+                res.setHeader('Content-Type', 'application/octet-stream');
+                res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+                res.end(fs.readFileSync(filePath));
             } catch (err) { sendJson(res, 500, { error: err.message }); }
             return;
         }

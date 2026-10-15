@@ -108,6 +108,14 @@ const initialState = {
     projetos: [],
     projetoFases: [],
     projetoCustos: [],
+    comprasRequisicoes: [],
+    comprasRequisicaoItens: [],
+    comprasCotacoes: [],
+    comprasCotacaoItens: [],
+    comprasPedidos: [],
+    comprasPedidoItens: [],
+    comprasNotas: [],
+    comprasNotaItens: [],
     activeNetworkArchitecture: null
 };
 
@@ -163,7 +171,7 @@ class Store {
             if (data.success && data.data) {
                 const sd = data.data;
                 console.log('[Load] Got data:', Object.keys(sd).map(k => `${k}:${Array.isArray(sd[k]) ? sd[k].length : '?'}`).join(', '));
-                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases','projetoCustos']) {
+                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases','projetoCustos','comprasRequisicoes','comprasRequisicaoItens','comprasCotacoes','comprasCotacaoItens','comprasPedidos','comprasPedidoItens','comprasNotas','comprasNotaItens']) {
                     if (Array.isArray(sd[key])) this.state[key] = sd[key];
                 }
                 // O servidor usa a entidade 'paineis'; o estado/chave de UI é 'painelTypes'
@@ -2021,6 +2029,60 @@ class Store {
             return false;
         }
     }
+}
+
+/* ================================================================
+   CRUD DAS ENTIDADES DE COMPRAS
+   As 8 entidades seguem exatamente a mesma semântica do CRUD explícito
+   de projetos/projetoFases/projetoCustos: escrita otimista no estado
+   local + rollback se o servidor recusar (_syncCreate/_syncUpdate/_syncDelete).
+   Gerados por fábrica para não manter 24 métodos duplicados à mão.
+   A API pública resultante é idêntica: store.addComprasRequisicao(...), etc.
+   ================================================================ */
+const COMPRAS_ENTIDADES = [
+    ['ComprasRequisicoes',       'comprasRequisicoes'],
+    ['ComprasRequisicaoItens',   'comprasRequisicaoItens'],
+    ['ComprasCotacoes',          'comprasCotacoes'],
+    ['ComprasCotacaoItens',      'comprasCotacaoItens'],
+    ['ComprasPedidos',           'comprasPedidos'],
+    ['ComprasPedidoItens',       'comprasPedidoItens'],
+    ['ComprasNotas',             'comprasNotas'],
+    ['ComprasNotaItens',         'comprasNotaItens']
+];
+
+for (const [sufixo, chave] of COMPRAS_ENTIDADES) {
+    Store.prototype['add' + sufixo] = async function (item) {
+        const now = new Date().toISOString();
+        const novo = { ...item, id: item.id || crypto.randomUUID(), created_at: item.created_at || now, updated_at: now };
+        this.setState({ [chave]: [...(this.state[chave] || []), novo] });
+        const ok = await this._syncCreate(chave, novo);
+        if (!ok) {
+            this.setState({ [chave]: (this.state[chave] || []).filter(x => x.id !== novo.id) });
+            return null;
+        }
+        return novo;
+    };
+
+    Store.prototype['update' + sufixo] = async function (id, updates) {
+        const now = new Date().toISOString();
+        const prev = (this.state[chave] || []).find(x => x.id === id);
+        this.setState({ [chave]: (this.state[chave] || []).map(x => x.id === id ? { ...x, ...updates, updated_at: now } : x) });
+        const ok = await this._syncUpdate(chave, id, { ...updates, updated_at: now });
+        if (!ok && prev) {
+            this.setState({ [chave]: (this.state[chave] || []).map(x => x.id === id ? prev : x) });
+        }
+        return ok;
+    };
+
+    Store.prototype['delete' + sufixo] = async function (id) {
+        const prev = (this.state[chave] || []).find(x => x.id === id);
+        this.setState({ [chave]: (this.state[chave] || []).filter(x => x.id !== id) });
+        const ok = await this._syncDelete(chave, id);
+        if (!ok && prev) {
+            this.setState({ [chave]: [...(this.state[chave] || []), prev] });
+        }
+        return ok;
+    };
 }
 
 export const store = new Store();

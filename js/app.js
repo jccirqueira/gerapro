@@ -884,13 +884,14 @@ const App = {
             'crm': 'CRM — Gestão de Leads',
             'manufatura': 'Gestão de Manufatura',
             'automacao-rede': 'Arquitetura de Rede Industrial',
-            'comparacao-documentos': 'Comparação de Documentos'
+            'comparacao-documentos': 'Comparação de Documentos',
+            'compras': 'Compras'
         };
         this.dom.pageTitle.textContent = 'GeraPro_1.0';
 
         // 4. Trigger specific module loads if necessary
         // Reset viewMode for modules that support it
-        const modulesToReset = ['clientes', 'fornecedores', 'materiais', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'automacao-rede', 'projetos'];
+        const modulesToReset = ['clientes', 'fornecedores', 'materiais', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'automacao-rede', 'projetos', 'compras'];
         modulesToReset.forEach(m => {
             const moduleName = m.replace(/-([a-z])/g, (g) => g[1].toUpperCase()); // camelCase
             const module = window.app[moduleName] || window[`${moduleName}Module`];
@@ -987,6 +988,9 @@ const App = {
         }
         if (viewName === 'comparacao-documentos' && window.comparacaoDocumentosModule) {
             window.comparacaoDocumentosModule.render();
+        }
+        if (viewName === 'compras' && window.comprasModule) {
+            window.comprasModule.render();
         }
 
         // DVT visibility / theme
@@ -2717,7 +2721,7 @@ const App = {
                 return;
             }
             // Conta registros das coleções para o diálogo de confirmação
-            const COLLECTIONS = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente'];
+            const COLLECTIONS = ['clientes','fornecedores','materiais','paineis','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','comprasRequisicoes','comprasRequisicaoItens','comprasCotacoes','comprasCotacaoItens','comprasPedidos','comprasPedidoItens','comprasNotas','comprasNotaItens'];
             const total = COLLECTIONS.reduce((s, k) => s + (Array.isArray(data[k]) ? data[k].length : 0), 0);
             if (total === 0 && !data.settings) {
                 this.showToast("Arquivo de backup vazio ou de formato desconhecido.", "error");

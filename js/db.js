@@ -1047,6 +1047,244 @@ function initSchema() {
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_empresa ON projeto_custos(empresa_id)'); } catch (e) { /* ignore */ }
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_projeto ON projeto_custos(empresa_id, projeto_id, tipo)'); } catch (e) { /* ignore */ }
 
+    /* ================================================================
+       MÓDULO DE COMPRAS
+       Requisição (LM da Engenharia) → Cotação → Pedido → NF recebida.
+       Todas as tabelas são multiempresa (empresa_id).
+       Campos booleanos são INTEGER 0/1 — o node:sqlite não bindeia booleanos.
+       ================================================================ */
+
+    // Requisição de Compras — cabeçalho da LM recebida.
+    // origem é AGNÓSTICA da fonte: 'upload' (hoje) | 'manual' | 'proposta' (LM nativa futura).
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_requisicoes (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            codigo TEXT DEFAULT '',
+            projeto_id TEXT DEFAULT '',
+            origem TEXT DEFAULT 'upload',
+            titulo TEXT DEFAULT '',
+            solicitante TEXT DEFAULT '',
+            revisao TEXT DEFAULT '',
+            arquivo_nome TEXT DEFAULT '',
+            arquivo_path TEXT DEFAULT '',
+            arquivo_hash TEXT DEFAULT '',
+            data_lm TEXT DEFAULT '',
+            data_requisicao TEXT DEFAULT '',
+            data_liberacao TEXT DEFAULT '',
+            liberada_por TEXT DEFAULT '',
+            status TEXT DEFAULT 'rascunho',
+            total_estimado REAL DEFAULT 0,
+            total_real REAL DEFAULT 0,
+            observacoes TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_empresa ON compras_requisicoes(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_projeto ON compras_requisicoes(empresa_id, projeto_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_status ON compras_requisicoes(empresa_id, status)'); } catch (e) { /* ignore */ }
+
+    // Linhas da LM. material_id NULL + nao_cadastrado=1 => o alerta de item não cadastrado.
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_requisicao_itens (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            requisicao_id TEXT DEFAULT '',
+            ordem INTEGER DEFAULT 0,
+            material_id TEXT DEFAULT '',
+            nao_cadastrado INTEGER DEFAULT 0,
+            match_confianca REAL DEFAULT 0,
+            codigo TEXT DEFAULT '',
+            descricao TEXT DEFAULT '',
+            fabricante TEXT DEFAULT '',
+            unidade TEXT DEFAULT '',
+            qtd REAL DEFAULT 0,
+            custo_catalogo REAL DEFAULT 0,
+            lead_time_catalogo REAL DEFAULT 0,
+            status TEXT DEFAULT 'pendente',
+            qtd_cotada REAL DEFAULT 0,
+            qtd_pedida REAL DEFAULT 0,
+            qtd_recebida REAL DEFAULT 0,
+            observacoes TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_empresa ON compras_requisicao_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_req ON compras_requisicao_itens(empresa_id, requisicao_id, ordem)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_material ON compras_requisicao_itens(material_id)'); } catch (e) { /* ignore */ }
+
+    // Cotação — UMA por fornecedor, dentro da requisição (1 requisição → N cotações).
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_cotacoes (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            requisicao_id TEXT DEFAULT '',
+            fornecedor_id TEXT DEFAULT '',
+            numero TEXT DEFAULT '',
+            data_solicitacao TEXT DEFAULT '',
+            data_resposta TEXT DEFAULT '',
+            status TEXT DEFAULT 'aberta',
+            prazo_entrega TEXT DEFAULT '',
+            condicao_pagamento TEXT DEFAULT '',
+            validade_proposta TEXT DEFAULT '',
+            frete REAL DEFAULT 0,
+            total REAL DEFAULT 0,
+            observacoes TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_empresa ON compras_cotacoes(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_req ON compras_cotacoes(empresa_id, requisicao_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_forn ON compras_cotacoes(fornecedor_id)'); } catch (e) { /* ignore */ }
+
+    // Preço do fornecedor por item da requisição. vencedor=1 marca item a item.
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_cotacao_itens (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            cotacao_id TEXT DEFAULT '',
+            requisicao_item_id TEXT DEFAULT '',
+            material_id TEXT DEFAULT '',
+            qtd REAL DEFAULT 0,
+            custo_unitario REAL DEFAULT 0,
+            ipi REAL DEFAULT 0,
+            icms REAL DEFAULT 0,
+            desconto REAL DEFAULT 0,
+            prazo_entrega TEXT DEFAULT '',
+            total REAL DEFAULT 0,
+            vencedor INTEGER DEFAULT 0,
+            observacoes TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_empresa ON compras_cotacao_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_cot ON compras_cotacao_itens(empresa_id, cotacao_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_reqitem ON compras_cotacao_itens(requisicao_item_id)'); } catch (e) { /* ignore */ }
+
+    // Pedido de Compras — um por fornecedor (1 requisição → N pedidos).
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_pedidos (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            codigo TEXT DEFAULT '',
+            requisicao_id TEXT DEFAULT '',
+            cotacao_id TEXT DEFAULT '',
+            fornecedor_id TEXT DEFAULT '',
+            data_pedido TEXT DEFAULT '',
+            data_prevista_entrega TEXT DEFAULT '',
+            data_recebimento TEXT DEFAULT '',
+            status TEXT DEFAULT 'rascunho',
+            condicao_pagamento TEXT DEFAULT '',
+            prazo_entrega TEXT DEFAULT '',
+            transportadora TEXT DEFAULT '',
+            frete REAL DEFAULT 0,
+            desconto REAL DEFAULT 0,
+            total REAL DEFAULT 0,
+            solicitante TEXT DEFAULT '',
+            aprovado_por TEXT DEFAULT '',
+            aprovado_em TEXT DEFAULT '',
+            observacoes TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_empresa ON compras_pedidos(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_req ON compras_pedidos(empresa_id, requisicao_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_forn ON compras_pedidos(fornecedor_id)'); } catch (e) { /* ignore */ }
+
+    // Linha do pedido. qtd_recebida permite baixa parcial via NF.
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_pedido_itens (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            pedido_id TEXT DEFAULT '',
+            requisicao_item_id TEXT DEFAULT '',
+            cotacao_item_id TEXT DEFAULT '',
+            material_id TEXT DEFAULT '',
+            codigo TEXT DEFAULT '',
+            descricao TEXT DEFAULT '',
+            fabricante TEXT DEFAULT '',
+            unidade TEXT DEFAULT '',
+            qtd REAL DEFAULT 0,
+            qtd_recebida REAL DEFAULT 0,
+            custo_unitario REAL DEFAULT 0,
+            ipi REAL DEFAULT 0,
+            icms REAL DEFAULT 0,
+            desconto REAL DEFAULT 0,
+            lead_time_previsto TEXT DEFAULT '',
+            total REAL DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_empresa ON compras_pedido_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_ped ON compras_pedido_itens(empresa_id, pedido_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_material ON compras_pedido_itens(material_id)'); } catch (e) { /* ignore */ }
+
+    // NF recebida — N por pedido (entregas parciais).
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_notas (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            pedido_id TEXT DEFAULT '',
+            fornecedor_id TEXT DEFAULT '',
+            numero TEXT DEFAULT '',
+            serie TEXT DEFAULT '',
+            chave_acesso TEXT DEFAULT '',
+            data_emissao TEXT DEFAULT '',
+            data_recebimento TEXT DEFAULT '',
+            data_entrada TEXT DEFAULT '',
+            valor_produtos REAL DEFAULT 0,
+            valor_frete REAL DEFAULT 0,
+            valor_desconto REAL DEFAULT 0,
+            valor_total REAL DEFAULT 0,
+            icms REAL DEFAULT 0,
+            ipi REAL DEFAULT 0,
+            pis REAL DEFAULT 0,
+            cofins REAL DEFAULT 0,
+            transportadora TEXT DEFAULT '',
+            volumes REAL DEFAULT 0,
+            conferida INTEGER DEFAULT 0,
+            conferida_por TEXT DEFAULT '',
+            conferida_em TEXT DEFAULT '',
+            status TEXT DEFAULT 'recebida',
+            observacoes TEXT DEFAULT '',
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_empresa ON compras_notas(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_ped ON compras_notas(empresa_id, pedido_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_numero ON compras_notas(numero)'); } catch (e) { /* ignore */ }
+
+    // Linha da NF — vincula ao item do pedido e registra a baixa.
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS compras_nota_itens (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            nota_id TEXT DEFAULT '',
+            pedido_item_id TEXT DEFAULT '',
+            material_id TEXT DEFAULT '',
+            codigo TEXT DEFAULT '',
+            descricao TEXT DEFAULT '',
+            unidade TEXT DEFAULT '',
+            qtd_recebida REAL DEFAULT 0,
+            custo_unitario REAL DEFAULT 0,
+            lote TEXT DEFAULT '',
+            data_validade TEXT DEFAULT '',
+            total REAL DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_empresa ON compras_nota_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_nf ON compras_nota_itens(empresa_id, nota_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_peditem ON compras_nota_itens(pedido_item_id)'); } catch (e) { /* ignore */ }
+
     // Migration: add created_at to usuarios
     try { db.exec("ALTER TABLE usuarios ADD COLUMN created_at TEXT"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_chat_id to usuarios
@@ -1125,7 +1363,15 @@ const TABLE_MAP = {
     unidadesCliente: { pk: 'id', table: 'unidades_cliente' },
     projetos: { pk: 'id', table: 'projetos' },
     projetoFases: { pk: 'id', table: 'projeto_fases' },
-    projetoCustos: { pk: 'id', table: 'projeto_custos' }
+    projetoCustos: { pk: 'id', table: 'projeto_custos' },
+    comprasRequisicoes: { pk: 'id', table: 'compras_requisicoes' },
+    comprasRequisicaoItens: { pk: 'id', table: 'compras_requisicao_itens' },
+    comprasCotacoes: { pk: 'id', table: 'compras_cotacoes' },
+    comprasCotacaoItens: { pk: 'id', table: 'compras_cotacao_itens' },
+    comprasPedidos: { pk: 'id', table: 'compras_pedidos' },
+    comprasPedidoItens: { pk: 'id', table: 'compras_pedido_itens' },
+    comprasNotas: { pk: 'id', table: 'compras_notas' },
+    comprasNotaItens: { pk: 'id', table: 'compras_nota_itens' }
 };
 
 // --- System seed data (composicoes + regras, loaded on first run) ---
@@ -2018,7 +2264,15 @@ function getFullSync(empresaId = 'default') {
         unidadesCliente: findAll('unidadesCliente', empresaId),
         projetos: findAll('projetos', empresaId),
         projetoFases: findAll('projetoFases', empresaId),
-        projetoCustos: findAll('projetoCustos', empresaId)
+        projetoCustos: findAll('projetoCustos', empresaId),
+        comprasRequisicoes: findAll('comprasRequisicoes', empresaId),
+        comprasRequisicaoItens: findAll('comprasRequisicaoItens', empresaId),
+        comprasCotacoes: findAll('comprasCotacoes', empresaId),
+        comprasCotacaoItens: findAll('comprasCotacaoItens', empresaId),
+        comprasPedidos: findAll('comprasPedidos', empresaId),
+        comprasPedidoItens: findAll('comprasPedidoItens', empresaId),
+        comprasNotas: findAll('comprasNotas', empresaId),
+        comprasNotaItens: findAll('comprasNotaItens', empresaId)
     };
 }
 

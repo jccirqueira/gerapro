@@ -140,6 +140,12 @@
                     <i class="ph ph-git-diff"></i> Comparar Docs
                 </a>
 
+                <div class="sidebar-section-label">Operações</div>
+                <a href="#" class="nav-item" data-target="compras">
+                    <i class="ph ph-shopping-cart"></i> Compras
+                    <span id="compras-badge" class="nav-badge"></span>
+                </a>
+
                 <div class="sidebar-section-label">Relatórios</div>
                 <a href="#" class="nav-item" data-target="relatorio-propostas">
                     <i class="ph ph-article"></i> Relatório de Propostas
@@ -1264,6 +1270,9 @@
                 <div id="crm-app"></div>
             </div>
 
+            <!-- MODULE: COMPRAS -->
+            <div id="view-compras" class="module-view hidden-module fade-in"></div>
+
         </main>
     </div>
 
@@ -1315,7 +1324,8 @@
                 'js/crm.js',
                 'js/manufatura.js',
                 'js/automacaoRedeUI.js',
-                'js/comparacaoDocumentos.js'
+                'js/comparacaoDocumentos.js',
+                'js/compras.js'
             ];
 
             // Unique version per reload to force update
