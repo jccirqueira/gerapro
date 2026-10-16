@@ -376,7 +376,7 @@ const ProjetosModule = {
                 <div class="module-header-sticky" style="color:white;padding:20px 30px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:10;">
                     <div>
                         <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;">
-                            <i class="ph ph-folder"></i> Gestão de Projetos
+                            <i class="ph ph-folder"></i> Cronograma / DRE
                         </h2>
                         <div style="font-size:12px;opacity:0.9;margin-top:2px;">Projetos originados em propostas ganhas (Fechado).</div>
                     </div>

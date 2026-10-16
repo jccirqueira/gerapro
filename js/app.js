@@ -229,6 +229,9 @@ const App = {
         // Initial Dashboard Render
         this.renderDashboard(store.getState());
 
+        // Estado inicial do grupo PTC do header (view padrão: dashboard → oculto)
+        this._syncHeaderPtcGroup((store.getState().ui || {}).currentView || 'dashboard');
+
         // Init Theme
         const storedTheme = store.getState().settings?.theme || 'light';
         this.setTheme(storedTheme);
@@ -851,6 +854,7 @@ const App = {
         this.dom.views = document.querySelectorAll('.module-view');
 
         // 3. Update Title
+        this._syncHeaderPtcGroup(viewName);
         const titleMap = {
             'dashboard': 'Dashboard',
             'clientes': 'Gestão de Clientes',
@@ -874,7 +878,7 @@ const App = {
             'proposta-comercial': 'Proposta Comercial',
             'proposta-completa': 'Proposta Completa',
             'pipeline-comercial': 'Gestão de Propostas',
-            'projetos': 'Gestão de Projetos',
+            'projetos': 'Cronograma / DRE',
             'relatorio-propostas': 'Relatório de Propostas',
             'relatorio-cadastros': 'Relatório de Cadastros',
             'relatorio-tipicos': 'Relatório de Típicos',
@@ -1146,6 +1150,16 @@ const App = {
         this._filterSidebarForVendedor();
     },
 
+    // Mostra o grupo do header (badge PTC ativa + Buscar PTC + Iniciar Nova PTC)
+    // apenas nos módulos onde ele faz sentido — fora do contexto de propostas
+    // o cabeçalho fica limpo. Chamado no navigateTo, no init e no filtro de vendedor.
+    _syncHeaderPtcGroup(viewName) {
+        const grupo = document.getElementById('ptc-header-group');
+        if (!grupo) return;
+        const viewsComPtc = ['proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'precificacao'];
+        grupo.style.display = viewsComPtc.includes(viewName) ? 'flex' : 'none';
+    },
+
     _filterSidebarForVendedor() {
         const userLevel = store.getUserLevel();
         const nav = document.getElementById('main-nav');
@@ -1161,20 +1175,15 @@ const App = {
                     child.style.display = 'none';
                 }
             }
-            // Hide PTC header buttons
-            const btnBuscar = document.getElementById('btn-buscar-ptc');
-            const btnIniciar = document.getElementById('btn-iniciar-ptc');
-            if (btnBuscar) btnBuscar.style.display = 'none';
-            if (btnIniciar) btnIniciar.style.display = 'none';
+            // Hide PTC header buttons (vendedor não navega em módulos de PTC)
+            const grupo = document.getElementById('ptc-header-group');
+            if (grupo) grupo.style.display = 'none';
         } else {
             for (const child of nav.children) {
                 child.style.display = '';
             }
-            // Restore PTC header buttons
-            const btnBuscar = document.getElementById('btn-buscar-ptc');
-            const btnIniciar = document.getElementById('btn-iniciar-ptc');
-            if (btnBuscar) btnBuscar.style.display = '';
-            if (btnIniciar) btnIniciar.style.display = '';
+            // Restore PTC header buttons conforme o módulo atual
+            this._syncHeaderPtcGroup((store.getState().ui || {}).currentView || 'dashboard');
         }
     },
 
