@@ -31,6 +31,8 @@
     :root {
         --sidebar-width: 0px;
     }
+    /* No mobile o sidebar sai da tela — o hambúrguer é a única forma de abri-lo */
+    #toggle-sidebar { display: inline-flex; }
     .app-container {
         grid-template-columns: 1fr;
     }

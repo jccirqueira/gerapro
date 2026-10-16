@@ -42,6 +42,9 @@
     justify-content: space-between;
 }
 
+/* Botão de menu (hambúrguer): só no mobile — no desktop o sidebar fica fixo */
+#toggle-sidebar { display: none; }
+
 .module-header-sticky {
     background: var(--color-accent);
     color: white;

@@ -144,7 +144,6 @@ const App = {
         this.dom = {
             navItems: document.querySelectorAll('.nav-item'),
             views: document.querySelectorAll('.module-view'),
-            pageTitle: document.getElementById('page-title'),
             toggleSidebar: document.getElementById('toggle-sidebar'),
             sidebar: document.querySelector('.app-sidebar'),
             toggleTheme: document.getElementById('toggle-theme'),
@@ -853,45 +852,9 @@ const App = {
         // For now, let's stick to simple class toggle which works for display:none -> block transition animations.
         this.dom.views = document.querySelectorAll('.module-view');
 
-        // 3. Update Title
+        // 3. Header PTC (badge + botões contextuais por módulo de proposta)
         this._syncHeaderPtcGroup(viewName);
-        const titleMap = {
-            'dashboard': 'Dashboard',
-            'clientes': 'Gestão de Clientes',
-            'fornecedores': 'Gestão de Fornecedores',
-            'materiais': 'Catálogo de Materiais',
-            'mao-de-obra': 'Consolidado de Mão de Obra',
-            'despesas': 'Gestão de Despesas de Projeto',
-            'orcamentos': 'Propostas & Orçamentos',
-            'paineis': 'Cadastros de Painéis',
-            'chaparia': 'Catálogo de Típicos de Chaparia',
-            'tipicos': 'Engenharia de Típicos',
-            'cubiculos': 'Engenharia de Cubículos',
-            'cargas': 'Lista de Cargas',
-            'lm': 'Lista de Materiais (LM)',
-            'importacao': 'Importação de Dados',
-            'configuracoes': 'Configurações do Sistema',
-            'precificacao': 'Precificação e Rentabilidade',
-            'calculos-eletricos': 'Cálculos Elétricos',
-            'calculos-mecanicos': 'Cálculos Mecânicos',
-            'proposta-tecnica': 'Proposta Técnica',
-            'proposta-comercial': 'Proposta Comercial',
-            'proposta-completa': 'Proposta Completa',
-            'pipeline-comercial': 'Gestão de Propostas',
-            'projetos': 'Cronograma / DRE',
-            'relatorio-propostas': 'Relatório de Propostas',
-            'relatorio-cadastros': 'Relatório de Cadastros',
-            'relatorio-tipicos': 'Relatório de Típicos',
-            'relatorio-manufatura': 'Relatório de Manufatura',
-            'composicoes': 'Composições de Mão de Obra',
-            'regras-derivacao': 'Regras de Derivação',
-            'crm': 'CRM — Gestão de Leads',
-            'manufatura': 'Gestão de Manufatura',
-            'automacao-rede': 'Arquitetura de Rede Industrial',
-            'comparacao-documentos': 'Comparação de Documentos',
-            'compras': 'Compras'
-        };
-        this.dom.pageTitle.textContent = 'GeraPro_1.0';
+        // Título da página fixo no <title> do documento; o header exibe o badge da empresa.
 
         // 4. Trigger specific module loads if necessary
         // Reset viewMode for modules that support it

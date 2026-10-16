@@ -15,7 +15,7 @@
         id: 'interface',
         titulo: 'Interface Geral',
         screenshot: 'prints/geral/interface.png',
-        texto: 'A interface é dividida em duas áreas principais:\n\nBarra Lateral (Menu): Localizada à esquerda, contém a navegação principal do sistema, organizada em categorias: Principal, Cadastros, Comercial, Engenharia, Operações, Relatórios e Configurações.\n\nÁrea de Conteúdo: Ocupa o restante da tela à direita. É onde os módulos e ferramentas são carregados conforme a seleção no menu.\n\nHeader: Contém o título da página, botão de busca de PTC, botão para criar nova PTC, alternador de tema claro/escuro, indicadores de dólar e data base, e avatar do usuário.'
+        texto: 'A interface é dividida em duas áreas principais:\n\nBarra Lateral (Menu): Localizada à esquerda, contém a navegação principal do sistema, organizada em categorias: Principal, Cadastros, Comercial, Engenharia, Operações, Relatórios e Configurações.\n\nÁrea de Conteúdo: Ocupa o restante da tela à direita. É onde os módulos e ferramentas são carregados conforme a seleção no menu.\n\nHeader: Contém o badge colorido com o nome da empresa em uso, botão de busca de PTC, botão para criar nova PTC, alternador de tema claro/escuro, indicadores de dólar e data base, e avatar do usuário.'
       },
       {
         id: 'navegacao',
