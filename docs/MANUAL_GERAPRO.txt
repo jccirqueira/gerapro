@@ -160,7 +160,9 @@ Fluxo de compras da Engenharia ao recebimento (sem controle de estoque):
 - PEDIDO DE COMPRAS por fornecedor (1 requisição → N pedidos), com aprovação
   por valor acima de R$ 50.000.
 - NOTA FISCAL com baixa automática no pedido, gravação do preço real no
-  catálogo e lançamento na DRE do projeto.
+  catálogo e lançamento na DRE do projeto. O botão "Importar XML" lê o XML
+  da NF-e (SEFAZ), preenche cabeçalho, valores e itens, casa os itens com o
+  pedido (código / descrição / "só na NF") e exige revisão antes de salvar.
 
 8.1. PAINEL DE INDICADORES
 - KPIs (em cotação, em pedido, recebido no mês, atrasos), lead time real ×

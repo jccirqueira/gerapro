@@ -358,6 +358,33 @@ Cada recebimento é lançado pelo botão Lançar NF do pedido. Um pedido aceita 
 notas fiscais — entregas parciais. O item entra com a quantidade efetivamente
 recebida; quantidade zero fica de fora da NF.
 
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Importar o XML da NF-e (o caminho rápido):                                     │
+│                                                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+No formulário da NF, o botão Importar XML recebe o arquivo XML emitido pela
+SEFAZ (o mesmo baixado do portal da NF-e). O sistema lê o cabeçalho (número,
+série, chave de acesso, emitente, transportadora, volumes), os valores
+(produtos, frete, desconto, impostos) e os itens — e faz o casamento automático
+dos itens da NF com os do pedido em três níveis de confiança:
+
+  • Código exato — o código do item do pedido aparece na NF (mais confiável).
+  • Descrição similar — casamento por palavras da descrição (Jaccard ≥ 0,55),
+    com desempate pela quantidade.
+  • Só na NF — item que não existe no pedido: fica sinalizado para revisão
+    manual.
+
+📌 Nada é gravado às cegas: abre o banner de revisão com o resumo do
+   casamento e o formulário preenchido. Confira, corrija o que precisar e só
+   então clique em Salvar NF. O botão Desfazer restaura o formulário ao estado
+   anterior ao importar.
+
+O mesmo XML pode ser reimportado sem virar duplicata — a chave de acesso
+deduplica. Sem XML, o preenchimento manual continua funcionando normalmente.
+
 A conferência é automática ao salvar: quantidade e preço da NF × pedido.
 Divergência (tolerância de preço de 0,5%) muda o status da NF para Divergente e
 exibe o alerta na tela.
@@ -471,8 +498,9 @@ O ciclo completo, do zero à recepção:
   6. Na matriz de comparação, marque o vencedor item a item.
   7. Clique em Gerar Pedido — sai um PC por fornecedor.
   8. Acompanhe o pedido: Rascunho → Enviado → Em Entrega.
-  9. Ao receber, clique em Lançar NF: baixa, preço real e DRE do projeto são
-     atualizados automaticamente.
+  9. Ao receber, clique em Lançar NF e importe o XML da NF-e: cabeçalho e itens
+     são preenchidos com casamento automático ao pedido — confira a revisão e
+     salve. Baixa, preço real e DRE do projeto são atualizados automaticamente.
   10. Acompanhe tudo no painel Indicadores (KPIs, lead time, fornecedores e
       duplicidades).
 
@@ -494,6 +522,8 @@ O ciclo completo, do zero à recepção:
     planejamento passa a acertar.
   • Confira a NF contra o pedido no papel antes de lançar — o alerta de
     divergência mostra exatamente onde.
+  • Importe o XML da NF-e em vez de digitar: cabeçalho, valores e itens entram
+    sozinhos — sua tarefa é só revisar o banner de casamento.
   • O painel de duplicidade resolve o clássico "compramos o mesmo item duas
     vezes".
   • As condições espelhadas no fornecedor economizam digitação: preencha bem o
@@ -507,27 +537,31 @@ O ciclo completo, do zero à recepção:
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-┌───────────────────┬────────────────────────────────────────────────────────┐
-│ TERMO             │ SIGNIFICADO                                            │
-├───────────────────┼────────────────────────────────────────────────────────┤
-│ LM                │ Lista de Materiais (BOM) da Engenharia: o que precisa  │
-│                   │ ser comprado para o projeto.                           │
-│ Requisição (REQ)  │ Pedido formal de compra interno, gerado a partir da    │
-│                   │ LM.                                                    │
-│ Cotação (COT)     │ Consulta de preços enviada a um fornecedor específico. │
-│ Pedido de Compras │ Documento emitido para o fornecedor vencedor.          │
-│ (PC)              │                                                        │
-│ NF                │ Nota Fiscal da mercadoria recebida.                    │
-│ Vencedor          │ Fornecedor escolhido para cada item na matriz de       │
-│                   │ comparação.                                            │
-│ Baixa             │ Abatimento da quantidade recebida sobre o pedido.      │
-│ Lead time         │ Tempo entre o pedido e o recebimento real de um        │
-│                   │ material.                                              │
-│ Duplicidade       │ Mesmo material em mais de uma requisição aberta (risco │
-│                   │ de compra dupla).                                      │
-│ Gate              │ Ponto de controle formal — aqui, a "Liberação para     │
-│                   │ Compras".                                              │
-└───────────────────┴────────────────────────────────────────────────────────┘
+┌────────────────────┬────────────────────────────────────────────────────────┐
+│ TERMO              │ SIGNIFICADO                                            │
+├────────────────────┼────────────────────────────────────────────────────────┤
+│ LM                 │ Lista de Materiais (BOM) da Engenharia: o que precisa  │
+│                    │ ser comprado para o projeto.                           │
+│ Requisição (REQ)   │ Pedido formal de compra interno, gerado a partir da    │
+│                    │ LM.                                                    │
+│ Cotação (COT)      │ Consulta de preços enviada a um fornecedor específico. │
+│ Pedido de Compras  │ Documento emitido para o fornecedor vencedor.          │
+│ (PC)               │                                                        │
+│ NF                 │ Nota Fiscal da mercadoria recebida.                    │
+│ XML da NF-e        │ Arquivo digital emitido pela SEFAZ; importado no       │
+│                    │ lançamento da NF para preencher cabeçalho e itens.     │
+│ Casamento de itens │ Pareamento automático entre os itens do XML e os do    │
+│                    │ pedido (código, descrição ou "só na NF" para revisão). │
+│ Vencedor           │ Fornecedor escolhido para cada item na matriz de       │
+│                    │ comparação.                                            │
+│ Baixa              │ Abatimento da quantidade recebida sobre o pedido.      │
+│ Lead time          │ Tempo entre o pedido e o recebimento real de um        │
+│                    │ material.                                              │
+│ Duplicidade        │ Mesmo material em mais de uma requisição aberta (risco │
+│                    │ de compra dupla).                                      │
+│ Gate               │ Ponto de controle formal — aqui, a "Liberação para     │
+│                    │ Compras".                                              │
+└────────────────────┴────────────────────────────────────────────────────────┘
 
 
 
@@ -580,6 +614,22 @@ O ciclo completo, do zero à recepção:
 │            (tolerância de 0,5%). Confira a nota contra o pedido: se o pedido    │
 │            está errado, ajuste e lance de novo; se a NF está errada, estorne e  │
 │            relance — estorno reverte baixa, preço e DRE.                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "Um item do XML ficou "só na NF""                                      │
+│SOLUÇÃO: O casamento não encontrou código nem descrição parecida no              │
+│            pedido. É a etapa de revisão avisando: confira se o item pertence    │
+│            mesmo a este pedido. Se for erro de cadastro, corrija a              │
+│            descrição/código ou lance o item manualmente antes de salvar.        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "O XML não abriu / foi rejeitado"                                      │
+│SOLUÇÃO: Selecione o arquivo XML da NF-e baixado do portal (não o                │
+│            DANFE em PDF). O sistema lê o layout da SEFAZ; arquivos de           │
+│            cancelamento ou carta de correção não têm itens e não servem para    │
+│            lançar NF.                                                           │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐

@@ -159,6 +159,8 @@ const ComprasModule = {
     _pedModal: null,        // contexto do modal de gerar pedido ({ requisicao_id, fornecedores })
     activeNota: null,       // id da NF aberta (viewMode === 'nota')
     _notaStaging: null,     // NF em construção ({ nota, itens }) — itens vinculados ao pedido
+    _xmlImport: null,       // dados do XML importado (cabeçalho, itens, nome do arquivo)
+    _xmlRevisao: null,      // estrutura de revisão do casamento XML × pedido
 
     /* ================================================================
        CICLO DE VIDA
@@ -227,6 +229,9 @@ const ComprasModule = {
             setNotaCampo: this.setNotaCampo.bind(this),
             setNotaItemCampo: this.setNotaItemCampo.bind(this),
             salvarNota: this.salvarNota.bind(this),
+            pickXmlNota: this.pickXmlNota.bind(this),
+            handleXmlNota: this.handleXmlNota.bind(this),
+            limparRevisaoXml: this.limparRevisaoXml.bind(this),
             estornarNota: this.estornarNota.bind(this),
             openPainel: this.openPainel.bind(this),
             fecharPainel: this.fecharPainel.bind(this),
@@ -291,6 +296,9 @@ const ComprasModule = {
         this._pedModal = null;
         this.activeNota = null;
         this._notaStaging = null;
+        this._xmlImport = null;
+        this._xmlRevisao = null;
+        this._xmlNotaAntes = null;
     },
 
     /* Badge: prioriza itens ainda não resolvidos; senão, pendências de fluxo. */
@@ -346,6 +354,9 @@ const ComprasModule = {
         this.pedSub = 'lista';
         this.activeNota = null;
         this._notaStaging = null;
+        this._xmlImport = null;
+        this._xmlRevisao = null;
+        this._xmlNotaAntes = null;
         this.render();
     },
 
@@ -3135,8 +3146,8 @@ const ComprasModule = {
 
         this._seeding = true;
         const itens = this._itensDoPedido(pedidoId);
-        await Promise.all(itens.map(pi => store.removeComprasPedidoItens(pi.id)));
-        await store.removeComprasPedidos(pedidoId);
+        await Promise.all(itens.map(pi => store.deleteComprasPedidoItens(pi.id)));
+        await store.deleteComprasPedidos(pedidoId);
         this._seeding = false;
 
         // Volta para a requisição
@@ -4377,12 +4388,406 @@ const ComprasModule = {
         return { status: divergencias.length ? 'divergente' : 'conferida', divergencias };
     },
 
+    /* ================================================================
+       IMPORTAÇÃO DO XML DA NF-e — o documento-fonte (layout SEFAZ).
+       - Parser puro (`_parseXmlNFe`): extrai cabeçalho e itens do XML.
+       - Casamento puro (`_casarItensNota`): liga itens do XML aos itens
+         do pedido por código, depois por descrição+qtd+valor, com
+         nível de confiança por item (exato / aprox / não casado).
+       - `_importarXmlNota` orquestra: lê o arquivo, valida a chave,
+         preenche o staging e abre a etapa de revisão antes de gravar.
+       Nada é gravado sem o usuário confirmar a tela de revisão.
+       ================================================================ */
+
+    /* Extrai o texto de uma tag dentro de um elemento (namespace-insensitive). */
+    _xmlTag(el, tag) {
+        if (!el) return '';
+        const n = el.getElementsByTagName(tag)[0];
+        return n ? String(n.textContent || '').trim() : '';
+    },
+
+    /* Lê o XML da NF-e e devolve { ok, erro, cabecalho, itens }.
+       Suporta tanto o envelope <nfeProc> quanto o <NFe> avulso. */
+    _parseXmlNFe(texto) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(texto, 'application/xml');
+
+        // Erro de sintaxe do próprio parser
+        const parseErr = doc.getElementsByTagName('parsererror')[0];
+        if (parseErr) return { ok: false, erro: 'XML inválido ou corrompido.' };
+
+        const infNFe = doc.getElementsByTagName('infNFe')[0];
+        if (!infNFe) {
+            return { ok: false, erro: 'Arquivo não é uma NF-e (tag infNFe ausente). Verifique se o XML veio da SEFAZ.' };
+        }
+
+        const idAttr = infNFe.getAttribute('Id') || '';
+        const chave = idAttr.replace(/^NFe/i, '').replace(/\D/g, '');
+
+        const ide = doc.getElementsByTagName('ide')[0];
+        const emit = doc.getElementsByTagName('emit')[0];
+        const dest = doc.getElementsByTagName('dest')[0];
+        const transp = doc.getElementsByTagName('transp')[0];
+        const total = doc.getElementsByTagName('ICMSTot')[0];
+
+        const numero = this._xmlTag(ide, 'nNF');
+        const serie = this._xmlTag(ide, 'serie');
+        // dhEmi pode vir como dEmi (layout antigo); pega a parte da data
+        let emissao = this._xmlTag(ide, 'dhEmi') || this._xmlTag(ide, 'dEmi');
+        emissao = emissao.slice(0, 10);
+
+        const num = (t) => { const v = parseFloat(t); return isFinite(v) ? v : 0; };
+        const cabecalho = {
+            chave,
+            numero,
+            serie,
+            data_emissao: emissao,
+            valor_produtos: num(this._xmlTag(total, 'vProd')),
+            valor_frete: num(this._xmlTag(total, 'vFrete')),
+            valor_desconto: num(this._xmlTag(total, 'vDesc')),
+            valor_total: num(this._xmlTag(total, 'vNF')),
+            icms: num(this._xmlTag(total, 'vICMS')),
+            ipi: num(this._xmlTag(total, 'vIPI')),
+            pis: num(this._xmlTag(total, 'vPIS')),
+            cofins: num(this._xmlTag(total, 'vCOFINS')),
+            transportadora: this._xmlTag(transp, 'xNome'),
+            volumes: num(this._xmlTag(transp, 'qVol')),
+            emitente: this._xmlTag(emit, 'xNome'),
+            destinatario: this._xmlTag(dest, 'xNome')
+        };
+        if (!cabecalho.numero) return { ok: false, erro: 'XML sem número de NF (tag nNF).' };
+
+        // Itens: cada <det nItem=...> contém <prod> e <imposto>
+        const dets = doc.getElementsByTagName('det');
+        const itens = [];
+        for (let i = 0; i < dets.length; i++) {
+            const det = dets[i];
+            const prod = det.getElementsByTagName('prod')[0];
+            if (!prod) continue;
+            const qCom = num(this._xmlTag(prod, 'qCom'));
+            const vUn = num(this._xmlTag(prod, 'vUnCom'));
+            itens.push({
+                ordem: parseInt(det.getAttribute('nItem'), 10) || (i + 1),
+                codigo: this._xmlTag(prod, 'cProd'),
+                descricao: this._xmlTag(prod, 'xProd'),
+                unidade: this._xmlTag(prod, 'uCom'),
+                qtd: qCom,
+                custo_unitario: vUn,
+                total: num(this._xmlTag(prod, 'vProd')) || Math.round(qCom * vUn * 100) / 100
+            });
+        }
+        if (!itens.length) return { ok: false, erro: 'XML sem itens de produto (tag det/prod).' };
+
+        return { ok: true, cabecalho, itens };
+    },
+
+    /* Normaliza texto para comparação flexível: minúsculas, sem acentos,
+       sem pontuação e com espaços colapsados. */
+    _normTxt(s) {
+        return String(s || '')
+            .toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    },
+
+    /* Pontua similaridade entre descrição do XML e do pedido (0..1).
+       Cooperam: compartilhamento de tokens + prefixo do código. */
+    _similaridade(a, b) {
+        const ta = this._normTxt(a).split(' ').filter(Boolean);
+        const tb = this._normTxt(b).split(' ').filter(Boolean);
+        if (!ta.length || !tb.length) return 0;
+        const sa = new Set(ta), sb = new Set(tb);
+        let comum = 0;
+        sa.forEach(t => { if (sb.has(t)) comum++; });
+        const jacard = comum / (sa.size + sb.size - comum);
+        return Math.round(jacard * 1000) / 1000;
+    },
+
+    /* Casa os itens do XML com os itens do pedido ainda com saldo.
+       Estratégia profissional em 3 passos, do mais confiável ao menos:
+         1) código exato (cProd == codigo do pedido) — confiança 'codigo'
+         2) descrição similar (≥ limiar) + qtd compatível — 'aprox'
+         3) o que sobrar fica 'sem_casa' (entra como item avulso, revisão)
+       Devolve { pares, xmlNaoCasados, pedidoNaoUsados }. */
+    _casarItensNota(itensXml, itensPedido) {
+        const limiarDesc = 0.55;     // similaridade mínima para aceitar aprox
+        const livres = itensPedido.map((pi, i) => ({
+            pi, idx: i, usado: false,
+            saldo: Math.max(0, (parseFloat(pi.qtd) || 0) - this._qtdJaRecebida(pi.id, null))
+        })).filter(x => x.saldo > 0.0001);
+
+        const pares = [];
+        const xmlUsado = new Set();
+
+        // Passo 1: código exato
+        itensXml.forEach((xi, xiIdx) => {
+            if (!xi.codigo) return;
+            const alvo = livres.find(l => !l.usado && l.pi.codigo && String(l.pi.codigo).trim() === String(xi.codigo).trim());
+            if (alvo) {
+                alvo.usado = true; xmlUsado.add(xiIdx);
+                pares.push({ xmlIdx: xiIdx, pedidoItem: alvo.pi, pedidoIdx: alvo.idx, confianca: 'codigo', similaridade: 1, saldo: alvo.saldo });
+            }
+        });
+
+        // Passo 2: descrição similar + qtd compatível (sem código exato)
+        itensXml.forEach((xi, xiIdx) => {
+            if (xmlUsado.has(xiIdx)) return;
+            let melhor = null, melhorScore = 0;
+            livres.forEach(l => {
+                if (l.usado) return;
+                const sim = this._similaridade(xi.descricao, l.pi.descricao);
+                if (sim < limiarDesc) return;
+                // desempata pela proximidade de qtd
+                const qtdOk = xi.qtd > 0 && l.saldo > 0 && xi.qtd <= l.saldo + 0.0001;
+                const score = sim + (qtdOk ? 0.2 : 0);
+                if (score > melhorScore) { melhorScore = score; melhor = { l, sim }; }
+            });
+            if (melhor) {
+                melhor.l.usado = true; xmlUsado.add(xiIdx);
+                pares.push({ xmlIdx: xiIdx, pedidoItem: melhor.l.pi, pedidoIdx: melhor.l.idx, confianca: 'aprox', similaridade: melhor.sim, saldo: melhor.l.saldo });
+            }
+        });
+
+        // Passo 3: o que sobrou
+        const xmlNaoCasados = itensXml.map((xi, i) => ({ ...xi, idx: i })).filter(o => !xmlUsado.has(o.idx));
+        const pedidoNaoUsados = livres.filter(l => !l.usado).map(l => ({ ...l.pi, saldo: l.saldo }));
+        return { pares, xmlNaoCasados, pedidoNaoUsados };
+    },
+
+    /* Dispara o seletor de arquivo XML (botão na tela da NF). */
+    pickXmlNota() {
+        const inp = document.getElementById('cp-nf-xml-input');
+        if (inp) inp.click();
+    },
+
+    /* Lê o arquivo escolhido e roda a importação. */
+    handleXmlNota(input) {
+        const file = input.files && input.files[0];
+        input.value = '';
+        if (!file) return;
+        this._importarXmlNota(file);
+    },
+
+    /* Orquestra a importação: valida formato, parseia, checa duplicidade
+       pela chave de acesso e monta a tela de revisão. */
+    async _importarXmlNota(file) {
+        const st = this._notaStaging;
+        if (!st) return;
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        if (ext !== 'xml') {
+            window.app.toast('Envie o arquivo XML da NF-e (o documento-fonte da SEFAZ).', 'error');
+            return;
+        }
+        let texto;
+        try {
+            texto = await file.text();
+        } catch (e) {
+            window.app.toast('Não foi possível ler o arquivo XML.', 'error');
+            return;
+        }
+        const res = this._parseXmlNFe(texto);
+        if (!res.ok) {
+            window.app.toast(res.erro || 'XML não reconhecido como NF-e.', 'error');
+            return;
+        }
+
+        // Deduplicação: mesma chave de acesso não pode virar outra NF
+        if (res.cabecalho.chave) {
+            const dup = (store.getState().comprasNotas || []).find(n =>
+                n.chave_acesso && String(n.chave_acesso).replace(/\D/g, '') === res.cabecalho.chave && n.id !== st.nota.id);
+            if (dup) {
+                window.app.toast(`XML já importado: a NF ${dup.numero} tem esta chave de acesso.`, 'error');
+                return;
+            }
+        }
+
+        // Preenche o staging e abre a revisão (não grava ainda)
+        this._aplicaXmlAoStaging(res);
+        this._xmlImport = { cabecalho: res.cabecalho, itens: res.itens, nomeArquivo: file.name };
+        this.render();
+        const casados = (this._xmlRevisao.pares || []).length;
+        window.app.toast(`XML lido: NF ${res.cabecalho.numero} · ${res.itens.length} item(ns) · ${casados} casado(s) com o pedido. Revise e confirme.`, 'success');
+    },
+
+    /* Aplica o cabeçalho do XML ao staging e monta a estrutura de revisão
+       dos itens (pares casados + não casados), sem gravar. */
+    _aplicaXmlAoStaging(res) {
+        const st = this._notaStaging;
+        const cab = res.cabecalho;
+        // Snapshot do cabeçalho antes de sobrescrever — usado pelo Desfazer
+        // para restaurar a tela ao estado anterior à importação. Guarda só o
+        // primeiro: reimportar sem desfazer não pode "cimentar" o estado.
+        if (!this._xmlNotaAntes) this._xmlNotaAntes = { ...st.nota };
+        Object.assign(st.nota, {
+            numero: cab.numero || st.nota.numero,
+            serie: cab.serie || st.nota.serie,
+            chave_acesso: cab.chave || st.nota.chave_acesso,
+            data_emissao: cab.data_emissao || st.nota.data_emissao,
+            valor_frete: cab.valor_frete,
+            valor_desconto: cab.valor_desconto,
+            icms: cab.icms,
+            ipi: cab.ipi,
+            pis: cab.pis,
+            cofins: cab.cofins,
+            transportadora: cab.transportadora || st.nota.transportadora,
+            volumes: cab.volumes
+        });
+
+        const itensPedido = this._itensDoPedido(st.nota.pedido_id) || [];
+        const casamento = this._casarItensNota(res.itens, itensPedido);
+
+        // Monta os itens do staging: casados reaproveitam o pedido_item,
+        // não casados entram como avulsos (revisão manual).
+        const novosItens = [];
+        casamento.pares.forEach(par => {
+            const xi = res.itens[par.xmlIdx];
+            const pi = par.pedidoItem;
+            novosItens.push({
+                id: crypto.randomUUID(),
+                pedido_item_id: pi.id || '',
+                material_id: pi.material_id || '',
+                codigo: pi.codigo || xi.codigo || '',
+                descricao: pi.descricao || xi.descricao || '',
+                unidade: pi.unidade || xi.unidade || '',
+                qtd_recebida: Math.min(xi.qtd, par.saldo != null ? par.saldo : xi.qtd),
+                custo_unitario: xi.custo_unitario || parseFloat(pi.custo_unitario) || 0,
+                _confianca: par.confianca,
+                _similaridade: par.similaridade,
+                _pedido: { ...pi }
+            });
+        });
+        casamento.xmlNaoCasados.forEach(xi => {
+            novosItens.push({
+                id: crypto.randomUUID(),
+                pedido_item_id: '',
+                material_id: '',
+                codigo: xi.codigo || '',
+                descricao: xi.descricao || '',
+                unidade: xi.unidade || '',
+                qtd_recebida: xi.qtd,
+                custo_unitario: xi.custo_unitario || 0,
+                _confianca: 'sem_casa',
+                _similaridade: 0,
+                _pedido: null
+            });
+        });
+
+        st.itens = novosItens;
+        // estrutura de revisão para o banner/quadro
+        this._xmlRevisao = {
+            ...casamento,
+            totalXml: res.itens.length,
+            emitente: cab.emitente
+        };
+        this._atualizaTotaisNota();
+    },
+
+    /* Quadro de revisão mostrado após importar o XML: o que casou com o
+       pedido (código exato ou descrição próxima) e o que ficou por conta
+       da NF (entra como item avulso). O usuário confere antes de salvar. */
+    _bannerRevisaoXmlHTML() {
+        const rev = this._xmlRevisao;
+        const imp = this._xmlImport;
+        if (!rev) return '';
+        const esc = (s) => this._esc(s);
+        const total = rev.totalXml || 0;
+        const casados = (rev.pares || []).length;
+        const naoCasados = (rev.xmlNaoCasados || []).length;
+
+        const chip = (conf) => {
+            if (conf === 'codigo') return '<span class="cp-badge" style="background:#dcfce7;color:#166534;">código exato</span>';
+            if (conf === 'aprox') return '<span class="cp-badge" style="background:#fef9c3;color:#854d0e;">descrição próxima</span>';
+            return '<span class="cp-badge" style="background:#fee2e2;color:#991b1b;">só na NF</span>';
+        };
+
+        const linhasPares = (rev.pares || []).map(par => {
+            const xi = (imp.itens || [])[par.xmlIdx] || {};
+            const pi = par.pedidoItem || {};
+            const qtdOk = xi.qtd <= (par.saldo != null ? par.saldo : Infinity) + 0.0001;
+            const dif = Math.abs((parseFloat(xi.custo_unitario) || 0) - (parseFloat(pi.custo_unitario) || 0));
+            return `<tr>
+                <td style="text-align:center;">${chip(par.confianca)}</td>
+                <td>${esc(pi.codigo || xi.codigo || '')}</td>
+                <td>${esc(pi.descricao || xi.descricao || '')}</td>
+                <td style="text-align:right;">${this._fmtQtd(xi.qtd || 0)}</td>
+                <td style="text-align:right;color:${qtdOk ? '#166534' : '#991b1b'};">${this._fmtQtd(par.saldo != null ? par.saldo : 0)}</td>
+                <td style="text-align:right;color:${dif <= 0.005 ? '#166534' : '#854d0e'};">${window.app.formatCurrency(xi.custo_unitario || 0)}</td>
+            </tr>`;
+        }).join('');
+
+        const linhasNaoCasados = (rev.xmlNaoCasados || []).map(xi => `<tr style="background:#fffbeb;">
+            <td style="text-align:center;">${chip('sem_casa')}</td>
+            <td>${esc(xi.codigo || '')}</td>
+            <td>${esc(xi.descricao || '')}</td>
+            <td style="text-align:right;">${this._fmtQtd(xi.qtd || 0)}</td>
+            <td style="text-align:right;color:#991b1b;">—</td>
+            <td style="text-align:right;">${window.app.formatCurrency(xi.custo_unitario || 0)}</td>
+        </tr>`).join('');
+
+        return `
+        <div class="cp-panel" style="border-left:4px solid #4F46E5;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <i class="ph ph-file-xml" style="font-size:20px;color:#4F46E5;"></i>
+                <b>XML da NF-e importado</b>
+                <span style="font-size:12px;color:#6b7280;">${esc(imp ? imp.nomeArquivo : '')} · emitente ${esc(rev.emitente || '—')}</span>
+                <span style="margin-left:auto;font-size:12px;">${casados}/${total} itens casados com o pedido${naoCasados ? ` · <b style="color:#991b1b;">${naoCasados} só na NF</b>` : ''}</span>
+                <button class="btn btn-sm btn-ghost" onclick="app.compras.limparRevisaoXml()" title="Descartar a importação e voltar aos itens do pedido"><i class="ph ph-arrow-counter-clockwise"></i> Desfazer</button>
+            </div>
+            <div class="cp-conf-wrap" style="margin-top:10px;">
+                <div class="cp-conf-scroll">
+                    <table class="cp-table cp-price">
+                        <thead><tr><th>Origem</th><th>Código</th><th>Descrição</th><th style="text-align:right">Qtd NF</th><th style="text-align:right">Saldo pedido</th><th style="text-align:right">Custo unit.</th></tr></thead>
+                        <tbody>${linhasPares}${linhasNaoCasados || ''}</tbody>
+                    </table>
+                </div>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#6b7280;">
+                <b>Próximo passo:</b> confira as quantidades e custos acima. Itens <b>só na NF</b> ficam sem vínculo com o pedido — ajuste ou remova antes de <b>Salvar NF</b>. Nada foi gravado ainda.
+            </div>
+        </div>`;
+    },
+
+    /* Descarta a revisão do XML e volta aos itens originais do pedido. */
+    limparRevisaoXml() {
+        const antes = this._xmlNotaAntes;
+        this._xmlImport = null;
+        this._xmlRevisao = null;
+        this._xmlNotaAntes = null;
+        const st = this._notaStaging;
+        if (!st) return;
+        // restaura o cabeçalho (número, chave, frete, impostos...) salvo antes
+        // da importação — senão os valores do XML ficariam presos na tela.
+        if (antes) st.nota = { ...antes };
+        // restaura itens a partir do pedido (mesma lógica do abrirNovaNF)
+        const itensPedido = this._itensDoPedido(st.nota.pedido_id) || [];
+        st.itens = itensPedido
+            .map(pi => ({
+                id: crypto.randomUUID(),
+                pedido_item_id: pi.id,
+                material_id: pi.material_id || '',
+                codigo: pi.codigo || '',
+                descricao: pi.descricao || '',
+                unidade: pi.unidade || '',
+                qtd_recebida: Math.max(0, (parseFloat(pi.qtd) || 0) - this._qtdJaRecebida(pi.id, st.nota.id)),
+                custo_unitario: parseFloat(pi.custo_unitario) || 0,
+                _pedido: { ...pi }
+            }))
+            .filter(ni => ni.qtd_recebida > 0);
+        this.render();
+        window.app.toast('Importação desfeita — itens voltaram ao estado do pedido.', 'info');
+    },
+
     /* -------- nova NF a partir do pedido -------- */
 
     abrirNovaNF(pedidoId) {
         if (!store.canEdit()) return;
         const p = this._pedido(pedidoId);
         if (!p) return;
+        this._xmlImport = null;
+        this._xmlRevisao = null;
+        this._xmlNotaAntes = null;
         if (p.status === 'cancelado') {
             window.app.toast('Pedido cancelado — não é possível lançar NF.', 'error');
             return;
@@ -4445,6 +4850,9 @@ const ComprasModule = {
     abrirNF(notaId) {
         const n = this._nota(notaId);
         if (!n) { this.voltarDaNF(); return; }
+        this._xmlImport = null;
+        this._xmlRevisao = null;
+        this._xmlNotaAntes = null;
         const itens = this._itensDaNota(notaId).map(ni => ({ ...ni, _pedido: (store.getState().comprasPedidoItens || []).find(p => p.id === ni.pedido_item_id) || null }));
         this._notaStaging = { nota: { ...n }, itens };
         this.activeNota = notaId;
@@ -4455,6 +4863,9 @@ const ComprasModule = {
     voltarDaNF() {
         const pedidoId = this._notaStaging ? this._notaStaging.nota.pedido_id : null;
         this._notaStaging = null;
+        this._xmlImport = null;
+        this._xmlRevisao = null;
+        this._xmlNotaAntes = null;
         this.activeNota = null;
         if (pedidoId && this._pedido(pedidoId)) {
             this.openPedido(pedidoId);
@@ -4636,6 +5047,9 @@ const ComprasModule = {
         await this._lancarCustoProjeto(payloadNota, n);
 
         this._notaStaging = null;
+        this._xmlImport = null;
+        this._xmlRevisao = null;
+        this._xmlNotaAntes = null;
         this.activeNota = n.id;
         this.openPedido(n.pedido_id);
 
@@ -4988,6 +5402,10 @@ const ComprasModule = {
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
                         ${podeEditar ? `
+                        <input type="file" id="cp-nf-xml-input" accept=".xml" style="display:none" onchange="app.compras.handleXmlNota(this)">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.pickXmlNota()" style="color:white;border:1px solid rgba(255,255,255,0.3);" title="Importar o XML da NF-e (preenche os dados e casa os itens com o pedido)">
+                            <i class="ph ph-file-xml"></i> Importar XML
+                        </button>
                         <button class="btn btn-sm btn-ghost" onclick="app.compras.salvarNota()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
                             <i class="ph ph-floppy-disk"></i> Salvar NF
                         </button>` : ''}
@@ -5007,6 +5425,8 @@ const ComprasModule = {
                         <i class="ph ph-check-circle"></i>
                         <div><b>Conferida.</b> Quantidades e preços batem com o pedido.</div>
                     </div>`)}
+
+                    ${this._xmlRevisao ? this._bannerRevisaoXmlHTML() : ''}
 
                     <div class="cp-panel">
                         <div class="cp-section-title" style="margin-top:0;"><span class="cp-step">1</span> Dados da nota</div>
