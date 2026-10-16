@@ -953,6 +953,9 @@ const App = {
         if (viewName === 'paineis' && window.paineisModule) {
             window.paineisModule.render();
         }
+        if (viewName === 'chaparia' && window.chapariaModule) {
+            window.chapariaModule.render();
+        }
         if (viewName === 'tipicos' && window.app.tipicos) {
             window.app.tipicos.render();
         }

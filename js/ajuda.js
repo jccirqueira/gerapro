@@ -60,6 +60,33 @@ const AjudaModule = {
         this.open(parts[0], parts[1] || null);
       }
     });
+
+    // Enter/Espaço no gatilho (é um span com role=button)
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const trigger = e.target.closest && e.target.closest('.help-trigger');
+      if (trigger) {
+        e.preventDefault();
+        trigger.click();
+      }
+    });
+
+    // Injeção inicial (view já renderizada) + re-injeção quando qualquer
+    // módulo re-renderiza o cabeçalho por innerHTML.
+    this._injetaGatilho(this._viewAtiva());
+
+    const main = document.getElementById('main-content');
+    if (main && typeof MutationObserver !== 'undefined') {
+      let pending = null;
+      const obs = new MutationObserver(() => {
+        if (pending) return;
+        pending = setTimeout(() => {
+          pending = null;
+          this._injetaGatilho(this._viewAtiva());
+        }, 150);
+      });
+      obs.observe(main, { childList: true, subtree: true });
+    }
   },
 
   _getCurrentSectionId() {
@@ -73,7 +100,66 @@ const AjudaModule = {
 
   _currentView(viewName) {
     this._currentModule = viewName;
+    this._injetaGatilho(viewName);
   },
+
+  /* ==================================================================
+     Gatilho "?" contextual no cabeçalho de cada página.
+     Injetado programaticamente para cobrir todas as views (inclusive
+     as que re-renderizam o header por innerHTML) — o clique é delegado
+     no listener .help-trigger já existente no init().
+     ================================================================== */
+
+  // view → chave do módulo em AJUDA_CONTEUDO (só onde divergem)
+  _chaveAjuda(viewName) {
+    if (!viewName) return null;
+    const mapa = { 'comparacao-documentos': 'comparacaoDocumentos' };
+    const key = mapa[viewName] || viewName;
+    return (window.AJUDA_CONTEUDO && window.AJUDA_CONTEUDO[key]) ? key : null;
+  },
+
+  _viewAtiva() {
+    const el = document.querySelector('.module-view:not(.hidden-module)');
+    if (!el || !el.id || el.id.indexOf('view-') !== 0) return null;
+    return el.id.slice(5);
+  },
+
+  _injetaGatilho(viewName) {
+    try {
+      const nome = viewName || this._viewAtiva();
+      if (!nome) return;
+      const key = this._chaveAjuda(nome);
+      if (!key) return;
+      const view = document.getElementById('view-' + nome);
+      if (!view || view.classList.contains('hidden-module')) return;
+
+      // Alvo: título do header sticky → primeiro h2/h4 → título de card
+      const alvo =
+        view.querySelector('.module-header-sticky h2') ||
+        view.querySelector('.module-header-sticky h4') ||
+        view.querySelector('.module-header-sticky h3') ||
+        view.querySelector('h2') ||
+        view.querySelector('h4') ||
+        view.querySelector('h3.card-title') ||
+        view.querySelector('h3');
+      if (!alvo) return;
+      if (alvo.querySelector('.help-trigger')) return; // já injetado (ou nativo)
+
+      const span = document.createElement('span');
+      span.className = 'help-trigger';
+      span.dataset.help = key;
+      span.setAttribute('role', 'button');
+      span.setAttribute('tabindex', '0');
+      span.setAttribute('title', 'Ajuda desta página');
+      span.setAttribute('aria-label', 'Ajuda desta página');
+      span.textContent = '?';
+      alvo.appendChild(span);
+    } catch (e) {
+      // injeção é cosmética — nunca deve quebrar a navegação
+      console.warn('[Ajuda] falha ao injetar gatilho:', e);
+    }
+  },
+
 
   _fuzzyMatch(text, query) {
     if (!text || !query) return false;

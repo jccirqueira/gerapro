@@ -15,7 +15,7 @@ const CalculosEletricosModule = {
         const proposal = store.getState().activeTechnicalProposal;
         const allLoads = this.extractLoads();
         const panelTags = [...new Set([
-            ...(proposal.datasheets || []).map(ds => ds.tag).filter(Boolean),
+            ...(proposal?.datasheets || []).map(ds => ds.tag).filter(Boolean),
             ...allLoads.map(load => load.panel).filter(p => p !== 'Geral')
         ])];
         if (!this.activeTab || !panelTags.includes(this.activeTab)) {
