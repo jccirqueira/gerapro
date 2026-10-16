@@ -177,6 +177,8 @@ Projetos pós-venda, criados automaticamente quando uma proposta é movida para
 - Fases com modelo padrão gerável (Planejamento, Compras, Manufatura, Testes,
   Logística, Instalação e Aceite), escalas dia/semana/mês e barras arrastáveis.
 - Tarefas por fase com progresso automático (média das tarefas).
+- Exportação do cronograma em PDF (A4 paisagem, com Gantt e assinaturas) e
+  em XLSX estilo MS Project (árvore WBS, faixa de Gantt mensal e aba Resumo).
 
 9.2. DRE (ESTIMADO × REAL)
 - Gerar Estimado a partir do valor do contrato e do regime tributário;

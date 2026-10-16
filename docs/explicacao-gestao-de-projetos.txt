@@ -158,6 +158,15 @@ destacados e o dia de hoje realçado.
 │    a entrega prevista.                                                          │
 │  • Tarefas — mostra ou oculta as tarefas no Gantt.                              │
 │  • Expandir/Recolher — abre ou fecha as tarefas de todas as fases de uma vez.   │
+│  • PDF — exporta o cronograma em PDF formatado (A4 paisagem): cabeçalho com     │
+│    dados do projeto, cartões de resumo, Gantt com barras e linha do hoje,       │
+│    tabela detalhada de fases/tarefas, legenda e campos de assinatura. Abre a    │
+│    janela de impressão — escolha "Salvar como PDF".                             │
+│  • XLSX — exporta o cronograma em planilha estilo MS Project, com duas abas:    │
+│    Cronograma (árvore WBS — fases como linhas-resumo e tarefas recuadas —,      │
+│    colunas de início, fim, duração, progresso, status e responsável, e uma      │
+│    faixa de Gantt mensal colorida à direita) e Resumo (período, progresso       │
+│    geral, fases/tarefas concluídas e itens atrasados).                          │
 │  • Nova Fase — cria uma fase manualmente.                                       │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘

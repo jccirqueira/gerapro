@@ -132,6 +132,8 @@ const ProjetosModule = {
             resetTemplate: this.resetTemplate.bind(this),
             barDown: this.barDown.bind(this),
             setZoom: this.setZoom.bind(this),
+            exportarCronogramaPDF: this.exportarCronogramaPDF.bind(this),
+            exportarCronogramaXLSX: this.exportarCronogramaXLSX.bind(this),
             _addTplRow: this._addTplRow.bind(this),
             // Fase 3 — DRE Estimado × Real
             openCustoModal: this.openCustoModal.bind(this),
@@ -975,6 +977,277 @@ const ProjetosModule = {
         }
     },
 
+    /** Cronograma em XLSX estilo MS Project — estrutura de desdobramento
+     *  (WBS): fases como linhas-resumo (macro), tarefas recuadas abaixo,
+     *  colunas Início/Fim/Duração/Progresso/Status/Responsável e uma faixa
+     *  de Gantt por semanas à direita (barras coloridas por fase). Padrão
+     *  da casa: banner, cabeçalho MAIÚSCULO, zebra e 2 linhas congeladas. */
+    exportarCronogramaXLSX(projetoId) {
+        const p = (store.getState().projetos || []).find(x => x.id === projetoId);
+        if (!p) return;
+        try {
+            if (typeof XLSX === 'undefined') {
+                window.app.toast('Biblioteca XLSX não disponível.', 'warning');
+                return;
+            }
+            const fases = this._fasesDoProjeto(projetoId);
+            if (fases.length === 0) {
+                window.app.toast('O cronograma está vazio — crie as fases antes de exportar o XLSX.', 'warning');
+                return;
+            }
+            const { wb, nTarefas } = this._buildCronogramaWorkbook(projetoId, p, fases);
+            const nomeArquivo = `Cronograma_${String(p.codigo || 'projeto').replace(/[^\w-]/g, '')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            this._patchXlsxFreezePane(buf, 2).then(patched => {
+                const blob = new Blob([patched], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nomeArquivo;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                window.app.toast(`Cronograma exportado (MS Project) — ${fases.length} fase(s), ${nTarefas} tarefa(s).`, 'success');
+            }).catch(err => {
+                console.error('[Projetos] XLSX freeze patch error:', err);
+                XLSX.writeFile(wb, nomeArquivo);
+                window.app.toast(`Cronograma exportado (MS Project) — ${fases.length} fase(s), ${nTarefas} tarefa(s).`, 'success');
+            });
+        } catch (e) {
+            console.error('[Projetos] Cronograma XLSX error:', e);
+            window.app.toast('Erro ao exportar cronograma: ' + e.message, 'error');
+        }
+    },
+
+    /** Constrói o workbook do cronograma estilo MS Project (somente leitura
+     *  do estado) — usado pela exportação e validável sem disparar download.
+     *  Aba "Cronograma": árvore WBS (fase resumo + tarefas recuadas) com
+     *  faixa de Gantt semanal colorida; aba "Resumo": KPIs e legenda. */
+    _buildCronogramaWorkbook(projetoId, p, fases) {
+        const fmtD = (d) => {
+            const s = String(d || '');
+            const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+            return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+        };
+        const hoje = this._today();
+        const pct = (v) => Math.max(0, Math.min(100, Math.round(parseFloat(v) || 0)));
+        const idProj = `${p.codigo || 'PROJ'} · ${p.projeto || '(sem nome)'} · Cliente: ${p.cliente || '—'}`;
+        const gerado = `gerado em ${new Date().toLocaleDateString('pt-BR')}`;
+        const tarefas = this._tarefasDoProjeto(projetoId);
+        const progressoGeral = this._progressoProjeto(projetoId) || 0;
+
+        /* ---- período do Gantt (mesma regra do PDF) ---- */
+        const datas = [];
+        fases.forEach(f => { if (f.data_inicio) datas.push(this._parseDate(f.data_inicio)); if (f.data_fim) datas.push(this._parseDate(f.data_fim)); });
+        tarefas.forEach(t => { if (t.data_inicio) datas.push(this._parseDate(t.data_inicio)); if (t.data_fim) datas.push(this._parseDate(t.data_fim)); });
+        if (p.data_inicio) datas.push(this._parseDate(p.data_inicio));
+        if (p.data_prevista_entrega) datas.push(this._parseDate(p.data_prevista_entrega));
+        datas.push(hoje);
+        let min = new Date(Math.min(...datas.map(d => d.getTime())));
+        let max = new Date(Math.max(...datas.map(d => d.getTime())));
+        min = this._addDays(min, -3);
+        max = this._addDays(max, 4);
+        if (this._diffDays(min, max) < 14) max = this._addDays(min, 14);
+
+        /* ---- faixa de Gantt: colunas MENSAIS (capped a 36) ---- */
+        const MAX_COL = 36;
+        const meses = [];
+        let cur = new Date(min.getFullYear(), min.getMonth(), 1);
+        while (cur <= max && meses.length < MAX_COL) {
+            const nextMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            const mStart = cur < min ? min : cur;
+            const mEnd = nextMonth > max ? max : this._addDays(nextMonth, -1);
+            const rotulo = cur.toLocaleDateString('pt-BR', { month: 'short' }).replace(/\./g, '') + '/' + String(cur.getFullYear()).slice(2);
+            meses.push({ ini: mStart, fim: mEnd, rotulo });
+            cur = nextMonth;
+        }
+
+        /* ---------------- estilos ---------------- */
+        const stTitle  = { font: { bold: true, sz: 12, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '312E81' } }, alignment: { horizontal: 'left', vertical: 'center' } };
+        const stHeader = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4F46E5' } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+        const stSemana = { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '6366F1' } }, alignment: { horizontal: 'center', vertical: 'center', textRotation: 90 } };
+        const stZebra  = { fill: { fgColor: { rgb: 'F3F4F6' } } };
+        const stGrupo  = { font: { bold: true, sz: 11, color: { rgb: '1F2937' } }, fill: { fgColor: { rgb: 'E0E7FF' } } };
+        const stOk     = { font: { bold: true, color: { rgb: '15803D' } }, alignment: { horizontal: 'center' } };
+        const stAtras  = { font: { bold: true, color: { rgb: 'B91C1C' } }, alignment: { horizontal: 'center' } };
+        const stCentro = { alignment: { horizontal: 'center' } };
+
+        const pctFmt = '0%';
+        const STATUS_LABEL = { pendente: 'Pendente', em_andamento: 'Em Andamento', concluido: 'Concluída', bloqueada: 'Bloqueada' };
+
+        /* ---- colunas fixas (WBS + descritivo) ---- */
+        const colunas = ['WBS', 'Nome', 'Início', 'Fim', 'Duração (dias)', 'Progresso', 'Status', 'Responsável'];
+        const largurasBase = [8, 44, 12, 12, 9, 10, 15, 22];
+        const largurasSemana = meses.map(() => ({ wch: 3.6 }));
+        const cabecalhoSemana = meses.map(m => m.rotulo);
+
+        const aoa = [];
+        const merges = [];
+        const styles = []; // { r, c, st, fmt }
+
+        /* linha 0: banner */
+        const ncolTotal = colunas.length + meses.length;
+        aoa.push([`CRONOGRAMA DO PROJETO — ${idProj} — ${gerado}`, ...Array(ncolTotal - 1).fill('')]);
+        /* linha 1: cabeçalho fixo + cabeçalho de meses */
+        aoa.push([...colunas, ...cabecalhoSemana]);
+
+        for (let c = 0; c < ncolTotal; c++) {
+            styles.push({ r: 0, c, st: stTitle });
+            styles.push({ r: 1, c, st: c < colunas.length ? stHeader : stSemana });
+        }
+        merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: ncolTotal - 1 } });
+
+        /* linhas de dados: fases (macro) + tarefas recuadas */
+        let r = 2;
+        fases.forEach((f, fi) => {
+            const cor = (f.cor || '').replace('#', '').toUpperCase();
+            const corBarras = /^[0-9A-F]{6}$/.test(cor) ? cor : '6366F1';
+            const prog = pct(f.progresso) / 100;
+            const tarefasFase = this._tarefasDaFase(f.id);
+            const atrasada = f.status !== 'concluido' && f.data_fim && this._parseDate(f.data_fim) < hoje;
+            const durDias = f.data_inicio && f.data_fim ? this._diffDays(this._parseDate(f.data_inicio), this._parseDate(f.data_fim)) + 1 : '';
+            const wbsFase = String(fi + 1);
+
+            aoa.push([
+                wbsFase, f.nome || '', fmtD(f.data_inicio), fmtD(f.data_fim), durDias,
+                prog, STATUS_LABEL[f.status] || 'Pendente', f.responsavel || ''
+            ]);
+            // estilo da linha-resumo (fase)
+            styles.push({ r, c: 0, st: Object.assign({}, stGrupo, stCentro) });
+            for (let c = 1; c < colunas.length; c++) styles.push({ r, c, st: stGrupo });
+            styles.push({ r, c: 4, st: Object.assign({}, stGrupo, stCentro) });
+            styles.push({ r, c: 5, st: Object.assign({}, stGrupo, stCentro), fmt: pctFmt });
+            if (atrasada) styles.push({ r, c: 6, st: Object.assign({}, stGrupo, stAtras) });
+            else if (f.status === 'concluido') styles.push({ r, c: 6, st: Object.assign({}, stGrupo, stOk) });
+            // barras da fase na faixa de meses
+            this._pintarBarraMensal(styles, r, colunas.length, meses, f.data_inicio, f.data_fim, prog, corBarras);
+            r++;
+
+            tarefasFase.forEach((t, ti) => {
+                const progT = pct(t.progresso) / 100;
+                const atrasT = t.status !== 'concluido' && t.data_fim && this._parseDate(t.data_fim) < hoje;
+                const durT = t.data_inicio && t.data_fim ? this._diffDays(this._parseDate(t.data_inicio), this._parseDate(t.data_fim)) + 1 : '';
+                const base = (r % 2 === 1) ? stZebra : {};
+                aoa.push([
+                    `${wbsFase}.${ti + 1}`, t.nome || '', fmtD(t.data_inicio), fmtD(t.data_fim), durT,
+                    progT, STATUS_LABEL[t.status] || 'Pendente', t.responsavel || ''
+                ]);
+                styles.push({ r, c: 0, st: Object.assign({}, base, stCentro) });
+                styles.push({ r, c: 1, st: Object.assign({}, base, { alignment: { horizontal: 'left', indent: 1 } }) });
+                for (let c = 2; c < 5; c++) styles.push({ r, c, st: Object.assign({}, base, stCentro) });
+                styles.push({ r, c: 5, st: Object.assign({}, base, stCentro), fmt: pctFmt });
+                if (atrasT) styles.push({ r, c: 6, st: Object.assign({}, base, stAtras) });
+                else if (t.status === 'concluido') styles.push({ r, c: 6, st: Object.assign({}, base, stOk) });
+                this._pintarBarraMensal(styles, r, colunas.length, meses, t.data_inicio, t.data_fim, progT, corBarras);
+                r++;
+            });
+        });
+
+        /* ---- monta a folha ---- */
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [...largurasBase.map(w => ({ wch: w })), ...largurasSemana];
+        ws['!merges'] = merges;
+        styles.forEach(s => {
+            const ref = XLSX.utils.encode_cell({ r: s.r, c: s.c });
+            const cell = ws[ref];
+            if (!cell) return;
+            const stFinal = Object.assign({}, s.st || {});
+            if (s.fmt) stFinal.numFmt = s.fmt;
+            cell.s = stFinal;
+        });
+
+        /* ---- aba 2: Resumo (KPIs + legenda) ---- */
+        const estado = { periodo: { inicio: this._iso(min), fim: this._iso(max) }, progressoGeral };
+        const wsResumo = this._buildCronogramaResumoSheet(p, fases, estado, idProj, gerado, { stTitle, stHeader, stGrupo, stZebra, stOk, stAtras, stCentro });
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Cronograma');
+        XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+        return { wb, nTarefas: tarefas.length };
+    },
+
+    /** Pinta uma barra de Gantt numa faixa de colunas mensais já existentes.
+     *  `colIni` = índice da primeira coluna da faixa; `meses` = [{ini,fim}]
+     *  em Date. Cada célula da faixa recebe fundo da cor da fase quando o
+     *  mês intersecta o período (conforme a regra do MS Project). */
+    _pintarBarraMensal(styles, r, colIni, meses, dataInicio, dataFim, prog, corBarras) {
+        if (!dataInicio || !this._parseDate(dataInicio)) return;
+        const ini = this._parseDate(dataInicio);
+        const fim = (dataFim && this._parseDate(dataFim)) || ini;
+        const preenchidoAte = prog > 0 ? this._addDays(ini, Math.round(this._diffDays(ini, fim) * prog)) : null;
+        meses.forEach((mes, i) => {
+            if (mes.fim < ini || mes.ini > fim) return;
+            let fill = corBarras;
+            // parte ainda não concluída (após o preenchimento) fica cinza-claro
+            if (preenchidoAte && mes.ini > preenchidoAte) fill = 'E5E7EB';
+            styles.push({ r, c: colIni + i, st: { fill: { fgColor: { rgb: fill } }, border: { bottom: { style: 'thin', color: { rgb: 'FFFFFF' } } } } });
+        });
+    },
+
+    /** Aba Resumo do cronograma XLSX: período, fases por status, tarefas e
+     *  itens atrasados — leitura rápida do estado do projeto. */
+    _buildCronogramaResumoSheet(p, fases, st, idProj, gerado, estilos) {
+        const { stTitle, stHeader, stGrupo, stZebra, stOk, stAtras, stCentro } = estilos;
+        const hoje = this._today();
+        const fmtD = (d) => {
+            const s = String(d || '');
+            const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+            return m ? `${m[3]}/${m[2]}/${m[1]}` : (s ? String(s).slice(0, 10) : '—');
+        };
+        const STATUS_LABEL = { pendente: 'Pendente', em_andamento: 'Em Andamento', concluido: 'Concluída', bloqueada: 'Bloqueada' };
+        const tarefas = fases.reduce((acc, f) => acc.concat(this._tarefasDaFase(f.id).map(t => ({ ...t, _fase: f.nome }))), []);
+
+        const nConclF = fases.filter(f => f.status === 'concluido').length;
+        const nConclT = tarefas.filter(t => t.status === 'concluido').length;
+        const atrasadas = fases.filter(f => f.status !== 'concluido' && f.data_fim && this._parseDate(f.data_fim) < hoje)
+            .concat(tarefas.filter(t => t.status !== 'concluido' && t.data_fim && this._parseDate(t.data_fim) < hoje));
+
+        const iniMin = st.periodo ? st.periodo.inicio : null;
+        const fimMax = st.periodo ? st.periodo.fim : null;
+
+        const linhas = [];
+        const push = (cells, kind) => linhas.push({ cells, kind });
+        push(['PERÍODO DO CRONOGRAMA']);
+        push(['Início', iniMin ? fmtD(iniMin) : '—']);
+        push(['Entrega Prevista (projeto)', p.data_prevista_entrega ? fmtD(p.data_prevista_entrega) : '—']);
+        push(['Fim real do cronograma', fimMax ? fmtD(fimMax) : '—']);
+        push(['Hoje', fmtD(this._iso(hoje))]);
+        push(['']);
+        push(['PROGRESSO']);
+        push(['Progresso geral', st.progressoGeral + '%']);
+        push(['Fases concluídas', `${nConclF} / ${fases.length}`]);
+        push(['Tarefas concluídas', `${nConclT} / ${tarefas.length}`]);
+        push(['']);
+        push(['ITENS ATRASADOS (' + atrasadas.length + ')']);
+        if (atrasadas.length) atrasadas.forEach(a => push(['⚠ ' + (a._fase ? a._fase + ' › ' : '') + (a.nome || ''), ' fim ' + fmtD(a.data_fim)]));
+        else push(['✓ Nenhum item atrasado']);
+
+        const aoa = [[`RESUMO DO CRONOGRAMA — ${idProj} — ${gerado}`, ''], ...linhas.map(l => [l.cells[0] || '', l.cells[1] || ''])];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{ wch: 44 }, { wch: 40 }];
+        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }];
+        // aplica estilos: banner, seções em negrito, alertas
+        for (let c = 0; c < 2; c++) {
+            const banner = ws[XLSX.utils.encode_cell({ r: 0, c })];
+            if (banner) banner.s = stTitle;
+        }
+        linhas.forEach((l, i) => {
+            const r = i + 1;
+            const ehSecao = l.cells.length === 1 && l.cells[0] !== '' && l.cells[0] === (l.cells[0] || '').toUpperCase();
+            const ehAlerta = String(l.cells[0] || '').startsWith('⚠');
+            const ehOk = String(l.cells[0] || '').startsWith('✓');
+            for (let c = 0; c < 2; c++) {
+                const cell = ws[XLSX.utils.encode_cell({ r, c })];
+                if (!cell) continue;
+                if (ehSecao) cell.s = stGrupo;
+                else if (ehAlerta) cell.s = stAtras;
+                else if (ehOk) cell.s = stOk;
+            }
+        });
+        return ws;
+    },
+
     /** Constrói o workbook completo da DRE (somente leitura do estado) —
      *  usado pela exportação e validável sem disparar o download. */
     _buildDreWorkbook(projetoId, p) {
@@ -1550,6 +1823,12 @@ const ProjetosModule = {
                     ${mostrarTarefas ? `<button class="btn btn-sm btn-ghost" onclick="app.projetos.toggleExpandirTodas('${p.id}')" title="${todasExpandidas ? 'Recolher' : 'Exibir'} as tarefas de todas as fases">
                         <i class="ph ${todasExpandidas ? 'ph-arrows-in' : 'ph-arrows-out'}"></i> ${todasExpandidas ? 'Recolher' : 'Expandir'}
                     </button>` : ''}
+                    <button class="btn btn-sm btn-ghost" onclick="app.projetos.exportarCronogramaPDF('${p.id}')" title="Exportar o cronograma em PDF formatado (Gantt, fases, tarefas e assinaturas — imprima ou salve como PDF)">
+                        <i class="ph ph-file-pdf"></i> PDF
+                    </button>
+                    <button class="btn btn-sm btn-ghost" onclick="app.projetos.exportarCronogramaXLSX('${p.id}')" title="Exportar o cronograma em XLSX estilo MS Project (WBS, fases, tarefas, faixa de Gantt mensal e resumo)">
+                        <i class="ph ph-file-xls"></i> XLSX
+                    </button>
                     <button class="btn btn-sm btn-primary" onclick="app.projetos.openFaseModal('${p.id}')">
                         <i class="ph ph-plus"></i> Nova Fase
                     </button>
@@ -1763,6 +2042,301 @@ const ProjetosModule = {
                 </div>
                 <div class="prj-gantt-row-track prj-track-tarefa" style="width:${g.totalW}px;${g.colWidth >= 8 ? `background-size:${g.colWidth}px 100%;` : ''}">${bar}</div>
             </div>`;
+    },
+
+    /* ================================================================
+       EXPORTAÇÃO — CRONOGRAMA EM PDF (impressão formatada)
+       Abre a janela de impressão do navegador em A4 paisagem:
+       cabeçalho da empresa, dados do projeto, resumo, Gantt com
+       fases e tarefas, tabela detalhada, legenda e assinaturas.
+       ================================================================ */
+
+    exportarCronogramaPDF(projetoId) {
+        const p = (store.getState().projetos || []).find(x => x.id === projetoId);
+        if (!p) return;
+        const fases = this._fasesDoProjeto(projetoId);
+        if (fases.length === 0) {
+            window.app.toast('O cronograma está vazio — crie as fases antes de exportar o PDF.', 'warning');
+            return;
+        }
+        try {
+            const html = this._buildCronogramaPdfHTML(projetoId, p);
+            const win = window.open('', '_blank', 'width=1100,height=760');
+            if (!win) { window.app.toast('Permita pop-ups para exportar o cronograma em PDF.', 'error'); return; }
+            win.document.write(html);
+            win.document.close();
+            window.app.toast('Cronograma aberto para impressão — escolha "Salvar como PDF".', 'success');
+        } catch (e) {
+            console.error('[Projetos] Cronograma PDF error:', e);
+            window.app.toast('Erro ao exportar cronograma: ' + e.message, 'error');
+        }
+    },
+
+    /** Constrói o HTML do cronograma formatado (somente leitura do
+     *  estado) — usado pela exportação e validável sem abrir janela. */
+    _buildCronogramaPdfHTML(projetoId, p) {
+        const esc = (v) => this._esc(v);
+        const emp = store.getState().company || {};
+        const fases = this._fasesDoProjeto(projetoId);
+        const tarefas = this._tarefasDoProjeto(projetoId);
+        const prog = this._progressoProjeto(projetoId) || 0;
+        const hoje = this._today();
+        const fmtD = (v) => this._fmtDate(v) || '—';
+        const pct = (v) => Math.max(0, Math.min(100, Math.round(parseFloat(v) || 0)));
+        const durD = (ini, fim) => (ini && fim && this._parseDate(ini) && this._parseDate(fim))
+            ? this._diffDays(this._parseDate(ini), this._parseDate(fim)) + 1 : null;
+        const atrasadaDe = (x) => x.status !== 'concluido' && x.data_fim && this._parseDate(x.data_fim) && this._parseDate(x.data_fim) < hoje;
+
+        /* --- Período do Gantt (mesma regra da tela, com tarefas na conta) --- */
+        const datas = [];
+        fases.forEach(f => { if (f.data_inicio) datas.push(this._parseDate(f.data_inicio)); if (f.data_fim) datas.push(this._parseDate(f.data_fim)); });
+        tarefas.forEach(t => { if (t.data_inicio) datas.push(this._parseDate(t.data_inicio)); if (t.data_fim) datas.push(this._parseDate(t.data_fim)); });
+        if (p.data_inicio) datas.push(this._parseDate(p.data_inicio));
+        if (p.data_prevista_entrega) datas.push(this._parseDate(p.data_prevista_entrega));
+        datas.push(hoje);
+        let min = new Date(Math.min(...datas.map(d => d.getTime())));
+        let max = new Date(Math.max(...datas.map(d => d.getTime())));
+        min = this._addDays(min, -3);
+        max = this._addDays(max, 4);
+        if (this._diffDays(min, max) < 14) max = this._addDays(min, 14);
+        const totalDias = this._diffDays(min, max) + 1;
+        const pctDe = (d) => Math.max(0, Math.min(100, this._diffDays(min, d) / totalDias * 100));
+
+        /* --- Cabeçalho de meses e grades verticais (em % para caber na página) --- */
+        let meses = '';
+        let grid = '';
+        let cur = new Date(min.getFullYear(), min.getMonth(), 1);
+        while (cur <= max) {
+            const mStart = cur < min ? min : cur;
+            const nextMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+            const mEnd = nextMonth > max ? max : this._addDays(nextMonth, -1);
+            const dias = this._diffDays(mStart, mEnd) + 1;
+            const label = cur.toLocaleDateString('pt-BR', { month: 'short' }).replace(/\./g, '') + '/' + String(cur.getFullYear()).slice(2);
+            meses += `<div class="mcol" style="width:${(dias / totalDias * 100).toFixed(3)}%">${esc(label)}</div>`;
+            if (cur > min) grid += `<div class="gline" style="left:${pctDe(cur).toFixed(3)}%"></div>`;
+            cur = nextMonth;
+        }
+        const hojeX = pctDe(hoje).toFixed(3);
+
+        /* --- Barras do Gantt (posicionadas em % — cabem em qualquer página) --- */
+        const barra = (iniStr, fimStr, cor, progF, atrasada, nome, ehTarefa) => {
+            if (!iniStr || !this._parseDate(iniStr)) return '<span class="nodate">sem datas</span>';
+            const ini = this._parseDate(iniStr);
+            const fim = (fimStr && this._parseDate(fimStr)) || ini;
+            const left = pctDe(ini);
+            const width = Math.max(0.5, (this._diffDays(ini, fim) + 1) / totalDias * 100);
+            const mile = this._diffDays(ini, fim) === 0 ? ' ms' : '';
+            return `<div class="bar${mile}${atrasada ? ' atrasada' : ''}" style="left:${left.toFixed(3)}%;width:${Math.min(width, 100 - left).toFixed(3)}%;background:${esc(cor)}">
+                <div class="fill" style="width:${progF}%"></div>
+                ${ehTarefa ? '' : `<span class="lab">${esc(nome)}</span>`}
+            </div>`;
+        };
+
+        /* --- Linhas do Gantt: fases e, logo abaixo, as tarefas --- */
+        const linhasGantt = fases.map(f => {
+            const cor = f.cor || FASE_CORES[f.status] || FASE_CORES.pendente;
+            const progF = pct(f.progresso);
+            const atrasada = atrasadaDe(f);
+            const tarefasF = this._tarefasDaFase(f.id);
+            const nConcl = tarefasF.filter(t => t.status === 'concluido').length;
+            let h = `<div class="row">
+                <div class="lbl">
+                    <span class="dot" style="background:${esc(cor)}"></span><b>${esc(f.nome)}</b>
+                    <small>${fmtD(f.data_inicio)}${f.data_fim ? ' → ' + fmtD(f.data_fim) : ''} · ${progF}%${tarefasF.length ? ` · ${nConcl}/${tarefasF.length} tarefas` : ''}${atrasada ? ' · <i class="at">atrasada</i>' : ''}</small>
+                </div>
+                <div class="track">${grid}<div class="hoje" style="left:${hojeX}%"></div>${barra(f.data_inicio, f.data_fim, cor, progF, atrasada, f.nome, false)}</div>
+            </div>`;
+            h += tarefasF.map(t => {
+                const corT = TAREFA_CORES[t.status] || TAREFA_CORES.pendente;
+                const progT = pct(t.progresso);
+                const atrT = atrasadaDe(t);
+                return `<div class="row tf">
+                    <div class="lbl">
+                        <span class="dot" style="background:${esc(corT)}"></span><span class="tn">${esc(t.nome)}</span>
+                        <small>${fmtD(t.data_inicio)}${t.data_fim ? ' → ' + fmtD(t.data_fim) : ''} · ${progT}%${t.responsavel ? ' · ' + esc(t.responsavel) : ''}${atrT ? ' · <i class="at">atrasada</i>' : ''}</small>
+                    </div>
+                    <div class="track">${grid}<div class="hoje" style="left:${hojeX}%"></div>${barra(t.data_inicio, t.data_fim, corT, progT, atrT, t.nome, true)}</div>
+                </div>`;
+            }).join('');
+            return h;
+        }).join('');
+
+        /* --- Tabela detalhada: fases e tarefas com datas, duração e progresso --- */
+        const linhasTabela = fases.map(f => {
+            const cor = f.cor || FASE_CORES[f.status] || FASE_CORES.pendente;
+            const progF = pct(f.progresso);
+            const tarefasF = this._tarefasDaFase(f.id);
+            const atrasada = atrasadaDe(f);
+            let h = `<tr class="f">
+                <td><span class="dot" style="background:${esc(cor)}"></span><b>${esc(f.nome)}</b></td>
+                <td>${esc(FASE_STATUS[f.status] || 'Pendente')}${atrasada ? ' <i class="at">(atrasada)</i>' : ''}</td>
+                <td class="c">${fmtD(f.data_inicio)}</td>
+                <td class="c">${fmtD(f.data_fim)}</td>
+                <td class="c">${durD(f.data_inicio, f.data_fim) !== null ? durD(f.data_inicio, f.data_fim) + ' d' : '—'}</td>
+                <td class="c">${tarefasF.length ? tarefasF.filter(t => t.status === 'concluido').length + '/' + tarefasF.length : '—'}</td>
+                <td class="c pc"><div class="pbar"><div style="width:${progF}%"></div></div>${progF}%</td>
+            </tr>`;
+            h += tarefasF.map(t => {
+                const corT = TAREFA_CORES[t.status] || TAREFA_CORES.pendente;
+                const progT = pct(t.progresso);
+                const atrT = atrasadaDe(t);
+                return `<tr class="t">
+                    <td class="ind"><span class="dot" style="background:${esc(corT)}"></span>${esc(t.nome)}</td>
+                    <td>${esc(TAREFA_STATUS[t.status] || 'Pendente')}${atrT ? ' <i class="at">(atrasada)</i>' : ''}${t.responsavel ? ` <span class="resp">(${esc(t.responsavel)})</span>` : ''}</td>
+                    <td class="c">${fmtD(t.data_inicio)}</td>
+                    <td class="c">${fmtD(t.data_fim)}</td>
+                    <td class="c">${durD(t.data_inicio, t.data_fim) !== null ? durD(t.data_inicio, t.data_fim) + ' d' : '—'}</td>
+                    <td class="c">—</td>
+                    <td class="c pc"><div class="pbar"><div style="width:${progT}%"></div></div>${progT}%</td>
+                </tr>`;
+            }).join('');
+            return h;
+        }).join('');
+
+        /* --- Resumo, legenda e assinaturas --- */
+        const conclF = fases.filter(f => f.status === 'concluido').length;
+        const conclT = tarefas.filter(t => t.status === 'concluido').length;
+        const atrasadas = fases.filter(atrasadaDe).length + tarefas.filter(atrasadaDe).length;
+        const legenda = Object.keys(FASE_STATUS).map(k => {
+            const n = fases.filter(f => (f.status || 'pendente') === k).length + tarefas.filter(t => (t.status || 'pendente') === k).length;
+            return `<span class="leg"><i style="background:${FASE_CORES[k]}"></i>${FASE_STATUS[k]}${n ? ` (${n})` : ''}</span>`;
+        }).join('');
+
+        const logo = emp.logoUrl ? `<img src="${esc(emp.logoUrl)}" alt="">` : '';
+
+        return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+        <title>Cronograma ${esc(p.codigo)}</title>
+        <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            * { box-sizing:border-box; margin:0; padding:0; }
+            body { font-family:'Segoe UI',Arial,sans-serif; font-size:10.5px; color:#111; padding:14px 18px;
+                   -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+            h1 { font-size:15px; letter-spacing:.6px; text-transform:uppercase; border-bottom:2.5px solid #111;
+                 padding-bottom:7px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:baseline; }
+            h1 .cod { font-size:13px; }
+            .top { display:flex; justify-content:space-between; align-items:flex-start; }
+            .top .logo img { max-height:44px; max-width:170px; }
+            .top .emp { text-align:right; font-size:10px; color:#444; }
+            .top .emp b { display:block; font-size:11.5px; color:#111; text-transform:uppercase; letter-spacing:.4px; }
+            .meta { display:grid; grid-template-columns:repeat(4,1fr); gap:3px 24px; margin-bottom:12px; }
+            .meta div { font-size:10px; }
+            .meta b { display:inline-block; min-width:96px; color:#555; }
+            .resumo { display:flex; gap:8px; margin-bottom:12px; }
+            .resumo .card { flex:1; border:1px solid #ddd; border-top:3px solid #111; padding:6px 9px; }
+            .resumo .k { font-size:8.5px; text-transform:uppercase; letter-spacing:.5px; color:#666; }
+            .resumo .v { font-size:15px; font-weight:800; margin-top:1px; }
+            .resumo .v small { font-size:9.5px; font-weight:600; color:#555; }
+            .resumo .v.at { color:#dc2626; }
+            h2 { font-size:11px; text-transform:uppercase; letter-spacing:.7px; margin:14px 0 7px;
+                 border-bottom:1px solid #111; padding-bottom:3px; }
+            .gantt { border:1px solid #ccc; }
+            .ghead { display:flex; background:#111; color:#fff; font-weight:700; }
+            .ghead .hleft { flex:0 0 68mm; padding:5px 7px; text-transform:uppercase; font-size:9px; letter-spacing:.5px; border-right:1px solid #555; }
+            .ghead .htrack { flex:1; position:relative; display:flex; }
+            .mcol { border-right:1px solid rgba(255,255,255,.35); text-align:center; font-size:8.5px; padding:4px 0;
+                    overflow:hidden; white-space:nowrap; text-transform:uppercase; }
+            .hmeses { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; pointer-events:none; }
+            .hhoje { position:absolute; top:0; bottom:0; border-left:2px dashed #dc2626; pointer-events:none; }
+            .hhoje span { position:absolute; top:1px; left:2px; font-size:7.5px; color:#dc2626; font-weight:700; }
+            .row { display:flex; border-top:1px solid #eee; }
+            .row .lbl { flex:0 0 68mm; padding:3px 7px; border-right:1px solid #ddd; overflow:hidden; }
+            .row .lbl b { font-size:10px; }
+            .row .lbl small { display:block; font-size:8.5px; color:#666; margin-left:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .row .track { flex:1; position:relative; height:30px; }
+            .row.tf .lbl { background:#f7f7f8; padding-left:16px; }
+            .row.tf .track { height:20px; background:#fcfcfc; }
+            .dot { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px; vertical-align:0; }
+            .tn { font-size:9.5px; }
+            .bar { position:absolute; top:6px; height:18px; border-radius:3px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.25); }
+            .row.tf .bar { top:4px; height:12px; border-radius:2px; }
+            .bar .fill { position:absolute; left:0; top:0; bottom:0; background:rgba(255,255,255,.4); border-right:1px solid rgba(255,255,255,.6); }
+            .bar .lab { position:absolute; left:0; right:0; padding:0 6px; font-size:9px; font-weight:700; color:#fff;
+                        line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 1px rgba(0,0,0,.35); }
+            .bar.ms { min-width:4px; }
+            .bar.atrasada { outline:2px solid #dc2626; outline-offset:-2px; }
+            .gline { position:absolute; top:0; bottom:0; border-left:1px solid #e8e8e8; pointer-events:none; }
+            .hoje { position:absolute; top:0; bottom:0; border-left:2px dashed #dc2626; opacity:.8; pointer-events:none; }
+            .nodate { position:absolute; left:5px; top:50%; transform:translateY(-50%); font-size:8.5px; color:#999; font-style:italic; }
+            .at { color:#dc2626; font-style:normal; font-weight:700; }
+            table { width:100%; border-collapse:collapse; margin-bottom:6px; }
+            th { background:#111; color:#fff; text-transform:uppercase; font-size:8.5px; letter-spacing:.4px;
+                 padding:5px 7px; text-align:left; }
+            th.c { text-align:center; }
+            td { border-bottom:1px solid #e5e7eb; padding:4px 7px; vertical-align:middle; }
+            tr.t td { background:#f7f7f8; font-size:9.5px; }
+            td.ind { padding-left:19px; }
+            td.c, th.c { text-align:center; }
+            .pc { min-width:88px; }
+            .pbar { display:inline-block; width:44px; height:7px; background:#e5e7eb; border-radius:4px; vertical-align:middle; margin-right:5px; overflow:hidden; }
+            .pbar div { height:100%; background:#111; border-radius:4px; }
+            .resp { color:#666; font-size:9px; }
+            .legenda { display:flex; flex-wrap:wrap; gap:14px; margin-top:7px; font-size:9px; color:#444; }
+            .leg i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+            .obs { margin-top:8px; font-size:9px; color:#555; }
+            .assinaturas { display:flex; gap:50px; margin-top:44px; justify-content:center; }
+            .assinaturas div { flex:0 0 250px; text-align:center; border-top:1px solid #111; padding-top:5px; font-size:10px; }
+            .assinaturas small { display:block; color:#555; font-size:9px; margin-top:2px; }
+            .foot { margin-top:14px; padding-top:6px; border-top:1px solid #ddd; font-size:8.5px; color:#777;
+                    display:flex; justify-content:space-between; }
+            tr, .row { page-break-inside:avoid; }
+            thead { display:table-header-group; }
+            @media print { body { padding:0; } }
+        </style></head><body>
+        <div class="top">
+            <div>
+                <h1><span>Cronograma do Projeto</span> <span class="cod">${esc(p.codigo)}</span></h1>
+                <div class="meta">
+                    <div><b>Projeto:</b> ${esc(p.projeto) || '—'}</div>
+                    <div><b>Cliente:</b> ${esc(p.cliente) || '—'}</div>
+                    <div><b>Status:</b> ${esc(STATUS[p.status] || p.status || '—')}</div>
+                    <div><b>Valor:</b> ${window.app.formatCurrency(p.valor_contrato || 0)}</div>
+                    <div><b>Início:</b> ${fmtD(p.data_inicio)}</div>
+                    <div><b>Entrega Prevista:</b> ${fmtD(p.data_prevista_entrega)}</div>
+                    <div><b>Responsável:</b> ${esc(p.responsavel) || '—'}</div>
+                    <div><b>Engenheiro:</b> ${esc(p.engenheiro_responsavel) || '—'}</div>
+                    <div><b>Vendedor:</b> ${esc(p.vendedor) || '—'}</div>
+                    <div><b>Criado em:</b> ${fmtD(p.created_at)}</div>
+                </div>
+            </div>
+            <div class="emp">${logo}<b>${esc(emp.name || 'GeraPro')}</b>${emp.cnpj ? esc(emp.cnpj) : ''}</div>
+        </div>
+        <div class="resumo">
+            <div class="card"><div class="k">Progresso Geral</div><div class="v">${prog}%</div></div>
+            <div class="card"><div class="k">Fases</div><div class="v">${conclF}/${fases.length} <small>concluídas</small></div></div>
+            <div class="card"><div class="k">Tarefas</div><div class="v">${conclT}/${tarefas.length} <small>concluídas</small></div></div>
+            <div class="card"><div class="k">Duração do Cronograma</div><div class="v">${this._diffDays(min, max) + 1} <small>dias corridos</small></div></div>
+            <div class="card"><div class="k">Itens Atrasados</div><div class="v ${atrasadas ? 'at' : ''}">${atrasadas}</div></div>
+        </div>
+        <h2>Linha do Tempo (Gantt)</h2>
+        <div class="gantt">
+            <div class="ghead">
+                <div class="hleft">Fases e Tarefas</div>
+                <div class="htrack"><div class="hmeses">${meses}</div><div class="hhoje" style="left:${hojeX}%"><span>Hoje</span></div></div>
+            </div>
+            ${linhasGantt}
+        </div>
+        <div class="legenda">${legenda}<span class="leg"><i style="background:#fff;border:1px solid #999"></i>Preenchimento da barra = progresso concluído</span><span class="leg"><i style="background:#fff;border:2px dashed #dc2626"></i>Linha tracejada = hoje (${this._fmtDate(this._iso(hoje))})</span></div>
+        <h2>Detalhamento das Fases e Tarefas</h2>
+        <table>
+            <thead><tr>
+                <th>Fase / Tarefa</th><th style="width:170px;">Status</th>
+                <th class="c" style="width:88px;">Início</th><th class="c" style="width:88px;">Fim</th>
+                <th class="c" style="width:64px;">Duração</th><th class="c" style="width:74px;">Tarefas</th>
+                <th class="c" style="width:120px;">Progresso</th>
+            </tr></thead>
+            <tbody>${linhasTabela}</tbody>
+        </table>
+        ${fases.some(f => atrasadaDe(f) || this._tarefasDaFase(f.id).some(atrasadaDe)) ? `<div class="obs"><i class="at">▲</i> Itens marcados como <b>atrasada</b> têm data de fim anterior a hoje e ainda não foram concluídos.</div>` : ''}
+        <div class="assinaturas">
+            <div>${esc(p.responsavel) || 'Responsável pelo Projeto'}<small>Responsável pelo Projeto</small></div>
+            <div>${esc(p.engenheiro_responsavel) || 'Engenheiro Responsável'}<small>Engenheiro Responsável</small></div>
+        </div>
+        <div class="foot">
+            <span>${esc(emp.name || 'GeraPro')}${emp.cnpj ? ' · ' + esc(emp.cnpj) : ''}</span>
+            <span>Documento gerado pelo GeraPro em ${new Date().toLocaleString('pt-BR')}</span>
+        </div>
+        <script>window.onload = function () { setTimeout(function () { window.print(); }, 250); };</script>
+        </body></html>`;
     },
 
     /* --- Modal de fases (criar/editar) --- */
