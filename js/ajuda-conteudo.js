@@ -9,13 +9,13 @@
         id: 'introducao',
         titulo: 'Introdução',
         screenshot: 'prints/geral/introducao.png',
-        texto: 'O GeraPro é um sistema web integrado para gestão de engenharia e processos comerciais da Minha Empresa. Foi desenvolvido para facilitar a criação de listas de cargas, geração automática de listas de materiais, elaboração de propostas técnicas e comerciais, e gestão de clientes.\n\nO sistema opera localmente e sincroniza automaticamente os dados com a estrutura de pastas PTC no computador, utilizando um servidor Node.js para versionamento e armazenamento em disco.'
+        texto: 'O GeraPro é um sistema web integrado para gestão de engenharia e processos comerciais da Minha Empresa. Foi desenvolvido para facilitar a criação de listas de cargas, geração automática de listas de materiais, elaboração de propostas técnicas e comerciais, gestão de clientes e funil comercial, acompanhamento de projetos pós-venda e do ciclo de compras.\n\nO sistema opera localmente e sincroniza automaticamente os dados com a estrutura de pastas PTC no computador, utilizando um servidor Node.js para versionamento e armazenamento em disco.'
       },
       {
         id: 'interface',
         titulo: 'Interface Geral',
         screenshot: 'prints/geral/interface.png',
-        texto: 'A interface é dividida em duas áreas principais:\n\nBarra Lateral (Menu): Localizada à esquerda, contém a navegação principal do sistema, organizada em categorias: Principal, Cadastros, Comercial, Engenharia, Relatórios e Configurações.\n\nÁrea de Conteúdo: Ocupa o restante da tela à direita. É onde os módulos e ferramentas são carregados conforme a seleção no menu.\n\nHeader: Contém o título da página, botão de busca de PTC, botão para criar nova PTC, alternador de tema claro/escuro, indicadores de dólar e data base, e avatar do usuário.'
+        texto: 'A interface é dividida em duas áreas principais:\n\nBarra Lateral (Menu): Localizada à esquerda, contém a navegação principal do sistema, organizada em categorias: Principal, Cadastros, Comercial, Engenharia, Operações, Relatórios e Configurações.\n\nÁrea de Conteúdo: Ocupa o restante da tela à direita. É onde os módulos e ferramentas são carregados conforme a seleção no menu.\n\nHeader: Contém o título da página, botão de busca de PTC, botão para criar nova PTC, alternador de tema claro/escuro, indicadores de dólar e data base, e avatar do usuário.'
       },
       {
         id: 'navegacao',
@@ -1871,39 +1871,200 @@
     ]
   },
 
+  projetos: {
+    titulo: 'Gestão de Projetos',
+    icone: 'ph-folder',
+    descricao: 'Projetos pós-venda: cronograma (Gantt) com fases e tarefas, DRE estimado × real e integração com o módulo Compras.',
+    secoes: [
+      {
+        id: 'visao-geral',
+        titulo: 'Visão Geral',
+        texto: 'A Gestão de Projetos é o módulo pós-venda: depois que a proposta é ganha, é aqui que o projeto vive — cronograma, execução e rentabilidade.\n\nTrês formas de um projeto nascer:\n- **Automaticamente:** quando uma proposta da Gestão de Propostas é movida para **Fechado (ganha)**, o projeto é criado aqui com código PRJ-0001, cliente, datas e valor da proposta.\n- **Importar Fechadas:** o botão da lista varre o funil e cria os projetos que ainda não foram importados — com deduplicação, a mesma proposta nunca gera dois projetos.\n- **Manual:** o botão Novo Projeto, para obras que não nasceram de proposta.\n\nCada projeto tem status (Em Andamento, Pausado, Concluído ou Cancelado) e carrega três pilares:\n- **Cronograma** — fases e tarefas no Gantt.\n- **DRE** — estimado × real, a rentabilidade do projeto.\n- **Integrações** — requisições de Compras ligadas ao projeto e custos reais que voltam para a DRE.'
+      },
+      {
+        id: 'lista',
+        titulo: 'A Lista de Projetos',
+        texto: 'Os cards de resumo mostram Total de Projetos, Em Andamento, Concluídos e Valor Contratado (soma dos contratos).\n\nA barra de ferramentas tem busca por código, cliente ou projeto, filtro por status e contador de resultados. Na tabela, cada linha traz código, cliente (com o vendedor), título, status, uma barra minúscula de cronograma (ex.: 3/7 fases · 42%), valor do contrato, início e entrega prevista.\n\nClique em qualquer linha para abrir o projeto. Os ícones da direita abrem (seta), editam (lápis) e excluem (lixeira, com confirmação). O menu lateral mostra um badge com a contagem de projetos em andamento.'
+      },
+      {
+        id: 'cadastro',
+        titulo: 'Novo Projeto e Edição',
+        texto: 'O formulário tem os campos:\n\n- **Cliente** (obrigatório) e **Projeto** (título da obra).\n- **Valor do Contrato** — base do Gerar Estimado da DRE.\n- **Status** — Em Andamento (padrão), Pausado, Concluído ou Cancelado.\n- **Datas** — início, entrega prevista e entrega real.\n- **Fase Atual** — texto livre exibido no cabeçalho do detalhe.\n- **Responsável** e **Engenheiro Responsável**.\n- **Descrição** e **Observações**.\n\nO código (PRJ-0001, PRJ-0002, ...) é gerado automaticamente. Na exclusão, o sistema pergunta e remove em cascata as fases, tarefas e lançamentos da DRE — nada fica órfão.',
+        campos: [
+          { nome: 'Cliente', descricao: 'Obrigatório — nome do cliente dono da obra.' },
+          { nome: 'Valor do Contrato (R$)', descricao: 'Usado pelo Gerar Estimado da DRE como receita.' },
+          { nome: 'Origem', descricao: 'Pipeline, Proposta Técnica, Proposta Comercial, Proposta Completa ou Orçamento — mostra de qual documento o projeto veio.' },
+          { nome: 'Status', descricao: 'Em Andamento, Pausado, Concluído ou Cancelado — alterável também no cabeçalho do detalhe.' }
+        ]
+      },
+      {
+        id: 'detalhe',
+        titulo: 'A Visão do Projeto',
+        texto: 'O cabeçalho traz o código com badge de status, cliente e título, e três controles: alterar status na hora (seletor), **Editar** e **Excluir**. O resumo mostra título, código, data de criação e o **Valor do Contrato** em destaque; a grade de informações repete cliente, vendedor, engenheiro responsável, responsável pelo projeto, datas de início/entrega e a **origem** (de qual proposta o projeto veio).\n\nAbaixo ficam três abas: **Informações** (descrição, fase atual e observações), **Cronograma** (Gantt) e **DRE**.'
+      },
+      {
+        id: 'cronograma',
+        titulo: 'Aba Cronograma (Gantt)',
+        texto: 'O Gantt mostra as fases como barras coloridas ao longo do tempo, com cabeçalho de meses e — em escalas próximas do dia — a régua de dias com **fins de semana destacados** e o **dia de hoje realçado**.\n\nBarra de ferramentas:\n- **Escala** — Automática, Dia, Semana ou Mês.\n- **Modelo** — edita o modelo padrão de fases (nomes, dias e cores, salvos no navegador).\n- **Gerar Fases Padrão** — cria as 7 fases do modelo distribuídas proporcionalmente entre o início e a entrega prevista: Planejamento e Engenharia, Compras e Suprimentos, Manufatura e Montagem, Testes e QA, Logística e Entrega, Instalação e Comissionamento e Aceite e Entrega Final.\n- **Tarefas** — mostra ou oculta as tarefas no Gantt.\n- **Expandir/Recolher** — abre ou fecha as tarefas de todas as fases de uma vez.\n- **Nova Fase** — cria uma fase manualmente.\n\nInterações:\n- **Arraste a barra** de uma fase para reagendar — o sistema avisa quantos dias ela moveu (+3 dias, −5 dias...).\n- As **setas ↑ ↓** reordenam as fases na sequência.\n- Clique na fase para abrir o modal com nome, datas, status, cor e progresso. Se a fase já tem tarefas, o progresso fica **travado** (escrito: calculado pelas tarefas); sem tarefas, você edita à mão.\n- A linha de dias tem destaque para sábado, domingo e para hoje.'
+      },
+      {
+        id: 'tarefas',
+        titulo: 'Tarefas por Fase',
+        texto: 'Cada fase pode ter várias **tarefas** — subtarefas de um único nível, com a fase como agrupador.\n\n- O **chevron** (seta ao lado do nome) expande ou recolhe as tarefas da fase; a preferência fica salva no navegador.\n- Dentro da fase aparece o chip **x/y tarefas** e a lista com nome, datas, responsável e status de cada tarefa.\n- O botão ✓ conclui a tarefa (o progresso vai a 100%), o lápis edita e a lixeira exclui com confirmação.\n- Tarefas são **reordenadas** com ↑ ↓ e também **arrastadas** no Gantt — a barra da tarefa reagenda como a da fase.\n- O botão **Tarefas** da toolbar oculta ou mostra todas; **Expandir/Recolher** abre ou fecha tudo.\n\n**Progresso automático:** quando a fase tem tarefas, o progresso dela passa a ser a **média do progresso das tarefas**, materializado no campo da fase (que fica travado no modal). Fase sem tarefas continua com progresso manual. Na lista, o mini indicador de cronograma mostra o agregado do projeto (ex.: 0/7 · 14%).\n\nO modal da tarefa tem fase de contexto, nome obrigatório, datas de início e fim (a fim não pode ser anterior à início), status, progresso, responsável e descrição.',
+        campos: [
+          { nome: 'Nome da Tarefa', descricao: 'Obrigatório — ex.: Aprovar projeto elétrico.' },
+          { nome: 'Status', descricao: 'Pendente, Em Andamento, Concluída ou Bloqueada — concluir força o progresso em 100%.' },
+          { nome: 'Progresso (%)', descricao: '0 a 100, passo 5 — a média das tarefas alimenta o progresso da fase.' },
+          { nome: 'Responsável', descricao: 'Nome ou equipe que executa a tarefa.' }
+        ]
+      },
+      {
+        id: 'dre',
+        titulo: 'Aba DRE (Estimado × Real)',
+        texto: 'A DRE mostra a rentabilidade do projeto: quatro cards de resumo (Receita Líquida, Custos Diretos, Despesas Operacionais e Lucro Líquido com a margem) e uma tabela por conta com os lados **Estimado** e **Real**, a **variação** em R$ e % (verde quando favorável, vermelho quando não é) e subtotais encadeados: RECEITA LÍQUIDA, LUCRO BRUTO e LUCRO LÍQUIDO.\n\nGrupos de contas: Receita; (−) Deduções sobre Vendas (impostos); (−) Custos Diretos (materiais, mão de obra, despesas diretas e subcontratação); (−) Despesas Operacionais (custos fixos, comissão, viagens, frete e outras).\n\n**Gerar Estimado** cria as linhas de estimativa a partir do Valor do Contrato:\n- Receita = valor do contrato.\n- Impostos conforme o regime tributário da empresa: 21,25% no Lucro Real ou 4% no Simples Nacional.\n- Custos fixos 8% e comissão 5% sobre a receita.\n- Materiais e Mão de Obra nascem zerados para você completar pelo orçamento.\n\nO botão é idempotente: só cria linhas que ainda não existem e avisa quando o estimado já está completo.\n\n**Novo Lançamento** registra qualquer linha (conta da DRE, tipo estimado ou real, data, descrição e valor). Os lançamentos individuais aparecem embaixo da tabela, editáveis e excluíveis. Os custos reais também chegam sozinhos do módulo Compras: cada NF recebida lança o custo de material automaticamente.\n\nA toolbar tem **Gerar Estimado**, **Novo Lançamento** e **XLSX** — export no padrão do sistema (cabeçalho em destaque, linhas zebradas e primeira linha congelada).',
+        campos: [
+          { nome: 'Conta (linha da DRE)', descricao: 'Receita Bruta, Impostos, Materiais, Mão de Obra, Despesas Diretas, Subcontratação, Custos Fixos, Comissão, Viagens, Frete e Outras.' },
+          { nome: 'Tipo', descricao: 'Estimado (orçamento) ou Real (o que saiu de fato).' },
+          { nome: 'Valor', descricao: 'Sempre positivo — o sinal da linha ( + / − ) é definido pela conta.' },
+          { nome: 'Descrição', descricao: 'Ex.: Valor do contrato, Estimativa de impostos — Lucro Real, Rateio de custos fixos.' }
+        ]
+      },
+      {
+        id: 'integracoes',
+        titulo: 'Integrações',
+        texto: '- **Gestão de Propostas → Projetos:** proposta movida para Fechado vira projeto automaticamente (ou pelo botão Importar Fechadas), trazendo cliente, título, vendedor, engenheiro, valor do contrato e entrega prevista.\n- **Compras → DRE:** a requisição de compra pode ser vinculada ao projeto; ao lançar a NF, o custo real de material entra automaticamente na DRE do projeto (categoria material, tipo real) — sem digitar nada duas vezes.\n- **Catálogo de Materiais:** o recebimento grava o preço real no histórico com origem compra, alimentando o custo do catálogo.\n- **Ajuda:** pressione F1 em qualquer lugar para abrir a ajuda contextual deste módulo.'
+      },
+      {
+        id: 'passo-a-passo',
+        titulo: 'Passo a Passo — Do contrato ao fechamento',
+        passos: [
+          'Abra a Gestão de Propostas e mova a proposta ganha para Fechado — ou clique em Importar Fechadas na lista de projetos.',
+          'Abra o projeto pela lista e confira os dados na aba Informações.',
+          'Na aba Cronograma, clique em Gerar Fases Padrão (ou crie as fases manualmente).',
+          'Ajuste as datas arrastando as barras e reordene as fases com as setas.',
+          'Adicione tarefas em cada fase e acompanhe o progresso automático da fase.',
+          'Na aba DRE, clique em Gerar Estimado e complete materiais e mão de obra pelo orçamento.',
+          'Registre custos reais com Novo Lançamento — ou lance as NFs de Compras com o projeto vinculado.',
+          'Acompanhe a variação estimado × real, a margem e exporte a DRE em XLSX.'
+        ]
+      },
+      {
+        id: 'glossario',
+        titulo: 'Glossário',
+        texto: '- **PRJ-0001** — código sequencial automático do projeto.\n- **Gantt** — gráfico de cronograma com barras posicionadas ao longo do tempo.\n- **Fase** — etapa grande do projeto (ex.: Manufatura e Montagem) que agrupa as tarefas.\n- **Tarefa** — atividade dentro de uma fase, um único nível de detalhe.\n- **DRE** — Demonstrativo do Resultado do Exercício: receitas, custos e lucro do projeto.\n- **Estimado** — o que se espera gastar e receber (orçamento).\n- **Real** — o que foi efetivamente recebido e gasto.\n- **Variação** — diferença entre real e estimado; verde quando o desvio é favorável.\n- **Cascata** — ao excluir o projeto, fases, tarefas e lançamentos são excluídos junto.'
+      }
+    ]
+  },
   compras: {
     titulo: 'Compras',
     icone: 'ph-shopping-cart',
-    descricao: 'Fluxo completo de compras: requisição a partir da LM da Engenharia, cotação com vários fornecedores, pedido de compra e entrada de nota fiscal.',
+    descricao: 'Fluxo completo de compras: requisição a partir da LM da Engenharia, cotação com N fornecedores, pedidos por fornecedor, notas fiscais e painel de indicadores.',
     secoes: [
       {
         id: 'visao-geral',
         titulo: 'Visão Geral do Fluxo',
-        texto: 'O módulo Compras executa o fluxo real de aquisição de uma indústria de painéis elétricos:\n\nLM da Engenharia → REQUISIÇÃO → COTAÇÃO → PEDIDO DE COMPRAS → NF RECEBIDA\n\nO gatilho é a Lista de Materiais (LM/BOM) entregue pelo engenheiro responsável pelo projeto. A requisição é conferida, os itens são cotados junto a fornecedores e, com o vencedor definido, são gerados os Pedidos de Compras. O recebimento da mercadoria se dá pelo lançamento da Nota Fiscal, que dá baixa no pedido e alimenta o histórico de preços do Banco de Materiais.\n\nEscalar: uma requisição pode gerar N pedidos (um por fornecedor) e um pedido pode receber N notas fiscais (entregas parciais).'
+        texto: 'O módulo Compras executa o fluxo real de aquisição de uma indústria de painéis elétricos:\n\nLM da Engenharia → REQUISIÇÃO → COTAÇÃO → PEDIDO DE COMPRAS → NF RECEBIDA\n\nO gatilho é a Lista de Materiais (LM) enviada pelo engenheiro responsável pelo projeto. A requisição é conferida, os itens são cotados junto a N fornecedores, os vencedores são marcados item a item e sai um Pedido de Compras por fornecedor. O recebimento acontece pelo lançamento da Nota Fiscal, que dá baixa no pedido, grava o preço real no histórico do catálogo de materiais e alimenta a DRE do projeto.\n\nRegras de escopo (alinhadas com a empresa):\n- Somente fluxo de compras — não há controle de saldo em estoque.\n- 1 requisição pode gerar N cotações (uma por fornecedor) e N pedidos (um por fornecedor).\n- 1 pedido pode receber N notas fiscais (entregas parciais).\n- A NF é registrada como entrada com conferência — sem escrituração fiscal nem integração com ERP.'
+      },
+      {
+        id: 'lista',
+        titulo: 'Tela Inicial (Lista de Requisições)',
+        texto: 'O topo mostra os cards de resumo: Requisições, Itens Não Cadastrados (fica em alerta quando maior que zero), Em Andamento e Valor Estimado. Do lado direito ficam dois botões:\n\n- **Nova Requisição** — abre o assistente de upload da LM.\n- **Indicadores** — abre o painel de gestão do ciclo de compras.\n\nAbaixo ficam a busca (código, título, revisão ou solicitante), o filtro por status, o filtro por projeto e a tabela de requisições com código (REQ-0001), título, projeto, status, totais e datas. O menu lateral exibe um badge com a contagem de requisições abertas (rascunho, em conferência, liberada, em cotação e em pedido).'
       },
       {
         id: 'requisicao',
-        titulo: 'Requisição de Compras (LM)',
-        texto: 'A Requisição nasce do upload da LM enviada pela Engenharia. Cabeçalho com projeto, revisão, solicitante e o arquivo de origem anexado (com hash para detectar reenvio).\n\nO sistema lê as colunas do arquivo e faz o pareamento automático contra o Banco de Materiais:\n- Código interno ou do fabricante (exato, escopo da empresa)\n- Pontuação textual na descrição quando não há código\n- Sem correspondência: item sinalizado como NÃO CADASTRADO\n\nNenhum item sem pareamento impede a liberação — o sistema exige que todos os itens estejam resolvidos antes de liberar a requisiição para compras. Isso separa formalmente a Engenharia (que emite) de Compras (que executa), registrando quem liberou e quando.',
+        titulo: 'Nova Requisição — a entrada da LM',
+        texto: 'A Requisição nasce do arquivo de LM enviado pela Engenharia. O fluxo primário é planilha: clique em **Baixar template da LM** para receber o modelo com as colunas esperadas — Código | Descrição | Fabricante | Unidade | Quantidade (sinônimos de cabeçalho também são aceitos, como Qtd, PN ou referência).\n\nNo cabeçalho você informa o projeto de destino (Gestão de Projetos), a revisão do documento, o solicitante e a data da LM, e anexa o arquivo. O sistema calcula o hash do arquivo e avisa quando o reenvio é idêntico ao anterior. O campo origem (Upload da Engenharia, Lançamento manual ou Gerada da Proposta Técnica) deixa o cadastro agnóstico da fonte: quando a Engenharia virar módulo nativo, a LM poderá ser gerada dentro do GeraPro sem mudar nada aqui.\n\nAo importar, cada linha é pareada com o Banco de Materiais:\n- Código interno ou do fabricante (exato, com escopo de empresa)\n- Pontuação textual na descrição quando não há código (o limiar de sugestão é 80 pontos; medidas elétricas divergentes — corrente, tensão, potência — ficam como não cadastrado para não apontar o material errado)\n- Sem correspondência: o item fica marcado como NÃO CADASTRADO\n\nO custo e o lead time do catálogo são congelados (snapshot) na importação e o Valor Estimado da requisição é calculado na hora (soma de quantidade × custo do catálogo).',
         campos: [
           { nome: 'Código', descricao: 'REQ-0001 sequencial por empresa.' },
-          { nome: 'Projeto', descricao: 'Projeto de destino (Gestão de Projetos).' },
+          { nome: 'Projeto', descricao: 'Projeto de destino — integra com a Gestão de Projetos.' },
           { nome: 'Revisão', descricao: 'Nº da revisão do documento de LM.' },
-          { nome: 'Status', descricao: 'rascunho, em_conferencia, liberada, em_cotacao, em_pedido, recebida, cancelada.' },
-          { nome: 'Material não cadastrado', descricao: 'Item sem correspondência no catálogo — bloqueia a liberação até ser resolvido.' }
+          { nome: 'Status', descricao: 'Rascunho, Em Conferência, Liberada, Em Cotação, Em Pedido, Recebida ou Cancelada.' },
+          { nome: 'Material não cadastrado', descricao: 'Item sem correspondência no catálogo — impede a liberação até ser resolvido.' }
         ]
       },
       {
         id: 'conferencia',
         titulo: 'Conferência dos Itens',
-        texto: 'A grade de conferência mostra três estados:\n\n✓ Casado (verde) — código exato no catálogo.\n? Sugestão (âmbar) — pontuação textual; o usuário confirma.\n✗ Não cadastrado (vermelho) — precisa de cadastro.\n\nPara o item vermelho, use o botão \"Cadastrar material\": o formulário abre pré-preenchido com código, descrição, fabricante, unidade e custo vindos da LM. Ao salvar, o item é vinculado e o contador de pendências é atualizado.\n\nImportante: o catálogo não possui restrição de unicidade nos códigos, por isso o pareamento é sempre limitado à empresa atual.',
+        texto: 'A grade de conferência mostra três estados:\n\n- ✓ **Casado** (verde) — código exato no catálogo.\n- ? **Sugestão** (âmbar) — pontuação textual; você confirma o vínculo.\n- ✗ **Não cadastrado** (vermelho) — precisa de cadastro; o card da lista fica em alerta e o banner da requisição resume tudo (ex.: "148 itens — 132 casados, 11 sugeridos, 5 não cadastrados").\n\nPara o item vermelho, use o botão **Cadastrar material**: o formulário abre pré-preenchido com código, descrição, fabricante, unidade e custo vindos da LM. Ao salvar, o item é vinculado e o contador de pendências é atualizado na hora.\n\nO catálogo não tem restrição de unicidade nos códigos, por isso o pareamento é sempre limitado à empresa atual.',
         passos: [
           'Abra Compras e clique em Nova Requisição.',
           'Baixe o template da LM e preencha a planilha da Engenharia.',
           'Envie o arquivo e confira o resumo de pareamento.',
-          'Resolva os itens em âmbar e vermelho.',
-          'Clique em Liberar para Compras.'
+          'Resolva os itens em âmbar (confirmar sugestão) e em vermelho (cadastrar material).',
+          'Clique em "Salvar e Liberar para Compras" — ou salve o rascunho e libere depois pela própria requisição.'
         ]
+      },
+      {
+        id: 'liberacao',
+        titulo: 'Gate "Liberar para Compras"',
+        texto: 'A liberação é o gate formal que separa a Engenharia (que emite a LM) de Compras (que executa). Somente requisições liberadas podem ser cotadas ou virar pedido.\n\nValidações bloqueantes antes de liberar:\n- Pelo menos 1 item na requisição.\n- Todos os itens com material vinculado (nenhum não cadastrado).\n- Todas as quantidades maiores que zero e com unidade preenchida.\n- Sem itens duplicados internamente (mesmo material na mesma requisição).\n\nAo liberar, o sistema grava quem liberou e quando (liberada_por e data_liberacao) — trilha de auditoria completa. Depois disso a requisição avança para **Liberada** e aparece pronta para cotação.'
+      },
+      {
+        id: 'cotacoes',
+        titulo: 'Cotações (1 requisição → N fornecedores)',
+        texto: 'A partir da requisição liberada, crie uma cotação por fornecedor. Cada cotação tem ciclo de vida próprio — Aberta → Enviada → Recebida → Vencedora ou Descartada — e guarda os campos de negociação: prazo de entrega, condição de pagamento, validade da proposta e frete.\n\nA **Matriz de comparação** mostra itens × fornecedores lado a lado, com destaque do menor preço e do menor prazo em cada célula. Cada célula é clicável: é assim que se marca o vencedor, **item a item** — nem sempre o mesmo fornecedor vence todos os itens.\n\nOs preços podem ser digitados manualmente ou importados da planilha do fornecedor (template: Código | Descrição | Preço Unitário | Prazo (dias)).\n\nTrês comportamentos automáticos de prazo e condição:\n- Ao trocar o fornecedor no modal, prazo e condição são pré-preenchidos com o cadastro dele (o campo limpo nunca herda o fornecedor anterior).\n- Ao criar ou salvar a cotação, os valores negociados diferentes são espelhados no cadastro do fornecedor — a última negociação vence.\n- Campo vazio no cadastro nunca apaga histórico.\n\nCom a cotação em andamento, a requisição passa para **Em Cotação**.',
+        campos: [
+          { nome: 'Número', descricao: 'COT-0001 sequencial por empresa.' },
+          { nome: 'Prazo de entrega', descricao: 'Dias prometidos — vira a base do indicador de lead time.' },
+          { nome: 'Condição de pagamento', descricao: 'Ex.: 30/60/90 dias — espelhada no cadastro do fornecedor.' },
+          { nome: 'Vencedor', descricao: 'Marcação item a item na matriz de comparação.' },
+          { nome: 'Frete / Validade', descricao: 'Condições comerciais congeladas na cotação e levadas ao pedido.' }
+        ]
+      },
+      {
+        id: 'pedidos',
+        titulo: 'Pedido de Compras (1 requisição → N pedidos)',
+        texto: 'Com os vencedores marcados, clique em **Gerar Pedido**: o sistema agrupa os itens vencedores POR FORNECEDOR e cria um pedido para cada um (PC-0001, PC-0002, ...). Itens ainda sem vencedor ficam pendentes e o próprio botão avisa quantos.\n\n**Aprovação por valor:** pedidos acima de R$ 50.000 exigem o campo Aprovado por preenchido; abaixo do limite não há alçada. O limite é configurável.\n\nCiclo de vida do pedido: Rascunho → Enviado → Em Entrega → Parcialmente Recebido → Recebido (e Cancelado em qualquer ponto anterior). O PC pode ser visualizado para impressão em XLSX ou PDF pelo navegador.\n\nQuando todos os itens da requisição já estão em pedido, ela fecha sozinha para **Em Pedido**.',
+        campos: [
+          { nome: 'Código', descricao: 'PC-0001 sequencial por empresa.' },
+          { nome: 'Aprovado por / Aprovado em', descricao: 'Obrigatórios acima do limite de aprovação (R$ 50.000).' },
+          { nome: 'Data prevista de entrega', descricao: 'Data explícita ou data do pedido + prazo de entrega — base do cálculo de atraso.' },
+          { nome: 'Condição / Prazo', descricao: 'Condições negociadas congeladas no pedido.' },
+          { nome: 'Status', descricao: 'Rascunho, Enviado, Em Entrega, Parcialmente Recebido, Recebido ou Cancelado.' }
+        ]
+      },
+      {
+        id: 'notas',
+        titulo: 'Nota Fiscal (fecha o ciclo)',
+        texto: 'Cada recebimento é lançado pelo botão **Lançar NF** do pedido. Um pedido aceita N notas fiscais — entregas parciais. O item entra com a quantidade efetivamente recebida; quantidade zero fica de fora da NF.\n\nA conferência é automática ao salvar: quantidade e preço da NF × pedido. Divergência (tolerância de preço de 0,5%) muda o status da NF para **Divergente** e exibe o alerta na tela. O estorno posterior reverte exatamente tudo: baixa no pedido, preço no catálogo e lançamento na DRE.\n\nO que o recebimento faz automaticamente:\n- Baixa item a item no pedido (quantidade recebida) — o pedido vira Parcial ou Recebido.\n- Grava o preço real em `price_history` com origem compra — o Banco de Materiais se auto-alimenta.\n- Lançamento automático na DRE do projeto (categoria material, tipo real) — estimado × real instantâneo.\n- Quando todos os pedidos foram recebidos, a requisição vira **Recebida**.',
+        campos: [
+          { nome: 'Número / Série / Chave', descricao: 'Identificação da NF; a chave de acesso pode ser conferida.' },
+          { nome: 'Datas', descricao: 'Emissão, recebimento e entrada — a entrada alimenta o KPI "Recebido no mês".' },
+          { nome: 'Valores', descricao: 'Produtos, frete, desconto, total e impostos destacados.' },
+          { nome: 'Status', descricao: 'Recebida, Conferida, Divergente ou Estornada.' },
+          { nome: 'Conferida por / em', descricao: 'Auditoria de quem conferiu a NF e quando.' }
+        ]
+      },
+      {
+        id: 'indicadores',
+        titulo: 'Painel de Indicadores',
+        texto: 'O botão **Indicadores** (cabeçalho da lista) abre o painel de gestão do ciclo de compras.\n\n**KPIs (4 cards):**\n- **Em cotação** — soma das cotações abertas, enviadas e recebidas.\n- **Em pedido** — soma dos pedidos que ainda não foram cancelados nem recebidos.\n- **Recebido no mês** — total das NFs do mês corrente, sem estornadas.\n- **Pedidos em atraso** — contagem de pedidos com previsão anterior a hoje (data explícita ou data do pedido + prazo), com a lista dos atrasados.\n\n**Lead time real × catálogo:** para cada material, a média de data do pedido até o recebimento é comparada ao lead time do catálogo e ao prazo prometido. Os botões por linha e em lote atualizam o catálogo com o valor real — é a rotina que alimenta o Planejamento de Compras.\n\n**Desempenho de fornecedores:** pedidos, total comprado, prazo prometido × prazo real, índice de divergências das NFs e a diferença de preço média ponderada pela quantidade vs catálogo.\n\n**Duplicidade:** mesmo material em 2 ou mais requisições abertas — evita a compra dupla.\n\nO painel exporta XLSX com 4 abas: Resumo, Lead Time, Fornecedores e Duplicidade — no padrão do sistema (cabeçalho em destaque, linhas zebradas e primeira linha congelada).'
+      },
+      {
+        id: 'fornecedores',
+        titulo: 'Fornecedores — prazo e condição',
+        texto: 'O cadastro de fornecedores tem os campos **Prazo de Entrega** e **Condição de Pagamento**. Eles funcionam em três momentos:\n\n- **Pré-preenchimento:** ao escolher o fornecedor no modal da cotação, prazo e condição são copiados do cadastro dele. Trocar de fornecedor limpa os campos antes de copiar — nunca herda o valor do anterior.\n- **Espelho automático:** ao criar ou salvar cotação, valores negociados diferentes são gravados no cadastro — a última negociação vence.\n- **Campo vazio nunca apaga histórico:** só se grava quando o valor existe e é diferente.\n\nO prazo e a condição efetivamente negociados continuam gravados na cotação e no pedido, que é o local contabilmente correto — eles variam por negociação.'
+      },
+      {
+        id: 'passo-a-passo',
+        titulo: 'Passo a Passo — Do arquivo da LM à NF',
+        passos: [
+          'Prepare a LM no template (Baixar template da LM) com Código, Descrição, Fabricante, Unidade e Quantidade.',
+          'Nova Requisição: escolha o projeto, informe revisão, solicitante e data, e envie o arquivo.',
+          'Confira o pareamento: confirme sugestões e cadastre os itens não cadastrados.',
+          'Clique em "Salvar e Liberar para Compras" — a requisição fica Liberada.',
+          'Crie uma cotação por fornecedor e preencha os preços (digitalmente ou importando a tabela do fornecedor).',
+          'Na matriz de comparação, marque o vencedor item a item.',
+          'Clique em "Gerar Pedido" — sai um PC por fornecedor.',
+          'Acompanhe o pedido: Rascunho → Enviado → Em Entrega.',
+          'Ao receber, clique em "Lançar NF": a baixa, o preço real e a DRE do projeto são atualizados automaticamente.',
+          'Acompanhe tudo no painel Indicadores (KPIs, lead time, fornecedores e duplicidades).'
+        ]
+      },
+      {
+        id: 'glossario',
+        titulo: 'Glossário',
+        texto: '- **LM** — Lista de Materiais (BOM) da Engenharia: o que precisa ser comprado para o projeto.\n- **Requisição (REQ)** — pedido formal de compra interno, gerado a partir da LM.\n- **Cotação (COT)** — consulta de preços enviada a um fornecedor específico.\n- **Pedido de Compras (PC)** — documento emitido para o fornecedor vencedor.\n- **NF** — Nota Fiscal da mercadoria recebida.\n- **Vencedor** — fornecedor escolhido para cada item na matriz de comparação.\n- **Baixa** — abatimento da quantidade recebida sobre o pedido.\n- **Lead time** — tempo entre o pedido e o recebimento real.\n- **Duplicidade** — mesmo material aparecendo em mais de uma requisição aberta (risco de compra dupla).'
       }
     ]
   }
@@ -1912,7 +2073,7 @@
 window.AJUDA_CATEGORIAS = [
   { label: 'Principal', modules: ['dashboard'] },
   { label: 'Cadastros', modules: ['clientes', 'fornecedores'] },
-  { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'precificacao', 'orcamentos', 'importacaoET', 'comparacaoDocumentos'] },
+  { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'projetos', 'precificacao', 'orcamentos', 'importacaoET', 'comparacaoDocumentos'] },
   { label: 'Engenharia', modules: ['materiais', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'cargas', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'calculos-eletricos', 'calculos-mecanicos', 'lm', 'automacao-rede', 'manufatura'] },
   { label: 'Operações', modules: ['compras'] },
   { label: 'Relatórios', modules: ['relatorio-propostas', 'relatorio-cadastros', 'relatorio-tipicos', 'relatorio-manufatura'] },

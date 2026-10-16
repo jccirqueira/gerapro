@@ -1,7 +1,7 @@
 MANUAL DE UTILIZAÇÃO - GERAPRO
 ================================================================================
-VERSÃO DO DOCUMENTO: 1.1
-DATA: 19/03/2026
+VERSÃO DO DOCUMENTO: 1.2
+DATA: 16/10/2026
 ================================================================================
 
 SUMÁRIO
@@ -21,6 +21,12 @@ SUMÁRIO
     6.3. Típicos
 7. CONFIGURAÇÕES E SISTEMA
     7.1. Sincronização de Arquivos
+8. MÓDULO: COMPRAS
+    8.1. Fluxo LM → Requisição → Cotação → Pedido → NF
+    8.2. Painel de Indicadores
+9. MÓDULO: GESTÃO DE PROJETOS
+    9.1. Cronograma (Gantt) e Tarefas
+    9.2. DRE (Estimado × Real)
 
 ================================================================================
 1. INTRODUÇÃO
@@ -142,6 +148,42 @@ O GeraPro agora possui "inteligência de disco":
 - Ao abrir, ele lê todas as propostas salvas nas pastas de Documentos.
 - Ao salvar, ele cria as pastas de revisão (Rev1, Rev2...) conforme a necessidade.
 - Se o servidor Node.js for reiniciado, a lista é refrescada automaticamente.
+
+================================================================================
+8. MÓDULO: COMPRAS
+================================================================================
+Fluxo de compras da Engenharia ao recebimento (sem controle de estoque):
+- LM da Engenharia (upload XLSX/CSV) vira REQUISIÇÃO (REQ-0001), com alerta
+  obrigatório para material não cadastrado e liberação auditada.
+- COTAÇÃO por fornecedor (1 requisição → N cotações) com matriz de comparação
+  e vencedor marcado item a item.
+- PEDIDO DE COMPRAS por fornecedor (1 requisição → N pedidos), com aprovação
+  por valor acima de R$ 50.000.
+- NOTA FISCAL com baixa automática no pedido, gravação do preço real no
+  catálogo e lançamento na DRE do projeto.
+
+8.1. PAINEL DE INDICADORES
+- KPIs (em cotação, em pedido, recebido no mês, atrasos), lead time real ×
+  catálogo, desempenho de fornecedores e alerta de duplicidade.
+- Exportação XLSX com 4 abas (Resumo, Lead Time, Fornecedores, Duplicidade).
+
+================================================================================
+9. MÓDULO: GESTÃO DE PROJETOS
+================================================================================
+Projetos pós-venda, criados automaticamente quando uma proposta é movida para
+"Fechado" no Pipeline (ou pelo botão "Importar Fechadas").
+
+9.1. CRONOGRAMA (GANTT) E TAREFAS
+- Fases com modelo padrão gerável (Planejamento, Compras, Manufatura, Testes,
+  Logística, Instalação e Aceite), escalas dia/semana/mês e barras arrastáveis.
+- Tarefas por fase com progresso automático (média das tarefas).
+
+9.2. DRE (ESTIMADO × REAL)
+- Gerar Estimado a partir do valor do contrato e do regime tributário;
+  lançamentos estimado × real com variação e exportação XLSX.
+
+Para detalhes, pressione F1 dentro do sistema ou leia
+docs/explicacao-compras.html e docs/explicacao-gestao-de-projetos.html.
 
 ================================================================================
 FIM DO MANUAL

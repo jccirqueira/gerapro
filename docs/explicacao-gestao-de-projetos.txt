@@ -1,0 +1,465 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    GESTÃO DE PROJETOS NO GERAPRO                                                 ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   IMPORTANTE: Este documento explica o módulo GESTÃO DE PROJETOS do GeraPro      ║
+║   (cronograma, tarefas e DRE).                                                   ║
+║   Ele NÃO explica como criar propostas — pressione F1 dentro do sistema          ║
+║   ou leia os outros arquivos da pasta /docs.                                     ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É A GESTÃO DE PROJETOS?                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Toda proposta ganha vira obra. E a obra precisa de três coisas: um prazo
+(cronograma), um dinheiro (quanto entra e quanto sai) e um responsável (quem faz
+o quê). A Gestão de Projetos é o módulo pós-venda do GeraPro que segura essas
+três coisas no mesmo lugar.
+
+Aqui vivem o cronograma em Gantt (fases e tarefas), a DRE estimado × real (a
+rentabilidade do projeto) e as ligações com o resto do sistema — em especial o
+Compras, cujas notas fiscais entram na DRE automaticamente.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Três formas de um projeto nascer:                                              │
+│                                                                                 │
+│  1. Automaticamente — quando uma proposta da Gestão de Propostas é movida para  │
+│     Fechado (ganha), o projeto é criado aqui com cliente, datas, valor e        │
+│     vendedor.                                                                   │
+│  2. Importar Fechadas — o botão da lista varre o funil e cria os projetos que   │
+│     ainda faltam (com deduplicação: a mesma proposta nunca gera dois projetos). │
+│  3. Manual — o botão Novo Projeto, para obras que não nasceram de proposta.     │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 Cada projeto tem status (Em Andamento, Pausado, Concluído ou Cancelado) e
+   um badge no menu lateral com a contagem dos projetos em andamento.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. A LISTA DE PROJETOS                                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Os cards de resumo mostram Total de Projetos, Em Andamento, Concluídos e Valor
+Contratado (soma dos contratos).
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  A tabela traz:                                                                 │
+│                                                                                 │
+│  • Código (PRJ-0001) e Cliente (com o vendedor embaixo).                        │
+│  • Projeto (título) e Status (badge colorido).                                  │
+│  • Cronograma — barra minúscula com o agregado do projeto (ex.: 3/7 fases ·     │
+│    42%).                                                                        │
+│  • Valor do Contrato, Início e Entrega Prevista.                                │
+│  • Ações — abrir (seta), editar (lápis) e excluir (lixeira, com confirmação).   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A barra de ferramentas tem busca por código, cliente ou projeto, filtro por
+status e contador de resultados. Clicar em qualquer linha abre o projeto.
+
+📌 Sem projetos ainda? O estado vazio traz o botão "Importar propostas já
+   fechadas" — é o caminho mais rápido para começar.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. CRIANDO E EDITANDO PROJETOS                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O formulário (Novo Projeto / Editar) tem estes campos:
+
+┌────────────────────────┬──────────────────────────────────────────────────┐
+│ CAMPO                  │ O QUE É                                          │
+├────────────────────────┼──────────────────────────────────────────────────┤
+│ Cliente *              │ Nome do cliente dono da obra (obrigatório).      │
+│ Projeto                │ Título da obra (ex.: Painel Principal — QGBT 2). │
+│ Valor do Contrato (R$) │ Base do Gerar Estimado da DRE (vira a receita).  │
+│ Status                 │ Em Andamento (padrão), Pausado, Concluído ou     │
+│                        │ Cancelado.                                       │
+│ Datas                  │ Início, Entrega Prevista e Entrega Real.         │
+│ Fase Atual             │ Texto livre exibido no cabeçalho do detalhe.     │
+│ Responsável /          │ Quem responde pelo projeto e o engenheiro        │
+│ Engenheiro             │ responsável.                                     │
+│ Descrição /            │ Escopo e anotações livres (multilinha).          │
+│ Observações            │                                                  │
+└────────────────────────┴──────────────────────────────────────────────────┘
+
+📌 O código (PRJ-0001, PRJ-0002, ...) é gerado sozinho e não pode ser
+   trocado.
+
+📌 A exclusão pergunta e remove em cascata as fases, tarefas e lançamentos da
+   DRE — nada fica órfão no banco.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. A VISÃO DO PROJETO (DETALHE)                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O cabeçalho traz o código com badge de status, cliente e título, e três
+controles: alterar status na hora (seletor), Editar e Excluir.
+
+O resumo mostra título, código, data de criação e o Valor do Contrato em
+destaque. A grade de informações repete cliente, vendedor, engenheiro
+responsável, responsável pelo projeto, datas de início/entrega e a origem — de
+qual proposta o projeto veio.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Três abas embaixo:                                                             │
+│                                                                                 │
+│  • Informações — descrição, fase atual e observações.                           │
+│  • Cronograma — o Gantt com fases e tarefas.                                    │
+│  • DRE — estimado × real, lançamentos e export.                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. ABA CRONOGRAMA (O GANTT)                                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O Gantt mostra as fases como barras coloridas ao longo do tempo, com cabeçalho
+de meses e — em escalas próximas do dia — a régua de dias com fins de semana
+destacados e o dia de hoje realçado.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Barra de ferramentas:                                                          │
+│                                                                                 │
+│  • Escala — Automática, Dia, Semana ou Mês.                                     │
+│  • Modelo — edita o modelo padrão de fases (nomes, dias e cores, salvos no      │
+│    navegador).                                                                  │
+│  • Gerar Fases Padrão — cria as 7 fases do modelo distribuídas entre o início e │
+│    a entrega prevista.                                                          │
+│  • Tarefas — mostra ou oculta as tarefas no Gantt.                              │
+│  • Expandir/Recolher — abre ou fecha as tarefas de todas as fases de uma vez.   │
+│  • Nova Fase — cria uma fase manualmente.                                       │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Interações:                                                                    │
+│                                                                                 │
+│  • Arraste a barra de uma fase para reagendar — o sistema avisa quantos dias    │
+│    ela moveu (+3 dias, −5 dias...).                                             │
+│  • As setas ↑ ↓ reordenam as fases na sequência.                                │
+│  • Clique na fase para abrir o modal com nome, datas, status, cor e progresso.  │
+│  • As tarefas também têm barra arrastável no Gantt.                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  O modelo padrão de fases (Gerar Fases Padrão):                                 │
+│                                                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────┬──────────────┐
+│ FASE                         │ PRAZO PADRÃO │
+├──────────────────────────────┼──────────────┤
+│ Planejamento e Engenharia    │ 10 dias      │
+│ Compras e Suprimentos        │ 15 dias      │
+│ Manufatura e Montagem        │ 30 dias      │
+│ Testes e QA                  │ 10 dias      │
+│ Logística e Entrega          │ 7 dias       │
+│ Instalação e Comissionamento │ 10 dias      │
+│ Aceite e Entrega Final       │ 5 dias       │
+└──────────────────────────────┴──────────────┘
+
+📌 As fases são distribuídas proporcionalmente entre a data de início e a
+   entrega prevista do projeto — dá para editar nomes, dias e cores em "Modelo".
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. TAREFAS POR FASE                                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada fase pode ter várias tarefas — subtarefas de um único nível, com a fase
+como agrupador. O chevron (seta ao lado do nome) expande ou recolhe, e a
+preferência fica salva no navegador.
+
+  • Dentro da fase aparece o chip x/y tarefas e a lista com nome, datas,
+    responsável e status.
+  • O botão ✓ conclui a tarefa (o progresso vai a 100%), o lápis edita e a
+    lixeira exclui com confirmação.
+  • Tarefas são reordenadas com ↑ ↓ e também arrastadas no Gantt.
+  • O botão Tarefas da toolbar oculta ou mostra todas; Expandir/Recolher abre ou
+    fecha tudo.
+  • Excluir uma fase pergunta e leva as tarefas junto.
+
+Progresso automático: quando a fase tem tarefas, o progresso dela passa a ser a
+média do progresso das tarefas, materializado no campo da fase — que fica
+travado no modal (escrito: "calculado pelas tarefas"). Fase sem tarefas continua
+com progresso manual.
+
+📌 Na lista, o mini indicador de cronograma mostra o agregado do projeto
+   (ex.: 0/7 · 14%) — fases concluídas sobre o total, com o progresso médio.
+
+O modal da tarefa tem fase de contexto, nome obrigatório, datas de início e fim
+(a fim não pode ser anterior à início), status, progresso, responsável e
+descrição.
+
+┌────────────────┬─────────────────────────────────────────────────┐
+│ CAMPO          │ DETALHE                                         │
+├────────────────┼─────────────────────────────────────────────────┤
+│ Nome da Tarefa │ Obrigatório — ex.: Aprovar projeto elétrico.    │
+│ Status         │ Pendente, Em Andamento, Concluída ou Bloqueada. │
+│ Progresso (%)  │ 0 a 100 (passo 5) — concluir força 100%.        │
+│ Responsável    │ Nome ou equipe que executa.                     │
+│ Descrição      │ Detalhes, critérios de aceite...                │
+└────────────────┴─────────────────────────────────────────────────┘
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. ABA DRE (ESTIMADO × REAL)                                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A DRE responde a pergunta de todo mundo: quanto sobrou? Ela mostra quatro cards
+de resumo — Receita Líquida, Custos Diretos, Despesas Operacionais e Lucro
+Líquido (com a margem) — e uma tabela por conta com os lados Estimado e Real, a
+variação em R$ e % (verde quando favorável, vermelho quando não é) e subtotais
+encadeados: RECEITA LÍQUIDA → LUCRO BRUTO → LUCRO LÍQUIDO.
+
+┌───────────────────────────┬────────────────────────────────────────────────┐
+│ GRUPO                     │ CONTAS                                         │
+├───────────────────────────┼────────────────────────────────────────────────┤
+│ (+) Receita               │ Receita Bruta.                                 │
+│ (−) Deduções sobre Vendas │ Impostos sobre Vendas.                         │
+│ (−) Custos Diretos        │ Materiais, Mão de Obra, Despesas Diretas,      │
+│                           │ Subcontratação.                                │
+│ (−) Despesas Operacionais │ Custos Fixos/Admin., Comissão, Viagens, Frete, │
+│                           │ Outras.                                        │
+└───────────────────────────┴────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Gerar Estimado cria as linhas a partir do Valor do Contrato:                   │
+│                                                                                 │
+│  • Receita = valor do contrato.                                                 │
+│  • Impostos conforme o regime tributário da empresa: 21,25% no Lucro Real ou 4% │
+│    no Simples Nacional.                                                         │
+│  • Custos fixos 8% e comissão 5% sobre a receita.                               │
+│  • Materiais e Mão de Obra nascem zerados para você completar pelo orçamento.   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 O botão é idempotente: só cria linhas que ainda não existem e avisa quando
+   o estimado já está completo. Os percentuais vêm dos defaults da Precificação
+   e você ajusta à mão depois.
+
+Novo Lançamento registra qualquer linha: conta da DRE, tipo (estimado ou real),
+data, descrição e valor. Os lançamentos individuais aparecem embaixo da tabela,
+editáveis e excluíveis. O valor é sempre positivo — o sinal (+/−) é da conta.
+
+Os custos reais também chegam sozinhos do módulo Compras: cada NF recebida lança
+o custo de material na DRE do projeto (categoria material, tipo real). Estimado
+× real instantâneo, sem digitar nada duas vezes.
+
+📌 O botão XLSX exporta a DRE no padrão do sistema: cabeçalho em destaque,
+   linhas zebradas e primeira linha congelada.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. INTEGRAÇÕES                                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  • Gestão de Propostas → Projetos: proposta movida para Fechado vira projeto
+    (automático ou pelo botão Importar Fechadas), trazendo cliente, título,
+    vendedor, engenheiro, valor e entrega prevista.
+  • Compras → DRE: a requisição pode ser vinculada ao projeto; ao lançar a NF, o
+    custo real de material entra automaticamente na DRE (categoria material,
+    tipo real).
+  • Catálogo de Materiais: o recebimento grava o preço real no histórico com
+    origem compra.
+  • Ajuda: pressione F1 em qualquer lugar para abrir a ajuda contextual deste
+    módulo.
+
+📌 Vincular a requisição ao projeto desde o início mantém compras, cronograma
+   e DRE falando a mesma língua.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. PASSO A PASSO — DO CONTRATO AO FECHAMENTO                                   │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  1. Abra a Gestão de Propostas e mova a proposta ganha para Fechado — ou clique
+     em Importar Fechadas na lista de projetos.
+  2. Abra o projeto pela lista e confira os dados na aba Informações.
+  3. Na aba Cronograma, clique em Gerar Fases Padrão (ou crie as fases
+     manualmente).
+  4. Ajuste as datas arrastando as barras e reordene as fases com as setas.
+  5. Adicione tarefas em cada fase e acompanhe o progresso automático da fase.
+  6. Na aba DRE, clique em Gerar Estimado e complete materiais e mão de obra
+     pelo orçamento.
+  7. Registre custos reais com Novo Lançamento — ou lance as NFs de Compras com
+     o projeto vinculado.
+  8. Acompanhe a variação estimado × real, a margem e exporte a DRE em XLSX.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  • Preencha bem o valor do contrato ao criar o projeto: é ele que alimenta o
+    Gerar Estimado.
+  • Gere as fases padrão logo na primeira abertura do cronograma — o Gantt ganha
+    forma na hora.
+  • Arraste as barras em vez de digitar datas: o Gantt mostra colisões e folgas
+    visivamente.
+  • Concluir tarefa ≠ excluir: o histórico do progresso da fase depende das
+    tarefas existentes.
+  • Ligue a requisição de Compras ao projeto desde o início — a DRE agradece no
+    fim.
+  • Exporte a DRE (XLSX) para a reunião de fechamento: o arquivo já sai
+    formatado.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────┬────────────────────────────────────────────────────────┐
+│ TERMO    │ SIGNIFICADO                                            │
+├──────────┼────────────────────────────────────────────────────────┤
+│ PRJ-0001 │ Código sequencial automático do projeto.               │
+│ Gantt    │ Gráfico de cronograma com barras posicionadas ao longo │
+│          │ do tempo.                                              │
+│ Fase     │ Etapa grande do projeto (ex.: Manufatura e Montagem)   │
+│          │ que agrupa as tarefas.                                 │
+│ Tarefa   │ Atividade dentro de uma fase — um único nível de       │
+│          │ detalhe.                                               │
+│ DRE      │ Demonstrativo do Resultado do Exercício: receitas,     │
+│          │ custos e lucro do projeto.                             │
+│ Estimado │ O que se espera gastar e receber (orçamento).          │
+│ Real     │ O que foi efetivamente recebido e gasto.               │
+│ Variação │ Diferença entre real e estimado; verde quando o desvio │
+│          │ é favorável.                                           │
+│ Cascata  │ Ao excluir o projeto, fases, tarefas e lançamentos são │
+│          │ excluídos junto.                                       │
+│ Origem   │ De qual documento o projeto veio (Pipeline, Proposta   │
+│          │ Técnica, Orçamento...).                                │
+└──────────┴────────────────────────────────────────────────────────┘
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "A proposta fechou mas o projeto não apareceu"                         │
+│SOLUÇÃO: Volte para a Gestão de Projetos e clique em "Importar                   │
+│            Fechadas" (ou abra a lista vazia e use o botão do estado vazio). A   │
+│            importação tem deduplicação: se o projeto já existe, ela avisa em vez│
+│            de duplicar.                                                         │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "Não consigo editar o progresso da fase"                               │
+│SOLUÇÃO: Se a fase tem tarefas, o campo fica travado de propósito: o             │
+│            progresso é a média das tarefas (o modal mostra "calculado pelas     │
+│            tarefas"). Edite o progresso de cada tarefa — a fase acompanha. Sem  │
+│            tarefas, o campo volta a ser manual.                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "O Gerar Fases Padrão não abriu"                                       │
+│SOLUÇÃO: Ele só funciona com o cronograma vazio: se já existem fases,            │
+│            o sistema avisa para excluir as antigas antes de gerar o modelo (para│
+│            não misturar). Use "Modelo" para editar o padrão antes de gerar.     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "O Estimado saiu zerado"                                               │
+│SOLUÇÃO: O Gerar Estimado usa o Valor do Contrato como receita — se              │
+│            ele estiver vazio, só as linhas de materiais/mão de obra são criadas │
+│            (zeradas). Edite o projeto, preencha o valor e gere de novo.         │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "Os impostos não batem com o meu contador"                             │
+│SOLUÇÃO: O Gerar Estimado usa o regime tributário da empresa (21,25%             │
+│            Lucro Real / 4% Simples Nacional) — configure o regime certo em      │
+│            Configurações e ajuste o valor do lançamento à mão quando preciso.   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "A DRE não mostra o material que comprei"                              │
+│SOLUÇÃO: O custo real entra automaticamente ao lançar a NF de um                 │
+│            pedido cuja requisição está vinculada a este projeto. Confira o      │
+│            vínculo da requisição (campo Projeto) e lance a NF pelo pedido.      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "Como excluir um projeto inteiro"                                      │
+│SOLUÇÃO: Pela lista ou pelo detalhe, no ícone de lixeira. O sistema              │
+│            pergunta e remove em cascata fases, tarefas e lançamentos da DRE —   │
+│            nada fica órfão. Prefira mover o status para Cancelado se for só um  │
+│            adiamento.                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   A Gestão de Projetos é a segunda metade do trabalho comercial: a proposta foi  ║
+║   ganha, agora é executar — com cronograma enxuto (fases e tarefas), dinheiro    ║
+║   visível (DRE) e as compras ligadas no mesmo lugar.                             ║
+║                                                                                  ║
+║   Cronograma vivo + DRE atualizada = projeto entregue no prazo e com margem.     ║
+║                                                                                  ║
+║   PROPOSTA GANHA (Fechado) → nasce o projeto automaticamente                     ║
+║   CRONOGRAMA → fases, tarefas e datas no Gantt                                   ║
+║   COMPRAS → a NF recebida alimenta a DRE do projeto                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+

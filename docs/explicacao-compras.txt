@@ -1,0 +1,618 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║    COMPRAS NO GERAPRO                                                            ║
+║                                                                                  ║
+║        (para quem não é programador nem engenheiro)                              ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   IMPORTANTE: Este documento explica o módulo COMPRAS do GeraPro                 ║
+║   (requisição, cotação, pedido e NF).                                            ║
+║   Ele NÃO explica o módulo de Materiais nem a Gestão de Projetos —               ║
+║   pressione F1 dentro do sistema ou leia os outros arquivos da pasta /docs.      ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  1. O QUE É O COMPRAS?                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Imagine que a empresa vendeu um painel elétrico e agora precisa comprar tudo o
+que vai dentro dele: disjuntores, contactores, cabos, chaves. Com quem falar?
+Quem já cotou? O pedido saiu? A nota chegou? O Compras do GeraPro organiza
+exatamente esse caminho.
+
+O módulo executa o fluxo real de aquisição de uma indústria: a Engenharia
+entrega a Lista de Materiais (LM), o Compras confere os itens, cota com
+fornecedores, emite os pedidos e registra as notas fiscais — tudo ligado ao
+projeto.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Onde ele se encaixa no fluxo da empresa:                                       │
+│                                                                                 │
+│  1. A Engenharia monta a LM (a lista do que precisa ser comprado) e envia o     │
+│     arquivo.                                                                    │
+│  2. O Compras cria a REQUISIÇÃO a partir do arquivo e confere os itens contra o │
+│     Banco de Materiais.                                                         │
+│  3. Os itens são COTADOS junto a N fornecedores; os vencedores são escolhidos   │
+│     item a item.                                                                │
+│  4. Sai um PEDIDO DE COMPRAS por fornecedor, com aprovação por valor.           │
+│  5. A mercadoria chega e a NOTA FISCAL é lançada: baixa no pedido, preço real   │
+│     no catálogo e custo na DRE do projeto.                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 Resumo em uma frase: LM vira requisição, requisição vira cotação, cotação
+   vira pedido e pedido vira nota fiscal.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  2. O FLUXO E OS STATUS                                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O caminho completo da requisição, de ponta a ponta:
+
+  LM DA ENGENHARIA  (planilha da revisão do projeto)
+        │
+        ▼
+  REQUISIÇÃO (REQ-0001)  ── conferência + liberação
+        │
+        ▼
+  COTAÇÃO (1 por fornecedor)  ── vencedor item a item
+        │
+        ▼
+  PEDIDO DE COMPRAS (PC-0001...)  ── um por fornecedor
+        │
+        ▼
+  NOTA FISCAL  ── baixa, preço real e DRE do projeto
+
+A requisição passa por estes status:
+
+┌────────────────┬────────────────────────────────────────────────────────┐
+│ STATUS         │ SIGNIFICADO                                            │
+├────────────────┼────────────────────────────────────────────────────────┤
+│ Rascunho       │ Criada, ainda em edição — o arquivo da LM está sendo   │
+│                │ conferido.                                             │
+│ Em Conferência │ Itens na grade: casados, sugestões a confirmar e não   │
+│                │ cadastrados.                                           │
+│ Liberada       │ Gate passou: auditada (quem liberou e quando) e pronta │
+│                │ para cotação.                                          │
+│ Em Cotação     │ Cotações abertas junto aos fornecedores.               │
+│ Em Pedido      │ Todos os itens já viraram pedido de compra.            │
+│ Recebida       │ Todas as notas dos pedidos foram lançadas — ciclo      │
+│                │ fechado.                                               │
+│ Cancelada      │ Fora do fluxo (mantida para histórico).                │
+└────────────────┴────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Regras de escopo (decididas com a empresa):                                    │
+│                                                                                 │
+│  • Somente fluxo de compras — não há controle de saldo em estoque.              │
+│  • 1 requisição pode gerar N cotações (uma por fornecedor) e N pedidos (um por  │
+│    fornecedor).                                                                 │
+│  • 1 pedido pode receber N notas fiscais (entregas parciais).                   │
+│  • A NF é registrada como entrada com conferência — sem escrituração fiscal nem │
+│    integração com ERP.                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 Requisições "abertas" (rascunho, em conferência, liberada, em cotação, em
+   pedido) são a base do alerta de duplicidade do painel de indicadores.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  3. A TELA INICIAL (LISTA)                                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+No topo, os cards de resumo dão o estado do momento:
+
+  • Requisições — total de requisições no sistema.
+  • Itens Não Cadastrados — fica em alerta vermelho enquanto houver item sem
+    catálogo.
+  • Em Andamento — requisições em fluxo (não canceladas nem fechadas).
+  • Valor Estimado — soma de quantidade × custo do catálogo das requisições.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Barra de ferramentas:                                                          │
+│                                                                                 │
+│  • Nova Requisição — abre o assistente de upload da LM.                         │
+│  • Indicadores — abre o painel de gestão (KPIs, lead time, fornecedores e       │
+│    duplicidades).                                                               │
+│  • Busca por código, título, revisão ou solicitante.                            │
+│  • Filtros por status e por projeto (puxa a lista da Gestão de Projetos).       │
+│  • Contador — "3 de 5 requisição(ões)".                                         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 O menu lateral mostra um badge com a contagem de requisições abertas — é o
+   seu "pendente de comprar".
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  4. NOVA REQUISIÇÃO — A ENTRADA DA LM                                           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Clique em Nova Requisição. No cabeçalho você informa o projeto de destino
+(Gestão de Projetos), a revisão do documento, o solicitante, a data da LM e
+anexa o arquivo.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Template da LM (botão "Baixar template da LM"):                                │
+│                                                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────┬───────────────────────────────────────────────────┐
+│ COLUNA     │ CONTEÚDO                                          │
+├────────────┼───────────────────────────────────────────────────┤
+│ Código     │ Código interno ou do fabricante (ex.: 3VA1116-6). │
+│ Descrição  │ Texto do item como vem na planilha da Engenharia. │
+│ Fabricante │ Marca / fabricante (Siemens, WEG, ABB...).        │
+│ Unidade    │ UN, MT, M, CJ...                                  │
+│ Quantidade │ Qtd a comprar (aceita também Qtd, Qtde, Qty...)   │
+└────────────┴───────────────────────────────────────────────────┘
+
+Sinônimos de cabeçalho são aceitos (PN, referência, SKU...), então planilhas
+reais da Engenharia costumam entrar sem retrabalho. O sistema calcula o hash do
+arquivo e avisa quando o reenvio é idêntico ao anterior.
+
+O campo origem (Upload da Engenharia / Lançamento manual / Gerada da Proposta
+Técnica) deixa o cadastro agnóstico da fonte: quando a Engenharia virar módulo
+nativo do GeraPro, a LM poderá ser gerada aqui dentro sem mudar nada no fluxo.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Na importação, cada linha é pareada com o Banco de Materiais em 3 passos:      │
+│                                                                                 │
+│  • Código exato — código interno ou do fabricante, com escopo de empresa.       │
+│  • Pontuação textual na descrição quando não há código (o limiar de sugestão é  │
+│    80 pontos).                                                                  │
+│  • Sem correspondência → o item fica marcado como NÃO CADASTRADO (é o alerta    │
+│    obrigatório).                                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 Medidas elétricas divergentes (corrente, tensão, potência) derrubam a
+   pontuação de propósito: é melhor o item ficar "não cadastrado" do que apontar
+   para o material errado.
+
+O custo e o lead time do catálogo são congelados (snapshot) na importação, e o
+Valor Estimado da requisição é calculado na hora — é o investimento que a
+requisição representa.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  5. CONFERÊNCIA DOS ITENS (O ALERTA)                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A grade de conferência mostra três estados visuais:
+
+┌────────────┬─────────────────────────────┬────────────────────────────────┐
+│ ESTADO     │ O QUE SIGNIFICA             │ O QUE FAZER                    │
+├────────────┼─────────────────────────────┼────────────────────────────────┤
+│ ✓ Casado   │ Código exato no catálogo    │ Nada a fazer — siga.           │
+│            │ (verde).                    │                                │
+│ ? Sugestão │ Casou por pontuação textual │ Confirme o vínculo ou corrija. │
+│            │ (âmbar).                    │                                │
+│ ✗ Não      │ Sem correspondência         │ Use "Cadastrar material".      │
+│ Cadastrado │ (vermelho).                 │                                │
+└────────────┴─────────────────────────────┴────────────────────────────────┘
+
+Para o item vermelho, o botão Cadastrar material abre o formulário do Banco de
+Materiais pré-preenchido com código, descrição, fabricante, unidade e custo
+vindos da LM. Ao salvar, o item é vinculado e o contador de pendências é
+atualizado na hora.
+
+📌 O banner no topo resume tudo: "148 itens — 132 casados, 11 sugeridos, 5
+   não cadastrados. A requisição não pode ser liberada até resolver." É o seu
+   checklist.
+
+O catálogo não tem restrição de unicidade nos códigos, por isso o pareamento é
+sempre limitado à empresa atual — dois clientes podem ter códigos iguais sem se
+confundir.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  6. LIBERAR PARA COMPRAS (O GATE)                                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A liberação é o gate formal que separa a Engenharia (que emite a LM) de Compras
+(que executa). Somente requisições liberadas podem ser cotadas ou virar pedido.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Validações bloqueantes antes de liberar:                                       │
+│                                                                                 │
+│  • Pelo menos 1 item na requisição.                                             │
+│  • Todos os itens com material vinculado (nenhum não cadastrado).               │
+│  • Todas as quantidades maiores que zero e com unidade preenchida.              │
+│  • Sem itens duplicados internamente (mesmo material na mesma requisição).      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Ao liberar, o sistema grava quem liberou e quando (liberada_por e
+data_liberacao) — trilha de auditoria completa. Depois disso a requisição avança
+para Liberada e aparece pronta para cotação. O botão aparece em dois lugares:
+"Salvar e Liberar para Compras", no assistente, e "Liberar para Compras", no
+detalhe da requisição.
+
+📌 Uma revisão nova de LM entra como nova requisição (ou reenvio na mesma) —
+   a revisão fica registrada, então dá para rastrear o que mudou.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  7. COTAÇÕES (1 REQUISIÇÃO → N FORNECEDORES)                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A partir da requisição liberada, crie uma cotação por fornecedor. Cada cotação
+tem ciclo de vida próprio: Aberta → Enviada → Recebida → Vencedora ou
+Descartada. Ela guarda os campos de negociação: prazo de entrega, condição de
+pagamento, validade da proposta e frete.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Como cotar:                                                                    │
+│                                                                                 │
+│  1. Nova cotação: escolha o fornecedor — prazo e condição são pré-preenchidos   │
+│     do cadastro dele.                                                           │
+│  2. Preencha os preços digitando na grade ou importando a tabela do fornecedor. │
+│  3. Na Matriz de comparação (itens × fornecedores), marque o vencedor de cada   │
+│     célula.                                                                     │
+│  4. Salve — a requisição passa para Em Cotação e os totais são recalculados.    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+A matriz destaca o menor preço e o menor prazo de cada linha, e cada célula é
+clicável: o vencedor é escolhido item a item — nem sempre o mesmo fornecedor
+vence tudo.
+
+📌 O vencedor item a item quase sempre ganha do "fornecedor único": misturar
+   fornecedores é onde mora a economia.
+
+O preço também pode vir de planilha (template: Código | Descrição | Preço
+Unitário | Prazo (dias)) — a mesma lógica de pareamento da LM.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  Prazo e condição de pagamento se comportam assim:                              │
+│                                                                                 │
+│  • Ao trocar o fornecedor no modal, os campos são limpos e re-preenchidos com o │
+│    cadastro do novo (nunca herda o anterior).                                   │
+│  • Ao criar ou salvar a cotação, valores diferentes são espelhados no cadastro  │
+│    do fornecedor — a última negociação vence.                                   │
+│  • Campo vazio no cadastro nunca apaga histórico.                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  8. PEDIDO DE COMPRAS (1 REQUISIÇÃO → N PEDIDOS)                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Com os vencedores marcados, clique em Gerar Pedido: o sistema agrupa os itens
+vencedores por fornecedor e cria um pedido para cada um (PC-0001, PC-0002, ...).
+Itens ainda sem vencedor ficam pendentes e o próprio botão avisa quantos.
+
+📌 Por isso uma requisição vira N pedidos: cada fornecedor recebe exatamente
+   o que venceu, na quantidade certa.
+
+Aprovação por valor: pedidos acima de R$ 50.000 exigem o campo "Aprovado por"
+preenchido; abaixo do limite não há alçada. O limite é configurável.
+
+Ciclo de vida do pedido:
+
+┌───────────────────────┬─────────────────────────────────────────────────┐
+│ STATUS                │ SIGNIFICADO                                     │
+├───────────────────────┼─────────────────────────────────────────────────┤
+│ Rascunho              │ Gerado, ainda em edição.                        │
+│ Enviado               │ Emitido e entregue ao fornecedor.               │
+│ Em Entrega            │ Aguardando a mercadoria.                        │
+│ Parcialmente Recebido │ Uma ou mais NFs lançadas, mas ainda falta item. │
+│ Recebido              │ Tudo recebido — fim do ciclo.                   │
+│ Cancelado             │ Cancelado antes do recebimento total.           │
+└───────────────────────┴─────────────────────────────────────────────────┘
+
+O PC pode ser visualizado para impressão em XLSX (padrão do sistema) ou PDF pelo
+navegador. Quando todos os itens da requisição já estão em pedido, ela fecha
+sozinha para Em Pedido.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  9. NOTA FISCAL (FECHA O CICLO)                                                 │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Cada recebimento é lançado pelo botão Lançar NF do pedido. Um pedido aceita N
+notas fiscais — entregas parciais. O item entra com a quantidade efetivamente
+recebida; quantidade zero fica de fora da NF.
+
+A conferência é automática ao salvar: quantidade e preço da NF × pedido.
+Divergência (tolerância de preço de 0,5%) muda o status da NF para Divergente e
+exibe o alerta na tela.
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  O que o recebimento faz sozinho:                                               │
+│                                                                                 │
+│  • Baixa item a item no pedido (quantidade recebida) — o pedido vira Parcial ou │
+│    Recebido.                                                                    │
+│  • Grava o preço real em `price_history` com origem compra — o Banco de         │
+│    Materiais se auto-alimenta.                                                  │
+│  • Lançamento na DRE do projeto (categoria material, tipo real) — estimado ×    │
+│    real instantâneo.                                                            │
+│  • Quando todos os pedidos foram recebidos, a requisição vira Recebida.         │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+📌 O estorno reverte exatamente tudo: baixa no pedido, preço no catálogo e
+   lançamento na DRE — nada fica pela metade.
+
+A NF guarda número, série, chave de acesso, datas, valores (produtos, frete,
+desconto, total, impostos) e a auditoria "conferida por / em". Os status são:
+Recebida, Conferida, Divergente ou Estornada.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. PAINEL DE INDICADORES                                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O botão Indicadores (cabeçalho da lista) abre o painel de gestão do ciclo de
+compras. Os 4 KPIs:
+
+┌───────────────────┬────────────────────────────────────────────────────────┐
+│ KPI               │ COMO É CALCULADO                                       │
+├───────────────────┼────────────────────────────────────────────────────────┤
+│ Em cotação        │ Soma das cotações abertas, enviadas e recebidas.       │
+│ Em pedido         │ Soma dos pedidos que ainda não foram cancelados nem    │
+│                   │ recebidos.                                             │
+│ Recebido no mês   │ Total das NFs do mês corrente, sem estornadas.         │
+│ Pedidos em atraso │ Previsão (data explícita ou pedido + prazo) anterior a │
+│                   │ hoje — com a lista dos atrasados.                      │
+└───────────────────┴────────────────────────────────────────────────────────┘
+
+Lead time real × catálogo: para cada material, a média de data do pedido até o
+recebimento é comparada ao lead time do catálogo e ao prazo prometido. Os botões
+por linha e em lote gravam o valor real no catálogo — é a rotina que alimenta o
+Planejamento de Compras.
+
+📌 Depois de duas ou três compras de um material, clique em "Atualizar
+   catálogo": o planejamento passa a acertar o prazo.
+
+Desempenho de fornecedores: pedidos, total comprado, prazo prometido × prazo
+real, índice de divergências das NFs e a diferença de preço média ponderada pela
+quantidade vs catálogo.
+
+Duplicidade: mesmo material em 2 ou mais requisições abertas — o clássico
+"compramos o mesmo item duas vezes" evitado numa tela só.
+
+📌 O painel exporta XLSX com 4 abas (Resumo, Lead Time, Fornecedores,
+   Duplicidade) no padrão do sistema: cabeçalho em destaque, linhas zebradas e
+   primeira linha congelada.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. FORNECEDORES — PRAZO E CONDIÇÃO                                            │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O cadastro de fornecedores tem os campos Prazo de Entrega e Condição de
+Pagamento — e eles se atualizam sozinhos:
+
+  • Pré-preenchimento: ao escolher o fornecedor na cotação, prazo e condição são
+    copiados do cadastro dele.
+  • Espelho automático: ao criar ou salvar cotação, valores diferentes são
+    gravados no cadastro — a última negociação vence.
+  • Campo vazio nunca apaga histórico: só se grava quando o valor existe e é
+    diferente.
+
+O prazo e a condição efetivamente negociados continuam gravados na cotação e no
+pedido, que é o local contabilmente correto — eles variam por negociação. O
+cadastro guarda o valor usual e alimenta o pré-preenchimento.
+
+📌 Depois de uma negociação boa, abra o fornecedor e confira: o valor já deve
+   estar lá, copiado da última cotação.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. PASSO A PASSO — DO ARQUIVO DA LM À NF                                      │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O ciclo completo, do zero à recepção:
+
+  1. Prepare a LM no template (Baixar template da LM) com Código, Descrição,
+     Fabricante, Unidade e Quantidade.
+  2. Nova Requisição: escolha o projeto, informe revisão, solicitante e data, e
+     envie o arquivo.
+  3. Confira o pareamento: confirme sugestões (âmbar) e cadastre os itens não
+     cadastrados (vermelho).
+  4. Clique em Salvar e Liberar para Compras — a requisição fica Liberada.
+  5. Crie uma cotação por fornecedor e preencha os preços (digitando ou
+     importando a tabela).
+  6. Na matriz de comparação, marque o vencedor item a item.
+  7. Clique em Gerar Pedido — sai um PC por fornecedor.
+  8. Acompanhe o pedido: Rascunho → Enviado → Em Entrega.
+  9. Ao receber, clique em Lançar NF: baixa, preço real e DRE do projeto são
+     atualizados automaticamente.
+  10. Acompanhe tudo no painel Indicadores (KPIs, lead time, fornecedores e
+      duplicidades).
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  13. DICAS IMPORTANTES                                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+  • Libere a requisição só depois de zerar o banner de pendências — é o gate
+    formal Engenharia → Compras.
+  • Marque o vencedor item a item: misturar fornecedores quase sempre sai mais
+    barato.
+  • Use a matriz (menor preço e menor prazo destacados) antes de decidir — prazo
+    também é dinheiro.
+  • Atualize o lead time do catálogo pelo painel a cada recebimento: o
+    planejamento passa a acertar.
+  • Confira a NF contra o pedido no papel antes de lançar — o alerta de
+    divergência mostra exatamente onde.
+  • O painel de duplicidade resolve o clássico "compramos o mesmo item duas
+    vezes".
+  • As condições espelhadas no fornecedor economizam digitação: preencha bem o
+    cadastro uma vez.
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  14. GLOSSÁRIO                                                                  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────┬────────────────────────────────────────────────────────┐
+│ TERMO             │ SIGNIFICADO                                            │
+├───────────────────┼────────────────────────────────────────────────────────┤
+│ LM                │ Lista de Materiais (BOM) da Engenharia: o que precisa  │
+│                   │ ser comprado para o projeto.                           │
+│ Requisição (REQ)  │ Pedido formal de compra interno, gerado a partir da    │
+│                   │ LM.                                                    │
+│ Cotação (COT)     │ Consulta de preços enviada a um fornecedor específico. │
+│ Pedido de Compras │ Documento emitido para o fornecedor vencedor.          │
+│ (PC)              │                                                        │
+│ NF                │ Nota Fiscal da mercadoria recebida.                    │
+│ Vencedor          │ Fornecedor escolhido para cada item na matriz de       │
+│                   │ comparação.                                            │
+│ Baixa             │ Abatimento da quantidade recebida sobre o pedido.      │
+│ Lead time         │ Tempo entre o pedido e o recebimento real de um        │
+│                   │ material.                                              │
+│ Duplicidade       │ Mesmo material em mais de uma requisição aberta (risco │
+│                   │ de compra dupla).                                      │
+│ Gate              │ Ponto de controle formal — aqui, a "Liberação para     │
+│                   │ Compras".                                              │
+└───────────────────┴────────────────────────────────────────────────────────┘
+
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  15. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "O upload da LM foi rejeitado"                                         │
+│SOLUÇÃO: As colunas precisam casar com o template. Baixe o template              │
+│            oficial (Código | Descrição | Fabricante | Unidade | Quantidade) ou  │
+│            use sinônimos comuns (Qtd, Qtde, PN, referência). A mensagem do      │
+│            sistema diz exatamente qual coluna falta.                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "Não consigo liberar a requisição"                                     │
+│SOLUÇÃO: Veja o banner de pendências: ainda há item NÃO CADASTRADO,              │
+│            quantidade zero, unidade vazia ou duplicidade interna. Resolva um a  │
+│            um — a liberação destrava sozinha quando zerar.                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "Um item ficou em âmbar — posso seguir?"                               │
+│SOLUÇÃO: Ambar é apenas sugestão de pontuação textual. Confirme o                │
+│            vínculo (ele vira casado) ou, se estiver errado, cadastre o material │
+│            correto. Sugestões não bloqueiam a liberação; só os vermelhos        │
+│            bloqueiam.                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "O botão Gerar Pedido não aparece"                                     │
+│SOLUÇÃO: Ele só aparece com vencedores marcados e em status que                  │
+│            permite (requisição liberada/ em cotação). Marque ao menos uma célula│
+│            vencedora na matriz de comparação.                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "Um pedido acima de R$ 50.000 não envia"                               │
+│SOLUÇÃO: Acima do limite é preciso preencher "Aprovado por" (e a data            │
+│            de aprovação é registrada). Abaixo do limite não há alçada. O limite │
+│            é configurável.                                                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "A NF ficou Divergente"                                                │
+│SOLUÇÃO: A quantidade ou o preço da NF bateu diferente do pedido                 │
+│            (tolerância de 0,5%). Confira a nota contra o pedido: se o pedido    │
+│            está errado, ajuste e lance de novo; se a NF está errada, estorne e  │
+│            relance — estorno reverte baixa, preço e DRE.                        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "O mesmo material aparece em duas requisições"                         │
+│SOLUÇÃO: Abra Indicadores → Duplicidade: a lista mostra o material,              │
+│            as requisições abertas e as quantidades. Cancele uma das requisições │
+│            ou ajuste as quantidades conforme a necessidade real.                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│PROBLEMA: "O lead time do catálogo não bate com o real"                          │
+│SOLUÇÃO: No painel, aba Lead time, use o botão da linha (ou                      │
+│            "Atualizar catálogo" em lote): o valor real do recebimento é gravado │
+│            em materiais.leadTime e a próxima comparação já fecha em zero.       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║   💡  LEMBRE-SE:                                                                 ║
+║                                                                                  ║
+║   O Compras é o elo entre a Engenharia e o dinheiro da empresa. Um fluxo bem     ║
+║   seguido (LM conferida, cotação comparada, pedido aprovado, NF batida) vira     ║
+║   histórico de preço, lead time confiável e DRE do projeto sempre atualizada —   ║
+║   sem planilha paralela.                                                         ║
+║                                                                                  ║
+║   LM conferida + vencedores marcados + NF batida = catálogo e DRE sempre         ║
+║   atualizados.                                                                   ║
+║                                                                                  ║
+║   ENGENHEIRO → entrega a LM (requisição nasce dela)                              ║
+║   COMPRAS → confere, cota, pede e recebe (REQ → COT → PC → NF)                   ║
+║   DRE DO PROJETO ← custo real entra sozinho ao lançar a NF                       ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
