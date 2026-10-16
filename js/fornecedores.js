@@ -313,6 +313,16 @@ const FornecedoresModule = {
                                         <input type="text" name="telefone" class="form-control" value="${data.telefone || ''}">
                                     </div>
                                 </div>
+                                <div class="row" style="display: flex; gap: 16px;">
+                                    <div class="form-group" style="flex: 1;">
+                                        <label class="form-label">Prazo de entrega habitual</label>
+                                        <input type="text" name="prazoEntrega" class="form-control" value="${data.prazoEntrega || ''}" placeholder="Ex.: 15 dias (espelho da última cotação)">
+                                    </div>
+                                    <div class="form-group" style="flex: 1;">
+                                        <label class="form-label">Condição de pagamento habitual</label>
+                                        <input type="text" name="condicaoPagamento" class="form-control" value="${data.condicaoPagamento || ''}" placeholder="Ex.: 30/60 dias (espelho da última cotação)">
+                                    </div>
+                                </div>
                                 <div class="form-group">
                                     <label class="form-label">Observações</label>
                                     <textarea name="observacoes" class="form-control" rows="3">${data.observacoes || ''}</textarea>

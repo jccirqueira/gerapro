@@ -151,6 +151,8 @@ function initSchema() {
             email TEXT,
             telefone TEXT,
             observacoes TEXT,
+            prazoEntrega TEXT,
+            condicaoPagamento TEXT,
             createdAt TEXT,
             updatedAt TEXT
         );
@@ -1316,6 +1318,11 @@ function initSchema() {
     // o preço com exatidão. Em entradas antigas fica NULL.
     try { db.exec("ALTER TABLE price_history ADD COLUMN custo_anterior REAL"); } catch (e) { /* column may already exist */ }
 
+    // Fase 5 de Compras: condições habituais do fornecedor (espelho da
+    // última negociação) — pré-preenche cotações e alimenta o painel.
+    try { db.exec("ALTER TABLE fornecedores ADD COLUMN prazoEntrega TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { db.exec("ALTER TABLE fornecedores ADD COLUMN condicaoPagamento TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+
     // Migration: add tensaoComando to tipicos table
     try { db.exec("ALTER TABLE tipicos ADD COLUMN tensaoComando TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
@@ -2473,14 +2480,15 @@ function migrateFromLegacy(data, empresaId = 'default') {
                     (id, empresa_id, razaoSocial, nomeFantasia, cnpj, segmento, cnae,
                      inscricaoEstadual, inscricaoMunicipal, cep, logradouro, numero,
                      bairro, cidade, estado, contatoNome, contatoCargo, email, telefone,
-                     observacoes, createdAt)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+                     observacoes, prazoEntrega, condicaoPagamento, createdAt)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
                 stmt.run(
                     f.id, empresaId, f.razaoSocial || '', f.nomeFantasia || '', f.cnpj || '',
                     f.segmento || '', f.cnae || '', f.inscricaoEstadual || '', f.inscricaoMunicipal || '',
                     f.cep || '', f.logradouro || '', f.numero || '', f.bairro || '', f.cidade || '',
                     f.estado || '', f.contatoNome || '', f.contatoCargo || '', f.email || '',
-                    f.telefone || '', f.observacoes || '', f.createdAt || new Date().toISOString()
+                    f.telefone || '', f.observacoes || '', f.prazoEntrega || '', f.condicaoPagamento || '',
+                    f.createdAt || new Date().toISOString()
                 );
             }
         }

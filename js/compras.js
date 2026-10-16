@@ -9,7 +9,11 @@ import { store } from './state.js';
            e gate formal de "Liberar para Compras".
    Fase 2: COTAÇÕES — 1 requisição → N cotações (uma por fornecedor),
            matriz de comparação item × fornecedor, marcação de vencedor
-           item a item, import da tabela de preços e campos de negociação.
+            item a item, import da tabela de preços e campos de negociação.
+   Fase 5: INDICADORES — painel com KPIs (em cotação / em pedido /
+            recebido no mês / atrasos), lead time real × catálogo
+            (alimenta o Banco de Materiais), desempenho de fornecedores
+            (preço × prazo × divergências) e relatório de duplicidade.
 
    Fluxo completo (fases seguintes): REQUISIÇÃO → COTAÇÃO → PEDIDO → NF.
    ===================================================================== */
@@ -134,7 +138,7 @@ const CP_PRECO_ALIASES = {
 const ComprasModule = {
     _active: false,
     _seeding: false,        // suprime re-render durante escrita em lote
-    viewMode: 'list',       // 'list' | 'nova' | 'detail'
+    viewMode: 'list',       // 'list' | 'nova' | 'detail' | 'cotacao' | 'pedido' | 'nota' | 'painel'
     activeId: null,
     activeTab: 'itens',     // 'itens' | 'resumo'
     searchQuery: '',
@@ -223,7 +227,13 @@ const ComprasModule = {
             setNotaCampo: this.setNotaCampo.bind(this),
             setNotaItemCampo: this.setNotaItemCampo.bind(this),
             salvarNota: this.salvarNota.bind(this),
-            estornarNota: this.estornarNota.bind(this)
+            estornarNota: this.estornarNota.bind(this),
+            openPainel: this.openPainel.bind(this),
+            fecharPainel: this.fecharPainel.bind(this),
+            aplicarLeadCatalogo: this.aplicarLeadCatalogo.bind(this),
+            aplicarLeadsCatalogo: this.aplicarLeadsCatalogo.bind(this),
+            exportPainelXLSX: this.exportPainelXLSX.bind(this),
+            prefillCotFornecedor: this.prefillCotFornecedor.bind(this)
         };
 
         store.subscribe((state) => {
@@ -242,6 +252,9 @@ const ComprasModule = {
                     // staging própria da NF; só reage se ela for removida
                     const existe = (state.comprasNotas || []).some(n => n.id === this.activeNota);
                     if (!existe) this.voltarDaNF();
+                } else if (this.viewMode === 'painel') {
+                    // painel derivado do estado (sem inputs): re-render seguro
+                    this.renderPainel();
                 } else if (this.viewMode === 'detail' && this.activeId) {
                     const exists = (state.comprasRequisicoes || []).some(r => r.id === this.activeId);
                     if (!exists) this.backToList();
@@ -308,6 +321,7 @@ const ComprasModule = {
         else if (this.viewMode === 'cotacao' && this._cotStaging) this.renderCotacao();
         else if (this.viewMode === 'pedido' && this._pedStaging) this.renderPedido();
         else if (this.viewMode === 'nota' && this._notaStaging) this.renderNota();
+        else if (this.viewMode === 'painel') this.renderPainel();
         else if (this.viewMode === 'detail' && this.activeId) this.renderDetail();
         else this.renderList();
     },
@@ -416,6 +430,9 @@ const ComprasModule = {
                         <div style="font-size:12px;opacity:0.9;margin-top:2px;">Requisição (LM da Engenharia) → Cotação → Pedido de Compras → Nota Fiscal.</div>
                     </div>
                     <div style="display:flex;gap:10px;">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.openPainel()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-chart-line-up"></i> Indicadores
+                        </button>
                         <button class="btn btn-sm btn-ghost" onclick="app.compras.openNova()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
                             <i class="ph ph-plus"></i> Nova Requisição
                         </button>
@@ -2670,7 +2687,7 @@ const ComprasModule = {
                         <div><b>Nenhum fornecedor cadastrado.</b> Cadastre o primeiro para começar a cotar.</div>
                     </div>` : `
                     <div class="cp-field"><label>Fornecedor <span style="color:#dc2626;">*</span></label>
-                        <select id="cp-cot-fornecedor" class="form-control">
+                        <select id="cp-cot-fornecedor" class="form-control" onchange="app.compras.prefillCotFornecedor(this.value)">
                             <option value="">— Selecione —</option>
                             ${fornecedores.map(f => {
                                 const usado = m.usados.has(f.id);
@@ -2708,6 +2725,7 @@ const ComprasModule = {
             </div>
         `;
         document.body.appendChild(overlay);
+        if (m.pre) this.prefillCotFornecedor(m.pre);
     },
 
     /* Formulário de cadastro rápido do fornecedor — mesmo modal, volta ao
@@ -2863,6 +2881,7 @@ const ComprasModule = {
 
         if (falhas) window.app.toast(`Cotação ${numero} criada, mas ${falhas} item(ns) falharam ao gravar.`, 'error');
         else window.app.toast(`Cotação ${numero} criada para ${this._nomeFornecedor(this._fornecedor(fornecedorId))}.`, 'success');
+        await this._espelhaCondicoesFornecedor(fornecedorId, payload.prazo_entrega, payload.condicao_pagamento);
         this.openCotacao(criada.id);
     },
 
@@ -3587,6 +3606,7 @@ const ComprasModule = {
                 ? 'Cotação salva — ainda sem preços informados.'
                 : `Cotação ${c.numero} salva · total ${window.app.formatCurrency(geral)}.`, 'success');
         }
+        await this._espelhaCondicoesFornecedor(c.fornecedor_id, c.prazo_entrega, c.condicao_pagamento);
         this.openCotacao(c.id);
     },
 
@@ -5095,6 +5115,532 @@ const ComprasModule = {
             <td style="width:110px;text-align:right;color:#6b7280;">${pi ? window.app.formatCurrency(parseFloat(pi.custo_unitario) || 0) : '—'}</td>
             <td style="width:120px;text-align:right;font-weight:700;">${window.app.formatCurrency(qtd * unit)}</td>
         </tr>`;
+    },
+
+    /* ================================================================
+       FASE 5 — PAINEL DE INDICADORES E RELATÓRIOS
+       - KPIs: valor em cotação / em pedido / recebido no mês / atrasos
+       - Lead time real × catálogo (alimenta o Banco de Materiais)
+       - Desempenho de fornecedores (preço × prazo × divergências)
+       - Duplicidade: mesmo material em requisições abertas
+       ================================================================ */
+
+    openPainel() {
+        this.viewMode = 'painel';
+        this.render();
+    },
+
+    fecharPainel() {
+        this.backToList();
+    },
+
+    /* Data local de hoje em YYYY-MM-DD (comparações sem depender de fuso). */
+    _hojeISO() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    },
+
+    /* Data prevista de entrega em YYYY-MM-DD: campo explícito, ou
+       data_pedido + prazo negociado (ex.: "15 dias") — aritmética de
+       calendário pura (Date.UTC), imune a fuso horário. */
+    _previstaEntrega(p) {
+        const expl = String(p.data_prevista_entrega || '').slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(expl)) return expl;
+        const dias = this._num(p.prazo_entrega);
+        const base = String(p.data_pedido || '').slice(0, 10);
+        if (!dias || !/^\d{4}-\d{2}-\d{2}$/.test(base)) return '';
+        const [y, m, dd] = base.split('-').map(Number);
+        return new Date(Date.UTC(y, m - 1, dd + dias)).toISOString().slice(0, 10);
+    },
+
+    _diasEntre(a, b) {
+        const da = new Date(a), db = new Date(b);
+        if (isNaN(da.getTime()) || isNaN(db.getTime())) return null;
+        return Math.round((db.getTime() - da.getTime()) / 86400000);
+    },
+
+    _painelKPIs() {
+        const state = store.getState();
+        const cotacoes = state.comprasCotacoes || [];
+        const pedidos = (state.comprasPedidos || []).filter(p => p.status !== 'cancelado');
+        const notas = (state.comprasNotas || []).filter(n => n.status !== 'estornada');
+        const hojeISO = this._hojeISO();
+        const mesAtual = new Date().toISOString().slice(0, 7);
+
+        const emCotacao = cotacoes
+            .filter(c => c.status === 'aberta' || c.status === 'enviada' || c.status === 'recebida')
+            .reduce((s, c) => s + (parseFloat(c.total) || 0), 0);
+
+        const emPedido = pedidos
+            .filter(p => p.status !== 'recebido')
+            .reduce((s, p) => s + (parseFloat(p.total) || 0), 0);
+
+        const recebidoMes = notas
+            .filter(n => String(n.data_entrada || n.created_at || '').slice(0, 7) === mesAtual)
+            .reduce((s, n) => s + (parseFloat(n.valor_total) || 0), 0);
+
+        const atrasados = pedidos.filter(p => {
+            if (p.status === 'recebido') return false;
+            const prev = this._previstaEntrega(p);
+            return !!prev && prev < hojeISO;
+        });
+
+        return { emCotacao, emPedido, recebidoMes, atrasados };
+    },
+
+    /* Lead time real (data_pedido → data_recebimento) por material, com a
+       média do prazo prometido na cotação — compara com o catálogo. */
+    _painelLeadTime() {
+        const state = store.getState();
+        const mats = new Map((state.materiais || []).map(m => [m.id, m]));
+        const amostras = new Map();
+
+        for (const p of (state.comprasPedidos || [])) {
+            if (p.status === 'cancelado' || !p.data_pedido || !p.data_recebimento) continue;
+            const real = this._diasEntre(p.data_pedido, p.data_recebimento);
+            if (real === null || real < 0) continue;
+            for (const pi of (state.comprasPedidoItens || [])) {
+                if (pi.pedido_id !== p.id) continue;
+                if (!(parseFloat(pi.qtd_recebida) || 0) > 0 || !pi.material_id) continue;
+                const a = amostras.get(pi.material_id) || [];
+                a.push({ real, previsto: this._num(pi.lead_time_previsto) });
+                amostras.set(pi.material_id, a);
+            }
+        }
+
+        const linhas = [];
+        for (const [matId, a] of amostras) {
+            const m = mats.get(matId);
+            const cat = this._num(m ? m.leadTime : 0);
+            const real = Math.round(a.reduce((s, x) => s + x.real, 0) / a.length);
+            const comPrevisto = a.filter(x => x.previsto > 0);
+            const previsto = comPrevisto.length
+                ? Math.round(comPrevisto.reduce((s, x) => s + x.previsto, 0) / comPrevisto.length)
+                : null;
+            linhas.push({
+                matId,
+                codigo: m ? (m.codigoInterno || m.codigoFabricante || '') : '',
+                descricao: m ? (m.descricao || '') : '',
+                cat, previsto, real,
+                amostras: a.length,
+                delta: real - cat
+            });
+        }
+        linhas.sort((a, b) => b.real - a.real || a.codigo.localeCompare(b.codigo));
+        return linhas;
+    },
+
+    /* Desempenho por fornecedor: pedidos, prazo prometido × real, índice de
+       divergências das NFs e desvio médio de preço vs. o catálogo. */
+    _painelFornecedores() {
+        const state = store.getState();
+        const forn = new Map((state.fornecedores || []).map(f => [f.id, f]));
+        const pedidos = state.comprasPedidos || [];
+        const notas = state.comprasNotas || [];
+        const reqItem = new Map((state.comprasRequisicaoItens || []).map(i => [i.id, i]));
+        const porForn = new Map();
+
+        for (const p of pedidos) {
+            if (!p.fornecedor_id || p.status === 'cancelado') continue;
+            const g = porForn.get(p.fornecedor_id) || { pedidos: 0, total: 0, prazos: [], reais: [] };
+            g.pedidos++;
+            g.total += parseFloat(p.total) || 0;
+            const prom = this._num(p.prazo_entrega);
+            if (prom > 0) g.prazos.push(prom);
+            if (p.data_pedido && p.data_recebimento) {
+                const d = this._diasEntre(p.data_pedido, p.data_recebimento);
+                if (d !== null && d >= 0) g.reais.push(d);
+            }
+            porForn.set(p.fornecedor_id, g);
+        }
+
+        const linhas = [];
+        for (const [fid, g] of porForn) {
+            const f = forn.get(fid);
+            const fNotas = notas.filter(n => n.fornecedor_id === fid && n.status !== 'estornada');
+            const divergentes = fNotas.filter(n => n.status === 'divergente').length;
+            const estornadas = notas.filter(n => n.fornecedor_id === fid && n.status === 'estornada').length;
+
+            // Δ preço vs catálogo: diferença média ponderada pela quantidade
+            const pedIds = new Set(pedidos.filter(p => p.fornecedor_id === fid).map(p => p.id));
+            let somaUnit = 0, somaCat = 0;
+            for (const pi of (state.comprasPedidoItens || [])) {
+                if (!pedIds.has(pi.pedido_id)) continue;
+                const ri = reqItem.get(pi.requisicao_item_id);
+                const cat = ri ? (parseFloat(ri.custo_catalogo) || 0) : 0;
+                if (!cat) continue;
+                const qtd = parseFloat(pi.qtd) || 0;
+                somaUnit += (parseFloat(pi.custo_unitario) || 0) * qtd;
+                somaCat += cat * qtd;
+            }
+
+            linhas.push({
+                nome: this._nomeFornecedor(f) || 'Fornecedor removido',
+                pedidos: g.pedidos,
+                total: g.total,
+                prom: g.prazos.length ? Math.round(g.prazos.reduce((s, x) => s + x, 0) / g.prazos.length) : null,
+                real: g.reais.length ? Math.round(g.reais.reduce((s, x) => s + x, 0) / g.reais.length) : null,
+                nf: fNotas.length,
+                divergentes,
+                estornadas,
+                indice: fNotas.length ? Math.round(divergentes / fNotas.length * 100) : 0,
+                preco: somaCat ? Math.round((somaUnit / somaCat - 1) * 10000) / 100 : null
+            });
+        }
+        linhas.sort((a, b) => b.total - a.total);
+        return linhas;
+    },
+
+    /* Mesmo material em 2+ requisições ainda abertas → risco de compra
+       duplicada (a LM da Engenharia pode repetir item entre projetos). */
+    _painelDuplicidade() {
+        const state = store.getState();
+        const abertas = new Set((state.comprasRequisicoes || [])
+            .filter(r => CP_ABERTAS.includes(r.status)).map(r => r.id));
+        const mats = new Map((state.materiais || []).map(m => [m.id, m]));
+        const reqs = new Map((state.comprasRequisicoes || []).map(r => [r.id, r]));
+        const grupos = new Map();
+
+        for (const it of (state.comprasRequisicaoItens || [])) {
+            if (!abertas.has(it.requisicao_id) || !it.material_id) continue;
+            const g = grupos.get(it.material_id) || { reqs: new Map(), qtd: 0 };
+            g.reqs.set(it.requisicao_id, (g.reqs.get(it.requisicao_id) || 0) + (parseFloat(it.qtd) || 0));
+            g.qtd += parseFloat(it.qtd) || 0;
+            grupos.set(it.material_id, g);
+        }
+
+        const linhas = [];
+        for (const [matId, g] of grupos) {
+            if (g.reqs.size < 2) continue;
+            const m = mats.get(matId);
+            linhas.push({
+                codigo: m ? (m.codigoInterno || m.codigoFabricante || '') : '',
+                descricao: m ? (m.descricao || '') : '',
+                requisicoes: [...g.reqs.keys()].map(id => (reqs.get(id) || {}).codigo || '?').join(', '),
+                qtd: g.qtd
+            });
+        }
+        linhas.sort((a, b) => a.codigo.localeCompare(b.codigo));
+        return linhas;
+    },
+
+    _painelAtrasadosHTML(atrasados) {
+        return `
+        <div class="cp-panel" style="margin-bottom:14px;border-color:#fecaca;background:#fef2f2;">
+            <div class="cp-section-title" style="margin-top:0;color:#991b1b;"><i class="ph ph-warning"></i> Pedidos em atraso (${atrasados.length})</div>
+            <div class="cp-table-wrap">
+                <table class="cp-table">
+                    <thead><tr><th>Pedido</th><th>Fornecedor</th><th>Previsão de entrega</th><th>Atraso</th><th>Status</th></tr></thead>
+                    <tbody>
+                        ${atrasados.map(p => {
+                            const prev = this._previstaEntrega(p);
+                            const atraso = Math.max(0, this._diasEntre(prev, this._hojeISO()) || 0);
+                            return `
+                            <tr onclick="app.compras.openPedido('${p.id}')">
+                                <td style="font-weight:700;">${this._esc(p.codigo)}</td>
+                                <td>${this._esc(this._nomeFornecedor(this._fornecedor(p.fornecedor_id)))}</td>
+                                <td style="text-align:center;">${this._fmtDate(prev)}</td>
+                                <td style="text-align:center;font-weight:700;color:#dc2626;">${atraso} dia(s)</td>
+                                <td>${this._esc(CP_PED_STATUS[p.status] || p.status)}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    },
+
+    renderPainel() {
+        const container = document.getElementById('view-compras');
+        if (!container) return;
+
+        const kpi = this._painelKPIs();
+        const lead = this._painelLeadTime();
+        const forn = this._painelFornecedores();
+        const dup = this._painelDuplicidade();
+
+        container.innerHTML = `
+            <div style="height:calc(100vh - 120px);display:flex;flex-direction:column;background:rgb(250,250,250);margin:-20px;position:relative;">
+                <div class="module-header-sticky" style="color:white;padding:20px 30px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:10;">
+                    <div style="display:flex;align-items:center;gap:14px;">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.fecharPainel()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-arrow-left"></i> Requisições
+                        </button>
+                        <div>
+                            <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;">
+                                <i class="ph ph-chart-line-up"></i> Indicadores de Compras
+                            </h2>
+                            <div style="font-size:12px;opacity:0.9;margin-top:2px;">Pipeline financeiro, lead time de entrega, desempenho de fornecedores e duplicidade.</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <button class="btn btn-sm btn-ghost" onclick="app.compras.exportPainelXLSX()" style="color:white;border:1px solid rgba(255,255,255,0.3);">
+                            <i class="ph ph-file-xls"></i> Exportar XLSX
+                        </button>
+                    </div>
+                </div>
+                <div class="cp-body">
+                    <div class="cp-summary">
+                        <div class="cp-card"><div class="cp-card-value">${window.app.formatCurrency(kpi.emCotacao)}</div><div class="cp-card-label">Em Cotação</div></div>
+                        <div class="cp-card"><div class="cp-card-value">${window.app.formatCurrency(kpi.emPedido)}</div><div class="cp-card-label">Em Pedido (aberto)</div></div>
+                        <div class="cp-card"><div class="cp-card-value">${window.app.formatCurrency(kpi.recebidoMes)}</div><div class="cp-card-label">Recebido no Mês</div></div>
+                        <div class="cp-card ${kpi.atrasados.length ? 'alert' : ''}"><div class="cp-card-value">${kpi.atrasados.length}</div><div class="cp-card-label">Pedidos em Atraso</div></div>
+                    </div>
+
+                    ${kpi.atrasados.length ? this._painelAtrasadosHTML(kpi.atrasados) : ''}
+
+                    <div class="cp-panel" style="margin-bottom:14px;">
+                        <div class="cp-section-title" style="margin-top:0;">
+                            <i class="ph ph-timer"></i> Lead time real × catálogo
+                            ${lead.length ? `<button class="btn btn-sm btn-ghost" style="margin-left:auto;" onclick="app.compras.aplicarLeadsCatalogo()" title="Copia a média real de recebimento para o lead time do Banco de Materiais"><i class="ph ph-database"></i> Atualizar catálogo (${lead.length})</button>` : ''}
+                        </div>
+                        ${lead.length ? `
+                        <div class="cp-table-wrap">
+                            <table class="cp-table">
+                                <thead><tr>
+                                    <th>Material</th><th>Descrição</th><th>Catálogo (dias)</th><th>Prometido (dias)</th><th>Real (média)</th><th>Δ</th><th>Entregas</th><th></th>
+                                </tr></thead>
+                                <tbody>
+                                    ${lead.map(l => `
+                                    <tr>
+                                        <td style="font-weight:700;">${this._esc(l.codigo)}</td>
+                                        <td>${this._esc(l.descricao)}</td>
+                                        <td style="text-align:center;">${l.cat}</td>
+                                        <td style="text-align:center;">${l.previsto === null ? '—' : l.previsto}</td>
+                                        <td style="text-align:center;font-weight:700;">${l.real}</td>
+                                        <td style="text-align:center;color:${l.delta > 0 ? '#dc2626' : (l.delta < 0 ? '#16a34a' : '#6b7280')};">${l.delta > 0 ? '+' + l.delta : l.delta}</td>
+                                        <td style="text-align:center;">${l.amostras}</td>
+                                        <td style="text-align:right;">
+                                            <button class="btn btn-sm btn-ghost" onclick="app.compras.aplicarLeadCatalogo('${l.matId}', ${l.real})" title="Copiar este lead real para o catálogo"><i class="ph ph-download-simple"></i></button>
+                                        </td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>` : `
+                        <div class="cp-empty-state" style="padding:26px 20px;">
+                            <i class="ph ph-timer" style="font-size:30px;"></i>
+                            <p style="margin:8px auto 0;">Nenhum recebimento com lead time ainda — gere pedidos e receba NFs para comparar o prazo real com o catálogo.</p>
+                        </div>`}
+                    </div>
+
+                    <div class="cp-panel" style="margin-bottom:14px;">
+                        <div class="cp-section-title" style="margin-top:0;"><i class="ph ph-handshake"></i> Desempenho de fornecedores</div>
+                        ${forn.length ? `
+                        <div class="cp-table-wrap">
+                            <table class="cp-table">
+                                <thead><tr>
+                                    <th>Fornecedor</th><th>Pedidos</th><th>Total comprado</th><th>Prazo prom.</th><th>Prazo real</th><th>NFs</th><th>Divergentes</th><th>Índice div.</th><th>Δ preço catálogo</th>
+                                </tr></thead>
+                                <tbody>
+                                    ${forn.map(f => `
+                                    <tr>
+                                        <td style="font-weight:600;">${this._esc(f.nome)}</td>
+                                        <td style="text-align:center;">${f.pedidos}</td>
+                                        <td style="text-align:right;">${window.app.formatCurrency(f.total)}</td>
+                                        <td style="text-align:center;">${f.prom === null ? '—' : f.prom + 'd'}</td>
+                                        <td style="text-align:center;font-weight:700;">${f.real === null ? '—' : f.real + 'd'}</td>
+                                        <td style="text-align:center;" title="${f.estornadas ? f.estornadas + ' nota(s) estornada(s)' : ''}">${f.nf}${f.estornadas ? ' · ' + f.estornadas + 'est' : ''}</td>
+                                        <td style="text-align:center;${f.divergentes ? 'color:#dc2626;font-weight:700;' : ''}">${f.divergentes}</td>
+                                        <td style="text-align:center;">${f.indice}%</td>
+                                        <td style="text-align:center;color:${f.preco === null ? '#6b7280' : (f.preco > 0 ? '#dc2626' : '#16a34a')};">${f.preco === null ? '—' : (f.preco > 0 ? '+' : '') + f.preco + '%'}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>` : `
+                        <div class="cp-empty-state" style="padding:26px 20px;">
+                            <i class="ph ph-handshake" style="font-size:30px;"></i>
+                            <p style="margin:8px auto 0;">Nenhum pedido de compra registrado ainda.</p>
+                        </div>`}
+                    </div>
+
+                    <div class="cp-panel" style="margin-bottom:14px;">
+                        <div class="cp-section-title" style="margin-top:0;"><i class="ph ph-copy"></i> Duplicidade em requisições abertas</div>
+                        ${dup.length ? `
+                        <div class="cp-table-wrap">
+                            <table class="cp-table">
+                                <thead><tr><th>Material</th><th>Descrição</th><th>Requisições</th><th>Qtd total</th></tr></thead>
+                                <tbody>
+                                    ${dup.map(d => `
+                                    <tr>
+                                        <td style="font-weight:700;">${this._esc(d.codigo)}</td>
+                                        <td>${this._esc(d.descricao)}</td>
+                                        <td>${this._esc(d.requisicoes)}</td>
+                                        <td style="text-align:right;">${this._fmtQtd(d.qtd)}</td>
+                                    </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>` : `
+                        <div class="cp-empty-state" style="padding:26px 20px;">
+                            <i class="ph ph-check-circle" style="font-size:30px;"></i>
+                            <p style="margin:8px auto 0;">Nenhum material duplicado entre requisições abertas.</p>
+                        </div>`}
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    /* Copia o lead time real medido para um item do catálogo ("alimenta a
+       base de dados" do Planejamento de Compras). */
+    async aplicarLeadCatalogo(materialId, dias) {
+        if (!store.canEdit()) return;
+        const m = (store.getState().materiais || []).find(x => x.id === materialId);
+        if (!m) { window.app.toast('Material não encontrado no catálogo.', 'info'); return; }
+        const ok = await window.app.confirm(
+            `Atualizar o lead time de "${m.descricao || m.codigoInterno || materialId}" para ${dias} dia(s)? Atual: ${this._num(m.leadTime)} dia(s).`
+        );
+        if (!ok) return;
+        this._seeding = true;
+        const res = await store.updateMaterial(materialId, { leadTime: dias }, { title: 'Lead time real — Recebimento (Compras)' });
+        this._seeding = false;
+        if (!res) { window.app.toast('Erro ao atualizar o catálogo.', 'error'); return; }
+        window.app.toast(`Lead time do material atualizado para ${dias} dia(s).`, 'success');
+        this.renderPainel();
+    },
+
+    async aplicarLeadsCatalogo() {
+        if (!store.canEdit()) return;
+        const linhas = this._painelLeadTime().filter(l => l.matId);
+        if (!linhas.length) { window.app.toast('Nenhum lead time medido para atualizar.', 'info'); return; }
+        const ok = await window.app.confirm(
+            `Atualizar ${linhas.length} lead time(s) do catálogo com a média real de recebimento?`
+        );
+        if (!ok) return;
+        this._seeding = true;
+        let n = 0;
+        for (const l of linhas) {
+            const res = await store.updateMaterial(l.matId, { leadTime: l.real }, { title: 'Lead time real — Recebimento (Compras)' });
+            if (res) n++;
+        }
+        this._seeding = false;
+        window.app.toast(`${n} lead time(s) atualizado(s) no catálogo.`, 'success');
+        this.renderPainel();
+    },
+
+    /* Pré-preenche prazo/condição da nova cotação com o cadastro do
+       fornecedor (Fase 5 — espelho da última negociação). */
+    prefillCotFornecedor(fornecedorId) {
+        const f = this._fornecedor(fornecedorId);
+        const pz = document.getElementById('cp-cot-prazo');
+        const cd = document.getElementById('cp-cot-condicao');
+        if (pz) pz.value = f ? (f.prazoEntrega || '') : '';
+        if (cd) cd.value = f ? (f.condicaoPagamento || '') : '';
+    },
+
+    /* Espelha prazo/condição negociados para o cadastro do fornecedor
+       (a última negociação vence; nunca apaga valor com campo vazio). */
+    async _espelhaCondicoesFornecedor(fornecedorId, prazo, condicao) {
+        if (!fornecedorId) return;
+        const f = this._fornecedor(fornecedorId);
+        if (!f) return;
+        const upd = {};
+        if (prazo && String(prazo).trim() !== String(f.prazoEntrega || '').trim()) upd.prazoEntrega = String(prazo).trim();
+        if (condicao && String(condicao).trim() !== String(f.condicaoPagamento || '').trim()) upd.condicaoPagamento = String(condicao).trim();
+        if (!Object.keys(upd).length) return;
+        this._seeding = true;
+        await store.updateFornecedor(fornecedorId, upd);
+        this._seeding = false;
+    },
+
+    /* Monta uma aba XLSX no padrão do módulo: cabeçalho MAIÚSCULO em negrito
+       centralizado, números formatados e linhas zebradas (freeze no patch). */
+    _painelXLSXAba(wb, nomeAba, cabecalhos, linhas, fmtColunas) {
+        const ws = XLSX.utils.aoa_to_sheet([cabecalhos, ...linhas]);
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        const headerStyle = {
+            font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '4F46E5' } },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
+        };
+        const zebraStyle = { fill: { fgColor: { rgb: 'F3F4F6' } } };
+
+        for (let row = range.s.r; row <= range.e.r; row++) {
+            for (let c = range.s.c; c <= range.e.c; c++) {
+                const cell = ws[XLSX.utils.encode_cell({ c, r: row })];
+                if (!cell) continue;
+                if (row === 0) {
+                    if (cell.t === 's' && cell.v) cell.v = String(cell.v).toUpperCase();
+                    cell.s = headerStyle;
+                } else {
+                    const fmt = fmtColunas ? fmtColunas[c] : null;
+                    const base = row % 2 === 1 ? zebraStyle : null;
+                    // xlsx-js-style lê numFmt de cell.s.numFmt (cell.z é ignorado).
+                    if (typeof cell.v === 'number') cell.s = { ...(base || {}), numFmt: fmt || '#,##0' };
+                    else if (base) cell.s = base;
+                }
+            }
+        }
+        XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+    },
+
+    exportPainelXLSX() {
+        try {
+            if (typeof XLSX === 'undefined') {
+                window.app.toast('Biblioteca XLSX não disponível.', 'warning');
+                return;
+            }
+            const kpi = this._painelKPIs();
+            const lead = this._painelLeadTime();
+            const forn = this._painelFornecedores();
+            const dup = this._painelDuplicidade();
+            if (!lead.length && !forn.length && !dup.length && !kpi.atrasados.length) {
+                window.app.toast('Nenhum dado para exportar no painel ainda.', 'info');
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+            this._painelXLSXAba(wb, 'Resumo',
+                ['Indicador', 'Valor'],
+                [
+                    ['Em cotação (R$)', Math.round(kpi.emCotacao * 100) / 100],
+                    ['Em pedido — aberto (R$)', Math.round(kpi.emPedido * 100) / 100],
+                    ['Recebido no mês (R$)', Math.round(kpi.recebidoMes * 100) / 100],
+                    ['Pedidos em atraso (qtd)', kpi.atrasados.length]
+                ],
+                { 1: '#,##0.00' }
+            );
+            if (lead.length) {
+                this._painelXLSXAba(wb, 'Lead Time',
+                    ['Material', 'Descrição', 'Catálogo (dias)', 'Prometido (dias)', 'Real médio (dias)', 'Δ (dias)', 'Entregas'],
+                    lead.map(l => [l.codigo, l.descricao, l.cat, l.previsto === null ? '' : l.previsto, l.real, l.delta, l.amostras])
+                );
+            }
+            if (forn.length) {
+                this._painelXLSXAba(wb, 'Fornecedores',
+                    ['Fornecedor', 'Pedidos', 'Total comprado (R$)', 'Prazo prometido (dias)', 'Prazo real (dias)', 'NFs', 'Divergentes', 'Estornos', 'Índice divergências (%)', 'Δ preço catálogo (%)'],
+                    forn.map(f => [f.nome, f.pedidos, Math.round(f.total * 100) / 100, f.prom === null ? '' : f.prom, f.real === null ? '' : f.real, f.nf, f.divergentes, f.estornadas, f.indice, f.preco === null ? '' : f.preco]),
+                    { 2: '#,##0.00' }
+                );
+            }
+            if (dup.length) {
+                this._painelXLSXAba(wb, 'Duplicidade',
+                    ['Material', 'Descrição', 'Requisições', 'Qtd total'],
+                    dup.map(d => [d.codigo, d.descricao, d.requisicoes, Math.round(d.qtd * 1000) / 1000])
+                );
+            }
+
+            const nomeArquivo = `Compras_Indicadores_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            this._patchXlsxFreezePane(buf).then(patched => {
+                const blob = new Blob([patched], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nomeArquivo;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                window.app.toast('Indicadores exportados em XLSX.', 'success');
+            }).catch(err => {
+                console.error('[Compras] XLSX freeze patch error:', err);
+                XLSX.writeFile(wb, nomeArquivo);
+                window.app.toast('Indicadores exportados em XLSX.', 'success');
+            });
+        } catch (e) {
+            console.error('[Compras] export painel XLSX:', e);
+            window.app.toast('Erro ao exportar: ' + e.message, 'error');
+        }
     },
 
     _fmtQtd(v) {

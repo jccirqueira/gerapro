@@ -61,7 +61,7 @@ Referências de matching a replicar: `js/state.js:1279-1287` (`isCodeDuplicate`)
 
 Apenas **2 cadastrados** (Wago, WEG). Campos: `razaoSocial`, `nomeFantasia`, `cnpj`, endereço completo, `contatoNome/Cargo`, `email`, `telefone`.
 
-**Não existem** campos de `prazo_pagamento` / `condicao_comercial`. → A condição de pagamento e o prazo serão gravados **na cotação e no pedido** (o local contabilmente correto, pois variam por negociação). Opcionalmente copiar para o cadastro na Fase 5.
+**~~Não existem~~** ~~campos de `prazo_pagamento` / `condicao_comercial`.~~ → **Existem desde a Fase 5**: `prazoEntrega` / `condicaoPagamento` (colunas novas, espelho da última negociação). O prazo/condição **da negociação** continua gravado **na cotação e no pedido** (o local contabilmente correto, pois variam por negociação); o cadastro guarda o valor usual e alimenta o pré-preenchimento.
 
 ### 2.3 LM / BOM
 
@@ -320,13 +320,17 @@ Quando a Engenharia de Projetos virar módulo nativo, a LM passará a ser gerada
 
 ---
 
-### Fase 5 — Indicadores e relatórios (enriquecimento)
+### Fase 5 — Indicadores e relatórios (enriquecimento) ✅ **concluída e validada**
 
-- Dashboard de compras: valor em cotação / em pedido / recebido no mês; pedidos em atraso
-- **Lead time real × lead time do catálogo** (alimenta a base de dados)
-- Desempenho de fornecedores: preço × prazo × índice de divergências
-- Relatório de duplicidade (mesmo material em requisições abertas)
-- Cópia de prazo/condição de pagamento para o cadastro do fornecedor
+**Entregáveis**
+- **Painel "Indicadores"** (novo `viewMode 'painel'`, botão no cabeçalho da lista) com **4 KPIs**: valor em cotação (cotações abertas/enviadas/recebidas), em pedido (não cancelados/recebidos), recebido no mês (NFs ≠ estornada com `data_entrada` no mês) e **pedidos em atraso** (previsão explícita ou `data_pedido + prazo_entrega` < hoje, aritmética de calendário sem fuso)
+- **Lead time real × catálogo**: média de `data_pedido → data_recebimento` por material (só itens com `qtd_recebida > 0`) vs `materiais.leadTime` + prazo prometido na cotação; botão por linha e botão em lote **gravam o real no catálogo** (`store.updateMaterial`)
+- **Desempenho de fornecedores**: pedidos, total comprado, prazo prometido × real, NFs (com estornos), índice de divergências e **Δ preço vs catálogo** (diferença média ponderada pela quantidade)
+- **Relatório de duplicidade**: mesmo `material_id` em ≥2 requisições com status em `CP_ABERTAS`
+- **Cópia de prazo/condição ao cadastro do fornecedor**: novas colunas `fornecedores.prazoEntrega` / `condicaoPagamento` (CREATE + migração `ALTER TABLE` + INSERT de restore); pré-preenchimento na troca do fornecedor no modal de cotação e **espelho automático** ao criar/salvar cotação (a última negociação vence; campo vazio nunca apaga)
+- **Export XLSX multi-aba** (Resumo, Lead Time, Fornecedores, Duplicidade) no padrão do módulo (cabeçalho MAIÚSCULO em negrito centralizado, zebra, primeira linha congelada em todas as abas)
+
+**Critério de aceite:** ✅ KPIs batem 1:1 com os dados (58.650 / 16.068 / 42.450 / 1 atraso no cenário de teste); lead time real atualiza o catálogo nas duas rotinas (linha e lote); prefill reflete o cadastro do fornecedor selecionado (limpa ao trocar); espelhamento confirmado nos dois caminhos (`criarCotacao` e `salvarCotacao`, última negociação vence); campos novos no form de fornecedores salvam round-trip completo; XLSX com 4 abas validado no XML (negrito/fill/zebra/freeze/numFmt); 0 erros de console. Validado no browser com dados reais.
 
 ---
 
@@ -350,7 +354,7 @@ Quando a Engenharia de Projetos virar módulo nativo, a LM passará a ser gerada
 1. **Catálogo de materiais** — leitura na importação da LM; **escrita** de `price_history` no recebimento da NF
 2. **DRE do Projeto** (entregue na Fase 3 de Projetos) — NF recebida alimenta `categoria='material'`, fechando o ciclo estimado × real
 3. **Gestão de Projetos** — `projeto_id` na requisição; painel de compras no detalhe do projeto
-4. **Fornecedores** — `fornecedor_id`; prazo/condição gravados na cotação/pedido
+4. **Fornecedores** — `fornecedor_id`; prazo/condição gravados na cotação/pedido e **espelhados** no cadastro (`prazoEntrega`/`condicaoPagamento`, Fase 5)
 
 ---
 
