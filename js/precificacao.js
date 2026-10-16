@@ -1256,45 +1256,40 @@ class PrecificacaoModule {
         const overrides = state.activeTechnicalProposal?.materialOverrides || {};
         const tipicos = state.tipicos || [];
 
+        // Deduplica por materialId (o mesmo material em várias cargas vira 1 linha, com qtd somada)
         const items = [];
+        const byId = new Map();
+        const pushItem = (item, mat) => {
+            const materialId = item.materialId || null;
+            if (materialId) {
+                const found = byId.get(materialId);
+                if (found) { found.qtd += (item.qtd || 0); return; }
+            }
+            const entry = {
+                materialId,
+                descricao: mat?.descricao || item.descricao || '(material sem vínculo ao catálogo)',
+                qtd: item.qtd || 0,
+                custoOriginal: mat?.custo ?? item.custo ?? 0,
+                override: materialId ? overrides[materialId]?.custo : undefined,
+                fabricante: mat?.fabricante || '',
+                categoria: mat?.categoria || '',
+                area: mat?.area || '',
+                grupoSiemens: mat?.grupoSiemens || ''
+            };
+            items.push(entry);
+            if (materialId) byId.set(materialId, entry);
+        };
 
         (eq.loads || []).forEach(load => {
             const typical = tipicos.find(t => t.id === load.typicalId);
             if (typical && typical.items) {
-                typical.items.forEach(item => {
-                    const mat = materiais.find(m => m.id === item.materialId);
-                    items.push({
-                        materialId: item.materialId,
-                        descricao: mat?.descricao || item.descricao || '(material sem descrição)',
-                        qtd: item.qtd || 0,
-                        custoOriginal: mat?.custo ?? item.custo ?? 0,
-                        override: overrides[item.materialId]?.custo
-                    });
-                });
+                typical.items.forEach(item => pushItem(item, materiais.find(m => m.id === item.materialId)));
             }
         });
 
-        (eq.materials || []).forEach(item => {
-            const mat = materiais.find(m => m.id === item.materialId);
-            items.push({
-                materialId: item.materialId,
-                descricao: mat?.descricao || item.descricao || '(material)',
-                qtd: item.qtd || 0,
-                custoOriginal: mat?.custo ?? item.custo ?? 0,
-                override: item.materialId ? overrides[item.materialId]?.custo : undefined
-            });
-        });
+        (eq.materials || []).forEach(item => pushItem(item, item.materialId ? materiais.find(m => m.id === item.materialId) : null));
 
-        (eq.automationMaterials || []).forEach(item => {
-            const mat = item.materialId ? materiais.find(m => m.id === item.materialId) : null;
-            items.push({
-                materialId: item.materialId,
-                descricao: mat?.descricao || item.descricao || '(automação)',
-                qtd: item.qtd || 0,
-                custoOriginal: mat?.custo ?? item.custo ?? 0,
-                override: item.materialId ? overrides[item.materialId]?.custo : undefined
-            });
-        });
+        (eq.automationMaterials || []).forEach(item => pushItem(item, item.materialId ? materiais.find(m => m.id === item.materialId) : null));
 
         if (items.length === 0) {
             app.toast('Aviso', 'Nenhum material encontrado para este equipamento.', 'info');
@@ -1331,6 +1326,53 @@ class PrecificacaoModule {
                 </div>
                 <div style="padding:12px 20px;font-size:13px;color:#64748b;">
                     <i>Preencha o custo negociado para esta proposta. Deixe em branco para usar o custo do cadastro.</i>
+                </div>
+
+                <!-- Ajuste em massa (só preenche os campos abaixo; nada vai ao Banco de Materiais) -->
+                <div id="bulk-override-panel" style="margin:0 20px 12px;padding:12px 14px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg-app,#f8fafc);">
+                    <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:10px;">
+                        <i class="ph ph-arrows-clockwise"></i> Ajuste em Massa (somente nesta proposta)
+                        <span style="font-weight:400;font-size:12px;color:#64748b;">— não altera o Banco de Materiais</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+                        <div style="min-width:140px;">
+                            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:2px;">Fabricante</label>
+                            <select id="bulk-ov-fab" class="form-control" style="font-size:12px;padding:4px 6px;"><option value="">Todos</option></select>
+                        </div>
+                        <div style="min-width:140px;">
+                            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:2px;">Categoria</label>
+                            <select id="bulk-ov-cat" class="form-control" style="font-size:12px;padding:4px 6px;"><option value="">Todas</option></select>
+                        </div>
+                        <div style="min-width:130px;">
+                            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:2px;">Área</label>
+                            <select id="bulk-ov-area" class="form-control" style="font-size:12px;padding:4px 6px;"><option value="">Todas</option></select>
+                        </div>
+                        <div style="min-width:130px;">
+                            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:2px;">Grupo Siemens</label>
+                            <select id="bulk-ov-grupo" class="form-control" style="font-size:12px;padding:4px 6px;"><option value="">Todos</option></select>
+                        </div>
+                        <div style="min-width:200px;">
+                            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:2px;">Base de cálculo</label>
+                            <select id="bulk-ov-base" class="form-control" style="font-size:12px;padding:4px 6px;">
+                                <option value="efetivo">Valor efetivo (override atual, senão cadastro)</option>
+                                <option value="cadastro">Custo de cadastro</option>
+                            </select>
+                        </div>
+                        <div style="min-width:110px;">
+                            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:2px;">Tipo</label>
+                            <select id="bulk-ov-type" class="form-control" style="font-size:12px;padding:4px 6px;">
+                                <option value="percent">Percentual (%)</option>
+                                <option value="fixed">Valor fixo (R$)</option>
+                            </select>
+                        </div>
+                        <div style="min-width:100px;">
+                            <label style="font-size:11px;color:#64748b;display:block;margin-bottom:2px;">Valor (+ ou −)</label>
+                            <input type="number" id="bulk-ov-value" class="form-control" step="0.01" placeholder="Ex: 5.5" style="font-size:12px;padding:4px 6px;">
+                        </div>
+                        <button id="btn-bulk-override" class="btn btn-primary btn-sm" style="height:30px;">Aplicar</button>
+                        <button id="btn-bulk-clear" class="btn btn-sm" style="height:30px;" title="Remove todos os overrides e volta ao custo do cadastro">Limpar Overrides</button>
+                    </div>
+                    <div id="bulk-ov-preview" style="margin-top:8px;font-size:12px;color:#64748b;">Selecione filtros (ou deixe Todos) para ver quantos itens serão afetados.</div>
                 </div>
                 <div style="overflow-y:auto;flex:1;padding:0 20px 12px;">
                     <table style="width:100%;border-collapse:collapse;">
@@ -1370,6 +1412,74 @@ class PrecificacaoModule {
             input.addEventListener('focus', (e) => {
                 e.target.value = e.target.value.replace(/\./g, '');
             });
+        });
+
+        // === Ajuste em massa: só pré-preenche os inputs de override acima ===
+        const uniq = k => [...new Set(items.map(i => i[k]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+        const fillSel = (id, vals) => {
+            const sel = modal.querySelector(id);
+            if (sel) vals.forEach(v => sel.insertAdjacentHTML('beforeend', `<option value="${String(v).replace(/"/g, '&quot;')}">${v}</option>`));
+        };
+        fillSel('#bulk-ov-fab', uniq('fabricante'));
+        fillSel('#bulk-ov-cat', uniq('categoria'));
+        fillSel('#bulk-ov-area', uniq('area'));
+        fillSel('#bulk-ov-grupo', uniq('grupoSiemens'));
+
+        const lerFiltros = () => ({
+            fabricante: modal.querySelector('#bulk-ov-fab').value,
+            categoria: modal.querySelector('#bulk-ov-cat').value,
+            area: modal.querySelector('#bulk-ov-area').value,
+            grupoSiemens: modal.querySelector('#bulk-ov-grupo').value
+        });
+        const itensAfetados = () => {
+            const f = lerFiltros();
+            return items.filter(it => (!f.fabricante || it.fabricante === f.fabricante)
+                && (!f.categoria || it.categoria === f.categoria)
+                && (!f.area || it.area === f.area)
+                && (!f.grupoSiemens || it.grupoSiemens === f.grupoSiemens));
+        };
+        const atualizarPreview = () => {
+            const el = modal.querySelector('#bulk-ov-preview');
+            if (!el) return;
+            const n = itensAfetados().length;
+            el.innerHTML = n > 0
+                ? `<b>${n}</b> de ${items.length} item(ns) serão afetados — o ajuste preenche a coluna <b>Override R$</b> abaixo; revise e clique em <b>Salvar e Recalcular</b>.`
+                : `Nenhum item corresponde aos filtros.`;
+        };
+        modal.querySelectorAll('#bulk-ov-fab,#bulk-ov-cat,#bulk-ov-area,#bulk-ov-grupo').forEach(sel => sel.addEventListener('change', atualizarPreview));
+        atualizarPreview();
+
+        modal.querySelector('#btn-bulk-override')?.addEventListener('click', () => {
+            const value = parseFloat(modal.querySelector('#bulk-ov-value').value);
+            if (isNaN(value)) { app.toast('Informe um valor válido para o ajuste.', 'warning'); return; }
+            const type = modal.querySelector('#bulk-ov-type').value;
+            const base = modal.querySelector('#bulk-ov-base').value;
+            const afetados = itensAfetados();
+            if (afetados.length === 0) { app.toast('Nenhum item corresponde aos filtros.', 'warning'); return; }
+            if (!confirm(`Aplicar ${type === 'percent' ? value + '%' : 'R$ ' + value} em ${afetados.length} item(ns) desta proposta?`)) return;
+
+            afetados.forEach(it => {
+                const idx = items.indexOf(it);
+                const input = modal.querySelector(`#override-val-${idx}`);
+                if (!input) return;
+                // Base: valor efetivo = override já digitado/existente, senão custo de cadastro
+                const atual = app.parseCurrency(input.value) > 0 ? app.parseCurrency(input.value)
+                    : (it.override != null ? it.override : it.custoOriginal);
+                const novo = type === 'percent' ? atual * (1 + value / 100) : atual + value;
+                const novoArred = Math.round(novo * 100) / 100;
+                input.value = novoArred > 0 ? app.formatCurrencyRaw(novoArred) : '';
+                input.dispatchEvent(new Event('blur'));
+            });
+            app.toast(`Ajuste aplicado em ${afetados.length} item(ns).`, 'success');
+        });
+
+        modal.querySelector('#btn-bulk-clear')?.addEventListener('click', () => {
+            if (!confirm('Remover TODOS os overrides e voltar ao custo do cadastro?')) return;
+            modal.querySelectorAll('[id^="override-val-"]').forEach(input => {
+                input.value = '';
+                input.dispatchEvent(new Event('blur'));
+            });
+            app.toast('Overrides limpos (custo do cadastro).', 'info');
         });
 
         document.getElementById('btn-save-override').addEventListener('click', () => {
