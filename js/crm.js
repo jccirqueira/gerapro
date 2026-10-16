@@ -1923,20 +1923,19 @@ const CRM = {
             `<tr><td>${this.getVendedorNome(vid)}</td><td>${d.total}</td><td>${d.qualificados}</td><td>${d.propostas}</td><td>${d.total > 0 ? (d.propostas / d.total * 100).toFixed(1) + '%' : '0%'}</td></tr>`
         ).join('');
 
-        const win = window.open('', '_blank');
-        win.document.write(`
+        const html = `
             <html><head><meta charset="UTF-8"><title>Relatório CRM</title>
             <style>
                 body { font-family: Arial, sans-serif; font-size: 12px; color: #333; padding: 20px; }
-                h2 { color:var(--color-accent); font-size: 18px; margin: 0 0 4px; }
+                h2 { color:#035ca9; font-size: 18px; margin: 0 0 4px; }
                 .subtitle { color: #666; font-size: 11px; margin-bottom: 20px; }
                 .kpi-grid { display: flex; gap: 12px; margin-bottom: 20px; }
                 .kpi-box { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
                 .kpi-label { font-size: 9px; text-transform: uppercase; color: #666; }
-                .kpi-value { font-size: 18px; font-weight: bold; margin-top: 2px; color:var(--color-accent); }
+                .kpi-value { font-size: 18px; font-weight: bold; margin-top: 2px; color:#035ca9; }
                 table { width: 100%; border-collapse: collapse; margin-top: 8px; }
                 th, td { padding: 5px 6px; border: 1px solid #ccc; text-align: left; font-size: 10px; }
-                th { background:var(--color-accent); color: #fff; font-size: 9px; text-transform: uppercase; }
+                th { background:#035ca9; color: #fff; font-size: 9px; text-transform: uppercase; }
                 .section-title { font-size: 13px; font-weight: bold; margin: 16px 0 4px; color: #333; }
                 .bar-bg { height: 8px; background: #e2e8f0; border-radius: 4px; margin: 4px 0 8px; overflow: hidden; }
                 .bar-fill { height: 100%; border-radius: 4px; }
@@ -1961,10 +1960,31 @@ const CRM = {
                     return `<div style="margin-bottom:4px"><div style="display:flex;justify-content:space-between;font-size:11px">${s.label}<span>${qtde} (${pct.toFixed(1)}%)</span></div><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${s.color}"></div></div></div>`;
                 }).join('')}
                 <div class="footer">Relatório gerado pelo GeraPro CRM</div>
-                <script>window.print();window.close();<\/script>
             </body></html>
-        `);
-        win.document.close();
+        `;
+        const dispararImpressao = (winDoc, fechar) => setTimeout(() => {
+            try { winDoc.print(); } catch (e) { console.error('Falha ao imprimir relatório CRM:', e); }
+            if (fechar) setTimeout(() => { try { fechar(); } catch (e) { /* janela já fechada */ } }, 300);
+        }, 250);
+        let win = null;
+        try { win = window.open('', '_blank'); } catch (e) { win = null; }
+        if (win) {
+            win.document.write(html);
+            win.document.close();
+            dispararImpressao(win, () => win.close());
+            return;
+        }
+        // Fallback: pop-up bloqueado — imprime via iframe oculto (não exige liberar pop-ups)
+        const iframe = document.createElement('iframe');
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        iframe.contentWindow.focus();
+        dispararImpressao(iframe.contentWindow, () => iframe.remove());
     },
 
     abrirModalNovoLead(statusInicial) {
