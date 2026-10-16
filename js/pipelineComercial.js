@@ -1479,6 +1479,7 @@ const PipelineComercialModule = {
             if (stageItens.length === 0) return;
 
             const tipoLabels = { tecnica: 'PT', comercial: 'PC', tecnica_comercial: 'PTC' };
+            const statusLabels = { prospect: 'Aguardando Início', elaboracao: 'Em Elaboração', enviado: 'Proposta Enviada', negociacao: 'Negociação', fechado: 'Fechado', perdido: 'Perdido' };
 
             let rowsHtml = '';
             stageItens.forEach(item => {
@@ -1488,7 +1489,8 @@ const PipelineComercialModule = {
                 const revStr = item.revisao !== undefined && item.revisao !== null ? `_R${String(item.revisao).padStart(2, '0')}` : '';
                 const codigo = base ? `${base}_${tipoLabel}${revStr}` : '';
                 const date = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '';
-                const ultContato = item.ultimoContato ? new Date(item.ultimoContato).toLocaleDateString() : '';
+                const statusLabel = statusLabels[item.status] || item.status || '—';
+                const prazoHtml = (function (p) { try { return PipelineComercialModule._calcularPrazo(p).html; } catch (e) { return '—'; } })(item.data_entrega);
                 rowsHtml += `
                     <tr>
                         <td>${item.cliente}</td>
@@ -1498,6 +1500,8 @@ const PipelineComercialModule = {
                         <td>${item.vendedor || '—'}</td>
                         <td>${item.engenheiro_responsavel || '—'}</td>
                         <td>${date}</td>
+                        <td>${statusLabel}</td>
+                        <td>${prazoHtml}</td>
                         <td style="text-align:right;">R$ ${(item.valor || 0).toLocaleString()}</td>
                     </tr>`;
             });
@@ -1517,6 +1521,8 @@ const PipelineComercialModule = {
                             <th>Vendedor</th>
                             <th>Eng. Resp.</th>
                             <th>Data Abertura</th>
+                            <th>Status</th>
+                            <th>Prazo</th>
                             <th style="text-align:right;">Valor</th>
                         </tr>
                     </thead>
