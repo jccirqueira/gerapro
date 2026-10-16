@@ -1615,7 +1615,7 @@ const CRM = {
         const atingidoGeral = metaTotalMes > 0 ? Math.min(realizadoTotalMes / metaTotalMes * 100, 999) : 0;
 
         content.innerHTML = `
-            <div class="crm-dashboard" style="max-width:900px">
+            <div class="crm-dashboard">
                 <div class="crm-panel">
                     <div class="crm-panel-header"><i class="ph ph-presentation-chart"></i> Relatórios CRM
                         <button class="btn btn-sm" onclick="window.crm._printRelatorios()" style="margin-left:auto"><i class="ph ph-printer"></i> Imprimir</button>
