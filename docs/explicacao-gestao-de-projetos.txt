@@ -1,6 +1,6 @@
 ╔══════════════════════════════════════════════════════════════════════════════════╗
 ║                                                                                  ║
-║    GESTÃO DE PROJETOS NO GERAPRO                                                 ║
+║    CRONOGRAMA / DRE NO GERAPRO                                                   ║
 ║                                                                                  ║
 ║        (para quem não é programador nem engenheiro)                              ║
 ║                                                                                  ║
@@ -8,8 +8,8 @@
 
 ╔══════════════════════════════════════════════════════════════════════════════════╗
 ║                                                                                  ║
-║   IMPORTANTE: Este documento explica o módulo GESTÃO DE PROJETOS do GeraPro      ║
-║   (cronograma, tarefas e DRE).                                                   ║
+║   IMPORTANTE: Este documento explica o módulo CRONOGRAMA / DRE do GeraPro        ║
+║   (antiga Gestão de Projetos: cronograma, tarefas e DRE).                        ║
 ║   Ele NÃO explica como criar propostas — pressione F1 dentro do sistema          ║
 ║   ou leia os outros arquivos da pasta /docs.                                     ║
 ║                                                                                  ║
@@ -18,14 +18,14 @@
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  1. O QUE É A GESTÃO DE PROJETOS?                                               │
+│  1. O QUE É O CRONOGRAMA / DRE?                                                 │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 Toda proposta ganha vira obra. E a obra precisa de três coisas: um prazo
 (cronograma), um dinheiro (quanto entra e quanto sai) e um responsável (quem faz
-o quê). A Gestão de Projetos é o módulo pós-venda do GeraPro que segura essas
-três coisas no mesmo lugar.
+o quê). O Cronograma / DRE é o módulo pós-venda do GeraPro que segura essas três
+coisas no mesmo lugar.
 
 Aqui vivem o cronograma em Gantt (fases e tarefas), a DRE estimado × real (a
 rentabilidade do projeto) e as ligações com o resto do sistema — em especial o
@@ -410,7 +410,7 @@ o custo de material na DRE do projeto (categoria material, tipo real). Estimado
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │PROBLEMA: "A proposta fechou mas o projeto não apareceu"                         │
-│SOLUÇÃO: Volte para a Gestão de Projetos e clique em "Importar                   │
+│SOLUÇÃO: Volte para o Cronograma / DRE e clique em "Importar                     │
 │            Fechadas" (ou abra a lista vazia e use o botão do estado vazio). A   │
 │            importação tem deduplicação: se o projeto já existe, ela avisa em vez│
 │            de duplicar.                                                         │
@@ -466,7 +466,7 @@ o custo de material na DRE do projeto (categoria material, tipo real). Estimado
 ║                                                                                  ║
 ║   💡  LEMBRE-SE:                                                                 ║
 ║                                                                                  ║
-║   A Gestão de Projetos é a segunda metade do trabalho comercial: a proposta foi  ║
+║   O Cronograma / DRE é a segunda metade do trabalho comercial: a proposta foi    ║
 ║   ganha, agora é executar — com cronograma enxuto (fases e tarefas), dinheiro    ║
 ║   visível (DRE) e as compras ligadas no mesmo lugar.                             ║
 ║                                                                                  ║

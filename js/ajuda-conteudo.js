@@ -1872,14 +1872,14 @@
   },
 
   projetos: {
-    titulo: 'Gestão de Projetos',
+    titulo: 'Cronograma / DRE',
     icone: 'ph-folder',
     descricao: 'Projetos pós-venda: cronograma (Gantt) com fases e tarefas, DRE estimado × real e integração com o módulo Compras.',
     secoes: [
       {
         id: 'visao-geral',
         titulo: 'Visão Geral',
-        texto: 'A Gestão de Projetos é o módulo pós-venda: depois que a proposta é ganha, é aqui que o projeto vive — cronograma, execução e rentabilidade.\n\nTrês formas de um projeto nascer:\n- **Automaticamente:** quando uma proposta da Gestão de Propostas é movida para **Fechado (ganha)**, o projeto é criado aqui com código PRJ-0001, cliente, datas e valor da proposta.\n- **Importar Fechadas:** o botão da lista varre o funil e cria os projetos que ainda não foram importados — com deduplicação, a mesma proposta nunca gera dois projetos.\n- **Manual:** o botão Novo Projeto, para obras que não nasceram de proposta.\n\nCada projeto tem status (Em Andamento, Pausado, Concluído ou Cancelado) e carrega três pilares:\n- **Cronograma** — fases e tarefas no Gantt.\n- **DRE** — estimado × real, a rentabilidade do projeto.\n- **Integrações** — requisições de Compras ligadas ao projeto e custos reais que voltam para a DRE.'
+        texto: 'O Cronograma / DRE é o módulo pós-venda: depois que a proposta é ganha, é aqui que o projeto vive — cronograma, execução e rentabilidade.\n\nTrês formas de um projeto nascer:\n- **Automaticamente:** quando uma proposta da Gestão de Propostas é movida para **Fechado (ganha)**, o projeto é criado aqui com código PRJ-0001, cliente, datas e valor da proposta.\n- **Importar Fechadas:** o botão da lista varre o funil e cria os projetos que ainda não foram importados — com deduplicação, a mesma proposta nunca gera dois projetos.\n- **Manual:** o botão Novo Projeto, para obras que não nasceram de proposta.\n\nCada projeto tem status (Em Andamento, Pausado, Concluído ou Cancelado) e carrega três pilares:\n- **Cronograma** — fases e tarefas no Gantt.\n- **DRE** — estimado × real, a rentabilidade do projeto.\n- **Integrações** — requisições de Compras ligadas ao projeto e custos reais que voltam para a DRE.'
       },
       {
         id: 'lista',
@@ -1973,10 +1973,10 @@
       {
         id: 'requisicao',
         titulo: 'Nova Requisição — a entrada da LM',
-        texto: 'A Requisição nasce do arquivo de LM enviado pela Engenharia. O fluxo primário é planilha: clique em **Baixar template da LM** para receber o modelo com as colunas esperadas — Código | Descrição | Fabricante | Unidade | Quantidade (sinônimos de cabeçalho também são aceitos, como Qtd, PN ou referência).\n\nNo cabeçalho você informa o projeto de destino (Gestão de Projetos), a revisão do documento, o solicitante e a data da LM, e anexa o arquivo. O sistema calcula o hash do arquivo e avisa quando o reenvio é idêntico ao anterior. O campo origem (Upload da Engenharia, Lançamento manual ou Gerada da Proposta Técnica) deixa o cadastro agnóstico da fonte: quando a Engenharia virar módulo nativo, a LM poderá ser gerada dentro do GeraPro sem mudar nada aqui.\n\nAo importar, cada linha é pareada com o Banco de Materiais:\n- Código interno ou do fabricante (exato, com escopo de empresa)\n- Pontuação textual na descrição quando não há código (o limiar de sugestão é 80 pontos; medidas elétricas divergentes — corrente, tensão, potência — ficam como não cadastrado para não apontar o material errado)\n- Sem correspondência: o item fica marcado como NÃO CADASTRADO\n\nO custo e o lead time do catálogo são congelados (snapshot) na importação e o Valor Estimado da requisição é calculado na hora (soma de quantidade × custo do catálogo).',
+        texto: 'A Requisição nasce do arquivo de LM enviado pela Engenharia. O fluxo primário é planilha: clique em **Baixar template da LM** para receber o modelo com as colunas esperadas — Código | Descrição | Fabricante | Unidade | Quantidade (sinônimos de cabeçalho também são aceitos, como Qtd, PN ou referência).\n\nNo cabeçalho você informa o projeto de destino (Cronograma / DRE), a revisão do documento, o solicitante e a data da LM, e anexa o arquivo. O sistema calcula o hash do arquivo e avisa quando o reenvio é idêntico ao anterior. O campo origem (Upload da Engenharia, Lançamento manual ou Gerada da Proposta Técnica) deixa o cadastro agnóstico da fonte: quando a Engenharia virar módulo nativo, a LM poderá ser gerada dentro do GeraPro sem mudar nada aqui.\n\nAo importar, cada linha é pareada com o Banco de Materiais:\n- Código interno ou do fabricante (exato, com escopo de empresa)\n- Pontuação textual na descrição quando não há código (o limiar de sugestão é 80 pontos; medidas elétricas divergentes — corrente, tensão, potência — ficam como não cadastrado para não apontar o material errado)\n- Sem correspondência: o item fica marcado como NÃO CADASTRADO\n\nO custo e o lead time do catálogo são congelados (snapshot) na importação e o Valor Estimado da requisição é calculado na hora (soma de quantidade × custo do catálogo).',
         campos: [
           { nome: 'Código', descricao: 'REQ-0001 sequencial por empresa.' },
-          { nome: 'Projeto', descricao: 'Projeto de destino — integra com a Gestão de Projetos.' },
+          { nome: 'Projeto', descricao: 'Projeto de destino — integra com o Cronograma / DRE.' },
           { nome: 'Revisão', descricao: 'Nº da revisão do documento de LM.' },
           { nome: 'Status', descricao: 'Rascunho, Em Conferência, Liberada, Em Cotação, Em Pedido, Recebida ou Cancelada.' },
           { nome: 'Material não cadastrado', descricao: 'Item sem correspondência no catálogo — impede a liberação até ser resolvido.' }
@@ -2074,8 +2074,9 @@
 window.AJUDA_CATEGORIAS = [
   { label: 'Principal', modules: ['dashboard'] },
   { label: 'Cadastros', modules: ['clientes', 'fornecedores'] },
-  { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'projetos', 'precificacao', 'orcamentos', 'importacaoET', 'comparacaoDocumentos'] },
+  { label: 'Comercial', modules: ['crm', 'proposta-tecnica', 'proposta-comercial', 'proposta-completa', 'pipeline-comercial', 'precificacao', 'orcamentos', 'importacaoET', 'comparacaoDocumentos'] },
   { label: 'Engenharia', modules: ['materiais', 'paineis', 'chaparia', 'tipicos', 'cubiculos', 'cargas', 'composicoes', 'regras-derivacao', 'mao-de-obra', 'despesas', 'calculos-eletricos', 'calculos-mecanicos', 'lm', 'automacao-rede', 'manufatura'] },
+  { label: 'Gestão de Projetos', modules: ['projetos'] },
   { label: 'Operações', modules: ['compras'] },
   { label: 'Relatórios', modules: ['relatorio-propostas', 'relatorio-cadastros', 'relatorio-tipicos', 'relatorio-manufatura'] },
   { label: 'Configurações', modules: ['importacao', 'configuracoes'] }

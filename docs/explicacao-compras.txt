@@ -10,7 +10,7 @@
 ║                                                                                  ║
 ║   IMPORTANTE: Este documento explica o módulo COMPRAS do GeraPro                 ║
 ║   (requisição, cotação, pedido e NF).                                            ║
-║   Ele NÃO explica o módulo de Materiais nem a Gestão de Projetos —               ║
+║   Ele NÃO explica o módulo de Materiais nem o Cronograma / DRE —                 ║
 ║   pressione F1 dentro do sistema ou leia os outros arquivos da pasta /docs.      ║
 ║                                                                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════════╝
@@ -133,7 +133,7 @@ No topo, os cards de resumo dão o estado do momento:
 │  • Indicadores — abre o painel de gestão (KPIs, lead time, fornecedores e       │
 │    duplicidades).                                                               │
 │  • Busca por código, título, revisão ou solicitante.                            │
-│  • Filtros por status e por projeto (puxa a lista da Gestão de Projetos).       │
+│  • Filtros por status e por projeto (puxa a lista do Cronograma / DRE).         │
 │  • Contador — "3 de 5 requisição(ões)".                                         │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -150,8 +150,8 @@ No topo, os cards de resumo dão o estado do momento:
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 Clique em Nova Requisição. No cabeçalho você informa o projeto de destino
-(Gestão de Projetos), a revisão do documento, o solicitante, a data da LM e
-anexa o arquivo.
+(Cronograma / DRE), a revisão do documento, o solicitante, a data da LM e anexa
+o arquivo.
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
