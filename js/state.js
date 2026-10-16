@@ -107,6 +107,7 @@ const initialState = {
     crmStages: [],
     projetos: [],
     projetoFases: [],
+    projetoTarefas: [],
     projetoCustos: [],
     comprasRequisicoes: [],
     comprasRequisicaoItens: [],
@@ -171,7 +172,7 @@ class Store {
             if (data.success && data.data) {
                 const sd = data.data;
                 console.log('[Load] Got data:', Object.keys(sd).map(k => `${k}:${Array.isArray(sd[k]) ? sd[k].length : '?'}`).join(', '));
-                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases','projetoCustos','comprasRequisicoes','comprasRequisicaoItens','comprasCotacoes','comprasCotacaoItens','comprasPedidos','comprasPedidoItens','comprasNotas','comprasNotaItens']) {
+                for (const key of ['clientes','materiais','fornecedores','painelTypes','tipicos','cubiculos','cargas','orcamentos','loadLists','chapariaLists','layoutTemplates','propostasTecnicas','propostasComerciais','propostasCompletas','pipelineItems','vendedores','composicoes','regrasDerivacao','crmLeads','crmInteracoes','crmTarefas','crmNotas','crmWebhooks','crmSequencias','crmAutomacoes','crmMetas','crmEmailTemplates','crmStages','manufaturaProjetos','manufaturaColunas','manufaturaGavetas','manufaturaComponentes','manufaturaHistorico','manufaturaPerfisTeste','manufaturaResultadosTeste','manufaturaAnexos','unidadesCliente','projetos','projetoFases','projetoTarefas','projetoCustos','comprasRequisicoes','comprasRequisicaoItens','comprasCotacoes','comprasCotacaoItens','comprasPedidos','comprasPedidoItens','comprasNotas','comprasNotaItens']) {
                     if (Array.isArray(sd[key])) this.state[key] = sd[key];
                 }
                 // O servidor usa a entidade 'paineis'; o estado/chave de UI é 'painelTypes'
@@ -2069,7 +2070,15 @@ const COMPRAS_ENTIDADES = [
     ['ComprasNotaItens',         'comprasNotaItens']
 ];
 
-for (const [sufixo, chave] of COMPRAS_ENTIDADES) {
+/* Fase 4 de Projetos — subtarefas por fase seguem o mesmo padrão
+   (escrita otimista no estado local + rollback se o servidor recusar).
+   O sufixo é no singular para gerar add/update/deleteProjetoTarefa,
+   como addProjetoFase/addProjetoCusto da Fase 2/3. */
+const PROJETO_ENTIDADES = [
+    ['ProjetoTarefa', 'projetoTarefas']
+];
+
+for (const [sufixo, chave] of [...COMPRAS_ENTIDADES, ...PROJETO_ENTIDADES]) {
     Store.prototype['add' + sufixo] = async function (item) {
         const now = new Date().toISOString();
         const novo = { ...item, id: item.id || crypto.randomUUID(), created_at: item.created_at || now, updated_at: now };

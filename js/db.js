@@ -1050,6 +1050,30 @@ function initSchema() {
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_empresa ON projeto_custos(empresa_id)'); } catch (e) { /* ignore */ }
     try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_projeto ON projeto_custos(empresa_id, projeto_id, tipo)'); } catch (e) { /* ignore */ }
 
+    // Fase 4 — Tarefas dos projetos (subtarefas por fase, exibidas no Gantt)
+    // status: pendente | em_andamento | concluido | bloqueada (mesmas chaves de projeto_fases)
+    // fase_id aponta para a fase "mãe"; o progresso da fase vira a média das tarefas.
+    try { db.exec(`
+        CREATE TABLE IF NOT EXISTS projeto_tarefas (
+            id TEXT PRIMARY KEY,
+            empresa_id TEXT NOT NULL DEFAULT 'default',
+            projeto_id TEXT NOT NULL DEFAULT '',
+            fase_id TEXT NOT NULL DEFAULT '',
+            ordem INTEGER DEFAULT 0,
+            nome TEXT NOT NULL DEFAULT '',
+            descricao TEXT DEFAULT '',
+            responsavel TEXT DEFAULT '',
+            status TEXT DEFAULT 'pendente',
+            data_inicio TEXT DEFAULT '',
+            data_fim TEXT DEFAULT '',
+            progresso INTEGER DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    `); } catch (e) { /* table may already exist */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_tarefas_empresa ON projeto_tarefas(empresa_id)'); } catch (e) { /* ignore */ }
+    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_tarefas_fase ON projeto_tarefas(empresa_id, projeto_id, fase_id, ordem)'); } catch (e) { /* ignore */ }
+
     /* ================================================================
        MÓDULO DE COMPRAS
        Requisição (LM da Engenharia) → Cotação → Pedido → NF recebida.
@@ -1377,6 +1401,7 @@ const TABLE_MAP = {
     projetos: { pk: 'id', table: 'projetos' },
     projetoFases: { pk: 'id', table: 'projeto_fases' },
     projetoCustos: { pk: 'id', table: 'projeto_custos' },
+    projetoTarefas: { pk: 'id', table: 'projeto_tarefas' },
     comprasRequisicoes: { pk: 'id', table: 'compras_requisicoes' },
     comprasRequisicaoItens: { pk: 'id', table: 'compras_requisicao_itens' },
     comprasCotacoes: { pk: 'id', table: 'compras_cotacoes' },
@@ -2279,6 +2304,7 @@ function getFullSync(empresaId = 'default') {
         projetos: findAll('projetos', empresaId),
         projetoFases: findAll('projetoFases', empresaId),
         projetoCustos: findAll('projetoCustos', empresaId),
+        projetoTarefas: findAll('projetoTarefas', empresaId),
         comprasRequisicoes: findAll('comprasRequisicoes', empresaId),
         comprasRequisicaoItens: findAll('comprasRequisicaoItens', empresaId),
         comprasCotacoes: findAll('comprasCotacoes', empresaId),

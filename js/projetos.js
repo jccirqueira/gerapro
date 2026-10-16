@@ -4,6 +4,9 @@ import { store } from './state.js';
  * GESTÃO DE PROJETOS
  * Módulo criado automaticamente quando uma proposta do Pipeline é "Fechada" (ganha).
  * Fase 1: entidade + gancho "fechado" + sidebar + visões lista/detalhe.
+ * Fase 2: cronograma/Gantt com a entidade projeto_fases.
+ * Fase 3: DRE Estimado x Real com a entidade projeto_custos.
+ * Fase 4: subtarefas por fase (projeto_tarefas) + refinamentos do Gantt.
  */
 
 const STATUS = {
@@ -28,6 +31,10 @@ const FASE_CORES = {
     concluido: '#10B981',
     bloqueada: '#EF4444'
 };
+
+/* Fase 4 — Subtarefas (projeto_tarefas): mesmos status/chaves das fases */
+const TAREFA_STATUS = { ...FASE_STATUS };
+const TAREFA_CORES = { ...FASE_CORES };
 
 /* Modelo padrão de fases — configurável pelo usuário (persistido em localStorage) */
 const FASES_PADRAO = [
@@ -94,6 +101,8 @@ const ProjetosModule = {
     searchQuery: '',
     statusFilter: '',
     ganttZoom: 'auto',   // 'auto' | 'dia' | 'semana' | 'mes'
+    ganttTarefas: localStorage.getItem('gerapro_prj_gantt_tarefas') !== '0', // Fase 4: subtarefas visíveis no Gantt
+    ganttExpandido: (() => { try { return JSON.parse(localStorage.getItem('gerapro_prj_gantt_exp') || '[]'); } catch (e) { return []; } })(), // fases expandidas
 
     init() {
         window.projetosModule = this;
@@ -129,7 +138,16 @@ const ProjetosModule = {
             saveCusto: this.saveCusto.bind(this),
             removeCusto: this.removeCusto.bind(this),
             seedEstimado: this.seedEstimado.bind(this),
-            exportDreXLSX: this.exportDreXLSX.bind(this)
+            exportDreXLSX: this.exportDreXLSX.bind(this),
+            // Fase 4 — Subtarefas por fase (projeto_tarefas)
+            openTarefaModal: this.openTarefaModal.bind(this),
+            saveTarefa: this.saveTarefa.bind(this),
+            toggleTarefa: this.toggleTarefa.bind(this),
+            moveTarefa: this.moveTarefa.bind(this),
+            removeTarefa: this.removeTarefa.bind(this),
+            toggleFaseExpandida: this.toggleFaseExpandida.bind(this),
+            toggleExpandirTodas: this.toggleExpandirTodas.bind(this),
+            toggleGanttTarefas: this.toggleGanttTarefas.bind(this)
         };
 
         store.subscribe((state) => {
@@ -1166,6 +1184,67 @@ const ProjetosModule = {
             </div>`;
     },
 
+    /* ================================================================
+       Fase 4 — SUBTAREFAS POR FASE (entidade projeto_tarefas)
+       ================================================================ */
+
+    _tarefasDoProjeto(projetoId) {
+        const tarefas = (store.getState().projetoTarefas || []).filter(t => t.projeto_id === projetoId);
+        tarefas.sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
+        return tarefas;
+    },
+
+    _tarefasDaFase(faseId) {
+        const tarefas = (store.getState().projetoTarefas || []).filter(t => t.fase_id === faseId);
+        tarefas.sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || String(a.created_at || '').localeCompare(String(b.created_at || '')));
+        return tarefas;
+    },
+
+    /* Progresso delegado: fase COM tarefas tem progresso = média das tarefas
+       (materializado em fase.progresso para lista/resumo lerem o mesmo valor);
+       fase SEM tarefas mantém o progresso manual digitado. */
+    _recalcProgressoFase(faseId) {
+        const f = (store.getState().projetoFases || []).find(x => x.id === faseId);
+        if (!f) return;
+        const tarefas = this._tarefasDaFase(faseId);
+        if (tarefas.length === 0) return;
+        const soma = tarefas.reduce((s, t) => s + Math.max(0, Math.min(100, parseFloat(t.progresso) || 0)), 0);
+        const media = Math.round(soma / tarefas.length);
+        if ((parseFloat(f.progresso) || 0) !== media) {
+            store.updateProjetoFase(faseId, { progresso: media });
+        }
+    },
+
+    _faseExpandida(faseId) {
+        return Array.isArray(this.ganttExpandido) && this.ganttExpandido.includes(faseId);
+    },
+
+    _persisteExpandido() {
+        try { localStorage.setItem('gerapro_prj_gantt_exp', JSON.stringify(this.ganttExpandido || [])); } catch (e) { /* ignora */ }
+    },
+
+    toggleFaseExpandida(faseId) {
+        const set = new Set(this.ganttExpandido || []);
+        if (set.has(faseId)) set.delete(faseId); else set.add(faseId);
+        this.ganttExpandido = [...set];
+        this._persisteExpandido();
+        this.renderDetail();
+    },
+
+    toggleExpandirTodas(projetoId) {
+        const comTarefas = this._fasesDoProjeto(projetoId).filter(f => this._tarefasDaFase(f.id).length > 0);
+        const todas = comTarefas.length > 0 && comTarefas.every(f => this._faseExpandida(f.id));
+        this.ganttExpandido = todas ? [] : comTarefas.map(f => f.id);
+        this._persisteExpandido();
+        this.renderDetail();
+    },
+
+    toggleGanttTarefas() {
+        this.ganttTarefas = !this.ganttTarefas;
+        try { localStorage.setItem('gerapro_prj_gantt_tarefas', this.ganttTarefas ? '1' : '0'); } catch (e) { /* ignora */ }
+        this.renderDetail();
+    },
+
     setZoom(v) {
         this.ganttZoom = GANTT_ZOOM[v] !== undefined ? v : 'auto';
         this.renderDetail();
@@ -1174,12 +1253,16 @@ const ProjetosModule = {
     _cronogramaHTML(p) {
         const fases = this._fasesDoProjeto(p.id);
         const prog = this._progressoProjeto(p.id);
+        const tarefas = this._tarefasDoProjeto(p.id);
+        const mostrarTarefas = this.ganttTarefas !== false && tarefas.length > 0;
+        const comTarefas = fases.filter(f => this._tarefasDaFase(f.id).length > 0);
+        const todasExpandidas = mostrarTarefas && comTarefas.length > 0 && comTarefas.every(f => this._faseExpandida(f.id));
 
         const toolbar = `
             <div class="prj-gantt-toolbar">
                 <div class="prj-gantt-title">
                     <i class="ph ph-chart-bar-horizontal"></i> Cronograma
-                    <span class="prj-gantt-count">${fases.length} fase(s)</span>
+                    <span class="prj-gantt-count">${fases.length} fase(s)${tarefas.length ? ' · ' + tarefas.length + ' tarefa(s)' : ''}</span>
                 </div>
                 <div class="prj-gantt-controls">
                     <select class="prj-filter" onchange="app.projetos.setZoom(this.value)" title="Escala do Gantt">
@@ -1194,6 +1277,12 @@ const ProjetosModule = {
                     <button class="btn btn-sm btn-ghost" onclick="app.projetos.seedFases('${p.id}')" title="Criar as 7 fases padrão distribuídas no período do projeto">
                         <i class="ph ph-magic-wand"></i> Gerar Fases Padrão
                     </button>
+                    <button class="btn btn-sm btn-ghost ${this.ganttTarefas !== false ? 'prj-btn-on' : ''}" onclick="app.projetos.toggleGanttTarefas()" title="Mostrar ou ocultar as tarefas (subtarefas) das fases no Gantt">
+                        <i class="ph ${this.ganttTarefas !== false ? 'ph-eye' : 'ph-eye-slash'}"></i> Tarefas
+                    </button>
+                    ${mostrarTarefas ? `<button class="btn btn-sm btn-ghost" onclick="app.projetos.toggleExpandirTodas('${p.id}')" title="${todasExpandidas ? 'Recolher' : 'Exibir'} as tarefas de todas as fases">
+                        <i class="ph ${todasExpandidas ? 'ph-arrows-in' : 'ph-arrows-out'}"></i> ${todasExpandidas ? 'Recolher' : 'Expandir'}
+                    </button>` : ''}
                     <button class="btn btn-sm btn-primary" onclick="app.projetos.openFaseModal('${p.id}')">
                         <i class="ph ph-plus"></i> Nova Fase
                     </button>
@@ -1250,7 +1339,8 @@ const ProjetosModule = {
             for (let i = 0; i < totalDias; i++) {
                 const d = this._addDays(min, i);
                 const isHoje = this._iso(d) === this._iso(hoje);
-                daysRow += `<div class="prj-gantt-day ${isHoje ? 'today' : ''}" style="left:${i * colWidth}px;width:${colWidth}px">
+                const fds = d.getDay() === 0 || d.getDay() === 6;
+                daysRow += `<div class="prj-gantt-day ${isHoje ? 'today' : ''}${fds && !isHoje ? ' weekend' : ''}" style="left:${i * colWidth}px;width:${colWidth}px">
                     <span>${d.getDate()}</span><small>${NOMES_DIA[d.getDay()]}</small></div>`;
             }
         }
@@ -1259,11 +1349,16 @@ const ProjetosModule = {
         const hojeX = this._diffDays(min, hoje) * colWidth + colWidth / 2;
         const hojeHTML = `<div class="prj-gantt-today-line" style="left:${260 + hojeX}px" title="Hoje — ${this._fmtDate(this._iso(hoje))}"></div>`;
 
-        /* --- Linhas (fases) --- */
+        /* --- Linhas (fases) + subtarefas (Fase 4) --- */
+        const ganttCtx = { min, colWidth, hoje, totalW };
         const linhas = fases.map(f => {
             const atrasada = f.status !== 'concluido' && f.data_fim && this._parseDate(f.data_fim) < hoje;
             const cor = f.cor || FASE_CORES[f.status] || FASE_CORES.pendente;
             const progF = Math.max(0, Math.min(100, parseFloat(f.progresso) || 0));
+            const tarefasFase = this._tarefasDaFase(f.id);
+            const temTarefas = tarefasFase.length > 0;
+            const expandida = mostrarTarefas && temTarefas && this._faseExpandida(f.id);
+            const nConcl = tarefasFase.filter(t => t.status === 'concluido').length;
 
             let bar = '';
             if (f.data_inicio) {
@@ -1286,19 +1381,24 @@ const ProjetosModule = {
                 bar = `<div class="prj-gantt-nodate">sem datas</div>`;
             }
 
-            return `
+            const linhaFase = `
                 <div class="prj-gantt-row">
                     <div class="prj-gantt-row-left">
                         <div class="prj-gantt-name">
+                            ${temTarefas && mostrarTarefas
+                                ? `<button class="prj-gantt-chevron ${expandida ? 'open' : ''}" onclick="app.projetos.toggleFaseExpandida('${f.id}')" title="${expandida ? 'Recolher' : 'Exibir'} as ${tarefasFase.length} tarefa(s) desta fase"><i class="ph ph-caret-right"></i></button>`
+                                : ''}
                             <span class="prj-gantt-dot" style="background:${cor}"></span>
                             <span title="${this._esc(f.nome)}">${this._esc(f.nome)}</span>
                         </div>
                         <div class="prj-gantt-meta">
                             ${this._fmtDate(f.data_inicio) || '—'}${f.data_fim ? ' → ' + this._fmtDate(f.data_fim) : ''}
                             · <b>${progF}%</b>
+                            ${temTarefas ? `<span class="prj-chip-tarefas" title="${nConcl}/${tarefasFase.length} tarefa(s) concluída(s)">${nConcl}/${tarefasFase.length} tarefas</span>` : ''}
                             ${atrasada ? '<span class="prj-gantt-attr">atrasada</span>' : ''}
                         </div>
                         <div class="prj-gantt-row-actions">
+                            <button onclick="app.projetos.openTarefaModal('${p.id}', '${f.id}')" title="Adicionar tarefa nesta fase"><i class="ph ph-list-plus"></i></button>
                             <button onclick="app.projetos.openFaseModal('${p.id}', '${f.id}')" title="Editar fase"><i class="ph ph-pencil-simple"></i></button>
                             <button onclick="app.projetos.toggleFase('${f.id}')" title="${f.status === 'concluido' ? 'Reabrir fase' : 'Marcar como concluída'}"><i class="ph ph-check-circle"></i></button>
                             <button onclick="app.projetos.moveFase('${f.id}', -1)" title="Mover para cima"><i class="ph ph-arrow-up"></i></button>
@@ -1308,6 +1408,10 @@ const ProjetosModule = {
                     </div>
                     <div class="prj-gantt-row-track" style="width:${totalW}px;${colWidth >= 8 ? `background-size:${colWidth}px 100%;` : ''}">${bar}</div>
                 </div>`;
+
+            /* Fase 4 — linhas de subtarefas sob a fase expandida */
+            const linhasTarefas = expandida ? tarefasFase.map(t => this._tarefaRowHTML(p, f, t, ganttCtx)).join('') : '';
+            return linhaFase + linhasTarefas;
         }).join('');
 
         /* --- Legenda / resumo --- */
@@ -1340,13 +1444,65 @@ const ProjetosModule = {
                     </div>
                 </div>
             </div>
-            <div class="prj-gantt-hint"><i class="ph ph-info"></i> Arraste uma barra para reprogramar a fase; clique nela para editar datas, status e progresso.</div>`;
+            <div class="prj-gantt-hint"><i class="ph ph-info"></i> Arraste uma barra para reprogramar (fase ou tarefa) e clique nela para editar. Use a seta <i class="ph ph-caret-right" style="font-size:11px;vertical-align:-1px"></i> da fase para expandir as subtarefas; o botão <b>Tarefas</b> mostra/oculta esse nível.</div>`;
+    },
+
+    /* --- Linha de subtarefa no Gantt (Fase 4) --- */
+    _tarefaRowHTML(p, f, t, g) {
+        const atrasada = t.status !== 'concluido' && t.data_fim && this._parseDate(t.data_fim) < g.hoje;
+        const corT = TAREFA_CORES[t.status] || TAREFA_CORES.pendente;
+        const progT = Math.max(0, Math.min(100, parseFloat(t.progresso) || 0));
+        const concluida = t.status === 'concluido';
+
+        let bar = '';
+        if (t.data_inicio) {
+            const ini = this._parseDate(t.data_inicio);
+            const fim = t.data_fim ? this._parseDate(t.data_fim) : ini;
+            const left = Math.max(0, this._diffDays(g.min, ini) * g.colWidth);
+            const dur = Math.max(1, this._diffDays(ini, fim) + 1);
+            const width = Math.max(6, dur * g.colWidth);
+            const titulo = `${t.nome} · ${this._fmtDate(t.data_inicio)}${t.data_fim ? ' → ' + this._fmtDate(t.data_fim) : ''} · ${dur} dia(s) · ${progT}%`;
+            bar = `
+                <div class="prj-gantt-bar prj-bar-tarefa${atrasada ? ' atrasada' : ''}" data-tarefa="${t.id}"
+                     style="left:${left}px;width:${width}px;background:${corT}"
+                     onpointerdown="app.projetos.barDown(event, '${t.id}', 'tarefa')"
+                     title="${this._esc(titulo)} — arraste para reprogramar, clique para editar">
+                    <div class="prj-gantt-bar-fill" style="width:${progT}%"></div>
+                    ${width >= 46 ? `<span class="prj-gantt-bar-label">${this._esc(t.nome)}</span>` : ''}
+                </div>`;
+        } else {
+            bar = `<div class="prj-gantt-nodate">sem datas</div>`;
+        }
+
+        return `
+            <div class="prj-gantt-row prj-tarefa">
+                <div class="prj-gantt-row-left">
+                    <div class="prj-gantt-name prj-tarefa-name">
+                        <button class="prj-t-check ${concluida ? 'ok' : ''}" onclick="app.projetos.toggleTarefa('${t.id}')" title="${concluida ? 'Reabrir tarefa' : 'Marcar como concluída'}"><i class="ph ${concluida ? 'ph-check-circle' : 'ph-circle'}"></i></button>
+                        <span title="${this._esc(t.nome)}">${this._esc(t.nome)}</span>
+                        ${t.responsavel ? `<small class="prj-t-resp" title="Responsável: ${this._esc(t.responsavel)}">${this._esc(t.responsavel)}</small>` : ''}
+                    </div>
+                    <div class="prj-gantt-meta">
+                        ${this._fmtDate(t.data_inicio) || '—'}${t.data_fim ? ' → ' + this._fmtDate(t.data_fim) : ''}
+                        · <b>${progT}%</b>
+                        ${atrasada ? '<span class="prj-gantt-attr">atrasada</span>' : ''}
+                    </div>
+                    <div class="prj-gantt-row-actions">
+                        <button onclick="app.projetos.openTarefaModal('${p.id}', '${f.id}', '${t.id}')" title="Editar tarefa"><i class="ph ph-pencil-simple"></i></button>
+                        <button onclick="app.projetos.moveTarefa('${t.id}', -1)" title="Mover para cima"><i class="ph ph-arrow-up"></i></button>
+                        <button onclick="app.projetos.moveTarefa('${t.id}', 1)" title="Mover para baixo"><i class="ph ph-arrow-down"></i></button>
+                        <button class="prj-danger" onclick="app.projetos.removeTarefa('${t.id}')" title="Excluir tarefa"><i class="ph ph-trash"></i></button>
+                    </div>
+                </div>
+                <div class="prj-gantt-row-track prj-track-tarefa" style="width:${g.totalW}px;${g.colWidth >= 8 ? `background-size:${g.colWidth}px 100%;` : ''}">${bar}</div>
+            </div>`;
     },
 
     /* --- Modal de fases (criar/editar) --- */
 
     openFaseModal(projetoId, faseId) {
         const f = faseId ? (store.getState().projetoFases || []).find(x => x.id === faseId) : null;
+        const temTarefas = faseId ? this._tarefasDaFase(faseId).length > 0 : false;
         document.querySelectorAll('.prj-modal-overlay').forEach(el => el.remove());
 
         const overlay = document.createElement('div');
@@ -1385,8 +1541,8 @@ const ProjetosModule = {
                             </select>
                         </div>
                         <div class="prj-field">
-                            <label>Progresso (%)</label>
-                            <input type="number" min="0" max="100" step="5" id="pf-f-prog" class="form-control" value="${f?.progresso ?? 0}">
+                            <label>Progresso (%)${temTarefas ? ' — calculado pelas tarefas' : ''}</label>
+                            <input type="number" min="0" max="100" step="5" id="pf-f-prog" class="form-control" value="${f?.progresso ?? 0}" ${temTarefas ? 'disabled title="Fase com tarefas: o progresso é a média delas e é atualizado automaticamente."' : ''}>
                         </div>
                     </div>
                     <div class="prj-field-row">
@@ -1442,6 +1598,10 @@ const ProjetosModule = {
             descricao: val('pf-f-desc').trim()
         };
         if (payload.status === 'concluido') payload.progresso = 100;
+        // Fase 4: fase com tarefas delega o progresso à média delas — ignora o valor manual
+        if (faseId && payload.status !== 'concluido' && this._tarefasDaFase(faseId).length > 0) {
+            delete payload.progresso;
+        }
 
         document.querySelectorAll('.prj-modal-overlay').forEach(el => el.remove());
 
@@ -1493,10 +1653,171 @@ const ProjetosModule = {
     async removeFase(faseId) {
         const f = (store.getState().projetoFases || []).find(x => x.id === faseId);
         if (!f) return;
-        if (!confirm(`Excluir a fase "${f.nome}"?`)) return;
+        const tarefas = this._tarefasDaFase(faseId);
+        const msg = tarefas.length
+            ? `Excluir a fase "${f.nome}" e ${tarefas.length} tarefa(s) ligada(s) a ela?`
+            : `Excluir a fase "${f.nome}"?`;
+        if (!confirm(msg)) return;
+        for (const t of tarefas) {
+            await store.deleteProjetoTarefa(t.id);
+        }
         await store.deleteProjetoFase(faseId);
         await this._syncFaseAtual(f.projeto_id);
-        window.app.toast('Fase excluída.', 'info');
+        window.app.toast(tarefas.length ? `Fase e ${tarefas.length} tarefa(s) excluídas.` : 'Fase excluída.', 'info');
+        this.renderDetail();
+    },
+
+    /* ================================================================
+       Fase 4 — SUBTAREFAS (projeto_tarefas): modal + CRUD
+       ================================================================ */
+
+    openTarefaModal(projetoId, faseId, tarefaId) {
+        const t = tarefaId ? (store.getState().projetoTarefas || []).find(x => x.id === tarefaId) : null;
+        const fid = t ? t.fase_id : faseId;
+        const fase = (store.getState().projetoFases || []).find(x => x.id === fid);
+        document.querySelectorAll('.prj-modal-overlay').forEach(el => el.remove());
+
+        const overlay = document.createElement('div');
+        overlay.className = 'prj-modal-overlay';
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+        overlay.innerHTML = `
+            <div class="prj-modal">
+                <div class="prj-modal-head">
+                    <h3><i class="ph ${t ? 'ph-pencil-simple' : 'ph-plus'}"></i> ${t ? 'Editar Tarefa' : 'Nova Tarefa'}</h3>
+                    <button class="btn btn-ghost btn-sm" onclick="this.closest('.prj-modal-overlay').remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <div class="prj-modal-body">
+                    <div class="prj-modal-contexto">Fase: <b>${this._esc(fase?.nome || '—')}</b></div>
+                    <div class="prj-field">
+                        <label>Nome da Tarefa *</label>
+                        <input type="text" id="pt-f-nome" class="form-control" value="${this._esc(t?.nome || '')}" placeholder="Ex.: Aprovar projeto elétrico">
+                    </div>
+                    <div class="prj-field-row">
+                        <div class="prj-field">
+                            <label>Data de Início</label>
+                            <input type="date" id="pt-f-inicio" class="form-control" value="${this._esc(t?.data_inicio || '')}">
+                        </div>
+                        <div class="prj-field">
+                            <label>Data de Fim</label>
+                            <input type="date" id="pt-f-fim" class="form-control" value="${this._esc(t?.data_fim || '')}">
+                        </div>
+                    </div>
+                    <div class="prj-field-row">
+                        <div class="prj-field">
+                            <label>Status</label>
+                            <select id="pt-f-status" class="form-control">
+                                ${Object.entries(TAREFA_STATUS).map(([k, v]) => `<option value="${k}" ${(t?.status || 'pendente') === k ? 'selected' : ''}>${v}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="prj-field">
+                            <label>Progresso (%)</label>
+                            <input type="number" min="0" max="100" step="5" id="pt-f-prog" class="form-control" value="${t?.progresso ?? 0}">
+                        </div>
+                    </div>
+                    <div class="prj-field">
+                        <label>Responsável</label>
+                        <input type="text" id="pt-f-resp" class="form-control" value="${this._esc(t?.responsavel || '')}" placeholder="Nome ou equipe">
+                    </div>
+                    <div class="prj-field">
+                        <label>Descrição</label>
+                        <textarea id="pt-f-desc" class="form-control" rows="2" placeholder="Detalhes, critérios de aceite...">${this._esc(t?.descricao || '')}</textarea>
+                    </div>
+                </div>
+                <div class="prj-modal-foot">
+                    <button class="btn btn-ghost" onclick="this.closest('.prj-modal-overlay').remove()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="app.projetos.saveTarefa('${projetoId}', '${fid}', '${tarefaId || ''}')"><i class="ph ph-check"></i> Salvar</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        setTimeout(() => document.getElementById('pt-f-nome')?.focus(), 60);
+    },
+
+    async saveTarefa(projetoId, faseId, tarefaId) {
+        const val = (id) => (document.getElementById(id)?.value ?? '');
+        const nome = val('pt-f-nome').trim();
+        if (!nome) { window.app.toast('Informe o nome da tarefa.', 'warning'); return; }
+
+        const payload = {
+            nome,
+            data_inicio: val('pt-f-inicio'),
+            data_fim: val('pt-f-fim'),
+            status: val('pt-f-status') || 'pendente',
+            progresso: Math.max(0, Math.min(100, parseFloat(val('pt-f-prog')) || 0)),
+            responsavel: val('pt-f-resp').trim(),
+            descricao: val('pt-f-desc').trim()
+        };
+        if (payload.data_inicio && payload.data_fim && payload.data_fim < payload.data_inicio) {
+            window.app.toast('A data de fim não pode ser anterior à de início.', 'warning');
+            return;
+        }
+        if (payload.status === 'concluido') payload.progresso = 100;
+
+        document.querySelectorAll('.prj-modal-overlay').forEach(el => el.remove());
+
+        try {
+            if (tarefaId) {
+                const ok = await store.updateProjetoTarefa(tarefaId, payload);
+                if (ok) window.app.toast('Tarefa atualizada.', 'success');
+            } else {
+                const tarefas = this._tarefasDaFase(faseId);
+                const ordem = tarefas.length ? Math.max(...tarefas.map(t => t.ordem || 0)) + 1 : 1;
+                const criada = await store.addProjetoTarefa({
+                    id: crypto.randomUUID(),
+                    projeto_id: projetoId,
+                    fase_id: faseId,
+                    ordem,
+                    ...payload
+                });
+                if (criada) {
+                    window.app.toast(`Tarefa "${nome}" criada.`, 'success');
+                    // Mostra a fase expandida para a nova tarefa já aparecer no Gantt
+                    if (!this._faseExpandida(faseId)) {
+                        this.ganttExpandido = [...(this.ganttExpandido || []), faseId];
+                        this._persisteExpandido();
+                    }
+                }
+            }
+            this._recalcProgressoFase(faseId);
+            this.renderDetail();
+        } catch (e) {
+            window.app.toast('Erro ao salvar tarefa: ' + e.message, 'error');
+        }
+    },
+
+    async toggleTarefa(tarefaId) {
+        const t = (store.getState().projetoTarefas || []).find(x => x.id === tarefaId);
+        if (!t) return;
+        const novo = t.status === 'concluido' ? 'em_andamento' : 'concluido';
+        const ok = await store.updateProjetoTarefa(tarefaId, {
+            status: novo,
+            progresso: novo === 'concluido' ? 100 : Math.min(95, parseFloat(t.progresso) || 0)
+        });
+        if (ok) window.app.toast(novo === 'concluido' ? `Tarefa "${t.nome}" concluída.` : `Tarefa "${t.nome}" reaberta.`, 'success');
+        this._recalcProgressoFase(t.fase_id);
+        this.renderDetail();
+    },
+
+    async moveTarefa(tarefaId, dir) {
+        const t = (store.getState().projetoTarefas || []).find(x => x.id === tarefaId);
+        if (!t) return;
+        const tarefas = this._tarefasDaFase(t.fase_id);
+        const idx = tarefas.findIndex(x => x.id === tarefaId);
+        const alvo = idx + dir;
+        if (alvo < 0 || alvo >= tarefas.length) return;
+        const outra = tarefas[alvo];
+        await store.updateProjetoTarefa(t.id, { ordem: outra.ordem || alvo + 1 });
+        await store.updateProjetoTarefa(outra.id, { ordem: t.ordem || idx + 1 });
+        this.renderDetail();
+    },
+
+    async removeTarefa(tarefaId) {
+        const t = (store.getState().projetoTarefas || []).find(x => x.id === tarefaId);
+        if (!t) return;
+        if (!confirm(`Excluir a tarefa "${t.nome}"?`)) return;
+        await store.deleteProjetoTarefa(tarefaId);
+        this._recalcProgressoFase(t.fase_id);
+        window.app.toast('Tarefa excluída.', 'info');
         this.renderDetail();
     },
 
@@ -1664,13 +1985,16 @@ const ProjetosModule = {
 
     /* --- Arrastar barra para reprogramar (pointer events) --- */
 
-    barDown(e, faseId) {
+    barDown(e, id, tipo = 'fase') {
         if (e.button !== 0 && e.pointerType === 'mouse') return;
         const bar = e.currentTarget;
         const g = this._gantt;
         if (!g) return;
-        const f = (store.getState().projetoFases || []).find(x => x.id === faseId);
-        if (!f || !f.data_inicio) return;
+        const isFase = tipo !== 'tarefa';
+        const item = isFase
+            ? (store.getState().projetoFases || []).find(x => x.id === id)
+            : (store.getState().projetoTarefas || []).find(x => x.id === id);
+        if (!item || !item.data_inicio) return;
 
         const startX = e.clientX;
         const origLeft = parseFloat(bar.style.left) || 0;
@@ -1693,15 +2017,19 @@ const ProjetosModule = {
             bar.classList.remove('dragging');
             try { bar.releasePointerCapture(e.pointerId); } catch (_) { /* ignora */ }
 
-            if (!dragging) { this.openFaseModal(f.projeto_id, faseId); return; }
+            if (!dragging) {
+                if (isFase) this.openFaseModal(item.projeto_id, id);
+                else this.openTarefaModal(item.projeto_id, item.fase_id, id);
+                return;
+            }
             if (deltaDays !== 0) {
-                const ini = this._addDays(this._parseDate(f.data_inicio), deltaDays);
-                const fim = f.data_fim ? this._addDays(this._parseDate(f.data_fim), deltaDays) : null;
-                const ok = await store.updateProjetoFase(faseId, {
-                    data_inicio: this._iso(ini),
-                    data_fim: fim ? this._iso(fim) : ''
-                });
-                if (ok) window.app.toast(`Fase "${f.nome}" reprogramada${deltaDays > 0 ? ' + ' + deltaDays : ' ' + deltaDays} dia(s).`, 'success');
+                const ini = this._addDays(this._parseDate(item.data_inicio), deltaDays);
+                const fim = item.data_fim ? this._addDays(this._parseDate(item.data_fim), deltaDays) : null;
+                const updates = { data_inicio: this._iso(ini), data_fim: fim ? this._iso(fim) : '' };
+                const ok = isFase
+                    ? await store.updateProjetoFase(id, updates)
+                    : await store.updateProjetoTarefa(id, updates);
+                if (ok) window.app.toast(`"${item.nome}" reprogramada${deltaDays > 0 ? ' + ' + deltaDays : ' ' + deltaDays} dia(s).`, 'success');
                 this.renderDetail();
             } else {
                 this.renderDetail();
@@ -1872,9 +2200,14 @@ const ProjetosModule = {
         for (const c of custos) {
             await store.deleteProjetoCusto(c.id);
         }
+        const tarefas = this._tarefasDoProjeto(id);
+        for (const t of tarefas) {
+            await store.deleteProjetoTarefa(t.id);
+        }
         await store.deleteProjeto(id);
         const removidos = [];
         if (fases.length) removidos.push(`${fases.length} fase(s)`);
+        if (tarefas.length) removidos.push(`${tarefas.length} tarefa(s)`);
         if (custos.length) removidos.push(`${custos.length} lançamento(s) da DRE`);
         window.app.toast(removidos.length
             ? `Projeto excluído (junto com ${removidos.join(' e ')}).`
