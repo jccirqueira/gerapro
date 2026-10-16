@@ -741,8 +741,8 @@ const ProjetosModule = {
                         <button class="btn btn-primary btn-sm" onclick="app.projetos.openCustoModal('${p.id}')">
                             <i class="ph ph-plus"></i> Novo Lançamento
                         </button>
-                        <button class="btn btn-ghost btn-sm" onclick="app.projetos.exportDreXLSX('${p.id}')">
-                            <i class="ph ph-file-xls"></i> XLSX
+                        <button class="btn btn-ghost btn-sm" onclick="app.projetos.exportDreXLSX('${p.id}')" title="Exporta a DRE detalhada: resumo, detalhamento por conta, lançamentos e análise">
+                            <i class="ph ph-file-xls"></i> XLSX Detalhado
                         </button>
                     </div>
                 </div>
@@ -937,7 +937,11 @@ const ProjetosModule = {
 
     /* --- Exportação --------------------------------------------------------- */
 
-    /** DRE em XLSX — cabeçalho formatado, linhas zebradas e primeira linha congelada. */
+    /** DRE em XLSX detalhado — 4 abas: resumo executivo, detalhamento de
+     *  cada conta com TODOS os lançamentos, base plana com autofiltro e
+     *  análise (KPIs, participação, desvios e alertas). Padrão da casa:
+     *  banner, cabeçalho em MAIÚSCULAS negrito centralizado, linhas
+     *  zebradas e 2 primeiras linhas congeladas em cada aba. */
     exportDreXLSX(projetoId) {
         const p = (store.getState().projetos || []).find(x => x.id === projetoId);
         if (!p) return;
@@ -946,88 +950,10 @@ const ProjetosModule = {
                 window.app.toast('Biblioteca XLSX não disponível.', 'warning');
                 return;
             }
-            const est   = this._drePorCategoria(projetoId, 'estimado');
-            const real  = this._drePorCategoria(projetoId, 'real');
-            const cEst  = this._dreCalculo(est);
-            const cReal = this._dreCalculo(real);
-            const num   = (v) => Math.round((Number(v) || 0) * 100) / 100;
-            const pctDe = (e, r) => {
-                const d = r - e;
-                return Math.abs(e) > 0.005 ? Math.round((d / Math.abs(e)) * 1000) / 10 : '';
-            };
-
-            const linhas = [];
-            Object.keys(DRE_GRUPOS).forEach(grupo => {
-                linhas.push({ Conta: DRE_GRUPOS[grupo], Estimado: '', Real: '', 'Variação (R$)': '', 'Variação (%)': '' });
-                DRE_CATEGORIAS.filter(c => c.grupo === grupo).forEach(cat => {
-                    const e = est[cat.key] || 0, r = real[cat.key] || 0;
-                    linhas.push({
-                        Conta: `${cat.sinal} ${cat.label}`,
-                        Estimado: num(e),
-                        Real: num(r),
-                        'Variação (R$)': num(r - e),
-                        'Variação (%)': pctDe(e, r)
-                    });
-                });
-                const sub = DRE_SUBTOTAIS.find(s => s.grupo === grupo);
-                if (sub) {
-                    const vE = this._dreAvaliar(cEst, sub.campos);
-                    const vR = this._dreAvaliar(cReal, sub.campos);
-                    linhas.push({ Conta: sub.label, Estimado: num(vE), Real: num(vR), 'Variação (R$)': num(vR - vE), 'Variação (%)': pctDe(vE, vR) });
-                }
-            });
-            linhas.push({ Conta: 'MARGEM (% sobre receita líquida)', Estimado: num(cEst.margem), Real: num(cReal.margem), 'Variação (R$)': '', 'Variação (%)': '' });
-
-            const ws = XLSX.utils.json_to_sheet(linhas);
-            const range = XLSX.utils.decode_range(ws['!ref']);
-            const headerStyle = {
-                font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } },
-                fill: { fgColor: { rgb: '4F46E5' } },
-                alignment: { horizontal: 'center', vertical: 'center', wrapText: true }
-            };
-            const zebraStyle   = { fill: { fgColor: { rgb: 'F3F4F6' } } };
-            const groupStyle   = { font: { bold: true, sz: 11, color: { rgb: '374151' } }, fill: { fgColor: { rgb: 'E0E7FF' } } };
-            const totalStyle   = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4B5563' } } };
-            const moneyFmt     = '#,##0.00';
-
-            for (let r = range.s.r; r <= range.e.r; r++) {
-                const linha  = linhas[r - range.s.r] || {};
-                const conta  = String(linha.Conta || '');
-                const ehGrupo = Object.values(DRE_GRUPOS).includes(conta);
-                const ehTotal = /^(RECEITA LÍQUIDA|LUCRO BRUTO|LUCRO LÍQUIDO|MARGEM)/.test(conta);
-                for (let c = range.s.c; c <= range.e.c; c++) {
-                    const addr = XLSX.utils.encode_cell({ c, r });
-                    const cell = ws[addr];
-                    if (!cell) continue;
-                    let base;
-                    if (r === 0) {
-                        if (cell.t === 's' && cell.v) cell.v = String(cell.v).toUpperCase();
-                        base = headerStyle;
-                    } else if (ehTotal) {
-                        base = totalStyle;
-                    } else if (ehGrupo) {
-                        base = groupStyle;
-                    } else {
-                        base = r % 2 === 1 ? zebraStyle : null;
-                    }
-                    // O xlsx-js-style lê o formato numérico de `style.numFmt` (dentro de cell.s).
-                    // `cell.z` é ignorado quando a célula já tem estilo, então o formato é
-                    // injetado numa cópia do estilo da própria célula.
-                    if (c > 0 && typeof cell.v === 'number') {
-                        cell.s = { ...(base || {}), numFmt: moneyFmt };
-                    } else if (base) {
-                        cell.s = base;
-                    }
-                }
-            }
-            ws['!cols'] = [{ wch: 36 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 13 }];
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'DRE');
-
+            const { wb, nLanc } = this._buildDreWorkbook(projetoId, p);
             const nomeArquivo = `DRE_${String(p.codigo || 'projeto').replace(/[^\w-]/g, '')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
             const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            this._patchXlsxFreezePane(buf).then(patched => {
+            this._patchXlsxFreezePane(buf, 2).then(patched => {
                 const blob = new Blob([patched], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -1037,11 +963,11 @@ const ProjetosModule = {
                 a.click();
                 document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
-                window.app.toast('DRE exportada em XLSX.', 'success');
+                window.app.toast(`DRE detalhada exportada — 4 abas, ${nLanc} lançamento(s).`, 'success');
             }).catch(err => {
                 console.error('[Projetos] XLSX freeze patch error:', err);
                 XLSX.writeFile(wb, nomeArquivo);
-                window.app.toast('DRE exportada em XLSX.', 'success');
+                window.app.toast(`DRE detalhada exportada — 4 abas, ${nLanc} lançamento(s).`, 'success');
             });
         } catch (e) {
             console.error('[Projetos] DRE XLSX error:', e);
@@ -1049,12 +975,351 @@ const ProjetosModule = {
         }
     },
 
+    /** Constrói o workbook completo da DRE (somente leitura do estado) —
+     *  usado pela exportação e validável sem disparar o download. */
+    _buildDreWorkbook(projetoId, p) {
+        const num = (v) => Math.round((Number(v) || 0) * 100) / 100;
+        const custos = this._custosDoProjeto(projetoId);
+        const est    = this._drePorCategoria(projetoId, 'estimado');
+        const real   = this._drePorCategoria(projetoId, 'real');
+        const cEst   = this._dreCalculo(est);
+        const cReal  = this._dreCalculo(real);
+        const nEst   = custos.filter(c => c.tipo === 'estimado').length;
+
+        const pctDe = (e, r) => Math.abs(e) > 0.005 ? (r - e) / Math.abs(e) : '';
+        const fmtData = (d) => {
+            const s = String(d || '');
+            const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+            return m ? `${m[3]}/${m[2]}/${m[1]}` : (s || '—');
+        };
+        const ORIGEM_LABEL = { manual: 'Manual', orcamento: 'Orçamento', compra: 'Compras (NF)' };
+        const origemDe = (c) => ORIGEM_LABEL[c.origem] || c.origem || 'Manual';
+        const bucketKey = (c) => DRE_CATEGORIAS.some(x => x.key === c.categoria) ? c.categoria : 'outras';
+        const porConta = {};
+        DRE_CATEGORIAS.forEach(c => { porConta[c.key] = []; });
+        custos.forEach(c => porConta[bucketKey(c)].push(c));
+        const ordem = (a, b) =>
+            (a.tipo === 'estimado' ? 0 : 1) - (b.tipo === 'estimado' ? 0 : 1) ||
+            String(a.data || '').localeCompare(String(b.data || '')) ||
+            String(a.descricao || '').localeCompare(String(b.descricao || ''));
+
+        const idProj = `${p.codigo || 'PROJ'} · ${p.projeto || '(sem nome)'} · Cliente: ${p.cliente || '—'}`;
+        const gerado = `gerado em ${new Date().toLocaleDateString('pt-BR')}`;
+
+        /* ---------------- estilos ---------------- */
+        const moneyFmt = '#,##0.00';
+        const pctFmt   = '0.0%';
+        const ppFmt    = '+0.0" p.p.";-0.0" p.p.";0.0" p.p."';
+        const stTitle   = { font: { bold: true, sz: 12, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '312E81' } }, alignment: { horizontal: 'left', vertical: 'center' } };
+        const stHeader  = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4F46E5' } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true } };
+        const stZebra   = { fill: { fgColor: { rgb: 'F3F4F6' } } };
+        const stGroup   = { font: { bold: true, sz: 11, color: { rgb: '374151' } }, fill: { fgColor: { rgb: 'E0E7FF' } } };
+        const stTotal   = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4B5563' } } };
+        const stSub     = { font: { bold: true, sz: 11, color: { rgb: '1F2937' } }, fill: { fgColor: { rgb: 'EEF2FF' } } };
+        const stNote    = { font: { italic: true, sz: 10, color: { rgb: '9CA3AF' } } };
+        const stAlerta  = { fill: { fgColor: { rgb: 'FFFBEB' } }, font: { color: { rgb: '92400E' } }, alignment: { vertical: 'center' } };
+        const stOk      = { fill: { fgColor: { rgb: 'F0FDF4' } }, font: { bold: true, color: { rgb: '15803D' } }, alignment: { vertical: 'center' } };
+        const stEstTag  = { font: { bold: true, sz: 10, color: { rgb: '9A3412' } }, fill: { fgColor: { rgb: 'FFF7ED' } }, alignment: { horizontal: 'center' } };
+        const stRealTag = { font: { bold: true, sz: 10, color: { rgb: '3730A3' } }, fill: { fgColor: { rgb: 'EEF2FF' } }, alignment: { horizontal: 'center' } };
+        const stNeutro  = { font: { bold: true, color: { rgb: 'E5E7EB' } } };
+        const BAND_CORES = { receita: '065F46', deducoes: '92400E', custos: '3730A3', operacionais: '374151' };
+        /* Cor da variação: favorável verde, desfavorável vermelho.
+           `escuro` = linha de total (fundo cinza): tons claros de texto. */
+        const vStyle = (delta, maiorMelhor, escuro) => {
+            if (Math.abs(delta) < 0.005) return { font: { color: { rgb: escuro ? 'E5E7EB' : '6B7280' } } };
+            const bom = maiorMelhor ? delta > 0 : delta < 0;
+            const st = { font: { bold: true, color: { rgb: bom ? (escuro ? '86EFAC' : '15803D') : (escuro ? 'FCA5A5' : 'B91C1C') } } };
+            if (!escuro) st.fill = { fgColor: { rgb: bom ? 'F0FDF4' : 'FEF2F2' } };
+            return st;
+        };
+
+        /* Monta uma aba: linha 0 = banner mesclado, linha 1 = cabeçalho em
+           MAIÚSCULAS negrito centralizado, demais linhas com `kind`
+           definindo o estilo base (zebra automática em linhas de dado). */
+        const mkSheet = (titulo, cabecalho, linhas, larguras, opts) => {
+            const ncol = cabecalho.length;
+            const aoa = [
+                [titulo, ...Array(ncol - 1).fill('')],
+                cabecalho.map(h => String(h).toUpperCase())
+            ];
+            linhas.forEach(l => {
+                const row = [...l.cells];
+                while (row.length < ncol) row.push('');
+                aoa.push(row);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = larguras.map(w => ({ wch: w }));
+            const baseDa = (l, r) => {
+                switch (l.kind) {
+                    case 'group':   return () => stGroup;
+                    case 'total':   return () => stTotal;
+                    case 'sub':     return () => stSub;
+                    case 'band':    return () => ({ font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: l.cor || '4B5563' } } });
+                    case 'note':    return () => stNote;
+                    case 'alert':   return () => stAlerta;
+                    case 'alertok': return () => stOk;
+                    case 'data':    return () => (r % 2 === 1 ? stZebra : null);
+                    default:        return () => null;
+                }
+            };
+            const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: ncol - 1 } }];
+            for (let c = 0; c < ncol; c++) {
+                const a = ws[XLSX.utils.encode_cell({ r: 0, c })];
+                if (a) a.s = stTitle;
+                const b = ws[XLSX.utils.encode_cell({ r: 1, c })];
+                if (b) b.s = stHeader;
+            }
+            linhas.forEach((l, i) => {
+                const r = i + 2;
+                const base = baseDa(l, r);
+                if (l.merge) merges.push({ s: { r, c: l.merge[0] }, e: { r, c: l.merge[1] } });
+                for (let c = 0; c < ncol; c++) {
+                    const cell = ws[XLSX.utils.encode_cell({ r, c })];
+                    if (!cell) continue;
+                    const st = Object.assign({}, base() || {}, (l.st && l.st[c]) || {});
+                    const fmt = l.fmt && l.fmt[c];
+                    if (fmt) st.numFmt = fmt;
+                    if (Object.keys(st).length) cell.s = st;
+                }
+            });
+            ws['!merges'] = merges;
+            if (opts && opts.autofilter) ws['!autofilter'] = { ref: opts.autofilter };
+            return ws;
+        };
+
+        /* ---- aba 1: DRE (resumo executivo) ---- */
+        const linhasDre = [];
+        Object.keys(DRE_GRUPOS).forEach(grupo => {
+            linhasDre.push({ kind: 'group', cells: [DRE_GRUPOS[grupo]], merge: [0, 6] });
+            DRE_CATEGORIAS.filter(c => c.grupo === grupo).forEach(cat => {
+                const e = est[cat.key] || 0, r = real[cat.key] || 0;
+                const rlE = cEst.receitaLiquida, rlR = cReal.receitaLiquida;
+                linhasDre.push({
+                    kind: 'data',
+                    cells: [
+                        `${cat.sinal} ${cat.label}`,
+                        num(e), num(r), num(r - e), pctDe(e, r),
+                        rlE > 0.005 ? e / rlE : '', rlR > 0.005 ? r / rlR : ''
+                    ],
+                    fmt: { 1: moneyFmt, 2: moneyFmt, 3: moneyFmt, 4: pctFmt, 5: pctFmt, 6: pctFmt },
+                    st: { 3: vStyle(r - e, cat.maiorMelhor), 4: vStyle(r - e, cat.maiorMelhor) }
+                });
+            });
+            const sub = DRE_SUBTOTAIS.find(s => s.grupo === grupo);
+            if (sub) {
+                const vE = this._dreAvaliar(cEst, sub.campos);
+                const vR = this._dreAvaliar(cReal, sub.campos);
+                linhasDre.push({
+                    kind: 'total',
+                    cells: [sub.label, num(vE), num(vR), num(vR - vE), pctDe(vE, vR), '', ''],
+                    fmt: { 1: moneyFmt, 2: moneyFmt, 3: moneyFmt, 4: pctFmt },
+                    st: { 3: vStyle(vR - vE, true, true), 4: vStyle(vR - vE, true, true) }
+                });
+            }
+        });
+        linhasDre.push({
+            kind: 'total',
+            cells: ['MARGEM (% SOBRE RECEITA LÍQUIDA)', cEst.margem / 100, cReal.margem / 100, (cReal.margem - cEst.margem) / 100, '', '', ''],
+            fmt: { 1: pctFmt, 2: pctFmt, 3: pctFmt },
+            st: { 3: vStyle((cReal.margem - cEst.margem) / 100, true, true) }
+        });
+        const wsDre = mkSheet(
+            `DRE DETALHADA — ${idProj} — ${gerado}`,
+            ['Conta', 'Estimado (R$)', 'Real (R$)', 'Variação (R$)', 'Variação (%)', '% Receita Líq. (E)', '% Receita Líq. (R)'],
+            linhasDre,
+            [42, 16, 16, 16, 13, 16, 16]
+        );
+
+        /* ---- aba 2: Detalhamento — cada conta com todos os lançamentos ---- */
+        const linhasDet = [];
+        DRE_CATEGORIAS.forEach(cat => {
+            const lista = porConta[cat.key] || [];
+            linhasDet.push({ kind: 'band', cor: BAND_CORES[cat.grupo], cells: [cat.label.toUpperCase()], merge: [0, 5] });
+            if (!lista.length) {
+                linhasDet.push({ kind: 'note', cells: ['(sem lançamentos nesta conta)'], merge: [0, 5] });
+                return;
+            }
+            [...lista].sort(ordem).forEach(c => {
+                const ehEst = c.tipo === 'estimado';
+                linhasDet.push({
+                    kind: 'data',
+                    cells: ['', ehEst ? 'ESTIMADO' : 'REAL', fmtData(c.data), c.descricao || '—', origemDe(c), Math.abs(num(c.valor))],
+                    fmt: { 5: moneyFmt },
+                    st: { 1: ehEst ? stEstTag : stRealTag }
+                });
+            });
+            const e = est[cat.key] || 0, r = real[cat.key] || 0;
+            linhasDet.push({ kind: 'sub', cells: ['SUBTOTAL ESTIMADO', '', '', '', '', num(e)], merge: [0, 4], fmt: { 5: moneyFmt } });
+            linhasDet.push({ kind: 'sub', cells: ['SUBTOTAL REAL', '', '', '', '', num(r)], merge: [0, 4], fmt: { 5: moneyFmt } });
+            linhasDet.push({
+                kind: 'sub',
+                cells: ['VARIAÇÃO (REAL − ESTIMADO)', '', '', '', pctDe(e, r), num(r - e)],
+                merge: [0, 3],
+                fmt: { 4: pctFmt, 5: moneyFmt },
+                st: { 4: vStyle(r - e, cat.maiorMelhor), 5: vStyle(r - e, cat.maiorMelhor) }
+            });
+        });
+        const volE = num(DRE_CATEGORIAS.reduce((s, c) => s + (est[c.key] || 0), 0));
+        const volR = num(DRE_CATEGORIAS.reduce((s, c) => s + (real[c.key] || 0), 0));
+        linhasDet.push({ kind: 'total', cells: ['VOLUME TOTAL LANÇADO — ESTIMADO', '', '', '', '', volE], merge: [0, 4], fmt: { 5: moneyFmt } });
+        linhasDet.push({ kind: 'total', cells: ['VOLUME TOTAL LANÇADO — REAL', '', '', '', '', volR], merge: [0, 4], fmt: { 5: moneyFmt } });
+        linhasDet.push({
+            kind: 'total',
+            cells: ['VARIAÇÃO DO VOLUME', '', '', '', pctDe(volE, volR), num(volR - volE)],
+            merge: [0, 3],
+            fmt: { 4: pctFmt, 5: moneyFmt },
+            st: { 4: stNeutro, 5: stNeutro }
+        });
+        const wsDet = mkSheet(
+            `DETALHAMENTO POR CONTA — ${idProj} — ${gerado}`,
+            ['Conta', 'Tipo', 'Data', 'Descrição', 'Origem', 'Valor (R$)'],
+            linhasDet,
+            [34, 12, 12, 50, 15, 16]
+        );
+
+        /* ---- aba 3: Lançamentos — base plana com autofiltro (pivot-ready) ---- */
+        const linhasLanc = [];
+        Object.keys(DRE_GRUPOS).forEach(grupo => {
+            DRE_CATEGORIAS.filter(c => c.grupo === grupo).forEach(cat => {
+                [...(porConta[cat.key] || [])].sort(ordem).forEach(c => {
+                    const ehEst = c.tipo === 'estimado';
+                    linhasLanc.push({
+                        kind: 'data',
+                        cells: [DRE_GRUPOS[grupo], `${cat.sinal} ${cat.label}`, ehEst ? 'ESTIMADO' : 'REAL', fmtData(c.data), c.descricao || '—', origemDe(c), Math.abs(num(c.valor))],
+                        fmt: { 6: moneyFmt },
+                        st: { 2: ehEst ? stEstTag : stRealTag }
+                    });
+                });
+            });
+        });
+        if (!linhasLanc.length) linhasLanc.push({ kind: 'note', cells: ['(nenhum lançamento registrado)'], merge: [0, 6] });
+        const wsLanc = mkSheet(
+            `LANÇAMENTOS (${custos.length}) — ${idProj} — ${gerado}`,
+            ['Grupo', 'Conta', 'Tipo', 'Data', 'Descrição', 'Origem', 'Valor (R$)'],
+            linhasLanc,
+            [26, 26, 12, 12, 48, 15, 16],
+            { autofilter: XLSX.utils.encode_range({ s: { r: 1, c: 0 }, e: { r: 1 + Math.max(1, linhasLanc.length), c: 6 } }) }
+        );
+
+        /* ---- aba 4: Análise — KPIs, participação, desvios e alertas ---- */
+        const linhasAna = [];
+        const pushBand = (txt) => linhasAna.push({ kind: 'band', cor: '1E1B4B', cells: [txt], merge: [0, 4] });
+
+        pushBand('INDICADORES-CHAVE');
+        [
+            ['RECEITA BRUTA', cEst.receitaBruta, cReal.receitaBruta, true, 'data'],
+            ['(−) IMPOSTOS SOBRE VENDAS', cEst.deducoes, cReal.deducoes, false, 'data'],
+            ['RECEITA LÍQUIDA', cEst.receitaLiquida, cReal.receitaLiquida, true, 'sub'],
+            ['(−) CUSTOS DIRETOS', cEst.custosDiretos, cReal.custosDiretos, false, 'data'],
+            ['LUCRO BRUTO', cEst.lucroBruto, cReal.lucroBruto, true, 'sub'],
+            ['(−) DESPESAS OPERACIONAIS', cEst.despesasOpers, cReal.despesasOpers, false, 'data'],
+            ['LUCRO LÍQUIDO', cEst.lucroLiquido, cReal.lucroLiquido, true, 'sub']
+        ].forEach(([label, vE, vR, mm, kind]) => {
+            linhasAna.push({
+                kind,
+                cells: [label, num(vE), num(vR), num(vR - vE), ''],
+                fmt: { 1: moneyFmt, 2: moneyFmt, 3: moneyFmt },
+                st: { 3: vStyle(vR - vE, mm, false) }
+            });
+        });
+        const dMargem = (cReal.margem - cEst.margem) / 100;
+        const notaMargem = !(cReal.receitaLiquida > 0.005)
+            ? 'sem receita líquida lançada'
+            : cReal.margem >= 10 ? `saudável (${cReal.margem.toFixed(1).replace('.', ',')}%)`
+            : cReal.margem > 0 ? `atenção: abaixo de 10% (${cReal.margem.toFixed(1).replace('.', ',')}%)`
+            : 'prejuízo no realizado';
+        linhasAna.push({
+            kind: 'sub',
+            cells: ['MARGEM LÍQUIDA', cEst.margem / 100, cReal.margem / 100, dMargem, notaMargem],
+            fmt: { 1: pctFmt, 2: pctFmt, 3: pctFmt },
+            st: {
+                3: vStyle(dMargem, true, false),
+                4: { font: { italic: true, bold: true, color: { rgb: cReal.margem >= 10 ? '15803D' : cReal.margem > 0 ? 'B45309' : 'B91C1C' } } }
+            }
+        });
+        linhasAna.push({
+            kind: 'data',
+            cells: ['Nº DE LANÇAMENTOS', nEst, custos.length - nEst, custos.length, `${nEst} estimado · ${custos.length - nEst} real`],
+            fmt: { 1: '0', 2: '0', 3: '0' }
+        });
+
+        pushBand('PARTICIPAÇÃO NA RECEITA LÍQUIDA');
+        let temPart = false;
+        DRE_CATEGORIAS.filter(c => c.key !== 'receita').forEach(cat => {
+            const e = est[cat.key] || 0, r = real[cat.key] || 0;
+            if (e < 0.005 && r < 0.005) return;
+            temPart = true;
+            const pE = cEst.receitaLiquida > 0.005 ? e / cEst.receitaLiquida : '';
+            const pR = cReal.receitaLiquida > 0.005 ? r / cReal.receitaLiquida : '';
+            const pp = (pE !== '' && pR !== '') ? (pR - pE) * 100 : '';
+            linhasAna.push({
+                kind: 'data',
+                cells: [`${cat.sinal} ${cat.label}`, pE, pR, pp, pp === '' ? '' : (pp > 0.05 ? '↑ ganhou participação' : pp < -0.05 ? '↓ perdeu participação' : 'estável')],
+                fmt: { 1: pctFmt, 2: pctFmt, 3: ppFmt },
+                st: { 3: typeof pp === 'number' ? { font: { bold: true, color: { rgb: (cat.maiorMelhor ? pp < 0 : pp > 0) ? 'B91C1C' : '15803D' } } } : null }
+            });
+        });
+        if (!temPart) linhasAna.push({ kind: 'note', cells: ['(sem lançamentos para calcular participação)'], merge: [0, 4] });
+
+        pushBand('MAIORES DESVIOS (TOP 5 — REAL × ESTIMADO)');
+        const desvios = DRE_CATEGORIAS.map(cat => ({ cat, e: est[cat.key] || 0, r: real[cat.key] || 0 }))
+            .map(d => ({ ...d, delta: d.r - d.e }))
+            .filter(d => Math.abs(d.delta) > 0.005)
+            .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+            .slice(0, 5);
+        if (!desvios.length) linhasAna.push({ kind: 'note', cells: ['(nenhum desvio entre estimado e realizado)'], merge: [0, 4] });
+        desvios.forEach(d => {
+            const semEst = Math.abs(d.e) < 0.005;
+            const bom = semEst ? null : (d.cat.maiorMelhor ? d.delta > 0 : d.delta < 0);
+            linhasAna.push({
+                kind: 'data',
+                cells: [`${d.cat.sinal} ${d.cat.label}`, num(d.e), num(d.r), num(d.delta),
+                    semEst ? 'REAL SEM ESTIMADO' : (bom ? 'FAVORÁVEL ✓' : 'DESFAVORÁVEL ✗')],
+                fmt: { 1: moneyFmt, 2: moneyFmt, 3: moneyFmt },
+                st: {
+                    3: vStyle(d.delta, d.cat.maiorMelhor, false),
+                    4: { font: { bold: true, color: { rgb: semEst ? '92400E' : bom ? '15803D' : 'B91C1C' } }, alignment: { horizontal: 'center' } }
+                }
+            });
+        });
+
+        pushBand('ALERTAS DA DRE');
+        const alertas = [];
+        const semEst  = DRE_CATEGORIAS.filter(c => (est[c.key] || 0) < 0.005 && (real[c.key] || 0) > 0.005);
+        const semReal = DRE_CATEGORIAS.filter(c => (est[c.key] || 0) > 0.005 && (real[c.key] || 0) < 0.005);
+        const desvio25 = DRE_CATEGORIAS.filter(c => {
+            const e = est[c.key] || 0;
+            return e > 0.005 && Math.abs((real[c.key] || 0) - e) / Math.abs(e) > 0.25;
+        });
+        const semData = custos.filter(c => !c.data);
+        if (semEst.length) alertas.push(`⚠ ${semEst.length} conta(s) com REAL sem ESTIMADO: ${semEst.map(c => c.label).join(', ')}`);
+        if (semReal.length) alertas.push(`⚠ ${semReal.length} conta(s) com ESTIMADO sem REAL: ${semReal.map(c => c.label).join(', ')}`);
+        if (desvio25.length) alertas.push(`⚠ Desvio acima de 25% entre estimado e real: ${desvio25.map(c => c.label).join(', ')}`);
+        if (semData.length) alertas.push(`⚠ ${semData.length} lançamento(s) sem data preenchida`);
+        if (alertas.length) alertas.forEach(txt => linhasAna.push({ kind: 'alert', cells: [txt], merge: [0, 4] }));
+        else linhasAna.push({ kind: 'alertok', cells: ['✓ DRE CONSISTENTE — nenhuma pendência encontrada'], merge: [0, 4] });
+
+        const wsAna = mkSheet(
+            `ANÁLISE DA DRE — ${idProj} — ${gerado}`,
+            ['Indicador / Conta', 'Estimado', 'Real', 'Variação', 'Nota'],
+            linhasAna,
+            [44, 16, 16, 16, 40]
+        );
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, wsDre, 'DRE');
+        XLSX.utils.book_append_sheet(wb, wsDet, 'Detalhamento');
+        XLSX.utils.book_append_sheet(wb, wsLanc, 'Lançamentos');
+        XLSX.utils.book_append_sheet(wb, wsAna, 'Análise');
+        return { wb, nLanc: custos.length };
+    },
+
     /**
-     * Injeta freeze pane (primeira linha congelada) num XLSX gerado pelo SheetJS.
+     * Injeta freeze pane (ySplit primeiras linhas congeladas) num XLSX gerado pelo SheetJS.
      * O xlsx-js-style não suporta !freeze no write — este helper faz post-processamento
      * no zip: descomprime as folhas, insere o <pane> e reconstrói o zip.
      */
-    async _patchXlsxFreezePane(arrayBuffer) {
+    async _patchXlsxFreezePane(arrayBuffer, ySplit = 1) {
         const orig = new Uint8Array(arrayBuffer);
         const dv = new DataView(orig.buffer);
         const entries = [];
@@ -1085,9 +1350,11 @@ const ProjetosModule = {
             if (/xl\/worksheets\/sheet\d+\.xml$/.test(entry.name)) {
                 let xml = new TextDecoder().decode(entry.content);
                 if (!xml.includes('<pane')) {
+                    const y = Math.max(1, ySplit | 0);
+                    const tl = 'A' + (y + 1);
                     xml = xml.replace(
                         /<sheetView([^>]*)\/>/,
-                        '<sheetView$1><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView>'
+                        `<sheetView$1><pane ySplit="${y}" topLeftCell="${tl}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="${tl}" sqref="${tl}"/></sheetView>`
                     );
                     entry.content = new TextEncoder().encode(xml);
                     patched = true;

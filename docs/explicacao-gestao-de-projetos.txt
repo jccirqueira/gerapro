@@ -288,8 +288,13 @@ Os custos reais também chegam sozinhos do módulo Compras: cada NF recebida lan
 o custo de material na DRE do projeto (categoria material, tipo real). Estimado
 × real instantâneo, sem digitar nada duas vezes.
 
-📌 O botão XLSX exporta a DRE no padrão do sistema: cabeçalho em destaque,
-   linhas zebradas e primeira linha congelada.
+📌 O botão XLSX Detalhado exporta a DRE em 4 abas: DRE (resumo executivo),
+   Detalhamento (cada conta aberta com TODOS os lançamentos, subtotais e
+   variação), Lançamentos (base completa com autofiltro, pronta para tabela
+   dinâmica do Excel) e Análise (indicadores-chave, participação na receita
+   líquida, maiores desvios e alertas). Todas seguem o padrão do sistema: banner
+   com identificação do projeto, cabeçalho em destaque, linhas zebradas e as
+   duas primeiras linhas congeladas.
 
 
 
@@ -332,7 +337,8 @@ o custo de material na DRE do projeto (categoria material, tipo real). Estimado
      pelo orçamento.
   7. Registre custos reais com Novo Lançamento — ou lance as NFs de Compras com
      o projeto vinculado.
-  8. Acompanhe a variação estimado × real, a margem e exporte a DRE em XLSX.
+  8. Acompanhe a variação estimado × real, a margem e exporte a DRE detalhada em
+     XLSX (4 abas).
 
 
 
@@ -352,8 +358,8 @@ o custo de material na DRE do projeto (categoria material, tipo real). Estimado
     tarefas existentes.
   • Ligue a requisição de Compras ao projeto desde o início — a DRE agradece no
     fim.
-  • Exporte a DRE (XLSX) para a reunião de fechamento: o arquivo já sai
-    formatado.
+  • Exporte a DRE detalhada (XLSX, 4 abas) para a reunião de fechamento: o
+    arquivo já sai formatado.
 
 
 
