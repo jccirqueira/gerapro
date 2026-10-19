@@ -1708,9 +1708,28 @@ class PrecificacaoModule {
         const labor = app.parseCurrency(document.getElementById('prec_labor_total')?.value || '0');
         const despesas = app.parseCurrency(document.getElementById('prec_despesas')?.value || '0');
 
+        // Créditos de entrada e consumíveis — MESMA base do calculateAll().
+        // (Antes, o caminho "Faturamento Direto" usava o material BRUTO, sem
+        //  créditos e sem consumíveis — divergente do Resumo Consolidado.)
+        const credIcms = getVal('prec_icms_credito', true);
+        const credPisCof = getVal('prec_pis_cofins_credito', true);
+        const credIpi = getVal('prec_ipi_credito', true);
+        let matLiquido = matBruto;
+        if (regime !== 'Simples Nacional') {
+            matLiquido = matBruto - credIcms - credPisCof - credIpi;
+        }
+        // Créditos efetivamente aplicados no custo (zerados no Simples Nacional)
+        const creditosAplicados = regime !== 'Simples Nacional'
+            ? { icms: credIcms, pisCofins: credPisCof, ipi: credIpi }
+            : { icms: 0, pisCofins: 0, ipi: 0 };
+
+        const percConsumiveis = getVal('prec_consumiveis');
+        const custoConsumiveis = matLiquido * (percConsumiveis / 100);
+
+        const custoTotal = matLiquido + custoConsumiveis + labor + despesas;
+
         // Faturamento Direto: preço = custo, sem margens, impostos ou descontos
         if (faturamento === 'Direto') {
-            const custoTotal = matBruto + labor + despesas;
             document.getElementById('prec_custo_total_display').innerText = app.formatCurrency(custoTotal);
             document.getElementById('res_preco_final_s_ipi').innerText = app.formatCurrency(custoTotal);
             document.getElementById('res_valor_ipi').innerText = app.formatCurrency(0);
@@ -1724,34 +1743,29 @@ class PrecificacaoModule {
                 profit: 0,
                 comissao: 0,
                 faturamento: 'Direto',
-                direto: true
+                direto: true,
+                impostos: { base: custoTotal, icms: 0, pisCofins: 0, iss: 0, das: 0, ipi: 0 },
+                creditos: creditosAplicados,
+                detalhe: { materialBruto: matBruto, consumiveis: custoConsumiveis, mo: labor, despesasDiretas: despesas, custosFixos: 0 }
             };
             return;
         }
 
         const businessType = document.getElementById('prec-business-type-select')?.value || 'Industrialização';
 
-        let matLiquido = matBruto;
-        if (regime !== 'Simples Nacional') {
-            const credIcms = getVal('prec_icms_credito', true);
-            const credPisCof = getVal('prec_pis_cofins_credito', true);
-            const credIpi = getVal('prec_ipi_credito', true);
-            matLiquido = matBruto - credIcms - credPisCof - credIpi;
-        }
-
-        const percConsumiveis = getVal('prec_consumiveis');
-        const custoConsumiveis = matLiquido * (percConsumiveis / 100);
-        
-        const custoTotal = matLiquido + custoConsumiveis + labor + despesas;
-
         document.getElementById('prec_custo_total_display').innerText = app.formatCurrency(custoTotal);
 
-        // 2. Impostos
+        // 2. Impostos (guarda também o detalhe por tributo — débito sobre a venda)
         let totalImpostosPercent = 0;
+        const pctImp = { icms: 0, pisCofins: 0, iss: 0, das: 0 };
         if (regime === 'Simples Nacional') {
             totalImpostosPercent = getVal('prec_das');
+            pctImp.das = totalImpostosPercent;
         } else {
-            totalImpostosPercent = getVal('prec_icms') + getVal('prec_pis_cofins') + (businessType === 'Prestação de Serviços' ? getVal('prec_iss') : 0);
+            pctImp.icms = getVal('prec_icms');
+            pctImp.pisCofins = getVal('prec_pis_cofins');
+            if (businessType === 'Prestação de Serviços') pctImp.iss = getVal('prec_iss');
+            totalImpostosPercent = pctImp.icms + pctImp.pisCofins + pctImp.iss;
         }
 
         // 3. IPI (precisa ser lido antes do markup para AutPro)
@@ -1807,7 +1821,7 @@ class PrecificacaoModule {
         const lucroEl = document.getElementById('res_lucro_reais');
         lucroEl.className = lucroLiquido >= 0 ? 'font-bold text-success' : 'font-bold text-danger';
 
-        // Save result for Summary
+        // Save result for Summary (+ detalhe tributário p/ o Resumo/DRE)
         this.calculatedResults[this.activeTag] = {
             cost: custoTotal,
             finalPriceNoIpi: precoFinalNoIpi,
@@ -1815,7 +1829,23 @@ class PrecificacaoModule {
             profit: lucroLiquido,
             comissao: valorComissao,
             faturamento: document.getElementById('prec-faturamento-select')?.value || 'Próprio',
-            direto: faturamento === 'Direto'
+            direto: false,
+            impostos: {
+                base: precoFinalNoIpi,
+                icms: precoFinalNoIpi * (pctImp.icms / 100),
+                pisCofins: precoFinalNoIpi * (pctImp.pisCofins / 100),
+                iss: precoFinalNoIpi * (pctImp.iss / 100),
+                das: precoFinalNoIpi * (pctImp.das / 100),
+                ipi: valorIpi
+            },
+            creditos: creditosAplicados,
+            detalhe: {
+                materialBruto: matBruto,
+                consumiveis: custoConsumiveis,
+                mo: labor,
+                despesasDiretas: despesas,
+                custosFixos: valorCustosFixos
+            }
         };
     }
 
@@ -1862,6 +1892,11 @@ class PrecificacaoModule {
             });
             const result = await res.json();
             if (result.success) {
+                // Snapshot tributário: recalcular tudo e persistir na proposta
+                // (valor do contrato + linhas detalhadas da DRE nos Projetos)
+                this.calculateAll();
+                const resumo = this.montarResumo();
+                await this._persistirResumo(resumo, ptcFolder);
                 app.toast('Configurações de precificação salvas.', 'success');
             }
         } catch (e) {
@@ -1904,13 +1939,15 @@ class PrecificacaoModule {
             console.log('[Precificacao] calculateAll - tag:', tag, 'mat:', matBruto, 'labor:', labor, 'desp:', despesas);
 
             let matLiquido = matBruto;
+            let credIcms = 0, credPisCof = 0, credIpi = 0;
             if (regime !== 'Simples Nacional') {
                 const autoCred = this.calculateEquipmentCredits(eq);
-                const credIcms = (data.icmsCredito || 0) || autoCred.credIcms;
-                const credPisCof = (data.pisCofinsCredito || 0) || autoCred.credPisCof;
-                const credIpi = (data.ipiCredito || 0) || autoCred.credIpi;
+                credIcms = (data.icmsCredito || 0) || autoCred.credIcms;
+                credPisCof = (data.pisCofinsCredito || 0) || autoCred.credPisCof;
+                credIpi = (data.ipiCredito || 0) || autoCred.credIpi;
                 matLiquido = matBruto - credIcms - credPisCof - credIpi;
             }
+            const creditosAplicados = { icms: credIcms, pisCofins: credPisCof, ipi: credIpi };
 
             const custoConsumiveis = matLiquido * ((data.consumiveis || 0) / 100);
             const custoTotal = matLiquido + custoConsumiveis + labor + despesas;
@@ -1924,16 +1961,24 @@ class PrecificacaoModule {
                     profit: 0,
                     comissao: 0,
                     faturamento: 'Direto',
-                    direto: true
+                    direto: true,
+                    impostos: { base: custoTotal, icms: 0, pisCofins: 0, iss: 0, das: 0, ipi: 0 },
+                    creditos: creditosAplicados,
+                    detalhe: { materialBruto: matBruto, consumiveis: custoConsumiveis, mo: labor, despesasDiretas: despesas, custosFixos: 0 }
                 };
                 continue;
             }
 
             let totalImpostosPercent = 0;
+            const pctImp = { icms: 0, pisCofins: 0, iss: 0, das: 0 };
             if (regime === 'Simples Nacional') {
                 totalImpostosPercent = data.das || 0;
+                pctImp.das = totalImpostosPercent;
             } else {
-                totalImpostosPercent = (data.icms || 0) + (data.pisCofins || 0) + (data.businessType === 'Prestação de Serviços' ? (data.iss || 0) : 0);
+                pctImp.icms = data.icms || 0;
+                pctImp.pisCofins = data.pisCofins || 0;
+                if (data.businessType === 'Prestação de Serviços') pctImp.iss = data.iss || 0;
+                totalImpostosPercent = pctImp.icms + pctImp.pisCofins + pctImp.iss;
             }
 
             const margemIdeal = data.margemIdeal || 0;
@@ -1976,7 +2021,23 @@ class PrecificacaoModule {
                 profit: lucroLiquido,
                 comissao: valorComissao,
                 faturamento: data.faturamento,
-                direto: false
+                direto: false,
+                impostos: {
+                    base: precoFinalNoIpi,
+                    icms: precoFinalNoIpi * (pctImp.icms / 100),
+                    pisCofins: precoFinalNoIpi * (pctImp.pisCofins / 100),
+                    iss: precoFinalNoIpi * (pctImp.iss / 100),
+                    das: precoFinalNoIpi * (pctImp.das / 100),
+                    ipi: valorIpi
+                },
+                creditos: creditosAplicados,
+                detalhe: {
+                    materialBruto: matBruto,
+                    consumiveis: custoConsumiveis,
+                    mo: labor,
+                    despesasDiretas: despesas,
+                    custosFixos: valorCustosFixos
+                }
             };
         }
 
@@ -1992,6 +2053,134 @@ class PrecificacaoModule {
             };
         } else {
             delete this.calculatedResults['__INFRA__'];
+        }
+    }
+
+    /* ================================================================
+       RESUMO TRIBUTÁRIO (snapshot) — espelha exatamente os totais do
+       Resumo Consolidado (mesma lógica de SEU/Direto/cap AutPro) e
+       detalha impostos (débito) e créditos de entrada. Persistido em
+       activeTechnicalProposal.precificacaoResumo (coluna `dados` da
+       proposta técnica) e consumido pelos Projetos para:
+         • Valor do Contrato (= preço final COM IPI);
+         • seed detalhado da DRE no "Gerar Estimado".
+       ================================================================ */
+    montarResumo() {
+        const state = store.getState();
+        const isAutPro = state.company?.folderName?.startsWith('AUT_');
+        const equipments = state.activeTechnicalProposal?.equipments || [];
+        const seus = equipments.filter(eq => eq.type === 'SEU');
+        const useSeuMode = seus.length > 0;
+
+        // Mesmas TAGs consideradas pelo Resumo Consolidado
+        const tags = [];
+        if (useSeuMode) {
+            const compIds = new Set();
+            seus.forEach(s => (s.seu_components || []).forEach(c => compIds.add(String(c))));
+            equipments.forEach(e => { if (compIds.has(String(e.id))) tags.push(e.tag); });
+        } else {
+            equipments.forEach(e => tags.push(e.tag));
+        }
+
+        const s = {
+            receitaNoIpi: 0, ipi: 0, receitaComIpi: 0, custo: 0, lucro: 0,
+            icms: 0, pisCofins: 0, iss: 0, das: 0, ipiDebito: 0,
+            creditos: { icms: 0, pisCofins: 0, ipi: 0 },
+            materialBruto: 0, consumiveis: 0, mo: 0, despesasDiretas: 0,
+            custosFixos: 0
+        };
+        tags.forEach(tag => {
+            const x = this.calculatedResults[tag];
+            if (!x) return;
+            s.custo += x.cost || 0;
+            s.receitaNoIpi += x.finalPriceNoIpi || 0;
+            s.ipi += x.ipiValue || 0;
+            s.lucro += x.profit || 0;
+            const imp = x.impostos;
+            if (imp) {
+                s.icms += imp.icms || 0;
+                s.pisCofins += imp.pisCofins || 0;
+                s.iss += imp.iss || 0;
+                s.das += imp.das || 0;
+                s.ipiDebito += imp.ipi || 0;
+            }
+            const cr = x.creditos;
+            if (cr) {
+                s.creditos.icms += cr.icms || 0;
+                s.creditos.pisCofins += cr.pisCofins || 0;
+                s.creditos.ipi += cr.ipi || 0;
+            }
+            const d = x.detalhe;
+            if (d) {
+                s.materialBruto += d.materialBruto || 0;
+                s.consumiveis += d.consumiveis || 0;
+                s.mo += d.mo || 0;
+                s.despesasDiretas += d.despesasDiretas || 0;
+                s.custosFixos += d.custosFixos || 0;
+            }
+        });
+
+        // Infraestrutura (BDI próprio): entra em custo/receita/lucro, sem impostos por TAG
+        const infra = this.calculatedResults['__INFRA__'];
+        if (infra) {
+            s.custo += infra.cost || 0;
+            s.receitaNoIpi += infra.finalPriceNoIpi || 0;
+            s.lucro += infra.profit || 0;
+        }
+
+        // Cap de comissão AutPro (mesmo critério do Resumo Consolidado)
+        let comissaoBruta = 0;
+        Object.values(this.calculatedResults).forEach(r => {
+            if (!r.direto && r.comissao !== undefined) comissaoBruta += r.comissao;
+        });
+        let comissao = comissaoBruta;
+        if (isAutPro) {
+            comissao = Math.min(comissaoBruta, 30000);
+            s.lucro += Math.max(0, comissaoBruta - 30000);
+        }
+
+        s.comissao = comissao;
+        s.receitaComIpi = s.receitaNoIpi + s.ipi;
+        s.margem = s.receitaNoIpi > 0 ? (s.lucro / s.receitaNoIpi) * 100 : 0;
+        s.regime = state.company?.regimeTributario || 'Lucro Real';
+        s.geradoEm = new Date().toISOString();
+        s.ptcFolder = window.app.currentPtc?.folder || '';
+        return s;
+    }
+
+    /* Persiste o snapshot: na proposta ativa (campo extra da coluna `dados`)
+       e o preço final COM IPI no(s) cartão(ões) desta PTC no pipeline. */
+    async _persistirResumo(resumo, ptcFolder) {
+        try {
+            const prop = store.getState().activeTechnicalProposal;
+            if (prop) {
+                store.setState({ activeTechnicalProposal: { ...prop, precificacaoResumo: resumo } });
+                if (prop.id) {
+                    await store.updatePropostaTecnica(prop.id, {
+                        precificacaoResumo: resumo,
+                        updatedAt: new Date().toISOString()
+                    });
+                }
+            }
+
+            const chave = String(ptcFolder || '').trim().toLowerCase();
+            const items = [...(store.getState().pipelineItems || [])];
+            let atualizados = 0;
+            items.forEach((it, i) => {
+                if (it.origem === 'ptc' && String(it.origemId || '').trim().toLowerCase() === chave
+                    && resumo.receitaComIpi > 0 && Number(it.valor) !== resumo.receitaComIpi) {
+                    const updatedAt = new Date().toISOString();
+                    items[i] = { ...it, valor: resumo.receitaComIpi, updatedAt };
+                    store._syncUpdate('pipelineItems', it.id, { valor: resumo.receitaComIpi, updatedAt });
+                    atualizados++;
+                }
+            });
+            if (atualizados > 0) {
+                store.setState({ pipelineItems: items });
+                app.toast(`Valor da proposta no pipeline atualizado: ${app.formatCurrency(resumo.receitaComIpi)}.`, 'info');
+            }
+        } catch (e) {
+            console.error('[Precificacao] Falha ao persistir o resumo tributário:', e);
         }
     }
 

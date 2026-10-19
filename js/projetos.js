@@ -59,7 +59,15 @@ const GANTT_ZOOM = { auto: 0, dia: 22, semana: 8, mes: 3 };
 const DRE_CATEGORIAS = [
     { key: 'receita',          label: 'Receita Bruta',          sinal: '+', grupo: 'receita',      maiorMelhor: true,  icone: 'ph-trend-up' },
     { key: 'impostos',         label: 'Impostos sobre Vendas',  sinal: '−', grupo: 'deducoes',     maiorMelhor: false, icone: 'ph-percent' },
+    { key: 'icms',             label: 'ICMS sobre Vendas (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-drop' },
+    { key: 'pis_cofins',       label: 'PIS/COFINS sobre Vendas (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-coins' },
+    { key: 'iss',              label: 'ISS sobre Serviços (débito)', sinal: '−', grupo: 'deducoes',  maiorMelhor: false, icone: 'ph-briefcase' },
+    { key: 'das',              label: 'DAS — Simples Nacional (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-file-text' },
+    { key: 'ipi',              label: 'IPI a Recolher (débito)', sinal: '−', grupo: 'deducoes',     maiorMelhor: false, icone: 'ph-fire' },
     { key: 'material',         label: 'Materiais',              sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-cube' },
+    { key: 'cred_icms',        label: 'Créd. ICMS (Entrada)',   sinal: '+', grupo: 'custos',       maiorMelhor: true,  icone: 'ph-arrow-down-left' },
+    { key: 'cred_pis_cofins',  label: 'Créd. PIS/COFINS (Entrada)', sinal: '+', grupo: 'custos',   maiorMelhor: true,  icone: 'ph-seal-check' },
+    { key: 'cred_ipi',         label: 'Créd. IPI (Entrada)',    sinal: '+', grupo: 'custos',       maiorMelhor: true,  icone: 'ph-certificate' },
     { key: 'mo',               label: 'Mão de Obra',            sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-users-three' },
     { key: 'despesas_diretas', label: 'Despesas Diretas',       sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-wrench' },
     { key: 'subcontratacao',   label: 'Subcontratação',         sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-handshake' },
@@ -188,6 +196,20 @@ const ProjetosModule = {
     },
 
     /* ================================================================
+       SNAPSHOT TRIBUTÁRIO da Precificação da PTC de origem
+       (gravado por precificacao.saveToServer → precificacaoResumo)
+       ================================================================ */
+    _resumoPrecificacao(origemId) {
+        if (!origemId) return null;
+        const chave = String(origemId).trim().toLowerCase();
+        if (!chave) return null;
+        const row = (store.getState().propostasTecnicas || []).find(p =>
+            String(p.ptc_folder || p.folder || '').trim().toLowerCase() === chave);
+        const snap = row?.precificacaoResumo;
+        return (snap && snap.receitaComIpi > 0) ? snap : null;
+    },
+
+    /* ================================================================
        GANCHO — chamado pelo Pipeline quando um cartão vira "Fechado"
        ================================================================ */
 
@@ -202,6 +224,11 @@ const ProjetosModule = {
             const existente = projetos.find(p => ((p.origem_id || '').toString().trim().toLowerCase()) === chave);
             if (existente) return existente;
         }
+
+        // Valor do contrato: preço final COM IPI da Precificação (quando salva);
+        // senão, o valor digitado no cartão do pipeline.
+        const snap = this._resumoPrecificacao(item.origemId);
+        const valorContrato = snap ? snap.receitaComIpi : (parseFloat(item.valor) || 0);
 
         const now = new Date().toISOString();
         const payload = {
@@ -218,7 +245,7 @@ const ProjetosModule = {
             responsavel: '',
             vendedor: item.vendedor || '',
             engenheiro_responsavel: item.engenheiro_responsavel || '',
-            valor_contrato: parseFloat(item.valor) || 0,
+            valor_contrato: valorContrato,
             data_inicio: now.slice(0, 10),
             data_prevista_entrega: this._isoDateFromBR(item.data_entrega),
             data_entrega_real: '',
@@ -622,14 +649,24 @@ const ProjetosModule = {
         }, 0);
     },
 
-    /* Subtotais encadeados da DRE a partir do mapa de categorias */
+    /* Subtotais encadeados da DRE — cálculo assinado por categoria:
+       • grupo 'receita' (o subtotal SOMA): linha '+' soma, '−' subtrai;
+       • demais grupos (o subtotal SUBTRAI do anterior): linha '−' entra no
+         balde a subtrair, linha '+' REDUZ o balde (ex.: créditos de ICMS,
+         PIS/COFINS e IPI da entrada, que abatem o custo do material). */
     _dreCalculo(t) {
-        const receitaBruta   = t.receita || 0;
-        const deducoes       = t.impostos || 0;
+        const balde = { receita: 0, deducoes: 0, custos: 0, operacionais: 0 };
+        DRE_CATEGORIAS.forEach(c => {
+            const v = Math.abs(Number(t[c.key]) || 0);
+            const somaNoGrupo = (c.grupo === 'receita') ? (c.sinal === '+') : (c.sinal === '−');
+            balde[c.grupo] += somaNoGrupo ? v : -v;
+        });
+        const receitaBruta   = balde.receita;
+        const deducoes       = balde.deducoes;
         const receitaLiquida = receitaBruta - deducoes;
-        const custosDiretos  = (t.material || 0) + (t.mo || 0) + (t.despesas_diretas || 0) + (t.subcontratacao || 0);
+        const custosDiretos  = balde.custos;
         const lucroBruto     = receitaLiquida - custosDiretos;
-        const despesasOpers  = (t.custos_fixos || 0) + (t.comissao || 0) + (t.viagens || 0) + (t.frete || 0) + (t.outras || 0);
+        const despesasOpers  = balde.operacionais;
         const lucroLiquido   = lucroBruto - despesasOpers;
         const margem         = receitaLiquida > 0 ? (lucroLiquido / receitaLiquida) * 100 : 0;
         return { receitaBruta, deducoes, receitaLiquida, custosDiretos, lucroBruto, despesasOpers, lucroLiquido, margem };
@@ -877,10 +914,12 @@ const ProjetosModule = {
     },
 
     /**
-     * Semear o lado ESTIMADO a partir do orçamento.
+     * Semear o lado ESTIMADO.
      * Não destrói lançamentos existentes: só cria as categorias que ainda não foram
-     * estimadas. Materiais/Mão de Obra não são deriváveis sem o orçamento detalhado,
-     * então criamos as linhas zeradas apenas para o usuário preencher.
+     * estimadas. Com Precificação salva na proposta (origem_id), semeia os valores
+     * EXATOS — débitos por tributo, créditos de entrada, material, MO, despesas,
+     * custos fixos e comissão em R$ (Lucro Líquido bate com a Precificação).
+     * Sem precificação, usa os percentuais padrão e cria Material e MO zerados.
      */
     async seedEstimado(projetoId) {
         const projeto = (store.getState().projetos || []).find(x => x.id === projetoId);
@@ -892,25 +931,109 @@ const ProjetosModule = {
         const pImpostos = regime === 'Simples Nacional' ? DRE_SEED_PADRAO.impostosSN : DRE_SEED_PADRAO.impostos;
 
         const novos = [];
-        if (!jaTem.has('receita') && receita > 0) {
-            novos.push({ categoria: 'receita', valor: receita, descricao: 'Valor do contrato' });
-        }
-        [
-            ['impostos',     pImpostos,                    `Estimativa de impostos — ${regime}`],
-            ['custos_fixos', DRE_SEED_PADRAO.custos_fixos, 'Rateio de custos fixos'],
-            ['comissao',     DRE_SEED_PADRAO.comissao,     'Comissão de vendas']
-        ].forEach(([cat, pct, desc]) => {
-            if (!jaTem.has(cat) && receita > 0 && pct > 0) {
+        const snap = this._resumoPrecificacao(projeto.origem_id);
+        // Se já existe linha de imposto (inclusive o agregado legado), não cria o detalhado
+        const temImposto = ['impostos', 'icms', 'pis_cofins', 'iss', 'das', 'ipi'].some(k => jaTem.has(k));
+
+        if (snap && receita > 0) {
+            /* ============================================================
+               CAMINHO DETALHADO — números EXATOS da Precificação salva:
+               débitos (ICMS/PIS-COFINS/ISS/DAS/IPI), créditos de entrada,
+               material bruto, MO, despesas, custos fixos e comissão em R$.
+               O Lucro Líquido do estimado bate com o da Precificação.
+               ============================================================ */
+            const fator = snap.receitaComIpi > 0 ? receita / snap.receitaComIpi : 1;
+            const esc = Math.abs(fator - 1) > 0.0001
+                ? ` · escalonado ×${fator.toFixed(3).replace('.', ',')} p/ o valor do contrato`
+                : '';
+            const base = snap.receitaNoIpi || 0;
+            const pct = (v, b) => (b > 0 && v > 0) ? ` — ${(v / b * 100).toFixed(2).replace('.', ',')}%` : '';
+
+            if (!jaTem.has('receita')) {
                 novos.push({
-                    categoria: cat,
-                    valor: receita * pct / 100,
-                    descricao: `${desc} (${String(pct).replace('.', ',')}% sobre a receita)`
+                    categoria: 'receita', valor: receita, origem: 'precificacao',
+                    descricao: 'Valor do contrato — preço final com IPI da precificação' + esc
                 });
             }
-        });
-        ['material', 'mo'].forEach(cat => {
-            if (!jaTem.has(cat)) novos.push({ categoria: cat, valor: 0, descricao: '' });
-        });
+            if (!temImposto) {
+                [
+                    ['icms',       snap.icms,       `ICMS sobre vendas (débito)${pct(snap.icms, base)} sobre o preço s/ IPI${esc}`],
+                    ['pis_cofins', snap.pisCofins,  `PIS/COFINS sobre vendas (débito)${pct(snap.pisCofins, base)} sobre o preço s/ IPI${esc}`],
+                    ['iss',        snap.iss,        `ISS sobre serviços (débito)${pct(snap.iss, base)}${esc}`],
+                    ['das',        snap.das,        `DAS — Simples Nacional (débito)${pct(snap.das, snap.receitaComIpi)} da receita${esc}`],
+                    ['ipi',        snap.ipi,        `IPI a recolher (débito) — repasse do IPI destacado na nota${esc}`]
+                ].forEach(([cat, v, desc]) => {
+                    const val = (v || 0) * fator;
+                    if (!jaTem.has(cat) && val > 0.005) {
+                        novos.push({ categoria: cat, valor: val, origem: 'precificacao', descricao: desc });
+                    }
+                });
+            }
+            const materialVal = Math.max(((snap.materialBruto || 0) + (snap.consumiveis || 0)) * fator, 0);
+            if (!jaTem.has('material')) {
+                novos.push({
+                    categoria: 'material', valor: materialVal, origem: 'precificacao',
+                    descricao: materialVal > 0.005 ? 'Material bruto + consumíveis (ver os créditos de entrada abaixo)' + esc : ''
+                });
+            }
+            [
+                ['cred_icms',       snap.creditos.icms,      'Crédito de ICMS da entrada — abate o custo do material'],
+                ['cred_pis_cofins', snap.creditos.pisCofins, 'Crédito de PIS/COFINS da entrada — abate o custo do material'],
+                ['cred_ipi',        snap.creditos.ipi,       'Crédito de IPI da entrada — abate o custo do material']
+            ].forEach(([cat, v, desc]) => {
+                const val = (v || 0) * fator;
+                if (!jaTem.has(cat) && val > 0.005) {
+                    novos.push({ categoria: cat, valor: val, origem: 'precificacao', descricao: desc + esc });
+                }
+            });
+            if (!jaTem.has('mo')) {
+                const val = Math.max((snap.mo || 0) * fator, 0);
+                novos.push({
+                    categoria: 'mo', valor: val, origem: 'precificacao',
+                    descricao: val > 0.005 ? 'Mão de obra — custo calculado na precificação' + esc : ''
+                });
+            }
+            if (!jaTem.has('despesas_diretas') && (snap.despesasDiretas || 0) * fator > 0.005) {
+                novos.push({
+                    categoria: 'despesas_diretas', valor: snap.despesasDiretas * fator, origem: 'precificacao',
+                    descricao: 'Despesas diretas — custo calculado na precificação' + esc
+                });
+            }
+            if (!jaTem.has('custos_fixos') && (snap.custosFixos || 0) * fator > 0.005) {
+                novos.push({
+                    categoria: 'custos_fixos', valor: snap.custosFixos * fator, origem: 'precificacao',
+                    descricao: `Custos fixos${pct(snap.custosFixos, base)} sobre o preço s/ IPI (R$ da precificação)${esc}`
+                });
+            }
+            if (!jaTem.has('comissao') && (snap.comissao || 0) * fator > 0.005) {
+                const baseCom = base - ((snap.icms || 0) + (snap.pisCofins || 0) + (snap.iss || 0));
+                novos.push({
+                    categoria: 'comissao', valor: snap.comissao * fator, origem: 'precificacao',
+                    descricao: `Comissão de vendas${pct(snap.comissao, baseCom)} sobre o líquido de impostos (R$ da precificação)${esc}`
+                });
+            }
+        } else {
+            /* ---- Legado: percentuais padrão quando não há precificação salva ---- */
+            if (!jaTem.has('receita') && receita > 0) {
+                novos.push({ categoria: 'receita', valor: receita, descricao: 'Valor do contrato' });
+            }
+            [
+                ['impostos',     pImpostos,                    `Estimativa de impostos — ${regime}`],
+                ['custos_fixos', DRE_SEED_PADRAO.custos_fixos, 'Rateio de custos fixos'],
+                ['comissao',     DRE_SEED_PADRAO.comissao,     'Comissão de vendas']
+            ].forEach(([cat, pct2, desc]) => {
+                if (!jaTem.has(cat) && receita > 0 && pct2 > 0) {
+                    novos.push({
+                        categoria: cat,
+                        valor: receita * pct2 / 100,
+                        descricao: `${desc} (${String(pct2).replace('.', ',')}% sobre a receita)`
+                    });
+                }
+            });
+            ['material', 'mo'].forEach(cat => {
+                if (!jaTem.has(cat)) novos.push({ categoria: cat, valor: 0, descricao: '' });
+            });
+        }
 
         if (novos.length === 0) {
             window.app.toast('O estimado já está completo — nenhuma linha nova a criar.', 'info');
@@ -1265,7 +1388,7 @@ const ProjetosModule = {
             const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
             return m ? `${m[3]}/${m[2]}/${m[1]}` : (s || '—');
         };
-        const ORIGEM_LABEL = { manual: 'Manual', orcamento: 'Orçamento', compra: 'Compras (NF)' };
+        const ORIGEM_LABEL = { manual: 'Manual', orcamento: 'Orçamento', compra: 'Compras (NF)', precificacao: 'Precificação' };
         const origemDe = (c) => ORIGEM_LABEL[c.origem] || c.origem || 'Manual';
         const bucketKey = (c) => DRE_CATEGORIAS.some(x => x.key === c.categoria) ? c.categoria : 'outras';
         const porConta = {};
