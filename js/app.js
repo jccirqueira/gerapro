@@ -4064,8 +4064,15 @@ const App = {
                     return atual ? { ...atual, ...p } : p;
                 });
                 const st = store.getState();
+                const tecnicas = mergeLista(data.tecnicas, st.propostasTecnicas);
+                // Preserva, além das entries do disco, as rows do banco que a
+                // listagem não cobre (pastas com padrão de nome antigo, ex.:
+                // "002-Moenda-02") quando têm precificacaoResumo — é a fonte que
+                // os Projetos usam para o valor do contrato e o seed da DRE.
+                const extras = (st.propostasTecnicas || []).filter(x =>
+                    x.precificacaoResumo && !tecnicas.some(n => n.id === x.id));
                 store.setState({
-                    propostasTecnicas: mergeLista(data.tecnicas, st.propostasTecnicas),
+                    propostasTecnicas: [...tecnicas, ...extras],
                     propostasComerciais: mergeLista(data.comerciais, st.propostasComerciais)
                 });
             }

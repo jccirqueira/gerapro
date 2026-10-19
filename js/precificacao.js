@@ -2160,6 +2160,27 @@ class PrecificacaoModule {
                         precificacaoResumo: resumo,
                         updatedAt: new Date().toISOString()
                     });
+                    // Garante a row local: se a lista veio só da listagem de
+                    // arquivos (sem a row deste banco), insere-a para que o
+                    // lookup dos Projetos funcione já neste sessão.
+                    const rows = store.getState().propostasTecnicas || [];
+                    if (!rows.some(r => r.id === prop.id)) {
+                        store.setState({
+                            propostasTecnicas: [...rows, {
+                                id: prop.id,
+                                ptc_folder: ptcFolder,
+                                ptcFolder: ptcFolder,
+                                numero: prop.numero || prop.codigo || 'N/A',
+                                clienteName: prop.clienteName
+                                    || (typeof prop.cliente === 'string' ? prop.cliente
+                                        : (prop.cliente?.razaoSocial || prop.cliente?.nome || '')),
+                                obra: prop.obra || prop.titulo || '',
+                                revision: '0',
+                                status: 'Salvo em Disco',
+                                precificacaoResumo: resumo
+                            }]
+                        });
+                    }
                 }
             }
 
