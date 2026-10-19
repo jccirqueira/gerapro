@@ -2188,8 +2188,11 @@ class PrecificacaoModule {
             const items = [...(store.getState().pipelineItems || [])];
             let atualizados = 0;
             items.forEach((it, i) => {
+                // Regra: o preço final COM IPI só PREENCHE cartões vazios/zerados.
+                // Valores já digitados/definidos no cartão são preservados (um
+                // contrato pode ser maior do que o escopo precificado da PTC).
                 if (it.origem === 'ptc' && String(it.origemId || '').trim().toLowerCase() === chave
-                    && resumo.receitaComIpi > 0 && Number(it.valor) !== resumo.receitaComIpi) {
+                    && resumo.receitaComIpi > 0 && !Number(it.valor)) {
                     const updatedAt = new Date().toISOString();
                     items[i] = { ...it, valor: resumo.receitaComIpi, updatedAt };
                     store._syncUpdate('pipelineItems', it.id, { valor: resumo.receitaComIpi, updatedAt });
