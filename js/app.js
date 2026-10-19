@@ -4044,11 +4044,29 @@ const App = {
 
             if (data.success) {
                 console.log(`[App] Synced: ${data.tecnicas.length} technical, ${data.comerciais.length} commercial proposals.`);
-                
-                // Update store
+
+                // Update store — MESCLA com as rows locais para preservar os campos
+                // extras que vêm do banco e que a listagem de arquivos não retorna
+                // (ex.: ptc_folder e precificacaoResumo usados pelos Projetos).
+                // Os metadados do disco (p) continuam vencendo na sobreposição.
+                const mergeLista = (nova, prev) => (nova || []).map(p => {
+                    const chave = String(p.ptcFolder || '');
+                    let candidatos = (prev || []).filter(x => x.id && x.id === p.id);
+                    if (!candidatos.length) {
+                        candidatos = (prev || []).filter(x =>
+                            String(x.ptc_folder || x.ptcFolder || x.folder || '') === chave);
+                        if (candidatos.length > 1) {
+                            const porRev = candidatos.filter(x => String(x.revision || '') === String(p.revision || ''));
+                            if (porRev.length) candidatos = porRev;
+                        }
+                    }
+                    const atual = candidatos[0];
+                    return atual ? { ...atual, ...p } : p;
+                });
+                const st = store.getState();
                 store.setState({
-                    propostasTecnicas: data.tecnicas,
-                    propostasComerciais: data.comerciais
+                    propostasTecnicas: mergeLista(data.tecnicas, st.propostasTecnicas),
+                    propostasComerciais: mergeLista(data.comerciais, st.propostasComerciais)
                 });
             }
         } catch (error) {

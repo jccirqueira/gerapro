@@ -204,7 +204,7 @@ const ProjetosModule = {
         const chave = String(origemId).trim().toLowerCase();
         if (!chave) return null;
         const row = (store.getState().propostasTecnicas || []).find(p =>
-            String(p.ptc_folder || p.folder || '').trim().toLowerCase() === chave);
+            String(p.ptc_folder || p.ptcFolder || p.folder || '').trim().toLowerCase() === chave);
         const snap = row?.precificacaoResumo;
         return (snap && snap.receitaComIpi > 0) ? snap : null;
     },
