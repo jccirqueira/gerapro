@@ -1112,9 +1112,9 @@ const TipicosModule = {
                     <td style="text-align:center;cursor:grab;" class="bom-drag-handle">
                         <i class="ph ph-grip-vertical" style="font-size:14px;opacity:0.4;"></i>
                     </td>
-                    <td style="text-align: center;"><input type="number" class="form-control" style="padding: 2px; height: 24px; text-align: center;" value="${item.qtd}" onchange="app.tipicos.updateQtd(${index}, this.value)"></td>
+                    <td style="text-align: center;"><input type="number" class="form-control" style="padding: 2px; height: 24px; text-align: center; font-size: 11px;" value="${item.qtd}" onchange="app.tipicos.updateQtd(${index}, this.value)"></td>
                     <td style="padding-left: 10px;">
-                        <div style="font-size: 13px;">${item.descricao || mat.descricao || '-'}</div>
+                        <div style="font-size: 11px;">${item.descricao || mat.descricao || '-'}</div>
                     </td>
                     <td style="text-align: center;">
                         <div class="text-xs text-muted">${item.modelo || mat.modelo || '-'}</div>
@@ -1125,8 +1125,8 @@ const TipicosModule = {
                     <td style="text-align: center;">
                         <div class="text-xs text-muted">${item.fabricante || mat.fabricante || '-'}</div>
                     </td>
-                    <td style="text-align: right;">${app.formatCurrency(custo)}</td>
-                    <td style="text-align: right;">${app.formatCurrency(subtotal)}</td>
+                    <td style="text-align: right; font-size: 11px;">${app.formatCurrency(custo)}</td>
+                    <td style="text-align: right; font-size: 11px;">${app.formatCurrency(subtotal)}</td>
                     <td>${store.canDelete() ? `<button class="btn btn-ghost text-danger" onclick="app.tipicos.removeItem(${index})"><i class="ph ph-trash"></i></button>` : ''}</td>
                 </tr>
             `;
