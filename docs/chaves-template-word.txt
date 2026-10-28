@@ -1,0 +1,313 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                                                                                  ║
+║         CHAVES DOS TEMPLATES WORD DO GERAPRO — REFERÊNCIA COMPLETA               ║
+║                                                                                  ║
+║        (lista de todas as chaves aceitas pelos modelos .docx)                    ║
+║                                                                                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+Este documento lista TODAS as chaves (tags) que o sistema substitui ao gerar
+os documentos Word. Use-o ao montar seus templates em Configurações.
+
+Fonte da verdade: js/propostaTecnica/editor.js, js/propostaComercial.js e
+js/propostaCompleta.js.
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║  1. REGRAS GERAIS — LEIA ANTES DE MONTAR O TEMPLATE                              ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+1.1  DELIMITADOR É CHAVE SIMPLES: {chave}
+     ─────────────────────────────────────
+     No Word você escreve {cliente}, e NÃO {{cliente}}.
+     (Os templates atuais do sistema usam chave simples — confirmado lendo o
+      TEMPLATE_TEC.docx real: {ptc_number}, {nome_empresa}, {unidade_nome}...)
+
+1.2  TODA CHAVE TEXTO/NÚMERO TAMBÉM EXISTE EM MAIÚSCULAS
+     ────────────────────────────────────────────────────
+     O sistema gera automaticamente o alias em maiúsculas.
+     Logo: {CLIENTE} tem o mesmo efeito de {cliente}.
+          {UF} é o mesmo que {uf}.
+     As duas formas funcionam. Use a que preferir no layout — mas use sempre
+     a MESMA forma dentro de um mesmo loop.
+
+1.3  LOOPS (repetição de linhas/itens)
+     ──────────────────────────────────
+     {#nome_do_loop}   ← abre
+       ... conteúdo que será repetido ...
+     {/nome_do_loop}   ← fecha
+
+     Num TABLE LOOP (tabela do Word), coloque a abertura na PRIMEIRA célula
+     da linha e o fechamento na ÚLTIMA célula da MESMA linha. O Word repete
+     a linha inteira automaticamente.
+     Exemplo de linha:
+       | {#lista_paineis}{tag} | {tipo} | {tensao} | {/lista_paineis} |
+
+1.4  CONDICIONAIS (mostrar/esconder blocos)
+     ──────────────────────────────────────
+     {#chave_booleana} ... {/chave_booleana}
+     O bloco inteiro SAI do documento quando o valor for falso, vazio ou
+     lista sem itens. Útil para seções que nem sempre existem
+     (ex.: Eletrocentro, seções AUTPRO, Infraestrutura).
+
+1.5  CHAVE INEXISTENTE NÃO QUEBRA A EXPORTAÇÃO
+     ──────────────────────────────────────────
+     Se você usar uma chave que o sistema não envia, ela é substituída por
+     string VAZIA (nullGetter). Pode errar sem medo — mas o campo sai em
+     branco, então confira a lista abaixo.
+
+1.6  IMAGENS (logos)
+     ───────────────
+     logo_img, client_logo_img e watermark_img são BASE64 de imagem e
+     dependem do módulo de imagens do docxtemplater. No template, o ponto
+     da imagem precisa já existir como imagem. Se não for usar imagem,
+     simplesmente não use essas chaves.
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║  2. TEMPLATE_TEC — PROPOSTA TÉCNICA                                              ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+2.1  GERAL / PROJETO
+     projeto · cliente · ptc_number · codigo · revisao · data_emissao
+     objeto · objeto_do_fornecimento (alias) · cidade · uf · localizacao
+     engenheiro_responsavel · aos_cuidados · email · telefone · celular
+
+2.2  CLIENTE (preenchido automático do cadastro)
+     razao_social · nome_fantasia · cnpj · inscricao_estadual
+     inscricao_municipal · logradouro · numero · bairro · cidade · estado
+     cep · segmento · cnae · observacoes
+     cidade_cliente · nome_empresa · cidade_uf
+     Contato: contato_nome · contato_cargo · contato_email · contato_telefone
+
+2.3  UNIDADE DO CLIENTE
+     unidade_nome · unidade_codigo
+     contato_unidade_nome · contato_unidade_email · contato_unidade_telefone
+     contato_unidade_celular
+
+2.4  LOOP — DOCUMENTOS DO CLIENTE  {#documentos_cliente}
+     index · nome · extensao
+
+2.5  IMAGENS
+     logo_img · client_logo_img · watermark_img
+
+2.6  LOOP — REVISÕES  {#revisoes}
+     no · desc · elab · verif · aprov · data
+
+2.7  ELETROCENTRO
+     Flags (use como condicional):
+       tem_eletrocentro · tem_escopo_eletrocentro
+     Loop {#escopo_eletrocentro}:
+       index · desc · minhaEmpresa · na · cliente
+
+2.8  LOOP — EQUIPAMENTOS  {#lista_paineis}   ← o mais completo
+     ------------------------------------------------------------------
+     Base:
+       tag · tipo
+     Campos técnicos (todos são espalhados, use o nome exato):
+       tensao · tensao_max · frequencia · icc · icp · nbi · suportabilidade
+       corrente_nominal · iac · iac_tempo · lsc · particao · altitude
+       tensao_operacao · sistema_eletrico · comando · comando_fonte
+       auxiliar · auxiliar_fonte · coordenacao · execucao · montagem
+       instalacao · ip · cor_externa · camada_pintura · placa_montagem
+       segregacao · entrada_cabos · saida_cabos · acesso_frontal
+       acesso_traseiro · acesso_manutencao · protocolo · cabo_comunicacao
+       monitoramento_arco_eq · arco_interno · iluminacao · tomada
+       termostato · ventilacao · barramento_tratamento · termoretratil
+       norma_teste · alturaPainel · larguraPainel · profundidadePainel
+       fabricante
+     Apelidos prontos (mesmo conteúdo, mais curtos):
+       cor · pintura · fd_color            (= cor_externa)
+       espessura                           (= camada_pintura)
+       entrada · fd_cable_entry            (= entrada_cabos)
+       saida · fd_cable_exit               (= saida_cabos)
+       acesso · fd_maint_access            (= acesso_manutencao)
+       fd_frontal_access                   (= acesso_frontal)
+       fd_rear_access                      (= acesso_traseiro)
+       fd_protocol                         (= protocolo)
+       cabo · fd_comm_cable                (= cabo_comunicacao)
+       monitoramento_arco · fd_arc_monitor (= monitoramento_arco_eq)
+       fd_internal_lighting                (= iluminacao)
+       tomada · fd_service_outlet          (= tomada)
+       fd_thermostat                       (= termostato)
+       fd_ventilation                      (= ventilacao)
+     Barramentos:
+       bus_main_mat · bus_main_dim · bus_main_inc · bus_main_weight
+       bus_branch_mat · bus_branch_dim · bus_branch_inc · bus_branch_weight
+       bus_ground_mat · bus_ground_dim · bus_ground_weight
+     Cargas (do painel):
+       Flag: tem_cargas
+       Loop interno {#cargas}: index + todos os campos da carga, com
+       corrente · disjuntor · cabo (sempre fornecidos)
+
+2.9  ESCOPO PADRÃO  {#escopo}
+     desc · minhaEmpresa · cliente
+     (minhaEmpresa e cliente saem com "X" quando marcados, senão vazio)
+
+2.10 ESCOPO AUTPRO (Seções 5 / 7 / 9)
+     Flags booleanas — use como condicional:
+       tem_autpro_escopo · premissas_incluso · documentacao_incluso
+       fornecimento_incluso
+       autpro_08_incluso · autpro_17_incluso · autpro_72_incluso
+       autpro_73_incluso · autpro_97_incluso · autpro_99_incluso
+     Loops numerados (subchaves: numero · descricao):
+       {#premissas_itens} · {#secao71_itens} · {#secao72_itens}
+       {#secao73_itens} · {#secao91_itens} · {#secao92_itens}
+       {#secao93_itens}
+     Numeração de seção:
+       fornecimento_numero_secao
+     Loop de grupos {#fornecimento_grupos}:
+       numero · titulo
+       aninhado {#itens}      → numero · descricao
+       aninhado {#static_itens} → texto fixo
+     Numeração dinâmica de grupo/item (XX = número da seção):
+       fornecimento_grupo_XX_numero · fornecimento_item_XX_numero
+       Ex.: {fornecimento_grupo_99_numero}  (já usado no template atual)
+
+2.11 LOOP — VENDOR LIST  {#vendor_list}
+     index · comp · brand · opt_display
+
+2.12 ASSINATURAS
+     sig1_nome · sig1_cargo · sig1_tel · sig1_cel · sig1_email
+     sig2_nome · sig2_cargo · sig2_tel · sig2_cel · sig2_email
+     sig3_nome · sig3_cargo · sig3_tel · sig3_cel · sig3_email
+     (assinador desativado = string vazia)
+
+2.13 INFRAESTRUTURA
+     Totais:
+       infra_tem_itens (flag) · infra_qtd_itens · infra_custo_direto
+       infra_preco_final_total
+     Loop {#infraestrutura}:
+       infra_disciplina · infra_codigo · infra_descricao · infra_qtd
+       infra_un · infra_custo_unitario · infra_horas_instalacao
+       infra_dificuldade · infra_icms · infra_ipi · infra_desconto
+       infra_markup · infra_subtotal · infra_preco_final
+     ATENÇÃO: a TABELA da infraestrutura é injetada automaticamente no
+     documento pelo sistema. No template você só usa os TOTAIS se quiser.
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║  3. TEMPLATE_COM — PROPOSTA COMERCIAL                                            ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+3.1  GERAL
+     ptc_number · projeto · referencia · codigo · data_emissao
+     objeto · cidade · uf · localizacao · engenheiro_responsavel
+     aos_cuidados · contato
+
+3.2  CLIENTE
+     cliente · razao_social · nome_fantasia · cnpj · inscricao_estadual
+     inscricao_municipal · logradouro · numero · bairro · cidade · estado
+     cep · segmento · cnae · observacoes
+     contato_nome · contato_cargo · contato_email · contato_telefone
+
+3.3  E-MAIL E TELEFONE (vários aliases — use o que preferir)
+     email · E-mail · Email · E_mail
+     telefone · Telefone · TEL · fone · celular
+
+3.4  IMPOSTOS
+     impostos_texto · ipi_texto
+
+3.5  PAGAMENTO
+     pgto_evento · pgto_parcela · pgto_fat
+     Loop {#pagamento_eventos} → percentual · descricao
+
+3.6  CONDIÇÕES COMERCIAIS
+     faturamento_ncm · prazo_entrega · validade · data_base · despesas
+     transporte · condicoes
+
+3.7  INVESTIMENTO (tabela de preços)
+     Loop {#investment_items}:
+       index · qtd · desc · ipi · price · subtotal · direto
+       (direto sai com "(Faturamento Direto)" quando marcado)
+     Total: total_investment
+
+3.8  RESULTADOS DA PRECIFICAÇÃO
+     res_preco_final_s_ipi · res_preco_final_c_ipi · res_valor_ipi
+
+3.9  ESCOPO DA COMERCIAL
+     Loop {#supply_items} → text · index
+
+3.10 REVISÕES
+     revisao
+     Loop {#revisoes} → no · desc · elab · verif · aprov · data
+
+3.11 ASSINATURAS E IMAGENS
+     sig1_nome/cargo/tel/cel/email · sig2_* · sig3_*
+     logo_img · client_logo_img · watermark_img
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║  4. TEMPLATE_TEC_COM — PROPOSTA COMPLETA                                         ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+É a UNIÃO das duas propostas num único documento.
+
+     ptc_number sai no formato PTC-XXXXXXXX-R00.
+
+     Parte TÉCNICA (igual ao item 2):
+       todos os dados de cliente/unidade + lista_paineis + escopo +
+       escopo AUTPRO + vendor_list
+
+     Parte COMERCIAL (igual ao item 3):
+       supply_items · investment_items · res_preco_final_s_ipi
+       res_preco_final_c_ipi · res_valor_ipi · impostos_texto · ipi_texto
+       pagamento_eventos · pgto_evento · pgto_parcela · pgto_fat
+       faturamento_ncm · prazo_entrega · validade · data_base · despesas
+       transporte · condicoes
+
+     Revisões (atenção — são duas chaves distintas):
+       revisoes        → revisões da parte TÉCNICA
+       revisions_com   → revisões da parte COMERCIAL
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║  5. DICAS DE MONTAGEM                                                            ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+5.1  Teste sempre exportando uma proposta real depois de mexer no template.
+
+5.2  Comece pelas chaves simples (cliente, projeto, ptc_number) e vá
+     acrescentando loops conforme precisar.
+
+5.3  Para seções que nem sempre existem (Eletrocentro, Infraestrutura,
+     seções AUTPRO), use a flag como condicional — assim o documento não
+     fica com espaço vazio nem título órfão.
+
+5.4  Dica de numeração: para numerar seções condicionalmente no AUTPRO,
+     use fornecimento_numero_secao e fornecimento_grupo_XX_numero em vez
+     de digitar o número fixo no Word.
+
+5.5  Os exemplos prontos para estudo ficam em templates/exemplos/.
+     Eles NÃO são usados na exportação até você copiá-los para a pasta da
+     sua empresa e selecioná-los em Configurações.
+
+5.6  Este arquivo é a referência. Se um dia uma chave nova for incluída no
+     sistema, ela aparece em primeiro lugar no objeto templateData de
+     js/propostaTecnica/editor.js (Técnica), js/propostaComercial.js
+     (Comercial) ou js/propostaCompleta.js (Completa).
+
+
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║  6. SITUAÇÃO DOS TEMPLATES ATUAIS (auditoria 20-10-2026)                         ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+Os templates hoje em uso usam bem poucas das chaves disponíveis:
+
+     TEMPLATE_TEC (AUTPRO) ...... 14 chaves
+       cidade_uf, contato_unidade_celular, contato_unidade_email,
+       contato_unidade_nome, contato_unidade_telefone, descricao,
+       fornecimento_grupo_99_numero, fornecimento_numero_secao, index,
+       nome, nome_empresa, objeto_do_fornecimento, ptc_number,
+       unidade_nome
+
+     TEMPLATE_COM (default) .... 5 chaves
+       cliente, contato, localizacao, projeto, telefone
+
+     TEMPLATE_TEC_COM (default)  13 chaves
+       UF, bairro, cep, cidade_cliente, cnpj, contato_email,
+       contato_nome, data_emissao, logradouro, numero, projeto,
+       ptc_number, razao_social
+
+Ou seja: há muito espaço para enriquecer os documentos usando as chaves
+listadas acima.
