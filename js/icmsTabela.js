@@ -5,13 +5,16 @@ export const INTERNAL_RATES = {
     SE: 18, SP: 18, TO: 17
 };
 
-// Estados do Sul/Sudeste cujas SAÍDAS são sempre a 12% (Res. Senado 22/1989).
-// O ES não entra aqui: suas saídas seguem a regra das demais regiões (7% para S/SE).
-const ORIGIN_ALWAYS_12 = new Set(['SP', 'RJ', 'MG', 'PR', 'RS', 'SC']);
+// Estados do Sul/Sudeste que seguem a regra geral de 12% nas operações
+// interestaduais entre as Regiões Sul e Sudeste (Res. Senado 22/1989).
+const SUL_SUDESTE = new Set(['SP', 'RJ', 'MG', 'PR', 'RS', 'SC']);
 
-// Destinos que disparam a alíquota de 7% para origens fora do Sul/Sudeste.
-const DEST_FOR_7 = new Set(['SP', 'RJ', 'MG', 'ES', 'PR', 'RS', 'SC']);
-
+// Regra interestadual (Res. Senado 22/1989):
+//   • Interna → alíquota interna do próprio estado.
+//   • Sul/Sudeste (sem ES) → 12% para o resto do Sul/Sudeste; 7% para
+//     Norte/Nordeste/Centro-Oeste e para o Espírito Santo.
+//   • ES → 7% em todas as saídas interestaduais.
+//   • Norte/Nordeste/Centro-Oeste → 12%, exceto 7% para o Espírito Santo.
 export function getIcmsRate(origem, destino) {
     if (!origem || !destino) return null;
     const o = origem.toUpperCase().trim();
@@ -21,14 +24,14 @@ export function getIcmsRate(origem, destino) {
     // Operação interna → alíquota estadual do próprio estado
     if (o === d) return INTERNAL_RATES[o];
 
-    // Saída de SP/RJ/MG/PR/RS/SC → sempre 12% (qualquer destino)
-    if (ORIGIN_ALWAYS_12.has(o)) return 12;
+    // Saída de SP/RJ/MG/PR/RS/SC → 12% para o Sul/Sudeste; 7% para N/NE/CO e ES
+    if (SUL_SUDESTE.has(o)) return SUL_SUDESTE.has(d) ? 12 : 7;
 
-    // Origem fora do Sul/Sudeste (inclui ES) com destino no Sul/Sudeste → 7%
-    if (DEST_FOR_7.has(d)) return 7;
+    // Saída do Espírito Santo → 7% para qualquer destino interestadual
+    if (o === 'ES') return 7;
 
-    // Demais operações interestaduais (ex.: BA → AM) → 12%
-    return 12;
+    // Saída do Norte/Nordeste/Centro-Oeste → 12%, exceto destino Espírito Santo (7%)
+    return d === 'ES' ? 7 : 12;
 }
 
 export const UF_LIST = Object.keys(INTERNAL_RATES).sort();
