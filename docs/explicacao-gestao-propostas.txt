@@ -79,7 +79,7 @@ representam o ciclo de vida padrão de uma venda.
 │ (negociacao)         │  Amarela │ especiais. Estamos negociando.               │
 │                      │      │                                                    │
 │ Fechado              │ ✅   │ O cliente ACEITOU a proposta. Venda concluída!    │
-│ (fechado)            │ Verde │                                                   │
+│ (fechado)            │ Verde │ Um PROJETO nasce no módulo Cronograma / DRE.    │
 │                      │      │                                                    │
 │ Perdido              │ ❌   │ O cliente RECUSOU ou escolheu outro fornecedor.   │
 │ (perdido)            │ Vermelho │ A oportunidade foi perdida.                   │
@@ -111,7 +111,8 @@ Os cartões NÃO são criados manualmente. Eles aparecem automaticamente quando:
 │                          │ aparece como "Orçamento".                            │
 │                          │                                                       │
 │ Você salva a             │ Se a Proposta Técnica já existia, o cartão é        │
-│ Proposta Comercial       │ atualizado com o valor e o tipo muda para "PTC".    │
+│ Proposta Comercial       │ atualizado com o valor — mas só quando o valor     │
+│                          │ está vazio ou zerado — e o tipo muda para "PTC".   │
 │                          │                                                       │
 │ Você cria PTC separada   │ São criados DOIS cartões: um para PT e um para PC. │
 │ (PT + PC em 2 arquivos) │                                                       │
@@ -222,6 +223,9 @@ A BOLINHA COLORIDA no canto direito indica o tempo sem contato com o cliente:
 📌 A bolinha é um ALERTA VISUAL. Se ela está vermelha, significa que o cliente
    pode estar esfriando. Hora de registrar uma interação!
 
+📌 Sem nenhuma interação registrada, a bolinha conta os dias desde a CRIAÇÃO
+   do cartão — por isso ela pode ficar amarela ou vermelha sozinha com o tempo.
+
 Também aparecem badges especiais no cartão:
 
 ┌──────────────────────┬──────────────────────────────────────────────────────────┐
@@ -259,7 +263,8 @@ PARA CADA INTERAÇÃO, você registra:
   1. O TIPO (ligação, e-mail, reunião, WhatsApp, outro)
   2. A DATA (quando aconteceu)
   3. A DESCRIÇÃO (do que falaram, o que ficou combinado)
-  4. O PRÓXIMO FOLLOW-UP (quando você vai entrar em contato de novo)
+  4. O PRÓXIMO FOLLOW-UP (quando você vai entrar em contato de novo — o
+     registro aceita também a HORA, e o alerta "Vencido" respeita essa hora)
 
 ✅ A bolinha colorida do cartão é atualizada automaticamente com base na data
    da última interação.
@@ -292,10 +297,11 @@ Existem duas formas de mover um cartão:
 
 🔒 REGRA IMPORTANTE DE AVANÇO:
 
-  Se um cartão estiver "Fechado" ou "Perdido", ele NÃO pode ser reaberto.
-  O GeraPro bloqueia a edição da proposta e mostra uma mensagem de aviso.
-  Se precisar reabrir, é necessário criar uma CÓPIA da proposta via
-  "Salvar como Novo(a)".
+  Se um cartão estiver "Fechado" ou "Perdido", ele NÃO pode voltar para
+  outra coluna — o arrasto é recusado com aviso ("Proposta Fechada").
+  Os botões Editar e Excluir continuam disponíveis para quem tem permissão.
+  Se precisar de uma proposta limpa, use "Salvar como Novo(a)" na Proposta
+  Técnica para criar uma CÓPIA.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -318,6 +324,8 @@ Ao abrir um cartão, você pode clicar em "Editar" para alterar:
   │ Data Entrega       │ Data prevista para entrega dos equipamentos.             │
   │ Último Contato     │ Data do último contato com o cliente.                    │
   │ Próx. Follow-up    │ Data agendada para o próximo contato.                    │
+  │ Descrição da       │ Texto da revisão atual — o que precisa mudar nesta      │
+  │ Revisão            │ versão (também preenchido ao Subir Revisão).           │
   └────────────────────┴──────────────────────────────────────────────────────────┘
 
 💡 A edição manual é útil quando o cartão veio de um Orçamento (que não tem
@@ -339,10 +347,17 @@ O QUE ACONTECE QUANDO VOCÊ SOBE UMA REVISÃO:
 
   1. O número da revisão aumenta (Rev00 → Rev01 → Rev02...)
   2. O cartão VOLTA para "Aguardando Início" — porque a nova revisão
-     precisa ser trabalhada novamente
+     precisa ser trabalhada novamente (um cartão em "Negociação" também
+     volta para o início; só uma revisão marcada como "Consolidada" em
+     outra coluna vai direto para "Negociação")
   3. O engenheiro responsável é LIMPO — você precisa atribuir um novo
      engenheiro (ou o mesmo) para a nova revisão
   4. Opcional: você pode marcar como "Consolidada"
+
+  No diálogo você também DESCREVE a revisão (campo "Descrição da Revisão")
+  e pode ajustar a Data de Entrega. O botão "Subir Revisão" só aparece em
+  cartões que não estão em Em Elaboração, Fechado ou Perdido — e não
+  aparece para vendedores.
 
 ─── O QUE É "CONSOLIDADA"? ─────────────────────────────────────────────────────
 
@@ -351,6 +366,8 @@ O QUE ACONTECE QUANDO VOCÊ SOBE UMA REVISÃO:
 
   Se você marca "Consolidada" ao subir revisão:
     • O cartão vai para "Negociação" em vez de "Aguardando Início"
+      (a menos que ele já estivesse em "Negociação" — nesse caso ele
+      volta para o início, como qualquer revisão)
     • Aparece o badge "Consolidada" no cartão
 
 ─── QUANDO USAR? ────────────────────────────────────────────────────────────────
@@ -391,11 +408,13 @@ Ao clicar, uma lista de engenheiros cadastrados aparece. Escolha um.
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  11. EXPORTAR PIPELINE                                                         │
+│  11. EXPORTAR E IMPRIMIR PIPELINE                                               │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-O Pipeline pode ser exportado em dois formatos:
+A barra superior tem quatro botões: Limpar Antigos (só Admin/Gerente),
+Sincronizar, Imprimir e Exportar — os três últimos aparecem para todos os
+níveis. Dá para exportar em dois formatos e também imprimir:
 
 ─── CSV (📥) — Botão "Exportar" no topo da tela ─────────────────────────────
 
@@ -406,10 +425,26 @@ O Pipeline pode ser exportado em dois formatos:
 
   Abre no Excel, Google Planilhas ou qualquer editor de texto.
 
-─── XLSX (📊) — Botão no modal de detalhes do cartão ────────────────────────
+─── IMPRIMIR (🖨️) — Botão "Imprimir" no topo da tela ─────────────────────────
 
-  Gera uma planilha formatada com o histórico completo de ações da PTC:
-  criação, edição, movimentação, exclusão, interações e revisões.
+  Abre uma janela com duas opções de impressão:
+
+  1. Gestão de Propostas — os KPIs do topo e uma tabela por etapa com
+     Cliente, Projeto, Código, Tipo, Vendedor, Eng. Resp., Data Abertura,
+     Status, Prazo (No Prazo / Último dia / Atrasado, calculado da Data de
+     Entrega) e Valor, com o total geral no rodapé.
+  2. Log das Revisões — o histórico completo de TODAS as PTCs: PTC, Projeto,
+     Rev, Ação, Data/Hora, Eng. Resp., Vendedor, Status e Prazo.
+
+  A impressão abre em nova janela e dispara o diálogo de impressão do
+  navegador — escolha "Salvar como PDF" se quiser guardar o arquivo.
+
+─── VER LOG (📥/📊) — Botão "Ver Log" no cartão ───────────────────────────────
+
+  Todo cartão de proposta com pasta no servidor traz o botão "Ver Log".
+  Ele abre a tabela de histórico daquela proposta com as colunas PTC, Rev,
+  Data/Hora, Ação, Eng. Resp., Status, Valor, Consolidada e Prazo — e os
+  botões CSV e XLSX para exportar esse histórico.
 
   Disponível apenas para cartões que possuem PTC física no servidor.
 
@@ -446,9 +481,10 @@ Antigos" (🗑️) ajuda a organizar. Você escolhe os critérios:
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-O botão "Sincronizar" (🔄) verifica se as pastas das PTCs ainda existem no
-servidor. Se uma pasta foi deletada manualmente, o cartão correspondente é
-removido do Pipeline.
+O botão "Sincronizar" (🔄) — presente para todos os níveis, inclusive
+vendedores — verifica se as pastas das PTCs ainda existem no servidor.
+Se uma pasta foi deletada manualmente, o cartão correspondente é removido
+do Pipeline.
 
 💡 Use quando você excluiu PTCs diretamente pelo disco e quer limpar os
    cartões órfãos.
@@ -468,12 +504,13 @@ O Pipeline se comporta diferente conforme o nível do usuário:
 │ Vendedor          │ • Ver APENAS os cartões onde ele é o vendedor              │
 │                   │ • Não pode arrastar cartões entre colunas                 │
 │                   │ • Pode registrar interações                                │
-│                   │ • Não vê os botões Limpar/Sincronizar                      │
+│                   │ • Não vê o botão Limpar Antigos                            │
+│                   │ • Vê Sincronizar, Imprimir e Exportar                      │
 │                   │                                                             │
 │ Admin /           │ • Vê TODOS os cartões de todos os vendedores               │
 │ Gerente           │ • Pode arrastar cartões                                   │
 │                   │ • Pode editar, excluir, subir revisão                     │
-│                   │ • Vê os botões Limpar/Sincronizar/Exportar                │
+│                   │ • Vê os botões Limpar/Sincronizar/Imprimir/Exportar       │
 │                   │ • Pode atribuir engenheiro responsável                    │
 │                   │ • Pode fazer limpeza em massa                             │
 └───────────────────┴─────────────────────────────────────────────────────────────┘
@@ -579,8 +616,10 @@ O Pipeline se comporta diferente conforme o nível do usuário:
 │            vêm do orçamento original.                                          │
 │                                                                                 │
 │  PROBLEMA: "O cartão está como Fechado mas preciso reabrir"                   │
-│  SOLUÇÃO:  Não é possível reabrir. O sistema bloqueia edição. Crie uma cópia  │
-│            da proposta usando "Salvar como Novo(a)" na Proposta Técnica.       │
+│  SOLUÇÃO:  O arrasto de volta é bloqueado — Fechado e Perdido não voltam.     │
+│            Para corrigir dados, use "Editar" no modal de detalhes: a edição   │
+│            continua liberada para quem tem permissão. Se precisar começar     │
+│            do zero, crie uma cópia com "Salvar como Novo(a)" na PTC.          │
 │                                                                                 │
 │  PROBLEMA: "Tem muitos cartões perdidos, quero limpar"                        │
 │  SOLUÇÃO:  Use o botão "Limpar Antigos" no topo da tela. Selecione            │
@@ -591,14 +630,16 @@ O Pipeline se comporta diferente conforme o nível do usuário:
 │            Ou salve novamente a Proposta Comercial para atualizar o valor.     │
 │                                                                                 │
 │  PROBLEMA: "O valor do cartão está zerado"                                    │
-│  SOLUÇÃO:  O valor só é preenchido quando a Proposta Comercial é salva.       │
-│            Se você só criou a Proposta Técnica, o valor fica R$ 0,00.         │
-│            É normal — a PT não tem valores financeiros.                       │
+│  SOLUÇÃO:  O valor vem da Precificação quando a Proposta Comercial é salva —  │
+│            mas só preenche cartões vazios ou zerados; valores já digitados    │
+│            são preservados. Se você só criou a Proposta Técnica, o valor      │
+│            fica R$ 0,00 — é normal; a PT não tem valores financeiros.         │
 │                                                                                 │
 │  PROBLEMA: "A bolinha está vermelha mas eu liguei ontem"                      │
-│  SOLUÇÃO:  A bolinha olha a data da ÚLTIMA INTERAÇÃO registrada. Se você     │
-│            ligou mas não registrou a interação no cartão, o sistema não sabe.  │
-│            Registre a ligação no modal de detalhes para a bolinha ficar verde. │
+│  SOLUÇÃO:  A bolinha olha a data da ÚLTIMA INTERAÇÃO registrada — sem         │
+│            interação, conta os dias desde a criação do cartão. Se você ligou  │
+│            mas não registrou, o sistema não sabe. Registre a interação no     │
+│            modal de detalhes para a bolinha ficar verde.                      │
 │                                                                                 │
 │  PROBLEMA: "Não consigo ver a coluna Perdido"                                 │
 │  SOLUÇÃO:  As colunas têm rolagem horizontal. Role para a direita usando a    │
@@ -630,10 +671,10 @@ completo e auditável de tudo que aconteceu com aquele negócio.
   PTCs físicas:    /data/PTCs/26061101-PT/Log das Revisões/ACT_*.json
   PTCs separadas:  /data/PTCs/26061101-PT_REV01/Log das Revisões/ACT_*.json
 
-─── EXPORTAR LOG COMO XLSX ─────────────────────────────────────────────────────
+─── EXPORTAR O LOG (CSV OU XLSX) ───────────────────────────────────────────────
 
-  No modal de detalhes do cartão, há um botão 📊 Exportar XLSX que gera uma
-  planilha formatada com todo o histórico de ações daquela PTC.
+  No botão "Ver Log" do cartão, os botões 📥 CSV e 📊 XLSX geram o histórico
+  de ações e revisões daquela PTC — a mesma tabela que o modal exibe na tela.
 
 ─── PARA QUE SERVEM? ────────────────────────────────────────────────────────────
 
