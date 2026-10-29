@@ -55,7 +55,7 @@ Tudo isso para que o engenheiro não precise desenhar do zero ou calcular na mã
 │      AO = saída analógica)                                                     │
 │  3. No módulo Arquitetura de Rede, você escolhe parâmetros:                    │
 │     - Qual protocolo usar (PROFINET, EtherNet/IP, Modbus TCP)                  │
-│     - Qual topologia (anel, estrela, linha, árvore)                            │
+│     - Qual topologia (anel, estrela, linha, árvore, malha)                    │
 │     - Qual tipo de cabo, fibra óptica, etc.                                     │
 │  4. O sistema gera a arquitetura completa                                      │
 │  5. Você pode exportar: JSON, CSV (planilha), PDF, SVG (figura), DXF (CAD)     │
@@ -179,8 +179,9 @@ suporta 5 tipos:
 │                     │ (centro) ligados a switches access (nas máquinas).       │
 │                     │ Ideal para fábricas grandes com várias áreas.            │
 │                     │                                                          │
-│ MALHA               │ Várias conexões entre os switches. A mais redundante,    │
-│                     │ mas também a mais cara (mais cabos e equipamentos).      │
+│ MALHA (parcial)     │ Vários switches interligados por mais de um caminho.     │
+│                     │ Se um link cair, o tráfego reencontra outra rota.        │
+│                     │ Mais redundante — e mais cara (mais portas e fibra).      │
 └─────────────────────┴──────────────────────────────────────────────────────────┘
 
 
@@ -382,17 +383,20 @@ o sistema produz tudo isso:
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │ Um documento de texto completo, pronto para incluir na proposta:                │
 │   1. Objetivo                                                                   │
-│   2. Hierarquia (Campo, Célula, Gestão)                                        │
-│      2.1 Classe de Conformidade (se PROFINET)                                  │
-│      2.2 GSDML e DCP (descrição de dispositivos)                               │
-│      2.3 Cabo e Conectores (se configurado)                                    │
-│      2.4 Dados de Mercado PROFINET 2025-2026                                   │
-│   3. Lista de Materiais                                                         │
-│   4. Plano de Endereçamento IP                                                 │
-│   5. Validação de Restrições                                                   │
+│   2. Hierarquia da Rede — 3 níveis (ISA-95)                                     │
+│      2.1 Nível de Campo (barramentos e dispositivos de campo)                   │
+│      2.2 Nível de Célula / Controle (CLPs, IHMs e switches)                     │
+│      2.3 Nível de Gestão / IIoT (SCADA, MES/ERP)                                │
+│         (se PROFINET: Classe de Conformidade, Tempo Real e Redundância,         │
+│          Gerenciamento/GSDML e DCP, Cabeamento, Dados de Mercado)               │
+│      2.4 Conformidade Normativa (checklist de normas)                           │
+│   3. Lista de Materiais de Rede                                                 │
+│   4. Plano de Endereçamento IP                                                  │
+│   5. Validação de Restrições                                                    │
 │   6. Considerações Finais                                                       │
+│   (a numeração dos itens acima segue a ordem em que o sistema os emite)         │
 │                                                                                 │
-│ Você pode copiar, exportar PDF ou imprimir.                                    │
+│ Você pode copiar, exportar PDF ou imprimir.                                     │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -455,11 +459,13 @@ ETAPA 8 — ANALISAR O RESULTADO
   • Leia o memorial descritivo.
 
 ETAPA 9 — EXPORTAR
+  • Regenerar: refaz o cálculo com os parâmetros atuais (cabeçalho).
+  • Copiar Memorial: copia o texto do memorial para colar na proposta.
   • JSON: resultado completo em formato de dados.
-  • CSV: lista de materiais para planilha.
+  • BOM CSV: lista de materiais para planilha.
   • PDF: memorial descritivo para documento.
-  • SVG: diagrama da topologia (figura).
-  • DXF: diagrama para AutoCAD.
+  • SVG: diagrama da topologia — botão dentro do card do diagrama.
+  • DXF: diagrama para AutoCAD — botão dentro do card do diagrama.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
