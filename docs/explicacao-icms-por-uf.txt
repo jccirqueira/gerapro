@@ -46,15 +46,18 @@ O sistema novo faz esse cálculo automaticamente, usando a tabela oficial do CON
 
 ┌────────────┬────────────────────────────────────────────────────────────────────┐
 │ ANTES      │ O ICMS era um número fixo que você precisava saber e digitar       │
-│            │ toda vez. O sistema usava sempre o mesmo valor padrão (18%, 12%,   │
-│            │ ou 0%) para todos os equipamentos, independente de onde eram       │
-│            │ fabricados ou instalados.                                          │
+│            │ toda vez. O sistema usava sempre o mesmo valor padrão (12%) para    │
+│            │ todos os equipamentos, independente de onde eram fabricados ou     │
+│            │ instalados.                                                        │
 │            │                                                                    │
 │ AGORA      │ O sistema consulta automaticamente a tabela CONFAZ.                │
 │            │ Ele olha:                                                          │
 │            │   • De ONDE vem o equipamento (UF de Origem)                       │
 │            │   • Para ONDE vai (UF de Destino, extraída da Localização)         │
 │            │ E preenche o ICMS sozinho com o valor correto.                     │
+│            │                                                                    │
+│            │ Se faltar uma das UFs, ele não calcula e mantém o valor padrão     │
+│            │ (12%) — preencha a UF da empresa/equipamento e a da obra.          │
 │            │                                                                    │
 │            │ Mas se você quiser, ainda pode digitar manualmente — o sistema     │
 │            │ respeita sua escolha.                                              │
@@ -91,9 +94,9 @@ O sistema precisa de DOIS endereços para calcular o ICMS:
 │ UF DE DESTINO    │ O estado onde o equipamento será INSTALADO (obra do          │
 │ (Instalação)    │ cliente).                                                     │
 │                  │                                                              │
-│                  │ 💡 É extraída automaticamente do campo "Localização"          │
-│                  │ (Cidade/Estado) que você preenche no cabeçalho da            │
-│                  │ Proposta Técnica. Ex: "SERTÃOZINHO/SP" → UF = SP.            │
+│                  │ 💡 É a UF do campo "Localização (Cidade/Estado)" que          │
+│                  │ você preenche no cabeçalho da Proposta Técnica.              │
+│                  │ Ex: "SERTÃOZINHO/SP" → UF = SP.                              │
 │                  │                                                              │
 │                  │ Este campo é somente LEITURA na tela de Precificação —        │
 │                  │ você altera ele no cabeçalho da Proposta Técnica.            │
@@ -108,9 +111,11 @@ O sistema precisa de DOIS endereços para calcular o ICMS:
 
 O sistema divide os estados em dois grupos:
 
-  GRUPO SUL/SUDESTE: SP, RJ, MG, ES, PR, RS, SC
-  GRUPO NORTE/NORDESTE/CENTRO-OESTE: todos os outros (AC, AL, AM, AP, BA, CE,
-  DF, GO, MA, MS, MT, PA, PB, PE, PI, RN, RO, RR, SE, TO)
+  GRUPO SUL/SUDESTE: SP, RJ, MG, PR, RS, SC
+  GRUPO NORTE/NORDESTE/CENTRO-OESTE: AC, AL, AM, AP, BA, CE, DF, GO, MA, MS,
+  MT, PA, PB, PE, PI, RN, RO, RR, SE, TO
+
+O Espírito Santo (ES) tem regra especial — é tratado à parte (veja a tabela).
 
 E aplica estas regras:
 
@@ -123,7 +128,7 @@ E aplica estas regras:
 ├─────────────────────────────────────┼───────────────────────────────────────────┤
 │ SUL/SUDESTE → SUL/SUDESTE           │ 12%                                       │
 │ (estados diferentes, mas no mesmo   │ Ex: SP → RJ = 12%, PR → MG = 12%         │
-│  grupo)                             │                                           │
+│  grupo — exceto ES, ver abaixo)     │                                            │
 ├─────────────────────────────────────┼───────────────────────────────────────────┤
 │ SUL/SUDESTE → NORTE/NORDESTE/CO    │ 7%                                         │
 │ (de um grupo mais rico para um      │ Ex: SP → BA = 7%, RJ → PE = 7%,          │
@@ -131,6 +136,11 @@ E aplica estas regras:
 ├─────────────────────────────────────┼───────────────────────────────────────────┤
 │ NORTE/NORDESTE/CO → QUALQUER LUGAR  │ 12%                                       │
 │ (inclusive Sul/Sudeste)             │ Ex: BA → SP = 12%, MT → RJ = 12%         │
+│                                     │ Exceto destino ES → 7%                     │
+├─────────────────────────────────────┼───────────────────────────────────────────┤
+│ ES → QUALQUER ESTADO (interest.)    │ 7%                                         │
+│ (regra especial do Espírito Santo)  │ Ex: ES → SP = 7%, ES → BA = 7%             │
+│                                     │ (SUL/SUDESTE → ES também vale 7%)          │
 └─────────────────────────────────────┴───────────────────────────────────────────┘
 
 📌 Alíquotas internas de cada estado (quando Origem = Destino):
@@ -200,11 +210,13 @@ entende de tributação. Por isso ele tem dois modos:
 │              │                                                                  │
 │ MANUAL       │ • Quando você DIGITA um valor no campo ICMS                      │
 │              │ • O selo "✓ CONFAZ" some                                         │
-│              │ • O sistema NUNCA mais sobrescreve aquele valor                   │
-│              │ • Ele entende: "ok, o usuário sabe o que está fazendo"           │
-│              │ • Esse respeito é permanente (mesmo se fechar e abrir de novo)   │
-│              │ • Para voltar ao automático: apague o número, deixe o campo      │
-│              │   vazio, salve e recarregue a página                              │
+│              │ • Enquanto a página estiver aberta, o sistema não sobrescreve    │
+│              │   aquele valor — ele entende: "ok, o usuário sabe o que faz"     │
+│              │ • Esse respeito vale só até fechar a página: a escolha manual    │
+│              │   não é gravada no servidor.                                     │
+│              │ • Para voltar ao automático: recarregue a página — ao reabrir    │
+│              │   o equipamento, o cálculo CONFAZ volta e substitui o valor      │
+│              │   digitado (na gravação seguinte, ele passa a valer).            │
 └──────────────┴──────────────────────────────────────────────────────────────────┘
 
 
@@ -284,12 +296,13 @@ use o campo DAS e o sistema automaticamente oculta os campos de ICMS.
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-   ORIGEM ↓  ┆  DESTINO →  │  MSM ESTADO  │  S/SE → S/SE  │  S/SE → N/NE/CO │  N/NE/CO → TUDO
-   ──────────┼──────────────┼──────────────┼────────────────┼──────────────────┼─────────────────
-   ICMS      ┆             │  Interna*    │     12%       │       7%        │      12%
-              ┆             │              │                │                  │
+    ORIGEM ↓  │ DESTINO →  │ MSM ESTADO  │ S/SE → S/SE  │ S/SE → N/NE/CO  │ N/NE/CO → TUDO  │ ES → OUTROS  
+   ───────────┼────────────┼─────────────┼──────────────┼─────────────────┼─────────────────┼──────────────
+    ICMS      │            │ Interna*    │ 12%          │ 7%              │ 12%             │ 7%           
 
    * Alíquota interna varia por estado (ver lista na seção 4)
+   📌 Exceções do Espírito Santo (regra própria — Res. Senado 22/1989):
+      S/SE → ES = 7% · N/NE/CO → ES = 7% · ES → qualquer estado interestadual = 7%
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐

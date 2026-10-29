@@ -53,10 +53,11 @@ O número tem 8 dígitos, divididos em 3 partes:
    Onde:
    • 008 = código do cliente (o usuário cadastra no cliente)
    • 01  = código da unidade (o usuário cadastra na aba "Unidades")
-   • 017 = número sequencial (o sistema控制a automaticamente)
+   • 017 = número sequencial (o sistema controla automaticamente)
 
    OS 5 PRIMEIROS DÍGITOS (00801) SÃO FIXOS para este cliente nesta unidade.
-   Apenas os 3 últimos variam: 017, 018, 019... até 999.
+   Apenas os 3 últimos variam: 017, 018, 019... O formato previsto vai até 999 —
+   não há trava no sistema: acima de 999, o número cresce para 9 dígitos.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -113,11 +114,15 @@ Como fazer:
    1. Vá em "Clientes" no menu lateral.
    2. Abra um cliente ou crie um novo.
    3. Na aba "Dados Gerais", existe o campo "Código do Cliente".
-   4. Digite o código desejado (ex: 008, 015, 100...).
+   4. Digite o código desejado (ex: 008, 015, 100...) — use 3 dígitos.
    5. Salve o cliente.
 
-ATENÇÃO: O código deve ser único para cada cliente dentro da AUTPRO.
-Se dois clientes tiverem o mesmo código, o sistema vai alertar.
+ATENÇÃO: O código deve ser único para cada cliente dentro da AUTPRO. O sistema
+não valida duplicidade automaticamente — confira antes de salvar que dois
+clientes não tenham o mesmo código.
+
+📌 Se o campo ficar vazio, o sistema usa 000 no lugar do código do cliente —
+   o número da proposta sai como 000 + unidade + sequencial.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -209,7 +214,8 @@ Para outras empresas que usam o GeraPro, o sistema continua funcionando
 como antes (número baseado na data do dia).
 
 O sistema detecta automaticamente se a empresa logada é a AUTPRO
-(pela pasta da empresa: AUT_2e10603f) e aplica as regras novas.
+(pela pasta da empresa, que começa com AUT_ — ex.: AUT_2e10603f) e aplica
+as regras novas.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐

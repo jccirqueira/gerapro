@@ -59,9 +59,9 @@ quantas horas ela leva.
 Exemplos de composições que já vêm prontas no sistema:
 
   ┌──────────────────────────────────────────────────────────────────┐
-  │  Atividade: Montagem de estrutura metálica                      │
+  │  Atividade: Montagem de estrutura metálica do painel            │
   │  Unidade: unidade (cada painel)                                 │
-  │  Horas por unidade: 8,0 horas                                   │
+  │  Horas por unidade: 4,0 horas                                   │
   │  Grupo: Estrutura                                               │
   │  Profissional: Montador                                         │
   │  Área: Montagem (fábrica)                                       │
@@ -70,16 +70,16 @@ Exemplos de composições que já vêm prontas no sistema:
   ┌──────────────────────────────────────────────────────────────────┐
   │  Atividade: Lançamento de cabos de potência                     │
   │  Unidade: metro                                                  │
-  │  Horas por unidade: 0,5 hora (meia hora por metro)              │
+  │  Horas por unidade: 0,3 hora (18 minutos por metro)             │
   │  Grupo: Elétrica                                                 │
   │  Profissional: Eletricista                                       │
   │  Área: Montagem (fábrica)                                        │
   └──────────────────────────────────────────────────────────────────┘
 
   ┌──────────────────────────────────────────────────────────────────┐
-  │  Atividade: Teste de continuidade e isolamento                  │
-  │  Unidade: ponto                                                  │
-  │  Horas por unidade: 0,25 hora (15 minutos por ponto)            │
+  │  Atividade: Teste elétrico funcional do painel                  │
+  │  Unidade: hora                                                   │
+  │  Horas por unidade: 1,0 hora                                    │
   │  Grupo: Testes                                                   │
   │  Profissional: Técnico                                           │
   │  Área: Montagem (fábrica)                                        │
@@ -121,7 +121,7 @@ Cada regra funciona como um SE-ENTÃO:
   E   ele tem corrente nominal maior que zero
   ENTÃO  gere estas composições com estas quantidades
 
-Exemplo de regra pronta no sistema:
+Exemplo simplificado de regra (combina ações de regras reais do sistema):
 
   ┌──────────────────────────────────────────────────────────────────┐
   │  NOME: Barramento CCM BT                                        │
@@ -135,18 +135,20 @@ Exemplo de regra pronta no sistema:
   │  AÇÕES (o que gerar):                                           │
   │     • Montagem de estrutura metálica  → 1 unidade               │
   │     • Montagem de barramento de cobre → correnteNominal / 100   │
-  │     • Lançamento de cabos de potência → num_disjuntores * 2     │
-  │     • Teste de continuidade         → num_disjuntores * 1       │
+  │     • Lançamento de cabos de potência → cargas.length * 5       │
+  │     • Teste elétrico funcional      → cargas.length * 0,5       │
   └──────────────────────────────────────────────────────────────────┘
 
 Perceba que as quantidades podem ser DINÂMICAS:
   - "1 unidade" é fixo (sempre 1)
   - "correnteNominal / 100" é uma conta: se a corrente for 400A,
     o resultado é 4 (400 ÷ 100 = 4)
-  - "num_disjuntores * 2" multiplica o número de disjuntores por 2
+  - "cargas.length * 5" multiplica o número de cargas do equipamento
+    por 5 (usado pela regra de cabos de potência)
 
 O sistema já vem com 14 regras pré-cadastradas que cobrem os tipos
-de equipamento mais comuns: CCM-BT, QGBT, CUB-MT, PLC, etc.
+de equipamento mais comuns: CCM-BT, QGBT, PLC — além de regras
+gerais que valem para qualquer tipo.
 
 Cada regra tem:
   - Um NOME para identificar
@@ -171,7 +173,7 @@ ETAPA 1 — Você está na Proposta Técnica
 
 Você abriu uma proposta para um cliente. Dentro dela, cadastrou um
 equipamento chamado "CCM-01" do tipo "CCM-BT", com corrente nominal
-de 400A e 8 disjuntores.
+de 400A, 8 disjuntores e 4 cargas.
 
 ___________________________________
 ETAPA 2 — Você clica em "Estimar"
@@ -200,18 +202,18 @@ Para cada AÇÃO aprovada, o sistema gera uma linha de resultado:
 
   │ COMPOSIÇÃO                         │ QTD  │ UNID │ HH  │
   │────────────────────────────────────┼──────┼──────┼─────┤
-  │ Montagem de estrutura metálica     │  1   │  un  │ 8h  │
-  │ Montagem de barramento de cobre    │  4   │  un  │ 16h │
-  │ Lançamento de cabos de potência    │  16  │  m   │ 8h  │
-  │ Teste de continuidade              │  8   │ ponto│ 2h  │
+  │ Montagem de estrutura metálica     │  1   │  un  │ 4h  │
+  │ Montagem de barramento de cobre    │  4   │  m   │ 10h │
+  │ Lançamento de cabos de potência    │  20  │  m   │ 6h  │
+  │ Teste elétrico funcional           │  2   │  h   │ 2h  │
   │                                    │      │      │─────│
-  │ TOTAL DE HORAS ESTIMADAS           │      │      │ 34h │
+  │ TOTAL DE HORAS ESTIMADAS           │      │      │ 22h │
 
 Como foi calculado:
-  - Estrutura: 1 unidade × 8,0 HH = 8 horas
-  - Barramento: correnteNominal/100 = 400/100 = 4 × 4,0 HH = 16 h
-  - Cabos: 8 disjuntores × 2 = 16 m × 0,5 HH = 8 horas
-  - Testes: 8 disjuntores × 1 = 8 pontos × 0,25 HH = 2 horas
+  - Estrutura: 1 unidade × 4,0 HH = 4 horas
+  - Barramento: correnteNominal/100 = 400/100 = 4 m × 2,5 HH = 10 horas
+  - Cabos: 4 cargas × 5 = 20 m × 0,3 HH = 6 horas
+  - Testes: 4 cargas × 0,5 = 2 h × 1,0 HH = 2 horas
 
 ___________________________________
 ETAPA 5 — Você vê o resultado no equipamento
@@ -228,7 +230,7 @@ ___________________________________
 ETAPA 6 — Visão consolidada (opcional)
 
 No menu Engenharia → "Mão de Obra", você encontra uma
-visão consolidada "Agregado por Equipamento" que soma
+visão consolidada "Mão de Obra (Consolidado por Equipamento)" que soma
 todos os equipamentos da proposta em uma única tela.
 
 Este módulo é APENAS PARA VISUALIZAÇÃO — as horas
@@ -314,7 +316,7 @@ Pense em uma PIZZARIA:
 
   COMPOSIÇÃO          → Uma atividade padronizada, com nome, unidade
                         e horas por unidade. Ex: "Montar barramento
-                        de cobre: 4 horas por unidade"
+                        de cobre: 2,5 horas por unidade"
 
   COEFICIENTE HH      → Horas-Homem. Quantas horas uma pessoa leva
                         para fazer uma unidade da atividade.
@@ -337,8 +339,9 @@ Pense em uma PIZZARIA:
   AGREGADO            → Visão que junta todos os equipamentos e mostra
                         o total de horas de cada composição no projeto.
 
-  CARREGAR DA PTC     → Botão que copia as horas automáticas para a
-                        tabela manual, onde você pode editá-las.
+  ESTIMAR M.O. TODOS  → Botão "Estimar M.O. Todos Equip." na barra
+                        lateral de equipamentos: dispara o motor para
+                        todos os equipamentos da proposta de uma vez.
 
 
 ────────────────────────────────────────────────────────────────────────

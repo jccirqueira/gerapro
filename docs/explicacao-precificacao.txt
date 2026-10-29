@@ -149,6 +149,8 @@ precificação daquele equipamento. Vamos ver campo por campo.
 
   Total de Materiais (R$) ──── Soma de todos os materiais do equipamento.
                                ⛔ Campo somente leitura (vem da Proposta Técnica).
+                               💡 O lápis ✏️ ao lado abre o "Override de Custos"
+                               para considerar um custo negociado (ver seção 9).
 
   Consumíveis (%) ──────────── Percentual de materiais extras (fios, conectores,
                                etc.) que você quer incluir. Ex: 5% de 10.000 = 500.
@@ -159,15 +161,17 @@ precificação daquele equipamento. Vamos ver campo por campo.
   Despesas (R$) ───────────── Custos de logística, viagem, etc.
                                ⛔ Campo somente leitura (vem do módulo Despesas).
 
-  --- Créditos de Impostos (só aparece para Lucro Real) ---
+  --- Créditos sobre Entradas (não aparece no Simples Nacional) ---
   Crédito ICMS (R$) ───────── Valor de ICMS que você pode abater (crédito fiscal).
   Crédito PIS/COFINS (R$) ─── Crédito de PIS e COFINS.
   Crédito IPI (R$) ────────── Crédito de IPI.
 
-  💡 Para equipamentos de automação (PLC, REM), esses créditos são
-     preenchidos AUTOMATICAMENTE a partir dos valores de ICMS e IPI
-     informados na coluna "Lista de Materiais (Automação)" da Proposta
-     Técnica. Você ainda pode ajustá-los manualmente se necessário.
+  💡 Para QUALQUER equipamento, esses créditos são preenchidos
+     AUTOMATICAMENTE a partir das alíquotas de ICMS, IPI, PIS e COFINS
+     de cada material no catálogo (típicos de partida, materiais
+     diretos e materiais de automação). O bloco aparece para todos os
+     regimes que não sejam Simples Nacional (Lucro Real e Lucro
+     Presumido). Você ainda pode ajustá-los manualmente.
 
 Custo Total (R$) ────────── ⛔ Automático. É a soma de tudo acima.
 
@@ -184,6 +188,11 @@ Custo Total (R$) ────────── ⛔ Automático. É a soma de tu
 
   ICMS (%) ────────────────── Imposto sobre circulação de mercadorias.
                                Industrialização: 12% | Revenda: 18% | Serviços: 0%
+                               💡 O valor padrão é preenchido AUTOMATICAMENTE
+                               pela tabela CONFAZ (UF de origem × UF de destino).
+                               O selo "✓ CONFAZ" ao lado do campo indica que o
+                               valor veio da tabela. Se você digitar outro valor,
+                               ele é mantido como manual (e o selo some).
 
   PIS/COFINS (%) ──────────── Contribuições federais.
                                Industrialização/Revenda: 9,25% | Serviços: 4,65%
@@ -251,35 +260,39 @@ EXEMPLO:
 PASSO A PASSO DO CÁLCULO (simplificado):
 
 1. Somar todos os percentuais que incidem sobre o preço:
-   ICMS(12%) + PIS/COFINS(9,25%) + Custos Fixos(8%) + Comissão(5%) + Margem Ideal(20%)
-   = 54,25%
+   ICMS(12%) + PIS/COFINS(9,25%) + Custos Fixos(8%) + Comissão(3,94%)
+   + Margem Ideal(20%) = 53,19%
+
+   ⚠️ A comissão NÃO entra "crua" de 5%. Ela é cobrada sobre o valor
+   LÍQUIDO (preço − impostos), então o cálculo a reduz antes:
+   5% × (100% − 21,25%) = 3,94%
 
 2. Calcular o "fator do markup":
-   100% - 54,25% = 45,75%
-   Fator = 45,75 ÷ 100 = 0,4575
+   100% - 53,19% = 46,81%
+   Fator = 46,81 ÷ 100 = 0,468125
 
 3. Preço ideal (sem IPI):
-   R$ 10.000 ÷ 0,4575 = R$ 21.857,92
+   R$ 10.000 ÷ 0,468125 = R$ 21.361,82
 
    👍 Este é o preço que cobre TODOS os custos, impostos, comissões
       e ainda deixa 20% de lucro sobre o preço de venda.
 
 4. Aplicar desconto (se houver):
-   Se você deu 5% de desconto: R$ 21.857,92 × 0,95 = R$ 20.765,02
+   Se você deu 5% de desconto: R$ 21.361,82 × 0,95 = R$ 20.293,73
 
 5. Calcular o IPI por fora:
-   R$ 20.765,02 × 9,75% = R$ 2.024,59 de IPI
-   Preço final com IPI: R$ 20.765,02 + R$ 2.024,59 = R$ 22.789,61
+   R$ 20.293,73 × 9,75% = R$ 1.978,64 de IPI
+   Preço final com IPI: R$ 20.293,73 + R$ 1.978,64 = R$ 22.272,37
 
 6. Verificar o lucro real:
-   Preço vendido:       R$ 20.765,02
+   Preço vendido:        R$ 20.293,73
    (-) Custos:         -R$ 10.000,00
-   (-) ICMS (12%):     -R$ 2.491,80
-   (-) PIS/COFINS:     -R$ 1.920,76
-   (-) Custos Fixos:   -R$ 1.661,20
-   (-) Comissão:       -R$ 913,63    (sobre o valor após impostos)
-   (=) LUCRO LÍQUIDO:   R$ 3.777,63
-   Margem Real: 3.777,63 ÷ 20.765,02 = 18,19%  (menor que a ideal por causa do desconto)
+   (-) ICMS (12%):     -R$ 2.435,25
+   (-) PIS/COFINS:     -R$ 1.877,17
+   (-) Custos Fixos:   -R$ 1.623,50
+   (-) Comissão:       -R$ 799,07    (5% sobre o valor LÍQUIDO, após impostos)
+   (=) LUCRO LÍQUIDO:   R$ 3.558,74
+   Margem Real: 3.558,74 ÷ 20.293,73 = 17,54%  (menor que a ideal por causa do desconto)
 
 📌 O IPI NÃO entra no cálculo do markup porque ele é calculado "por fora" —
    ele é adicionado DEPOIS do preço final. Ou seja, o IPI não impacta o
@@ -317,8 +330,14 @@ automaticamente. Ele mostra:
 │                      │                                                          │
 │ Margem Real (%)      │ O percentual de lucro REAL (não o ideal).               │
 │                      │ Se a Margem Ideal era 20% mas você deu desconto, aqui   │
-│                      │ vai aparecer um valor menor (ex: 18,19%).               │
+│                      │ vai aparecer um valor menor (ex: 17,54%).               │
 └──────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 Por baixo dos panos, cada cálculo também grava os impostos
+   DETALHADOS por tributo (ICMS, PIS/COFINS, ISS, DAS e IPI) e o
+   detalhe dos custos (material, consumíveis, mão de obra, despesas).
+   É esse detalhe que alimenta o Resumo Consolidado e o resumo
+   tributário salvo na proposta (ver seção 10).
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -340,12 +359,13 @@ da Proposta Técnica. Eles são organizados assim:
 │    QGF-01                                                                       │
 │    CUB-MT-01                                                                    │
 │    SEU-01 (3 componentes)  ← Amarelo = Subestação (agrupa vários equipamentos) │
-│    ─────────────────────────────────────────────                                  │
+│    🔧 Infraestrutura (12 itens)  ← Aparece só se houver itens de infra         │
+│    ─────────────────────────────────────────────                                │
 │    [📊 RESUMO CONSOLIDADO]  ← Verde = visão geral de todos                     │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-TRÊS VISÕES:
+QUATRO VISÕES:
 
   1️⃣  VISÃO POR TAG (equipamento individual)
       - Clique no nome do equipamento (ex: CCM-BT-01)
@@ -357,20 +377,154 @@ TRÊS VISÕES:
       - Mostra os componentes da subestação em uma tabela
       - O IPI de cada componente é zero (isento)
 
-  3️⃣  RESUMO CONSOLIDADO
+  3️⃣  VISÃO DE INFRAESTRUTURA
+      - Clique no item "🔧 Infraestrutura" da barra lateral
+      - Consolidado das disciplinas (obra civil, elétrica, etc.)
+      - Preço calculado com BDI próprio e sem impostos por item
+      - Esses custos entram no Resumo Consolidado e no resumo
+        tributário salvo na proposta (ver seção 10)
+      - Obs: o item só aparece quando há itens de infra cadastrados
+
+  4️⃣  RESUMO CONSOLIDADO
       - Clique no botão verde "RESUMO CONSOLIDADO"
       - Mostra uma tabela com TODOS os equipamentos lado a lado
-      - 4 cards no topo com os números GLOBAIS:
+      - Cards no topo com os números GLOBAIS:
         • Custo Total de Todos os Equipamentos
         • Venda Total (soma de todos os preços)
         • Lucro Líquido Global
         • Margem Média Real
+      - 💡 Se algum equipamento é Faturamento Direto, são 6 cards
+        (Custo, Venda Próprio, Venda Direto, Valor do Pacote,
+        Lucro e Margem). No modo SEU, os rótulos trazem "IPI ISENTO".
+      - 🖨️ O botão "Imprimir" gera uma versão formatada do resumo
+      - Em pastas AUT_* (AutPro), um banner mostra o cálculo da
+        comissão especial (0,5% sobre o bruto, teto de R$ 30.000)
       - ❗ É aqui que você vê se o projeto TODO está dando lucro ou prejuízo
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  9. PASSO A PASSO NA TELA                                                       │
+│  9. OVERRIDE DE CUSTOS DE MATERIAIS                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+O campo "Total de Materiais" é somente leitura — mas às vezes você precisa
+usar um custo NEGOCIADO diferente do catálogo (ex: desconto especial do
+fornecedor) sem alterar o Banco de Materiais. Para isso existe o Override.
+
+─── COMO ABRIR ──────────────────────────────────────────────────────────────────
+
+  Clique no lápis ✏️ ao lado de "Total de Materiais (R$)". Abre a
+  janela "Override de Custos — Materiais", que lista TODOS os materiais
+  do equipamento: típicos de partida, materiais diretos e materiais de
+  automação. Materiais repetidos são agrupados (soma das quantidades).
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│  OVERRIDE DE CUSTOS — MATERIAIS                                                 │
+│  ┌──────────────────────────┬─────┬──────────┬─────────────┬──────────┐         │
+│  │ DESCRIÇÃO                │ QTD │ CADASTRO │ OVERRIDE R$ │ TOTAL    │         │
+│  ├──────────────────────────┼─────┼──────────┼─────────────┼──────────┤         │
+│  │ Disjuntor Motor DMW-5A   │  1  │   145,00 │ [  138,00 ] │   138,00 │         │
+│  │ Inversor G120-55         │  1  │ 3.200,00 │ [       ]   │ 3.200,00 │         │
+│  └──────────────────────────┴─────┴──────────┴─────────────┴──────────┘         │
+│  Deixe em branco para usar o custo do cadastro.                                 │
+│  [💾 Salvar Overrides]                                                          │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+─── AJUSTE EM MASSA (no topo da mesma janela) ───────────────────────────────────
+
+  Para mudar vários custos de uma vez:
+  • Filtros: Fabricante, Categoria, Área e Grupo Siemens
+  • Base de cálculo: "Valor efetivo" (o override atual, senão o
+    cadastro) ou "Custo de cadastro"
+  • Tipo: Percentual (%) ou Valor fixo (R$), com sinal + ou −
+  • "Aplicar" apenas PREENCHE os campos de override da lista
+  • "Limpar Overrides" apaga todos e volta ao cadastro
+
+📌 Nada é gravado até você clicar em "💾 Salvar Overrides". Revise os
+   campos preenchidos antes de salvar.
+
+📌 Os overrides são GRAVADOS NA PROPOSTA (junto com a precificação),
+   NÃO alteram o Banco de Materiais — outras propostas continuam vendo
+   o custo de cadastro.
+
+📌 Ao salvar, o custo do material e os créditos de imposto são
+   recalculados automaticamente, e o preço final se atualiza na hora.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  10. O RESUMO TRIBUTÁRIO, O PIPELINE E A DRE                                    │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Além de gravar os ajustes de cada equipamento, o "💾 Salvar Tudo" monta um
+RESUMO TRIBUTÁRIO do projeto inteiro e o salva junto com a Proposta Técnica.
+
+─── O QUE O RESUMO GUARDA ───────────────────────────────────────────────────────
+
+  • Receita sem IPI, valor do IPI e receita total COM IPI
+  • Custo total e lucro
+  • Impostos DETALHADOS por tributo (débito): ICMS, PIS/COFINS, ISS,
+    DAS e IPI
+  • Créditos de impostos de entrada (o que você pode abater)
+  • Detalhe dos custos: material, consumíveis, mão de obra e despesas
+  • A Infraestrutura (BDI próprio) entra em custo, receita e lucro,
+    mas sem impostos por item
+  • A regra especial da comissão AutPro (teto de R$ 30.000) já está
+    refletida no lucro
+
+─── ONDE ESSE RESUMO É USADO ────────────────────────────────────────────────────
+
+  📌 PIPELINE COMERCIAL — O preço final COM IPI é enviado para o cartão
+     da PTC no Pipeline. ⚠️ Mas SOMENTE se o cartão estiver VAZIO ou
+     ZERADO — valores já digitados no cartão são sempre preservados
+     (um contrato pode ser maior que o escopo precificado).
+
+  📌 PROJETOS — O "Valor do Contrato" do projeto vem da receita COM IPI
+     desse resumo.
+
+  📌 DRE — O resumo detalhado (impostos por tributo, créditos e custos)
+     alimenta a estimativa da DRE (Demonstrativo de Resultado) do
+     projeto, mostrando para onde vai cada real da venda.
+
+📌 Em resumo: ajustou preços ou custos? Clique em "Salvar Tudo" para o
+   Pipeline e a DRE refletirem os números novos.
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  11. REGRAS ESPECIAIS (AUTPRO, CONFAZ E IPI ISENTO)                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+Algumas regras entram automaticamente dependendo da empresa, da UF ou do
+equipamento. Você não precisa configurar nada — mas é bom saber:
+
+💡 AUTPRO (pastas AUT_*) — Comissão especial:
+   • A comissão vira 0,5% sobre o valor BRUTO (preço + IPI) em vez do
+     percentual padrão informado no campo
+   • Teto de R$ 30.000,00 por proposta: o que exceder o teto é
+     devolvido ao lucro
+   • No Resumo Consolidado, um banner mostra a comissão Bruta, a
+     Efetiva e a Economia do teto; no painel, o rótulo muda para
+     "(−) Comissão (s/ Bruto)"
+
+💡 ICMS PELO CONFAZ — O ICMS padrão é preenchido automaticamente pela
+   tabela CONFAZ (UF de origem × UF de destino), com selo "✓ CONFAZ"
+   no campo (detalhes na seção 5).
+
+💡 IPI ISENTO — Equipamentos SEU (subestação) e CUB-MT têm o IPI
+   zerado automaticamente por causa da NCM 8537.20.90 (detalhes nas
+   seções 5 e 13).
+
+💡 INFRAESTRUTURA — Itens de infra têm BDI próprio, sem impostos por
+   item, e entram no Resumo e no resumo tributário (seções 8 e 10).
+
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  12. PASSO A PASSO NA TELA                                                      │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
@@ -391,7 +545,9 @@ ETAPA 3 — CONFIGURAR UM EQUIPAMENTO
   • Clique em um equipamento na barra lateral (ex: CCM-BT-01).
   • Veja os custos diretos já preenchidos (materiais, mão de obra, despesas).
   • Ajuste Consumíveis se necessário (ex: 5%).
-  • Se a empresa for Lucro Real, preencha os créditos de impostos.
+  • Se o regime não for Simples Nacional, confira os créditos de
+    imposto (vêm preenchidos automaticamente — ver seção 5).
+  • Precisa de um custo negociado? Use o Override ✏️ (ver seção 9).
   • Confira os impostos. Ajuste se o cliente tiver alíquota diferente.
   • Ajuste Custos Fixos, Comissão e Margem Ideal.
   • Veja os resultados atualizarem em tempo real no painel da direita.
@@ -416,13 +572,16 @@ ETAPA 7 — SALVAR TUDO
   • Clique no botão "💾 Salvar Tudo" na barra lateral.
   • ✅ Todos os dados de precificação de TODOS os equipamentos
      são salvos de uma vez.
+  • ✅ O resumo tributário do projeto é montado e salvo junto:
+     ele alimenta o cartão do Pipeline (só se estiver vazio) e a
+     DRE dos Projetos (ver seção 10).
   • Se você fechar e abrir a Proposta Técnica depois, os dados
     de precificação são recuperados.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  10. DICAS IMPORTANTES                                                          │
+│  13. DICAS IMPORTANTES                                                          │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
@@ -444,9 +603,10 @@ ETAPA 7 — SALVAR TUDO
 ✅  Para SEU (subestação) e CUB-MT, o IPI é automaticamente zerado porque
     esses equipamentos têm NCM 8537.20.90 (isentos de IPI).
 
-✅  Se você alterar os materiais ou a mão de obra na Proposta Técnica,
-    os custos na Precificação NÃO atualizam sozinhos. Feche e abra a
-    Precificação novamente, ou clique em "Salvar Tudo".
+✅  Se você alterar materiais ou a mão de obra na Proposta Técnica,
+    a Precificação recalcula os custos ao abrir (ou quando a lista de
+    equipamentos muda). Os Overrides de Custos valem imediatamente,
+    sem precisar fechar e reabrir (ver seção 9).
 
 ⚠️  Se algum equipamento aparecer com margem negativa (prejuízo), revise:
     • O preço está muito baixo?
@@ -457,7 +617,7 @@ ETAPA 7 — SALVAR TUDO
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  11. GLOSSÁRIO                                                                  │
+│  14. GLOSSÁRIO                                                                  │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
@@ -515,10 +675,12 @@ ETAPA 7 — SALVAR TUDO
 │                       │                                                         │
 │ Crédito de Imposto    │ Valor de imposto que você pagou na compra de insumos    │
 │                       │ e pode abater do imposto devido na venda.               │
-│                       │ Só se aplica para empresas de Lucro Real.               │
-│                       │ Para equipamentos de automação (PLC, REM), o sistema    │
-│                       │ calcula automaticamente os créditos com base nos        │
-│                       │ impostos dos materiais cadastrados na BOM de Automação. │
+│                       │ Não existe no Simples Nacional (aparece no Lucro Real   │
+│                       │ e no Lucro Presumido). O sistema calcula os créditos    │
+│                       │ AUTOMATICAMENTE para todos os equipamentos, usando as   │
+│                       │ alíquotas de cada material no catálogo (típicos,        │
+│                       │ materiais diretos e automação). Ajuste manual é         │
+│                       │ possível.                                               │
 │                       │                                                         │
 │ Resumo Consolidado    │ Visão geral que mostra a precificação de TODOS os       │
 │                       │ equipamentos do projeto em uma única tela.              │
@@ -530,7 +692,7 @@ ETAPA 7 — SALVAR TUDO
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  12. PROBLEMAS COMUNS E SOLUÇÕES                                                │
+│  15. PROBLEMAS COMUNS E SOLUÇÕES                                                │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
@@ -562,12 +724,13 @@ ETAPA 7 — SALVAR TUDO
 │  SOLUÇÃO:  É NORMAL. Os custos diretos (materiais, mão de obra, despesas)      │
 │            são somente leitura porque vêm da Proposta Técnica. Para alterar,   │
 │            mexa nos Típicos, Composições ou Despesas.                           │
-└─────────────────────────────────────────────────────────────────────────────────┘
 │                                                                                 │
 │  PROBLEMA: "Os créditos de ICMS/IPI estão zerados"                             │
-│  SOLUÇÃO:  Verifique se os materiais na BOM de Automação (PLC/REM) têm ICMS     │
-│            e IPI preenchidos. O crédito é calculado a partir desses valores.    │
-│            Para outros equipamentos, o crédito deve ser informado manualmente.  │
+│  SOLUÇÃO:  O sistema preenche os créditos AUTOMATICAMENTE a partir das         │
+│            alíquotas de ICMS, IPI, PIS e COFINS de cada material do            │
+│            catálogo (típicos de partida, materiais diretos e automação).       │
+│            Se ficaram zerados, é porque esses materiais não têm alíquota       │
+│            informada — preencha no cadastro ou ajuste o crédito na mão.        │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 
