@@ -42,7 +42,7 @@ significa o quê, e o GeraPro cadastra ou atualiza tudo de uma vez.
 ║                                                                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════════╝
 
-Existem TRÊS tipos de importação no GeraPro:
+Existem TRÊS tipos de importação de planilhas no GeraPro:
 
 ┌──────────────────────┬──────────────────────────────────────────────────────────┐
 │ TIPO DE IMPORTAÇÃO   │ O QUE IMPORTA                                            │
@@ -60,6 +60,12 @@ Existem TRÊS tipos de importação no GeraPro:
 │                      │ Acessível dentro do módulo Fornecedores > botão Importar.│
 └──────────────────────┴──────────────────────────────────────────────────────────┘
 
+📌 ALÉM DESSOS TRÊS, existe a IMPORTAÇÃO POR IA — botão "Importar de Documento
+   (IA)" dentro da Proposta Técnica. Ela lê documentos PDF, Word ou Excel e
+   preenche a proposta técnica; não cadastra dados no sistema e não usa
+   planilha de cadastro. Esse tipo é explicado no help do sistema (F1), não
+   neste documento.
+   
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
@@ -193,6 +199,11 @@ ETAPA 4 — CONFIGURAR O MAPEAMENTO (O PASSO MAIS IMPORTANTE)
      "— Ignorar —". Ex: se o arquivo tem uma coluna "Observação" que
      você não quer cadastrar.
 
+  ⚠️ CHECKBOX "PREÇO COM ICMS INCLUSO": se a planilha traz o preço final já
+     com ICMS embutido, marque essa opção no rodapé do painel de mapeamento.
+     O sistema deduz o ICMS automaticamente (custo = custo ÷ (1 + ICMS%)) e
+     o preço registrado sai sem o imposto por cima.
+
   ⚡ SE FOR PLANILHA DA SIEMENS:
      O sistema DETECTA automaticamente (colunas __EMPTY*) e já preenche o
      mapeamento correto. Você só precisa confirmar e clicar em Processar.
@@ -215,7 +226,7 @@ ETAPA 6 — CONFERIR O RESULTADO
   • Você pode editar individualmente se precisar ajustar algo.
   • O campo "Grupo Siemens" (se mapeado) aparece na aba Fiscal do material.
   • A importação fica registrada no painel "Importações Recentes" — veja
-    a seção 13 deste documento para saber como desfazer se precisar.
+    a seção 7 deste documento para saber como desfazer se precisar.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -321,7 +332,7 @@ Isso permite duas ferramentas úteis:
 │   ⚠️ O "Desfazer" restaura os materiais que existiam ANTES da importação.      │
 │      Materiais criados são removidos; materiais atualizados voltam ao           │
 │      preço/descrição anteriores.                                                │
-│      ⚠️ Só é possível desfazer a ÚLTIMA importação de cada sessão.             │
+│      ⚠️ Cada sessão listada tem seu próprio botão Desfazer — não só a última.   │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -399,6 +410,14 @@ Isso permite duas ferramentas úteis:
 │ Área                      │ Não      │ Setor/departamento do material.         │
 │                           │          │                                         │
 │ Modelo                    │ Não      │ Modelo do produto.                       │
+│ Peso (kg)                 │ Não      │ Peso do material em quilogramas.        │
+│                           │          │                                         │
+│ Largura (mm)              │ Não      │ Largura em milímetros (ex.: chapa,      │
+│                           │          │ gabinete).                              │
+│                           │          │                                         │
+│ Altura (mm)               │ Não      │ Altura em milímetros.                   │
+│                           │          │                                         │
+│ Profundidade (mm)         │ Não      │ Profundidade em milímetros.             │
 └───────────────────────────┴──────────┴─────────────────────────────────────────┘
 
 * Se você não mapear Código Interno nem Cód. Fabricante, o sistema cria um
@@ -461,6 +480,7 @@ Quando você carrega a planilha Siemens, o sistema:
      ├──────────────────┼──────────────────────────────┤
      │ __EMPTY          │ Código Interno (MLFB)        │
      │ __EMPTY_1        │ Descrição                    │
+     │ __EMPTY_2        │ Código Interno (também)      │
      │ __EMPTY_3        │ Grupo Siemens (C01, C02...)  │
      │ __EMPTY_4        │ NCM                          │
      │ __EMPTY_7        │ Unidade                      │
@@ -535,7 +555,7 @@ normalmente já vem com nomes de coluna legíveis. Nesse caso:
 
 ✅  O histórico de preços guarda cada alteração. Você pode ver no
     material, na aba "Histórico", todas as vezes que o preço mudou
-    (inclusive via importação).
+    (inclusive via importação e via recebimento de NF no Compras).
 
 ✅  Após importar, use ⭐ "Só favoritos" na lista de Materiais
     para marcar os itens que você usa no dia a dia. Funciona como
@@ -600,7 +620,8 @@ normalmente já vem com nomes de coluna legíveis. Nesse caso:
 │                       │ cadastra um novo.                                       │
 │                       │                                                         │
 │ Histórico de Preços   │ Registro de todas as alterações de preço do material.  │
-│                       │ Cada importação ou edição manual fica registrada.       │
+│                       │ Cada importação, edição manual ou recebimento de NF do  │
+│                       │ Compras fica registrado.                                │
 └───────────────────────┴─────────────────────────────────────────────────────────┘
 
 
