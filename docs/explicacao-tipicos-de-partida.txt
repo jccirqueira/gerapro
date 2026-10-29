@@ -78,37 +78,48 @@ Cada típico tem um "Tipo de Acionamento" — que é a forma como o motor é lig
 │ TIPO                  │ SIGLA    │ PARA QUE SERVE                                │
 ├───────────────────────┼──────────┼──────────────────────────────────────────────┤
 │ Partida Direta        │ PD       │ Liga o motor direto na rede.                  │
-│                       │          │ Simples e barato, mas dá um "tranco" na hora │
-│                       │          │ de ligar (corrente alta). Para motores       │
-│                       │          │ pequenos (até uns 7,5CV).                    │
+│                       │          │ Simples e barato, mas dá um "tranco" na hora  │
+│                       │          │ de ligar (corrente alta). Para motores        │
+│                       │          │ pequenos (até uns 7,5CV).                     │
 │                       │          │                                                │
-│ Soft-Starter          │ SS       │ Liga o motor de forma suave, aumentando      │
-│                       │          │ a tensão aos poucos. Reduz o tranco na       │
-│                       │          │ partida. Para motores médios.                 │
+│ Partida Direta        │ PDR      │ Partida direta com reversão de rotação.       │
+│ Reversora             │          │ Usa para motores que precisam inverter o       │
+│                       │          │ sentido (ex: esteiras, guindastes).            │
 │                       │          │                                                │
-│ Inversor de           │ IF       │ Além de ligar suave, controla a VELOCIDADE   │
-│ Frequência            │          │ do motor. É o mais completo (e caro).        │
+│ Soft-Starter          │ SS       │ Liga o motor de forma suave, aumentando       │
+│                       │          │ a tensão aos poucos. Reduz o tranco na        │
+│                       │          │ partida. Para motores médios.                  │
 │                       │          │                                                │
-│ Estrela-Triângulo     │ ET       │ Liga primeiro em estrela (corrente baixa)    │
-│                       │          │ e depois muda para triângulo (potência       │
-│                       │          │ total). Para motores médios, mas hoje em      │
-│                       │          │ dia está sendo substituído por Soft-Starter.  │
+│ Inversor de           │ IF       │ Além de ligar suave, controla a VELOCIDADE    │
+│ Frequência            │          │ do motor. É o mais completo (e caro).         │
 │                       │          │                                                │
-│ Compensadora          │ CP       │ Usa um autotransformador para reduzir a      │
-│                       │          │ corrente de partida. Está em desuso.         │
+│ Estrela-Triângulo     │ ET       │ Liga primeiro em estrela (corrente baixa)     │
+│                       │          │ e depois muda para triângulo (potência        │
+│                       │          │ total). Para motores médios, mas hoje em       │
+│                       │          │ dia está sendo substituído por Soft-Starter.   │
 │                       │          │                                                │
-│ Alimentador           │ AL       │ Só distribui energia (não tem motor).        │
-│                       │          │ Ex: um alimentador para um quadro secundário. │
+│ Alimentador           │ AL       │ Só distribui energia (não tem motor).         │
+│                       │          │ Ex: um alimentador para um quadro secundário.  │
 │                       │          │                                                │
-│ Entrada Geral         │ EG       │ A entrada de energia do painel principal.    │
-│                       │          │ Disjuntor geral, barramentos, etc.            │
+│ Entrada Geral         │ EG       │ A entrada de energia do painel principal.     │
+│                       │          │ Disjuntor geral, barramentos, etc.             │
 │                       │          │                                                │
-│ Banco de Capacitores  │ BC       │ Correção de fator de potência. Não tem       │
-│                       │          │ motor — tem capacitor. Medido em KVAr.       │
+│ Medição               │ ME       │ Circuito de medição (transformadores de        │
+│                       │          │ corrente, amperímetros). Não tem partida de   │
+│                       │          │ motor.                                         │
 │                       │          │                                                │
-│ Cubículo MT           │ MT       │ Para média tensão (13,8KV, 34,5KV...).       │
-│                       │          │ Outro mundo — componentes completamente       │
-│                       │          │ diferentes.                                    │
+│ Comando e             │ CS       │ Circuito de comando e sinalização do painel   │
+│ Sinalização           │          │ (lâmpadas, botoeiras, sirenes, relés).         │
+│                       │          │                                                │
+│ Serviços Auxiliares   │ SA       │ Circuitos auxiliares: iluminação interna,      │
+│                       │          │ tomadas de serviço, ventilação, aquecimento.   │
+│                       │          │                                                │
+│ Banco de Capacitores  │ BC       │ Correção de fator de potência. Não tem        │
+│                       │          │ motor — tem capacitor. Medido em KVAr.        │
+│                       │          │                                                │
+│ Cubículo MT           │ PNMT     │ Para média tensão (4,16KV a 13,8KV).          │
+│                       │          │ Outro mundo — componentes completamente        │
+│                       │          │ diferentes.                                     │
 └───────────────────────┴──────────┴──────────────────────────────────────────────┘
 
 📌 A SIGLA é usada na GERAÇÃO AUTOMÁTICA do nome do típico (ex: IF-50-380).
@@ -126,28 +137,33 @@ A tela principal mostra uma TABELA com todos os típicos cadastrados:
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  🔍 [Buscar típico..._____________________________]                             │
+│  ┌───────────────────────┬──────────────┬─────────────┬──────┬────────┬───────┐ │
+│  │ Nome                  │ Tipo Partida │ Potên-Tensão│ Icc  │ Custo  │ Ações │ │
+│  ├───────────────────────┼──────────────┼─────────────┼──────┼────────┼───────┤ │
+│  │ IF-50-380-25-Modbus   │ Inversor     │ 50CV 380V   │ 25kA │ 12.450 │ ✏️🗑️  │ │
+│  │ SS-30-440             │ Soft-Starter │ 30CV 440V   │ 50kA │  8.230 │ ✏️🗑️  │ │
+│  │ PD-5-220              │ Partida Dir. │ 5CV 220V    │ 65kA │    850 │ ✏️🗑️  │ │
+│  │ EG-1000A-380          │ Entrada Ger. │ 1000A 380V  │ 50kA │ 35.000 │ ✏️🗑️  │ │
+│  │ ...                   │ ...          │ ...         │ ...  │ ...    │ ...   │ │
+│  └───────────────────────┴──────────────┴─────────────┴──────┴────────┴───────┘ │
 │                                                                                 │
-│  ┌──────────────────────┬──────────┬────────┬──────────┬──────────────────────┐ │
-│  │ Nome                 │ Aciona.  │ Motor  │ Tensão   │ Custo                │ │
-│  ├──────────────────────┼──────────┼────────┼──────────┼──────────────────────┤ │
-│  │ IF-50-380-25-Modbus  │ Inversor │ 50 CV  │ 380 V    │ R$ 12.450,00        │ │
-│  │ SS-30-440            │ SoftSt.  │ 30 CV  │ 440 V    │ R$ 8.230,00         │ │
-│  │ PD-5-220             │ Direta   │ 5 CV   │ 220 V    │ R$ 850,00           │ │
-│  │ EG-1000A-380         │ Ent.Geral│ 1000A  │ 380 V    │ R$ 35.000,00        │ │
-│  │ ...                  │ ...      │ ...    │ ...      │ ...                  │ │
-│  └──────────────────────┴──────────┴────────┴──────────┴──────────────────────┘ │
+│  [➕ NOVO TÍPICO]                                                                │
 │                                                                                 │
-│  [➕ NOVO TÍPICO]                          [📥 EXPORTAR]                        │
+│  📌 A tabela tem também a coluna "Comunicação" (protocolo, ex: Modbus) e          │
+│     "Custo Ref." (custo de referência dos materiais). Cada linha tem os botões   │
+│     de editar, clonar e excluir.                                                 │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 Você pode:
-  • Filtrar pelo nome ou tipo de acionamento
   • Clicar em um típico para EDITAR
   • Usar o botão "📋 Clonar" para copiar um típico existente
   • Excluir com o ícone de lixeira
-  • Exportar a lista para Excel ou CSV
+  • Ordenar clicando nos cabeçalhos das colunas
+
+📌 Para exportar a lista de típicos (Excel ou CSV), acesse o módulo
+   "Relatório de Típicos" no menu RELATÓRIOS — é lá que ficam os filtros
+   e o botão de exportação.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -210,11 +226,12 @@ Ao clicar em "Novo Típico" ou "Editar", abre o BUILDER — uma tela com dois la
 │                           │          │                                          │
 │ Tensão (V)                │ ✅ SIM   │ Tensão de alimentação.                  │
 │                           │          │ Ex: 220V, 380V, 440V, 480V, 760V.       │
-│                           │          │ Para MT: 13,8KV, 34,5KV.                │
+│                           │          │ Para MT: 4,16KV, 6,0KV, 6,9KV, 13,8KV.  │
 │                           │          │                                          │
 │ ICC (kA)                  │ Não      │ Corrente de curto-circuito disponível   │
 │                           │          │ no ponto de instalação.                 │
-│                           │          │ Ex: 25kA, 50kA, 65kA.                  │
+│                           │          │ Ex: 25kA, 50kA, 65kA (BT).               │
+│                           │          │ Para MT: 16, 20, 25, 31,5, 40kA.        │
 │                           │          │                                          │
 │ Frequência                │ Não      │ 50Hz ou 60Hz.                           │
 │                           │          │                                          │
@@ -231,8 +248,13 @@ Ao clicar em "Novo Típico" ou "Editar", abre o BUILDER — uma tela com dois la
 │                           │          │                                          │
 │ Rendimento (%)            │ Não      │ Eficiência do motor (η). Padrão: 85%.    │
 │                           │          │                                          │
-│ Aplicação                 │ Não      │ Descrição curta do que este típico faz. │
-│                           │          │ Ex: "Bomba de água 50CV".               │
+│ Sinalização/Comando       │ Não      │ Opções de sinalização e comando da      │
+│ Porta                     │          │ porta: SF (Sinaleiro Falha), SF +       │
+│                           │          │ Comutadora + Botão duplo iluminado, ou  │
+│                           │          │ SF + Comutadora + Botão Liga/Desliga.   │
+│                           │          │                                          │
+│ Tensão de Comando         │ Não      │ Tensão do circuito de comando:          │
+│                           │          │ 220vca, 24vcc ou 220vca/24vcc.          │
 │                           │          │                                          │
 │ Fabricante Proteção       │ Não      │ Marca preferida dos disjuntores e       │
 │                           │          │ fusíveis. Ex: ABB, Siemens, WEG.         │
@@ -261,12 +283,13 @@ Ao clicar em "Novo Típico" ou "Editar", abre o BUILDER — uma tela com dois la
 O sistema tem dois modos: BT (Baixa Tensão) e MT (Média Tensão).
 
 ┌──────────────────┬───────────────────────────┬─────────────────────────────────┐
-│                  │ BT (Baixa Tensão)         │ MT / Cubículo MT               │
+│                  │ BT (Baixa Tensão)         │ MT / Cubículo MT                │
 ├──────────────────┼───────────────────────────┼─────────────────────────────────┤
-│ Tensão           │ 220V, 380V, 440V, 480V... │ 13,8KV, 34,5KV                 │
+│ Tensão           │ 220V, 380V, 440V, 480V... │ 4,16KV, 6,0KV,                  │
+│                  │                           │ 6,9KV, 13,8KV                   │
 │ Potência         │ Em CV                     │ Em CV também                    │
-│ ICC              │ 25, 50, 65 kA             │ 12,5, 25, 31,5 kA              │
-│ Tipo             │ PD, SS, IF, ET...         │ CUB-MT                          │
+│ ICC              │ 25, 50, 65 kA             │ 16, 20, 25, 31,5, 40 kA         │
+│ Tipo             │ PD, SS, IF, ET...         │ PNMT                            │
 │ Fabricantes      │ Siemens, WEG, ABB...      │ Fabricantes específicos MT     │
 │ Materiais        │ Disjuntores, contatores   │ Disjuntores MT, relés,         │
 │                  │ cabos, soft-starters...   │ transformadores de corrente...  │
@@ -287,11 +310,12 @@ seguindo este padrão:
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│   NOME = {SIGLA}-{POTENCIA}-{TENSAO}-{ICC}-{COMUNICACAO}-{PROTECAO}-{DRIVES}   │
+│   NOME = {SIGLA}-{POTENCIA}-{TENSAO}-{ICC}-{COMUN}-{PROT}-{DRIVES}-{RESERVA}-  │
+│          {TENSÃO COMANDO}-{REGIME}                                              │
 │                                                                                 │
 │   EXEMPLO:                                                                      │
 │                                                                                 │
-│   IF-50-380-25-ModbusTCP-ABB-Siemens-STD                                       │
+│   IF-50-380-25-ModbusTCP-ABB-Siemens-STD                                        │
 │   │  │   │    │      │        │       │                                         │
 │   │  │   │    │      │        │       └── Regime: Standard (STD)                │
 │   │  │   │    │      │        └────────── Drives: Siemens                        │
@@ -300,6 +324,11 @@ seguindo este padrão:
 │   │  │   └──────────────────────── Tensão: 380V                                 │
 │   │   └───────────────────────── Potência: 50CV                                 │
 │   └──────────────────────────── Tipo: Inversor de Frequência (IF)               │
+│                                                                                 │
+│   📌 O nome também inclui os campos "Sinalização/Comando Porta" (ex: SF) e       │
+│      "Tensão de Comando" (ex: 220VCA, 24VCC) quando preenchidos, antes do       │
+│      sufixo de regime. Para Cubículo MT (PNMT), o sufixo de regime não é        │
+│      adicionado.                                                                │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
@@ -390,7 +419,8 @@ na partida do motor.
      de criar uma linha duplicada.
 
   ✅ Os valores de CUSTO vêm do catálogo de materiais. Se o preço do material
-     mudar depois, você pode usar o botão "Recalcular Custos" para atualizar.
+     mudar depois, edite o típico e ajuste os valores manualmente — não há
+     botão de recálculo automático.
 
   ✅ Cada material guarda também ICMS, IPI e UF do fornecedor — essas
      informações são usadas na Precificação para calcular créditos de impostos.
@@ -482,13 +512,13 @@ Esta é a parte mais importante para entender o valor dos típicos.
 
 Na tela de listagem de típicos, você pode:
 
-  🔍 FILTRAR por nome ou tipo de acionamento para encontrar rapidamente.
-
-  📥 EXPORTAR para Excel (.xlsx) ou CSV (.csv) — gera um arquivo com todos os
-     típicos, seus parâmetros e custos totais.
-
   📋 Na Proposta Técnica, a LM pode ser exportada para Excel (com ou sem preços)
      para ser usada na compra dos materiais.
+
+📌 Para filtrar e exportar a lista de típicos (Excel ou CSV), acesse o módulo
+   "Relatório de Típicos" no menu RELATÓRIOS — é lá que ficam os filtros e o
+   botão de exportação. A tela de listagem de típicos não tem exportação
+   própria.
 
 💡 A exportação da LM é útil para enviar ao setor de compras — eles têm a lista
    exata de códigos, fabricantes e quantidades para cotar.
@@ -505,7 +535,8 @@ Na tela de listagem de típicos, você pode:
     um típico IF-30-380, IF-50-380, IF-75-380... e reuse em todos os projetos.
 
 ✅  Mantenha os típicos ATUALIZADOS. Se um componente mudou de preço ou
-    foi descontinuado, edite o típico e use "Recalcular Custos".
+    foi descontinuado, edite o típico e ajuste os custos dos materiais
+    manualmente (não há botão de recálculo automático).
 
 ✅  Use a ESPECIFICAÇÃO TÉCNICA (descricao_word) para escrever um texto
     detalhado que vai aparecer na proposta em Word. Assim você não precisa
@@ -518,9 +549,9 @@ Na tela de listagem de típicos, você pode:
 ✅  Organize os típicos por tipo de acionamento. Use nomes claros que qualquer
     engenheiro da equipe entenda de cara.
 
-✅  O botão "Recalcular Custos" atualiza todos os preços dos materiais do
-    típico com base no catálogo atual. Use quando os fornecedores atualizam
-    a lista de preços.
+✅  Ao editar um típico, você pode ajustar os custos dos materiais caso os
+    preços do catálogo tenham mudado. Não existe botão de recálculo em massa
+    — a alteração é feita material a material.
 
 ⚠️  Se você DELETAR um típico que está sendo usado em alguma proposta, as
     cargas que usam ele perdem a referência. Os materiais já alocados não
@@ -577,9 +608,9 @@ Na tela de listagem de típicos, você pode:
 │                       │                                                         │
 │ BT (Baixa Tensão)     │ Tensões até 1000V. Ex: 220V, 380V, 440V.               │
 │                       │                                                         │
-│ MT (Média Tensão)     │ Tensões acima de 1000V. Ex: 13,8KV, 34,5KV.            │
+│ MT (Média Tensão)     │ Tensões acima de 1000V. Ex: 4,16KV, 6,9KV, 13,8KV.      │
 │                       │                                                         │
-│ CUB-MT                │ Cubículo de Média Tensão — painel para MT.              │
+│ PNMT                  │ Cubículo de Média Tensão — painel para MT.              │
 │                       │                                                         │
 │ Painel / Equipamento  │ O quadro elétrico como um todo (ex: CCM-BT-01).        │
 │                       │ Dentro dele podem ter várias cargas.                    │
@@ -605,9 +636,9 @@ Na tela de listagem de típicos, você pode:
 │            materiais que têm descrição preenchida. Verifique o catálogo.       │
 │                                                                                 │
 │  PROBLEMA: "O custo do típico está diferente da soma dos materiais"           │
-│  SOLUÇÃO:  Clique em "Recalcular Custos" para atualizar os preços a partir    │
-│            do catálogo. Se ainda assim estiver diferente, salve e abra         │
-│            novamente.                                                           │
+│  SOLUÇÃO:  Verifique se todos os materiais têm preço preenchido no catálogo.  │
+│            Se um preço tiver mudado, edite o típico e ajuste o custo do        │
+│            material manualmente. Salve e abra novamente.                       │
 │                                                                                 │
 │  PROBLEMA: "Não encontro o típico que criei na hora de selecionar na carga"  │
 │  SOLUÇÃO:  O sistema FILTRA os típicos pela potência, tensão e tipo da        │
