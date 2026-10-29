@@ -204,24 +204,38 @@ Exemplos de tags que o sistema procura no documento:
 │ {cliente}            │ Nome do cliente                                          │
 │ {projeto}            │ Título/Nome do projeto                                   │
 │ {codigo}             │ Código da proposta (ex: PT-001, PC-001)                  │
-│ {data}               │ Data de emissão                                          │
-│ {vendedor}           │ Nome do vendedor                                         │
+│ {data_emissao}       │ Data de emissão do documento                             │
 │ {revisao}            │ Número da revisão                                        │
-│ {tabela_equipamentos}│ Tabela com todos os equipamentos da proposta             │
-│ {tabela_precos}      │ Tabela com preços                                        │
-│ {logo_cliente}       │ Logotipo do cliente (se houver)                          │
-│ {marca_dagua}        │ Marca d'água (ex: "RASCUNHO", "APROVADO")               │
-│ {valores}            │ Tabela de valores totais                                 │
-│ {infraestrutura}     │ Tabela de infraestrutura (se houver)                     │
+│ {razao_social}       │ Razão social do cliente                                  │
+│ {nome_fantasia}      │ Nome fantasia do cliente                                 │
+│ {cnpj}               │ CNPJ do cliente                                          │
+│ {logradouro}         │ Endereço do cliente (logradouro, número, bairro)         │
+│ {cidade}             │ Cidade do cliente                                        │
+│ {estado}             │ UF do cliente                                            │
+│ {cep}                │ CEP do cliente                                           │
+│ {contato_nome}       │ Nome do contato principal do cliente                     │
+│ {contato_email}      │ E-mail do contato principal                              │
+│ {contato_telefone}   │ Telefone do contato principal                            │
+│ {lista_paineis}      │ Tabela com todos os equipamentos/painéis da proposta     │
+│ {escopo}             │ Itens de escopo da proposta                              │
+│ {infraestrutura}     │ Tabela de infraestrutura (injetada no fim do documento)  │
 └──────────────────────┴──────────────────────────────────────────────────────────┘
+
+📌 IMPORTANTE: As tags acima são os CAMPOS DE TEXTO. As imagens (logotipo da
+   empresa, logotipo do cliente e marca d'água) são inseridas pelo sistema
+   diretamente no documento — elas não são tags digitadas no Word. Veja a
+   seção 8.
 
 📌 DICA: O jeito mais fácil de criar um template é PEGAR UM EXISTENTE e
    editar. Faça o download de um template que já funciona, abra no Word,
    ajuste cores, fontes, logotipo, e faça upload como um template novo.
 
-📌 IMPORTANTE: As tags devem estar escritas EXATAMENTE como acima, incluindo
-   as chaves {}. Se você digitar "{Cliente}" em vez de "{cliente}", o sistema
-   não vai reconhecer e vai deixar o texto como está no documento final.
+📌 IMPORTANTE: As tags devem estar escritas como acima, incluindo as chaves {}.
+   Toda chave também funciona EM MAIÚSCULAS — o sistema gera esse alias
+   automaticamente. Ou seja, {cliente} e {CLIENTE} têm o mesmo efeito. A única
+   exigência é manter a MESMA forma (minúscula ou maiúscula) dentro de um
+   mesmo loop, para as colunas casarem. Uma chave totalmente inexistente (ex:
+   {descricao_curta}) não quebra a exportação — ela sai em branco no documento.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -231,24 +245,24 @@ Exemplos de tags que o sistema procura no documento:
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 O GeraPro insere automaticamente o logotipo e a marca d'água no documento
-gerado. Você NÃO precisa colocar logotipo dentro do template.
+gerado. Você NÃO precisa colocar logotipo nem marca d'água dentro do template.
 
 • O logotipo usado é o que está configurado em Configurações > Dados da Empresa
-  (campo "Logo (URL ou base64)").
+  (campo "Logo (URL ou base64)"). Existe também o logotipo do cliente, vindo do
+  cadastro do cliente.
 
-• A marca d'água é gerada automaticamente com base no status da proposta:
-  ┌──────────────┬──────────────────────────────────────────┐
-  │ STATUS       │ MARCA D'ÁGUA                             │
-  ├──────────────┼──────────────────────────────────────────┤
-  │ Rascunho     │ "RASCUNHO" (em cinza claro)              │
-  │ Enviada      │ "PROPOSTA" (versão limpa, sem marca)     │
-  │ Aprovada     │ "APROVADO" + carimbo verde               │
-  │ Cancelada    │ "CANCELADO" (em vermelho, diagonal)      │
-  └──────────────┴──────────────────────────────────────────┘
+• A marca d'água é uma IMAGEM enviada por proposta, no campo "Marca D'água
+  (Fundo)" — tanto na Proposta Comercial quanto na Proposta Técnica. É você
+  quem faz upload da imagem (PNG/JPG) que deve aparecer atrás do conteúdo
+  (por exemplo, o carimbo "RASCUNHO" da sua empresa).
 
-✅ Para que a marca d'água funcione, o template DEVE conter a tag {marca_dagua}
-   no local onde ela deve aparecer (normalmente no centro de cada página, ou
-   apenas na primeira página, dependendo de como você configurar).
+✅ O template não precisa de nenhuma tag para as imagens: logotipo da empresa,
+   logotipo do cliente e marca d'água são injetados pelo sistema
+   automaticamente na posição e no tamanho definidos no modelo. Basta fazer
+   upload da imagem no formulário da proposta antes de gerar o documento.
+
+📌 Se a proposta não tiver marca d'água, o documento é gerado sem ela — não
+   há marca padrão por status (RASCUNHO/APROVADO/etc.).
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -303,13 +317,13 @@ empresa.
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PROBLEMA: A marca d'água não aparece no documento gerado.                      │
+│ PROBLEMA: A marca d'água não aparece no documento gerado.                       │
 │                                                                                 │
-│ CAUSA: A tag {marca_dagua} não está presente no template, ou está escrita      │
-│ com formatação diferente (ex: {MARCA_DAGUA} em vez de {marca_dagua}).          │
+│ CAUSA: A proposta não tem imagem de marca d'água enviada no campo "Marca        │
+│ D'água (Fundo)", ou a imagem enviada está em formato inválido.                  │
 │                                                                                 │
-│ SOLUÇÃO: Edite o template e insira a tag {marca_dagua} exatamente assim,       │
-│ com letras minúsculas e chaves {}.                                              │
+│ SOLUÇÃO: Abra a proposta (Comercial ou Técnica), clique em "Escolher Marca      │
+│ D'água", envie uma imagem PNG ou JPG e gere o documento novamente.              │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -322,16 +336,18 @@ empresa.
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ PROBLEMA: O logotipo da empresa não aparece no documento.                      │
+│ PROBLEMA: O logotipo da empresa não aparece no documento.                       │
 │                                                                                 │
-│ CAUSA POSSÍVEL 1: O logotipo não foi configurado em Configurações > Dados      │
+│ CAUSA POSSÍVEL 1: O logotipo não foi configurado em Configurações > Dados       │
 │ da Empresa.                                                                     │
 │                                                                                 │
-│ CAUSA POSSÍVEL 2: A tag {logo_cliente} ou {logo_empresa} não está no template.│
+│ CAUSA POSSÍVEL 2: A imagem do logotipo é inválida ou não carrega no             │
+│ navegador.                                                                      │
 │                                                                                 │
 │ SOLUÇÃO:                                                                        │
-│   1. Verifique se o logotipo está configurado (campo "Logo")                   │
-│   2. Verifique se o template contém a tag correta                              │
+│   1. Verifique se o logotipo está configurado (campo "Logo")                    │
+│   2. Verifique se a imagem do campo Logo abre normalmente no navegador          │
+│   3. Gere o documento novamente — não é preciso nenhuma tag de imagem           │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 
@@ -359,8 +375,9 @@ empresa.
 │ Upload                │ Ação de enviar um arquivo do seu computador para o      │
 │                       │ servidor do GeraPro.                                    │
 │                       │                                                         │
-│ Marca d'água          │ Texto ou imagem sobreposta no documento, geralmente    │
-│                       │ transparente, indicando o status (RASCUNHO, APROVADO). │
+│ Marca d'água          │ Imagem de fundo enviada por proposta (campo "Marca      │
+│                       │ D'água (Fundo)" da Proposta Comercial ou Técnica).      │
+│                       │ Aparece atrás do conteúdo, em transparência.            │
 │                       │                                                         │
 │ Logotipo / Logo       │ Imagem da empresa (ou cliente) que aparece no          │
 │                       │ cabeçalho ou capa do documento.                         │
