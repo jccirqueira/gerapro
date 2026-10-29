@@ -25,7 +25,7 @@ export const equipments = {
         const isTrMt = eq && eq.type === 'TR-MT';
 
         // Determine available sub-tabs based on equipment type
-        const allSubTabs = ['technical', 'norms', 'loads', 'enclosures', 'busbars', 'deviations', 'labor', 'expenses', 'calc_eletrico', 'calc_mecanico', 'layout'];
+        const allSubTabs = ['technical', 'norms', 'loads', 'busbars', 'deviations', 'labor', 'expenses', 'calc_eletrico', 'calc_mecanico', 'layout'];
         const trMtSubTabs = ['technical', 'materiais', 'norms', 'deviations', 'expenses'];
         const eletrocentroSubTabs = ['technical', 'eletrocentro', 'materiais', 'norms', 'deviations', 'labor', 'expenses', 'calc_mecanico'];
         const seuSubTabs = ['technical', 'deviations', 'expenses'];
@@ -242,7 +242,6 @@ export const equipments = {
                             'technical': 'ph-notebook',
                             'norms': 'ph-book',
                             'loads': 'ph-list-checks',
-                            'enclosures': 'ph-squares-four',
                             'busbars': 'ph-lightning',
                             'exclusions': 'ph-x-circle',
                             'deviations': 'ph-warning',
@@ -704,89 +703,6 @@ export const equipments = {
                 `;
             }
 
-        } else if (subTab === 'enclosures') {
-            if (isTrMt) {
-                contentHtml = this.renderRestrictedTab(eq);
-            } else {
-                contentHtml = `
-                    <div style="animation: fadeIn 0.3s ease;">
-
-                        <div style="max-width: 800px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;">
-
-                            <div>
-
-                                <h4 style="margin: 0; color: #1e3a8a; font-size: 18px;">Configuração de Chaparia / Colunas: ${eq.tag}</h4>
-
-                                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Detalhamento físico do conjunto de painéis</div>
-
-                            </div>
-
-                            <button type="button" class="btn btn-sm btn-secondary" onclick="app.propostaTecnica.addEnclosureRow()">+ Adicionar Coluna</button>
-
-                        </div>
-
-                        <div class="table-container" style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-
-                            <table class="w-full" style="font-size: 13px; border-collapse: collapse;">
-
-                                <thead>
-
-                                    <tr style="background: var(--color-accent); border-bottom: 2px solid #e2e8f0; color: #fff;">
-
-                                        <th style="padding: 14px; text-align: center; width: 80px;">Coluna</th>
-
-                                        <th style="padding: 14px; text-align: left;">Tipo / Função</th>
-
-                                        <th style="padding: 14px; text-align: center;">Dimensões (AxLxP)</th>
-
-                                        <th style="padding: 14px; text-align: center; width: 100px;">IP</th>
-
-                                        <th style="padding: 14px; text-align: center; width: 100px;">Cor</th>
-
-                                        <th style="padding: 14px; text-align: center; width: 100px;">Lado</th>
-
-                                        <th style="padding: 14px; width: 60px;"></th>
-
-                                    </tr>
-
-                                </thead>
-
-                                <tbody id="enclosure-body">
-
-                                    ${(eq.enclosureItems || []).map((item, i) => `
-
-                                        <tr class="enclosure-row" style="border-bottom: 1px solid #f1f5f9;">
-
-                                            <td style="padding: 12px;"><input type="text" name="enc_col_${i}" class="form-control" value="${item.col}" style="text-align: center;"></td>
-
-                                            <td style="padding: 12px;"><input type="text" name="enc_type_${i}" class="form-control" value="${item.type}"></td>
-
-                                            <td style="padding: 12px;"><input type="text" name="enc_dim_${i}" class="form-control" value="${item.dim}" placeholder="2300x800x600"></td>
-
-                                            <td style="padding: 12px;"><input type="text" name="enc_ip_${i}" class="form-control" value="${item.ip}" style="text-align: center;"></td>
-
-                                            <td style="padding: 12px;"><input type="text" name="enc_color_${i}" class="form-control" value="${item.color}" style="text-align: center;"></td>
-
-                                            <td style="padding: 12px;"><input type="text" name="enc_side_${i}" class="form-control" value="${item.side}" style="text-align: center;"></td>
-
-                                            <td style="padding: 12px; text-align: center;"><button type="button" class="btn-icon" style="color: #ef4444;"><i class="ph ph-trash"></i></button></td>
-
-                                        </tr>
-
-                                    `).join('')}
-
-                                    ${(eq.enclosureItems || []).length === 0 ? '<tr><td colspan="7" style="padding: 30px; text-align: center; color: #94a3b8;">Clique em "+ Adicionar Coluna" para iniciar.</td></tr>' : ''}
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-
-                    </div>
-                `;
-            }
-
         } else if (subTab === 'busbars') {
             if (isTrMt) {
                 contentHtml = this.renderRestrictedTab(eq);
@@ -967,7 +883,6 @@ export const equipments = {
             'technical': 'Ficha Técnica',
             'norms': 'Normas',
             'loads': eq && eq.type === 'CUB-MT' ? 'Cubículos' : 'Cargas',
-            'enclosures': 'Invólucros',
             'busbars': 'Barramentos',
             'deviations': 'Desvios',
             'labor': 'Mão de Obra',

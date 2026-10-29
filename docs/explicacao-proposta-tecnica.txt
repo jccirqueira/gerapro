@@ -467,26 +467,21 @@ especificações técnicas do painel. Os campos variam conforme o tipo.
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  10. SUB-ABA: INVÓLUCROS                                                        │
+│  10. CHAPARIA (ARMÁRIOS) — VIA ABA LAYOUT                                       │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-A sub-aba "Invólucros" define o gabinete físico do painel: tipo, material,
-dimensões e quantidade de armários.
+Os armários (chaparia) do painel são configurados na sub-aba "Layout", não em
+uma aba separada. Ao desenhar o layout, o sistema gera automaticamente os
+materiais da chaparia (portas, laterais, fundos) e os envia para a lista de
+materiais do equipamento — de onde eles entram no cálculo de preço.
 
-┌──────────────────────────┬──────────────────────────────────────────────────┐
-│ CAMPO                    │ O QUE É                                          │
-├──────────────────────────┼──────────────────────────────────────────────────┤
-│ Tipo de Invólucro        │ Autoportante, sobrepor, de piso, mural, armário. │
-│ Material                 │ Aço carbono, aço inox, alumínio, poliéster.      │
-│ Cor                      │ Cor RAL do gabinete.                            │
-│ Quantidade de Armários   │ Número de corpos do painel.                     │
-│ Dimensões (L×A×P mm)    │ Dimensões externas de cada armário.             │
-│ Formato                  │ Montagem lado a lado, costas com costas.         │
-└──────────────────────────┴──────────────────────────────────────────────────┘
+📌 O Layout mantém um resumo dos armários gerados (enclosureItems), que é
+   usado pelos Cálculos Mecânicos (dimensões totais) e pelo Relatório da
+   Proposta. Não é uma aba editável — é derivada do Layout.
 
-💡 Para painéis com múltiplos armários, você pode configurar cada armário
-   individualmente (largura, altura, profundidade, tipo de porta).
+📌 O checkbox "Auto Chaparia" no Layout liga/desliga a injeção automática
+   dos itens da chaparia na lista de materiais do equipamento.
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐

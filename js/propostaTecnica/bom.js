@@ -3089,44 +3089,6 @@ export const bom = {
 
 
 
-    addEnclosureRow() {
-
-        const body = document.getElementById('enclosure-body');
-
-        if (!body) return;
-
-        const index = body.querySelectorAll('.enclosure-row').length;
-
-        const row = document.createElement('tr');
-
-        row.className = 'enclosure-row';
-
-        row.style.borderBottom = '1px solid #f1f5f9';
-
-        row.innerHTML = `
-
-            <td style="padding: 12px;"><input type="text" name="enc_col_${index}" class="form-control" value="C${index + 1}" style="text-align: center;"></td>
-
-            <td style="padding: 12px;"><input type="text" name="enc_type_${index}" class="form-control"></td>
-
-            <td style="padding: 12px;"><input type="text" name="enc_dim_${index}" class="form-control" placeholder="2300x800x600"></td>
-
-            <td style="padding: 12px;"><input type="text" name="enc_ip_${index}" class="form-control" value="IP-42" style="text-align: center;"></td>
-
-            <td style="padding: 12px;"><input type="text" name="enc_color_${index}" class="form-control" value="RAL 7035" style="text-align: center;"></td>
-
-            <td style="padding: 12px;"><input type="text" name="enc_side_${index}" class="form-control" value="Ambos" style="text-align: center;"></td>
-
-            <td style="padding: 12px; text-align: center;"><button type="button" class="btn-icon" style="color: #ef4444;" onclick="this.closest('tr').remove()"><i class="ph ph-trash"></i></button></td>
-
-        `;
-
-        body.appendChild(row);
-
-    },
-
-
-
     onVendorOptChange(index) {
 
         const row = document.querySelector(`.vendor-row [name="ven_opt_${index}"]`);

@@ -178,7 +178,7 @@ export const core = {
                     : newEq.type === 'SEU' ? ['technical', 'deviations', 'expenses']
                     : newEq.type === 'ELETROCENTRO' ? ['eletrocentro', 'materiais', 'norms', 'deviations', 'labor', 'expenses', 'calc_mecanico']
                     : isAutomation ? ['technical', 'norms', 'io_list', 'bom', 'deviations', 'labor', 'expenses']
-                    : ['technical', 'norms', 'loads', 'enclosures', 'busbars', 'deviations', 'labor', 'expenses', 'calc_eletrico', 'calc_mecanico', 'layout'];
+                    : ['technical', 'norms', 'loads', 'busbars', 'deviations', 'labor', 'expenses', 'calc_eletrico', 'calc_mecanico', 'layout'];
                 if (!validSubTabs.includes(this.activeSubTab)) {
                     this.activeSubTab = validSubTabs[0];
                 }
@@ -257,7 +257,7 @@ export const core = {
 
         let eq = data.equipments[this.activeEquipmentIndex];
 
-        if (eq && eq.type === 'TR-MT' && ['loads','enclosures','busbars','labor','calc_eletrico','calc_mecanico'].includes(this.activeSubTab)) {
+        if (eq && eq.type === 'TR-MT' && ['loads','busbars','labor','calc_eletrico','calc_mecanico'].includes(this.activeSubTab)) {
             return;
         }
         if (eq && eq.type === 'TR-MT' && this.activeSubTab === 'exclusions') {
@@ -372,38 +372,6 @@ export const core = {
         if (this.activeSubTab === 'norms') {
 
             eq.norms = Array.from(form.querySelectorAll('input[name="selectedNorms"]:checked')).map(cb => cb.value);
-
-        }
-
-
-
-        if (this.activeSubTab === 'enclosures') {
-
-            const items = [];
-
-            const rows = form.querySelectorAll('.enclosure-row');
-
-            rows.forEach((row, i) => {
-
-                items.push({
-
-                    col: formData.get(`enc_col_${i}`),
-
-                    type: formData.get(`enc_type_${i}`),
-
-                    dim: formData.get(`enc_dim_${i}`),
-
-                    ip: formData.get(`enc_ip_${i}`),
-
-                    color: formData.get(`enc_color_${i}`),
-
-                    side: formData.get(`enc_side_${i}`)
-
-                });
-
-            });
-
-            eq.enclosureItems = items;
 
         }
 
