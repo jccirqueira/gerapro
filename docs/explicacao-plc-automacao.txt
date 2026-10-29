@@ -68,11 +68,11 @@ Dentro do GeraPro, PLC e REM funcionam de forma praticamente idêntica.
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
-│  2. OS 7 SUB-TABS DO PLC                                                       │
+│  2. OS 8 SUB-TABS DO PLC                                                       │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-Quando você clica em um PLC na lista de equipamentos, aparecem 7 abas (sub-tabs)
+Quando você clica em um PLC na lista de equipamentos, aparecem 8 abas (sub-tabs)
 no topo da tela. Cada uma tem uma função específica:
 
 ┌──────────────────────┬──────────────────────────────────────────────────────────┐
@@ -93,6 +93,8 @@ no topo da tela. Cada uma tem uma função específica:
 │ Mão de Obra          │ Horas de engenharia e montagem estimadas                │
 │                      │                                                          │
 │ Despesas             │ Custos extras (frete, viagem, hospedagem, etc.)         │
+│                      │                                                          │
+│ Layout Sugerido      │ Desenho automático do painel e exportação DXF            │
 └──────────────────────┴──────────────────────────────────────────────────────────┘
 
 📌 DICA: A ordem importa! Primeiro configure a Lista de I/O, depois vá para
@@ -173,6 +175,11 @@ as normas padrão são:
 │                       │                                                         │
 │ NBR IEC 60529         │ Classificação de proteção (IP). Define o significado    │
 │                       │ de IP20, IP54, IP66, etc.                               │
+│                       │                                                         │
+│ NBR IEC 62271-200     │ Conjuntos de manobra e comando de média tensão          │
+│                       │ (cubículos MT).                                         │
+│                       │                                                         │
+│ NBR 14039             │ Instalações elétricas de média tensão.                  │
 └───────────────────────┴─────────────────────────────────────────────────────────┘
 
 ✅ Você pode marcar/desmarcar as normas aplicáveis.
@@ -384,8 +391,9 @@ Os profissionais são organizados por áreas:
 │ Engenharia de        │ Gerente, Supervisor, Engenheiro, Assistente             │
 │ Aplicação            │                                                          │
 │                      │                                                          │
-│ Engenharia de        │ Gerente Elétrica, Coordenador, Eng. Eletricista,        │
-│ Projetos             │ Projetista                                               │
+│ Engenharia de        │ Gerente e Coordenador Elétrica, Engenheiro e            │
+│ Projetos             │ Projetista Eletricista; Gerente e Coordenador de        │
+│                      │ Mecânica, Engenheiro e Projetista Mecânica              │
 │                      │                                                          │
 │ Fábrica de Painéis   │ Montador de Layout, Montador Eletricista, Auxiliar,     │
 │                      │ Barramentista                                            │

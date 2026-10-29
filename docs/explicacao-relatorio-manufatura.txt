@@ -365,8 +365,8 @@ as primeiras, as últimas e algumas do meio com "..." para economizar espaço.
 │                                                                                 │
 │  PROBLEMA: O relatório não aparece no menu lateral                             │
 │                                                                                 │
-│  CAUSA: O menu "Relatório de Manufatura" fica na seção RELATÓRIOS, abaixo de   │
-│  "Relatório de Cubículos".                                                     │
+│  CAUSA: O menu "Relatório de Manufatura" fica na seção RELATÓRIOS, na ordem:    │
+│  Propostas / Cadastros / Típicos / Manufatura (último da seção).              │
 │                                                                                 │
 │  SOLUÇÃO: Role o menu lateral para baixo. Ele aparece antes de "Configurações".│
 │                                                                                 │
