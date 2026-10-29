@@ -122,7 +122,7 @@ No topo, os cards de resumo dão o estado do momento:
   • Requisições — total de requisições no sistema.
   • Itens Não Cadastrados — fica em alerta vermelho enquanto houver item sem
     catálogo.
-  • Em Andamento — requisições em fluxo (não canceladas nem fechadas).
+  • Em Andamento — requisições liberadas, em cotação ou em pedido.
   • Valor Estimado — soma de quantidade × custo do catálogo das requisições.
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -184,7 +184,8 @@ nativo do GeraPro, a LM poderá ser gerada aqui dentro sem mudar nada no fluxo.
 │                                                                                 │
 │  • Código exato — código interno ou do fabricante, com escopo de empresa.       │
 │  • Pontuação textual na descrição quando não há código (o limiar de sugestão é  │
-│    80 pontos).                                                                  │
+│    55 pontos — sobe para 80 quando a descrição tem medida elétrica              │
+│    comparável: corrente, tensão ou potência).                                   │
 │  • Sem correspondência → o item fica marcado como NÃO CADASTRADO (é o alerta    │
 │    obrigatório).                                                                │
 │                                                                                 │
@@ -230,7 +231,8 @@ atualizado na hora.
 
 O catálogo não tem restrição de unicidade nos códigos, por isso o pareamento é
 sempre limitado à empresa atual — dois clientes podem ter códigos iguais sem se
-confundir.
+confundir. Se o mesmo código aparece repetido dentro da empresa, o pareamento
+não é tratado como exato — vira sugestão para você confirmar.
 
 
 
@@ -272,8 +274,8 @@ detalhe da requisição.
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 A partir da requisição liberada, crie uma cotação por fornecedor. Cada cotação
-tem ciclo de vida próprio: Aberta → Enviada → Recebida → Vencedora ou
-Descartada. Ela guarda os campos de negociação: prazo de entrega, condição de
+tem ciclo de vida próprio: Aberta → Enviada → Recebida → Vencedora, Descartada
+ou Cancelada. Ela guarda os campos de negociação: prazo de entrega, condição de
 pagamento, validade da proposta e frete.
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -327,7 +329,7 @@ Itens ainda sem vencedor ficam pendentes e o próprio botão avisa quantos.
    o que venceu, na quantidade certa.
 
 Aprovação por valor: pedidos acima de R$ 50.000 exigem o campo "Aprovado por"
-preenchido; abaixo do limite não há alçada. O limite é configurável.
+preenchido; abaixo do limite não há alçada. O limite é fixo em R$ 50.000.
 
 Ciclo de vida do pedido:
 
@@ -366,16 +368,18 @@ recebida; quantidade zero fica de fora da NF.
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 No formulário da NF, o botão Importar XML recebe o arquivo XML emitido pela
-SEFAZ (o mesmo baixado do portal da NF-e). O sistema lê o cabeçalho (número,
-série, chave de acesso, emitente, transportadora, volumes), os valores
-(produtos, frete, desconto, impostos) e os itens — e faz o casamento automático
-dos itens da NF com os do pedido em três níveis de confiança:
+SEFAZ (o mesmo baixado do portal da NF-e). O arquivo é lido no próprio
+navegador — aceita o padrão da SEFAZ (nfeProc) e também o XML NFe avulso. O
+sistema lê o cabeçalho (número, série, chave de acesso, emitente,
+transportadora, volumes), os valores (produtos, frete, desconto, impostos) e os
+itens — e faz o casamento automático dos itens da NF com os do pedido em três
+níveis de confiança:
 
   • Código exato — o código do item do pedido aparece na NF (mais confiável).
   • Descrição similar — casamento por palavras da descrição (Jaccard ≥ 0,55),
     com desempate pela quantidade.
-  • Só na NF — item que não existe no pedido: fica sinalizado para revisão
-    manual.
+  • Só na NF — item que não existe no pedido: entra como item avulso, sem
+    vínculo com o pedido, sinalizado para revisão manual.
 
 📌 Nada é gravado às cegas: abre o banner de revisão com o resumo do
    casamento e o formulário preenchido. Confira, corrija o que precisar e só
@@ -386,8 +390,8 @@ O mesmo XML pode ser reimportado sem virar duplicata — a chave de acesso
 deduplica. Sem XML, o preenchimento manual continua funcionando normalmente.
 
 A conferência é automática ao salvar: quantidade e preço da NF × pedido.
-Divergência (tolerância de preço de 0,5%) muda o status da NF para Divergente e
-exibe o alerta na tela.
+Divergência acima da tolerância (R$ 0,005 por item) muda o status da NF para
+Divergente e exibe o alerta na tela.
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
@@ -396,7 +400,8 @@ exibe o alerta na tela.
 │  • Baixa item a item no pedido (quantidade recebida) — o pedido vira Parcial ou │
 │    Recebido.                                                                    │
 │  • Grava o preço real em `price_history` com origem compra — o Banco de         │
-│    Materiais se auto-alimenta.                                                  │
+│    Materiais se auto-alimenta (só quando o custo difere do catálogo em mais de  │
+│    R$ 0,005 — evita histórico de versões idênticas).                            │
 │  • Lançamento na DRE do projeto (categoria material, tipo real) — estimado ×    │
 │    real instantâneo.                                                            │
 │  • Quando todos os pedidos foram recebidos, a requisição vira Recebida.         │
@@ -597,23 +602,23 @@ O ciclo completo, do zero à recepção:
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │PROBLEMA: "O botão Gerar Pedido não aparece"                                     │
 │SOLUÇÃO: Ele só aparece com vencedores marcados e em status que                  │
-│            permite (requisição liberada/ em cotação). Marque ao menos uma célula│
-│            vencedora na matriz de comparação.                                   │
+│            permite (requisição em cotação ou em pedido). Marque ao menos uma    │
+│            célula vencedora na matriz de comparação.                            │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │PROBLEMA: "Um pedido acima de R$ 50.000 não envia"                               │
 │SOLUÇÃO: Acima do limite é preciso preencher "Aprovado por" (e a data            │
 │            de aprovação é registrada). Abaixo do limite não há alçada. O limite │
-│            é configurável.                                                      │
+│            fixo em R$ 50.000.                                                   │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │PROBLEMA: "A NF ficou Divergente"                                                │
 │SOLUÇÃO: A quantidade ou o preço da NF bateu diferente do pedido                 │
-│            (tolerância de 0,5%). Confira a nota contra o pedido: se o pedido    │
-│            está errado, ajuste e lance de novo; se a NF está errada, estorne e  │
-│            relance — estorno reverte baixa, preço e DRE.                        │
+│            (tolerância de R$ 0,005 por item). Confira a nota contra o pedido:   │
+│            se o pedido está errado, ajuste e lance de novo; se a NF está        │
+│            errada, estorne e relance — estorno reverte baixa, preço e DRE.      │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
