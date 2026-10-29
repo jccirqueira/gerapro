@@ -72,7 +72,8 @@ A Manufatura usa uma estrutura de árvore. Você vai ouvir muito estes termos:
     Contém dados do cliente, datas e observações.
 
   • COLUNA: É um painel físico. Ex: CCM-01, QGBT-01, Cubículo MT-01.
-    Cada coluna tem um tipo (CCM-BT, QGBT, Cubículo MT) e uma TAG única.
+    Cada coluna tem um tipo (CCM-BT, QGBT, Cubículo MT, Painel Geral)
+    e uma TAG única.
 
   • GAVETA: É um módulo extraível que vai dentro da coluna.
     Ex: Partida Direta 15kW, Soft-Starter 30kW, Inversor 7.5kW.
@@ -88,8 +89,8 @@ A Manufatura usa uma estrutura de árvore. Você vai ouvir muito estes termos:
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-Quando você clica em "Manufatura" no menu lateral (visível apenas para a empresa
-DVT), você vê três ambientes principais:
+Quando você clica em "Manufatura" no menu lateral, você vê três ambientes
+principais:
 
   ┌─────────────────────────────────────────────────────────────────────────────┐
   │                                                                             │
@@ -101,12 +102,12 @@ DVT), você vê três ambientes principais:
   │                                                                             │
   │  AMBIENTE 2 — DETALHE DO PROJETO                                           │
   │  -----------------------------------------------------------------------    │
-  │  Ao clicar em um projeto, você entra no detalhe com várias abas:            │
+  │  Ao clicar em um projeto, você entra no detalhe com as abas nesta ordem:    │
   │    • Colunas: lista das colunas com suas gavetas e componentes              │
+  │    • Histórico: timeline de tudo que aconteceu                              │
   │    • Kanban: quadro visual de arrastar (drag & drop)                        │
   │    • Testes: gerenciamento de testes por gaveta                             │
   │    • Data Book: documentos, exportação, substituição em campo               │
-  │    • Histórico: timeline de tudo que aconteceu                              │
   │                                                                             │
   │  AMBIENTE 3 — DASHBOARD                                                    │
   │  -----------------------------------------------------------------------    │
@@ -166,6 +167,7 @@ Ações que você pode fazer em cada nível:
   • Componente: ❌ Remover / 📋 Ver lista
 
 ✅ Para adicionar uma coluna, clique em "Adicionar Coluna" no cabeçalho.
+   Os tipos disponíveis são: CCM-BT, QGBT, Cubículo MT e Painel Geral.
 ✅ Para adicionar uma gaveta, clique em "+ Gaveta" dentro da coluna.
 ✅ Para adicionar um componente, clique em "+ Componente" na gaveta.
 
@@ -183,7 +185,7 @@ O Kanban é um quadro visual que mostra todas as gavetas do projeto organizadas
 pela etapa de produção em que elas estão:
 
   ┌────────────┐  ┌────────────────┐  ┌────────┐  ┌────────┐  ┌──────────┐
-  │   INÍCIO   │  │ MONTAGEM MEC.  │  │ FIAÇÃO │  │ TESTE  │  │ LIBERADO │
+  │   INÍCIO   │  │ MON. MECÂNICA │  │ FIAÇÃO │  │ TESTE  │  │ LIBERADO │
   │  🔘 2 gav  │  │  🔘 5 gav      │  │ 🔘 3 g │  │ 🔘 1 g │  │ 🔘 4 gav │
   │────────────│  │────────────────│  │────────│  │────────│  │──────────│
   │ 📦 GAV-01  │  │ 📦 GAV-03      │  │📦 GAV-08│  │📦 GAV10│  │ 📦 GAV-02│
@@ -557,9 +559,10 @@ O módulo de Manufatura envia notificações no Telegram sempre que:
         arquivos de até alguns MB. Tente com um arquivo menor.
 
   ▶ "Não encontro o módulo Manufatura no menu"
-     ✅ O módulo Manufatura está disponível apenas para a empresa
-        DVT (Drivetech). Se você é de outra empresa, o menu não
-        aparece.
+     ✅ O módulo Manufatura fica no menu lateral, no grupo de módulos
+        operacionais (junto de Propostas e Engenharia). Se o menu não
+        aparece, verifique se sua empresa/usuário tem acesso liberado
+        nas permissões.
 
   ▶ "Quero substituir uma gaveta mas não tenho gaveta substituta"
      ✅ Tudo bem! Na substituição, deixe o campo "Gaveta Substituta"
@@ -598,5 +601,5 @@ O módulo de Manufatura envia notificações no Telegram sempre que:
   4. Testar cada gaveta antes de liberar
   5. Gerar o Data Book ao final do projeto
 
-  ⚠️ O módulo de Manufatura é exclusivo para a empresa DVT.
+  ⚠️ O menu Manufatura é visível para todas as empresas.
      Esta documentação é um guia completo para uso do sistema.
