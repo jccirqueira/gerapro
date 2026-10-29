@@ -55,8 +55,10 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
     data: string            — Data no formato "YYYY-MM-DD"
     autor: string           — Nome do responsável / empresa
 
-    Estes dados preenchem a tag <inset> e <diagram> do QET, que controlam
-    as informações exibidas no carimbo (legenda) do desenho.
+    Estes dados preenchem os atributos do <diagram> do QET (_title, _author,
+    _date), que controlam as informações exibidas no carimbo (legenda) do
+    desenho. A tag <inset> é emitida vazia pelo módulo — os metadados vão
+    apenas para o <diagram>.
 
   3.2. componentes (array de objetos) — Elementos elétricos
 
@@ -102,9 +104,9 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
     terminal1: number       — ID do terminal de origem
     terminal2: number       — ID do terminal de destino
 
-    Os IDs dos terminais são gerados sequencialmente (0, 1, 2, ...) na ordem
-    em que os componentes são listados. Cada terminal de cada componente recebe
-    um ID único e incremental.
+    Os IDs dos terminais são numerados sequencialmente (0, 1, 2, ...) DENTRO
+    de cada componente — a numeração recomeça a cada componente (é o tamanho
+    da lista de terminais daquele componente que vira o ID).
 
   3.4. bornes (array de objetos) — Réguas de bornes
 
@@ -123,9 +125,9 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
 4. MAPEAMENTO PARA XML DO QELETROTECH
 --------------------------------------------------------------------------------
 
-  O XML gerado segue o schema nativo do QET versão 0.4:
+  O XML gerado segue o schema nativo do QET versão 0.100.0:
 
-  <project version="0.4" title="..." folioSheetQuantity="0">
+  <project version="0.100.0" title="..." folioSheetQuantity="0">
     <properties/>
     <newdiagrams>
       <border .../>
@@ -157,11 +159,11 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
 
   Detalhamento do mapeamento:
 
-  titleblock → <inset> e atributos do <diagram>
-    - titleblock.titulo → @_title do <diagram> e @_title do <inset>
-    - titleblock.autor → @_author do <diagram> e <inset>
-    - titleblock.data → @_date do <diagram> e <inset>
-    - titleblock.numeroProposta → não mapeado diretamente no <inset>,
+  titleblock → atributos do <diagram> (<inset> fica vazio)
+    - titleblock.titulo → @_title do <diagram>
+    - titleblock.autor → @_author do <diagram>
+    - titleblock.data → @_date do <diagram>
+    - titleblock.numeroProposta → não mapeado diretamente no XML,
       mas pode ser concatenado ao título
 
   componentes[] → <element>
@@ -175,9 +177,9 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
       - <inputs> com <input> para exibir a tag
 
   terminais[] dentro de componentes → <terminal>
-    - Cada terminal recebe um ID sequencial (0, 1, 2, ...) no escopo de
-      todo o diagrama. Esse ID é usado por <conductor> para referenciar
-      as conexões.
+    - Cada terminal recebe um ID sequencial (0, 1, 2, ...) no escopo do
+      COMPONENTE (recomeça a cada elemento). Esse ID é usado por
+      <conductor> para referenciar as conexões.
     - Coordenadas do terminal são relativas à posição do elemento.
     - O QET usa terminal ID para identificar conexões entre elementos.
 
@@ -192,8 +194,8 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
     - Cada borne é convertido em um <element> com 2 terminais:
       superior (orientação 0/Norte) e inferior (orientação 2/Sul).
     - A tag exibida segue o formato "X1:1", "X1:2", etc.
-    - O símbolo padrão sugerido é "embed://bornes/bornes_2_elmt"
-      (deve ser ajustado conforme a biblioteca de símbolos instalada).
+    - O símbolo padrão do borne é "embed://import/gerapro/box_60x80.elmt"
+      (a coleção GeraPro é embutida no arquivo .qet gerado — veja 7.1).
 
 
 5. COMO UTILIZAR
@@ -245,10 +247,11 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
     Executa o módulo com dados mock internos e gera o arquivo
     teste_gerado.qet na raiz do projeto para validação no QElectroTech.
 
-  5.3. Integração futura no frontend
+  5.3. Integração no frontend (rota REST)
 
-    O módulo foi projetado para ser chamado tanto do lado servidor (Node.js)
-    quanto, futuramente, do frontend via rota REST. A função gerarProjetoQet()
+    Além do uso direto em Node.js, o módulo é chamado pelo frontend via
+    rota REST POST /api/export-qet, acionada pelo botão "Exportar QET"
+    da aba Layout Sugerido da Proposta Técnica. A função gerarProjetoQet()
     é síncrona e não depende de DOM ou APIs de navegador, podendo ser
     executada em qualquer contexto Node.js.
 
@@ -280,7 +283,7 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
      - Símbolos padrão seguem o formato:
        "embed://import/industria/disjoncteur.elmt"
        "embed://import/industria/contacteur.elmt"
-       "embed://bornes/bornes_2_elmt"
+       "embed://import/gerapro/box_60x80.elmt" (bornes — coleção embutida)
      - Caminhos podem variar conforme a instalação e coleção de símbolos
 
 
@@ -290,9 +293,11 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
   7.1. Dependência de símbolos
 
     O QElectroTech precisa ter os arquivos .elmt referenciados em simboloQet
-    instalados em sua biblioteca de elementos. O GeraPro não inclui símbolos
-    — eles devem ser obtidos separadamente (coleção padrão do QET ou
-    biblioteca personalizada do usuário).
+    instalados em sua biblioteca de elementos. O módulo EMBUTE uma coleção
+    própria no arquivo .qet (categoria "import/gerapro") com o símbolo
+    box_60x80.elmt, usado automaticamente nos bornes. Componentes com
+    símbolos externos (ex: disjoncteur.elmt) continuam dependendo da
+    biblioteca do QET ou de coleção personalizada do usuário.
 
   7.2. Roteamento automático de condutores
 
@@ -319,8 +324,12 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
     - Tabela de cabos
     - Tabela de bornes
     - Diagramas multifilares automáticos
-    - Cruzamento de referências (xrefs)
     - Folhas adicionais com diagramas de comando
+
+    O XML inclui as definições de xrefs do projeto (tipos protection, coil
+    e commutator, no formato QET 0.100), mas o módulo não preenche
+    cruzamentos de referências entre folhas — isso só faz sentido quando
+    houver múltiplos diagramas (roadmap 1.2).
 
     Estas funcionalidades podem ser implementadas em versões futuras.
 
@@ -345,6 +354,8 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
     - Geração de diagrama único com elementos, terminais e condutores
     - Suporte a réguas de bornes como elementos
     - Preenchimento do carimbo (titleblock)
+    - Coleção de símbolos embutida (box_60x80.elmt para bornes)
+    - Botão "Exportar QET" na aba Layout Sugerido da Proposta Técnica
     - Teste autônomo via mock
 
   Versão 1.1 (planejado):
@@ -358,7 +369,6 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
     - Gerenciador de bornes nativo do QET (terminalstrip)
 
   Versão 2.0 (visão):
-    - Botão de exportação no frontend da Proposta Técnica
     - Exportação em lote (todos os equipamentos de uma PTC)
     - Template personalizável de diagrama
     - Sincronização bidirecional (QET → GeraPro)
@@ -370,6 +380,6 @@ Exporta: gerarProjetoQet(dadosOrcamento, caminhoSaida)
   QElectroTech:              https://qelectrotech.org/
   Documentação XML .qet:     https://qelectrotech.org/wiki_new/doc/xml_projects_0.11
   fast-xml-parser (npm):     https://www.npmjs.com/package/fast-xml-parser
-  Repositório GeraPro:       [local] C:\Users\jcc\Documents\Workspace_A\GeraPro
+  Repositório GeraPro:       [local] C:\Users\jcc14\Documents\GeraPro
   Módulo:                    js/geradorQet.js
   Teste:                     node js/geradorQet.js (gera teste_gerado.qet)
