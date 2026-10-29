@@ -37,9 +37,12 @@ Compras, cujas notas fiscais entram na DRE automaticamente.
 │                                                                                 │
 │  1. Automaticamente — quando uma proposta da Gestão de Propostas é movida para  │
 │     Fechado (ganha), o projeto é criado aqui com cliente, datas, valor e        │
-│     vendedor.                                                                   │
+│     vendedor. O valor do contrato vem da Precificação salva (preço com IPI);    │
+│     sem precificação, do valor digitado no cartão.                              │
 │  2. Importar Fechadas — o botão da lista varre o funil e cria os projetos que   │
 │     ainda faltam (com deduplicação: a mesma proposta nunca gera dois projetos). │
+│     O relatório final separa projetos criados, propostas já importadas e        │
+│     falhas de gravação (com aviso para recarregar a página).                    │
 │  3. Manual — o botão Novo Projeto, para obras que não nasceram de proposta.     │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -106,6 +109,10 @@ O formulário (Novo Projeto / Editar) tem estes campos:
 📌 O código (PRJ-0001, PRJ-0002, ...) é gerado sozinho e não pode ser
    trocado.
 
+📌 Quando o projeto nasce de uma proposta fechada, o Valor do Contrato vem da
+   Precificação salva (receita com IPI); sem precificação, do valor digitado
+   no cartão do pipeline.
+
 📌 A exclusão pergunta e remove em cascata as fases, tarefas e lançamentos da
    DRE — nada fica órfão no banco.
 
@@ -165,8 +172,8 @@ destacados e o dia de hoje realçado.
 │  • XLSX — exporta o cronograma em planilha estilo MS Project, com duas abas:    │
 │    Cronograma (árvore WBS — fases como linhas-resumo e tarefas recuadas —,      │
 │    colunas de início, fim, duração, progresso, status e responsável, e uma      │
-│    faixa de Gantt mensal colorida à direita) e Resumo (período, progresso       │
-│    geral, fases/tarefas concluídas e itens atrasados).                          │
+│    faixa de Gantt mensal colorida à direita (limitada a 36 meses) e Resumo      │
+│    (período, progresso geral, fases/tarefas concluídas e itens atrasados).      │
 │  • Nova Fase — cria uma fase manualmente.                                       │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -180,6 +187,9 @@ destacados e o dia de hoje realçado.
 │  • As setas ↑ ↓ reordenam as fases na sequência.                                │
 │  • Clique na fase para abrir o modal com nome, datas, status, cor e progresso.  │
 │  • As tarefas também têm barra arrastável no Gantt.                             │
+│  • Uma barra de fim vencido e não concluída aparece marcada como "atrasada".    │
+│  • A faixa de resumo mostra o progresso geral e as fases por status (Pendente,  │
+│    Em Andamento, Concluída ou Bloqueada).                                       │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
@@ -203,7 +213,8 @@ destacados e o dia de hoje realçado.
 └──────────────────────────────┴──────────────┘
 
 📌 As fases são distribuídas proporcionalmente entre a data de início e a
-   entrega prevista do projeto — dá para editar nomes, dias e cores em "Modelo".
+   entrega prevista do projeto — dá para editar nomes, dias e cores em "Modelo"
+   e o sistema pede confirmação antes de criar.
 
 
 
@@ -221,6 +232,8 @@ preferência fica salva no navegador.
     responsável e status.
   • O botão ✓ conclui a tarefa (o progresso vai a 100%), o lápis edita e a
     lixeira exclui com confirmação.
+  • O botão + da linha da fase abre o modal de nova tarefa já com a fase
+    preenchida.
   • Tarefas são reordenadas com ↑ ↓ e também arrastadas no Gantt.
   • O botão Tarefas da toolbar oculta ou mostra todas; Expandir/Recolher abre ou
     fecha tudo.
@@ -266,9 +279,12 @@ encadeados: RECEITA LÍQUIDA → LUCRO BRUTO → LUCRO LÍQUIDO.
 │ GRUPO                     │ CONTAS                                         │
 ├───────────────────────────┼────────────────────────────────────────────────┤
 │ (+) Receita               │ Receita Bruta.                                 │
-│ (−) Deduções sobre Vendas │ Impostos sobre Vendas.                         │
+│ (−) Deduções sobre Vendas │ Impostos sobre Vendas e débitos por tributo:   │
+│                           │ ICMS, PIS/COFINS, ISS, DAS e IPI.              │
 │ (−) Custos Diretos        │ Materiais, Mão de Obra, Despesas Diretas,      │
-│                           │ Subcontratação.                                │
+│                           │ Subcontratação e os Créditos de Entrada:       │
+│                           │ Créd. ICMS, Créd. PIS/COFINS e Créd. IPI —     │
+│                           │ entram com sinal + e REDUZEM o custo.          │
 │ (−) Despesas Operacionais │ Custos Fixos/Admin., Comissão, Viagens, Frete, │
 │                           │ Outras.                                        │
 └───────────────────────────┴────────────────────────────────────────────────┘
@@ -277,25 +293,34 @@ encadeados: RECEITA LÍQUIDA → LUCRO BRUTO → LUCRO LÍQUIDO.
 │                                                                                 │
 │  Gerar Estimado cria as linhas a partir do Valor do Contrato:                   │
 │                                                                                 │
-│  • Receita = valor do contrato.                                                 │
-│  • Impostos conforme o regime tributário da empresa: 21,25% no Lucro Real ou 4% │
-│    no Simples Nacional.                                                         │
+│  Com a Precificação salva na proposta de origem, os valores saem EXATOS:        │
+│  débitos por tributo, créditos de entrada, material, mão de obra, despesas,     │
+│  custos fixos e comissão em R$ — o Lucro Líquido bate com o da Precificação.    │
+│  Se o valor do contrato diferir da receita precificada, tudo é escalonado       │
+│  na mesma proporção.                                                            │
+│                                                                                 │
+│  Sem precificação salva (ou com o valor do contrato zerado), o sistema usa      │
+│  o regime tributário e os percentuais padrão:                                   │
+│                                                                                 │
+│  • Receita = valor do contrato (nos dois caminhos).                             │
+│  • Impostos: 21,25% no Lucro Real ou 4% (DAS) no Simples Nacional.              │
 │  • Custos fixos 8% e comissão 5% sobre a receita.                               │
 │  • Materiais e Mão de Obra nascem zerados para você completar pelo orçamento.   │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 📌 O botão é idempotente: só cria linhas que ainda não existem e avisa quando
-   o estimado já está completo. Os percentuais vêm dos defaults da Precificação
-   e você ajusta à mão depois.
+   o estimado já está completo. Com Precificação salva os valores saem exatos;
+   sem ela, vêm dos percentuais padrão — e você ajusta à mão depois.
 
 Novo Lançamento registra qualquer linha: conta da DRE, tipo (estimado ou real),
 data, descrição e valor. Os lançamentos individuais aparecem embaixo da tabela,
 editáveis e excluíveis. O valor é sempre positivo — o sinal (+/−) é da conta.
 
 Os custos reais também chegam sozinhos do módulo Compras: cada NF recebida lança
-o custo de material na DRE do projeto (categoria material, tipo real). Estimado
-× real instantâneo, sem digitar nada duas vezes.
+o custo de material na DRE do projeto (categoria material, tipo real) — e editar
+uma NF atualiza o lançamento já existente, sem duplicar. Estimado × real
+instantâneo, sem digitar nada duas vezes.
 
 📌 O botão XLSX Detalhado exporta a DRE em 4 abas: DRE (resumo executivo),
    Detalhamento (cada conta aberta com TODOS os lançamentos, subtotais e
@@ -316,6 +341,9 @@ o custo de material na DRE do projeto (categoria material, tipo real). Estimado
   • Gestão de Propostas → Projetos: proposta movida para Fechado vira projeto
     (automático ou pelo botão Importar Fechadas), trazendo cliente, título,
     vendedor, engenheiro, valor e entrega prevista.
+  • Precificação → Projetos: o "Salvar Tudo" da precificação grava um resumo
+    tributário na proposta (snapshot). É dele que vêm o Valor do Contrato
+    (receita com IPI) e os valores exatos do Gerar Estimado da DRE.
   • Compras → DRE: a requisição pode ser vinculada ao projeto; ao lançar a NF, o
     custo real de material entra automaticamente na DRE (categoria material,
     tipo real).
@@ -413,7 +441,8 @@ o custo de material na DRE do projeto (categoria material, tipo real). Estimado
 │SOLUÇÃO: Volte para o Cronograma / DRE e clique em "Importar                     │
 │            Fechadas" (ou abra a lista vazia e use o botão do estado vazio). A   │
 │            importação tem deduplicação: se o projeto já existe, ela avisa em vez│
-│            de duplicar.                                                         │
+│            de duplicar; falhas de gravação aparecem em toast de erro —          │
+│            recarregue a página e tente de novo.                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -436,13 +465,18 @@ o custo de material na DRE do projeto (categoria material, tipo real). Estimado
 │SOLUÇÃO: O Gerar Estimado usa o Valor do Contrato como receita — se              │
 │            ele estiver vazio, só as linhas de materiais/mão de obra são criadas │
 │            (zeradas). Edite o projeto, preencha o valor e gere de novo.         │
+│            Com Precificação salva e valor preenchido, o estimado nasce cheio;   │
+│            se o valor do contrato for diferente da receita precificada, os      │
+│            valores são escalonados na mesma proporção.                          │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │PROBLEMA: "Os impostos não batem com o meu contador"                             │
-│SOLUÇÃO: O Gerar Estimado usa o regime tributário da empresa (21,25%             │
+│SOLUÇÃO: Com Precificação salva, os impostos entram detalhados por tributo       │
+│            (ICMS, PIS/COFINS, ISS, DAS e IPI), como foram calculados lá. Sem    │
+│            precificação, o Gerar Estimado usa o regime tributário (21,25%       │
 │            Lucro Real / 4% Simples Nacional) — configure o regime certo em      │
-│            Configurações e ajuste o valor do lançamento à mão quando preciso.   │
+│            Configurações e ajuste o valor à mão quando preciso.                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
