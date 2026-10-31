@@ -202,6 +202,7 @@ export const layout = {
                         </div>
                     </div>
                     ${this._lsRenderCabinetControls(cabinets, seg, eq, true)}
+                    ${this._lsRenderAlocacaoCargas(eq, true)}
                     ${this._lsRenderBom(bomHtml, totalMateriais, 'bom_body')}
                 </div>
             </div>`;
@@ -288,6 +289,7 @@ export const layout = {
                         </div>
                     </div>
                     ${this._lsRenderCabinetControls(cabinets, seg, eq, false)}
+                    ${this._lsRenderAlocacaoCargas(eq, false)}
                     ${this._lsRenderBom(bomHtml, totalMateriais, 'bom_body')}
                 </div>
             </div>
@@ -395,6 +397,132 @@ export const layout = {
                 }).join('')}
                 <button class="btn btn-sm btn-ghost" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:11px;padding:6px 10px;">+ Adicionar Armário</button>
             </div>`;
+    },
+
+    // ── Fase 3: painel de alocação por carga ────────────────────────────────
+    //
+    // Em vez de alocar carga a carga na BOM (material a material), mostra uma
+    // linha por carga com um dropdown para movê-la inteira entre armários.
+    // Clique move todos os materiais daquela carga de uma vez.
+
+    _lsRenderAlocacaoCargas(eq, isB2B) {
+        const assignments = eq.layoutConfig?.cabinetAssignments || {};
+        const cabIds = Object.keys(assignments);
+        const loadsWithTipico = (eq.loads || []).filter(l => l.typicalId && (l.id || l.tag));
+        if (cabIds.length === 0 || loadsWithTipico.length === 0) return '';
+
+        // Opções de destino (B2B: uma opção por armário × face).
+        const opcoes = cabIds.flatMap(cabId => {
+            const nome = assignments[cabId].name || cabId;
+            return isB2B
+                ? [
+                    `<option value="${cabId}|front">${nome} — Frontal</option>`,
+                    `<option value="${cabId}|rear">${nome} — Traseira</option>`
+                ]
+                : [`<option value="${cabId}">${nome}</option>`];
+        }).join('');
+
+        // Onde cada carga está hoje (percorre armários e faces).
+        const localizarCarga = (loadKey) => {
+            for (const [cabId, cabData] of Object.entries(assignments)) {
+                if (cabData.loads && cabData.loads[loadKey]) return `${cabId}`;
+                const front = cabData.faces?.front?.loads;
+                if (front && front[loadKey]) return `${cabId}|front`;
+                const rear = cabData.faces?.rear?.loads;
+                if (rear && rear[loadKey]) return `${cabId}|rear`;
+            }
+            return '';
+        };
+
+        const linhas = loadsWithTipico.map(load => {
+            const loadKey = load.id || load.tag;
+            const atual = localizarCarga(loadKey);
+            const cabAtual = atual ? assignments[atual.split('|')[0]] : null;
+            const nomeAtual = !atual
+                ? '<span style="color:#b45309;font-weight:600;">não alocada</span>'
+                : (cabAtual?.name || atual);
+            return `
+            <div class="ls-alc-row">
+                <span class="ls-alc-tag" title="${load.desc || ''}">${load.tag || loadKey}</span>
+                <span class="ls-alc-atual">${nomeAtual}</span>
+                <i class="ph ph-arrow-right ls-alc-arrow"></i>
+                <select class="ls-cab-select" onchange="window.propostaTecnicaModule._moverCargaArmario('${loadKey}', this.value)">
+                    ${opcoes}
+                </select>
+            </div>`;
+        }).join('');
+
+        return `
+            <div class="ls-alc">
+                <div class="ls-alc-header">
+                    <i class="ph ph-arrows-left-right"></i>
+                    <strong>Alocação por Carga</strong>
+                    <span class="ls-alc-hint">Mova cargas inteiras entre armários — todos os materiais da carga acompanham.</span>
+                </div>
+                <div class="ls-alc-body">${linhas}</div>
+            </div>`;
+    },
+
+    _moverCargaArmario(loadKey, destino) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq || !eq.layoutConfig?.cabinetAssignments) return;
+        const assignments = eq.layoutConfig.cabinetAssignments;
+
+        const [cabDestino, faceDestino] = (destino || '').split('|');
+        if (!assignments[cabDestino]) return;
+
+        // Localiza a carga na origem e captura o bloco de materiais.
+        let bloco = null;
+        let origemLabel = '';
+        for (const [cabId, cabData] of Object.entries(assignments)) {
+            const fontes = [
+                { parent: cabData, face: null },
+                { parent: cabData.faces?.front, face: 'front' },
+                { parent: cabData.faces?.rear, face: 'rear' }
+            ];
+            for (const { parent, face } of fontes) {
+                if (parent && parent.loads && parent.loads[loadKey]) {
+                    bloco = parent.loads[loadKey];
+                    delete parent.loads[loadKey];
+                    origemLabel = (assignments[cabId]?.name || cabId) + (face ? (face === 'front' ? ' — Frontal' : ' — Traseira') : '');
+                    break;
+                }
+            }
+            if (bloco) break;
+        }
+        if (!bloco) {
+            app.toast('Esta carga não está alocada em nenhum armário. Gere ou recomponha o layout primeiro.', 'warning');
+            return;
+        }
+
+        // Evita mover para o mesmo lugar (destruiria a alocação).
+        const mesmoLocal = origemLabel === (assignments[cabDestino].name || cabDestino) + (faceDestino ? (faceDestino === 'front' ? ' — Frontal' : ' — Traseira') : '');
+        if (mesmoLocal) return;
+
+        // Insere no destino (B2B: na face escolhida; senão, loads raiz).
+        const cabDest = assignments[cabDestino];
+        let alvo;
+        if (faceDestino) {
+            if (!cabDest.faces) cabDest.faces = { front: { loads: {}, layoutConfig: null }, rear: { loads: {}, layoutConfig: null } };
+            if (!cabDest.faces[faceDestino]) cabDest.faces[faceDestino] = { loads: {}, layoutConfig: null };
+            if (!cabDest.faces[faceDestino].loads) cabDest.faces[faceDestino].loads = {};
+            alvo = cabDest.faces[faceDestino].loads;
+        } else {
+            if (!cabDest.loads) cabDest.loads = {};
+            alvo = cabDest.loads;
+        }
+        alvo[loadKey] = bloco;
+
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[MoverCarga] store error:', e); }
+
+        this._recalcularLayout();
+        this.renderSubTab();
+        const destinoLabel = (assignments[cabDestino].name || cabDestino) + (faceDestino ? (faceDestino === 'front' ? ' — Frontal' : ' — Traseira') : '');
+        app.toast(`Carga movida para ${destinoLabel}.`, 'success');
     },
 
     _lsRenderBom(bomHtml, totalMateriais, bomId) {
@@ -3536,6 +3664,65 @@ export const layout = {
     // persistidos (retorna cabinets vazio). Estes dois métodos persistem essa
     // sugestão como armários reais — o caminho "feliz" de um clique.
 
+    // ── Fase 3: alocação por carga ──────────────────────────────────────────
+    //
+    // Divide as cargas em grupos que cabem dentro da maior largura padrão
+    // (1000mm), usando first-fit decreasing sobre a largura simulada de cada
+    // carga. Antes, todas as cargas iam para UM armário e estouravam quando
+    // o somatório passava de 1000mm.
+
+    _distribuirCargasEmGrupos(loadsWithTipico, tipicos, materiais) {
+        const cfg = this._getDefaultLayoutConfig();
+        const MAX_W = 1000; // maior largura padrão de armário
+
+        // Largura e profundidade de cada carga isoladamente.
+        const cargas = [];
+        for (const load of loadsWithTipico) {
+            const loadKey = load.id || load.tag;
+            if (!loadKey) continue;
+            const typical = tipicos.find(t => t.id === load.typicalId);
+            if (!typical || !typical.items) continue;
+            const items = [];
+            let maxDepth = 0;
+            for (const item of typical.items) {
+                const m = materiais.find(x => x.id === item.materialId);
+                if (!m) continue;
+                const w = parseFloat(m.largura_mm) || 0;
+                const h = parseFloat(m.altura_mm) || 0;
+                const d = parseFloat(m.profundidade_mm) || 0;
+                if (d > maxDepth) maxDepth = d;
+                if (w > 0 && h > 0) items.push({ category: m.categoria || 'Outros', w, h, qtd: item.qtd || 1 });
+            }
+            if (items.length === 0) continue;
+            cargas.push({ load, loadKey, items, maxDepth, largura: this._simulateMinWidth(items, cfg) });
+        }
+
+        // First-fit decreasing: da mais larga para a mais estreita, cabendo
+        // no primeiro grupo que não estourar MAX_W (re-simula o grupo com a
+        // carga incluída para respeitar gaps e distribuição em linhas).
+        cargas.sort((a, b) => b.largura - a.largura);
+        const grupos = [];
+        for (const carga of cargas) {
+            let colocado = false;
+            for (const grupo of grupos) {
+                const conjunto = [...grupo.items, ...carga.items];
+                const novaLargura = this._simulateMinWidth(conjunto, cfg);
+                if (novaLargura <= MAX_W) {
+                    grupo.items = conjunto;
+                    grupo.cargas.push(carga);
+                    grupo.largura = novaLargura;
+                    grupo.maxDepth = Math.max(grupo.maxDepth, carga.maxDepth);
+                    colocado = true;
+                    break;
+                }
+            }
+            if (!colocado) {
+                grupos.push({ items: carga.items.slice(), cargas: [carga], largura: carga.largura, maxDepth: carga.maxDepth });
+            }
+        }
+        return grupos;
+    },
+
     _gerarLayoutAutomatico() {
         const data = store.getState().activeTechnicalProposal;
         const eq = data?.equipments?.[this.activeEquipmentIndex];
@@ -3562,70 +3749,60 @@ export const layout = {
             return;
         }
 
-        // Calcula a largura mínima a partir dos materiais das cargas.
         const tipicos = store.getState().tipicos || [];
         const materiais = store.getState().materiais || [];
-        const itemsStd = [];
-        let maxDepthStd = 0;
-        for (const load of loadsWithTipico) {
-            const typical = tipicos.find(t => t.id === load.typicalId);
-            if (!typical?.items) continue;
-            for (const item of typical.items) {
-                const m = materiais.find(x => x.id === item.materialId);
-                if (!m) continue;
-                const w = parseFloat(m.largura_mm) || 0;
-                const h = parseFloat(m.altura_mm) || 0;
-                const d = parseFloat(m.profundidade_mm) || 0;
-                if (d > maxDepthStd) maxDepthStd = d;
-                if (w > 0 && h > 0) itemsStd.push({ category: m.categoria || 'Outros', w, h, qtd: item.qtd || 1 });
-            }
+
+        // Fase 3: distribui as cargas em grupos que cabem em cada armário.
+        const grupos = this._distribuirCargasEmGrupos(loadsWithTipico, tipicos, materiais);
+        if (grupos.length === 0) {
+            app.toast('Não foi possível dimensionar as cargas — verifique os materiais com dimensão no catálogo.', 'warning');
+            return;
         }
 
         const STANDARD_WIDTHS = [400, 600, 800, 1000];
-        const calcW = itemsStd.length > 0 ? this._simulateMinWidth(itemsStd, this._getDefaultLayoutConfig()) : 600;
-        let widthStd = 600;
-        for (const sw of STANDARD_WIDTHS) { if (calcW <= sw) { widthStd = sw; break; } widthStd = sw; }
-
         const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
         const alturaPainel = parseInt(eq.technical?.alturaPainel) || 2200;
         const heightStd = isForma2 ? 2300 : alturaPainel + 100;
-
-        const cabId = 'cab_' + Date.now();
         const nomeBase = eq.tag || 'Armário';
-        const cabEntry = {
-            name: nomeBase,
-            width: widthStd,
-            height: heightStd,
-            depth: maxDepthStd || 600,
-            loads: {},
-            faces: {
-                front: { loads: {}, layoutConfig: null },
-                rear: { loads: {}, layoutConfig: null }
-            },
-            layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
-        };
+        const baseTs = Date.now();
+        const multi = grupos.length > 1;
 
-        // Atribui todas as cargas com típico ao armário (B2B: face frontal).
-        const destinoLoads = isB2B ? cabEntry.faces.front.loads : cabEntry.loads;
-        for (const load of loadsWithTipico) {
-            if (!load.tag) continue;
-            if (!destinoLoads[load.tag]) destinoLoads[load.tag] = {};
-            const typical = tipicos.find(t => t.id === load.typicalId);
-            if (!typical?.items) continue;
-            for (const item of typical.items) {
-                const m = materiais.find(x => x.id === item.materialId);
-                if (!m) continue;
-                const w = parseFloat(m.largura_mm) || 0;
-                const h = parseFloat(m.altura_mm) || 0;
-                const d = parseFloat(m.profundidade_mm) || 0;
-                if (w === 0 && h === 0 && d === 0) continue;
-                const matId = m.id;
-                if (!destinoLoads[load.tag][matId]) destinoLoads[load.tag][matId] = { qtd: 0 };
-                destinoLoads[load.tag][matId].qtd += item.qtd || 1;
+        grupos.forEach((grupo, gi) => {
+            let widthStd = 600;
+            for (const sw of STANDARD_WIDTHS) { if (grupo.largura <= sw) { widthStd = sw; break; } widthStd = sw; }
+            const cabId = 'cab_' + (baseTs + gi);
+            const nome = multi ? `${nomeBase} ${gi + 1}` : nomeBase;
+            const cabEntry = {
+                name: nome,
+                width: widthStd,
+                height: heightStd,
+                depth: grupo.maxDepth || 600,
+                loads: {},
+                faces: {
+                    front: { loads: {}, layoutConfig: null },
+                    rear: { loads: {}, layoutConfig: null }
+                },
+                layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+            };
+            const destinoLoads = isB2B ? cabEntry.faces.front.loads : cabEntry.loads;
+            for (const carga of grupo.cargas) {
+                const typical = tipicos.find(t => t.id === carga.load.typicalId);
+                if (!typical || !typical.items) continue;
+                destinoLoads[carga.loadKey] = {};
+                for (const item of typical.items) {
+                    const m = materiais.find(x => x.id === item.materialId);
+                    if (!m) continue;
+                    const w = parseFloat(m.largura_mm) || 0;
+                    const h = parseFloat(m.altura_mm) || 0;
+                    const d = parseFloat(m.profundidade_mm) || 0;
+                    if (w === 0 && h === 0 && d === 0) continue;
+                    const matId = m.id;
+                    if (!destinoLoads[carga.loadKey][matId]) destinoLoads[carga.loadKey][matId] = { qtd: 0 };
+                    destinoLoads[carga.loadKey][matId].qtd += item.qtd || 1;
+                }
             }
-        }
-
-        eq.layoutConfig.cabinetAssignments[cabId] = cabEntry;
+            eq.layoutConfig.cabinetAssignments[cabId] = cabEntry;
+        });
 
         const idx = this.activeEquipmentIndex;
         const eqs = [...(data.equipments || [])];
@@ -3648,7 +3825,13 @@ export const layout = {
 
         this._recalcularLayout();
         this.renderSubTab();
-        app.toast(`Layout gerado: 1 armário (${widthStd}mm).${msgChaparia}`, 'success', 5000);
+        const resumoCab = grupos.map(g => {
+            let w = 600;
+            for (const sw of STANDARD_WIDTHS) { if (g.largura <= sw) { w = sw; break; } w = sw; }
+            return `${w}mm`;
+        }).join(' + ');
+        const totalCargas = grupos.reduce((s, g) => s + g.cargas.length, 0);
+        app.toast(`Layout gerado: ${grupos.length} armário(s) (${resumoCab}), ${totalCargas} carga(s) alocada(s).${msgChaparia}`, 'success', 5000);
     },
 
     _recomporLayout() {
@@ -3678,19 +3861,87 @@ export const layout = {
             }
         }
 
+        // Fase 3: identifica cargas ainda não alocadas (chave canônica id||tag).
         const jaAlocadas = new Set();
         for (const cabData of Object.values(assignments)) {
-            for (const loadTag of Object.keys(cabData.loads || {})) jaAlocadas.add(loadTag);
+            for (const lk of Object.keys(cabData.loads || {})) jaAlocadas.add(lk);
+            for (const face of ['front', 'rear']) {
+                const floads = cabData.faces?.[face]?.loads;
+                if (floads) for (const lk of Object.keys(floads)) jaAlocadas.add(lk);
+            }
         }
         const tipicos = store.getState().tipicos || [];
         const materiais = store.getState().materiais || [];
-        const novas = (eq.loads || []).filter(l => l.typicalId && !jaAlocadas.has(l.tag));
-        const alvo = assignments[cabIds[0]];
-        let alocadas = 0;
+        const novas = (eq.loads || []).filter(l => l.typicalId && (l.id || l.tag) && !jaAlocadas.has(l.id || l.tag));
+
+        // Monta itens e largura de cada carga nova.
+        const cfg = this._getDefaultLayoutConfig();
+        const MAX_W = 1000;
+        const preparadas = [];
         for (const load of novas) {
             const typical = tipicos.find(t => t.id === load.typicalId);
-            if (!typical?.items) continue;
-            if (!alvo.loads[load.tag]) alvo.loads[load.tag] = {};
+            if (!typical || !typical.items) continue;
+            const items = [];
+            for (const item of typical.items) {
+                const material = materiais.find(m => m.id === item.materialId);
+                if (!material) continue;
+                const w = parseFloat(material.largura_mm) || 0;
+                const h = parseFloat(material.altura_mm) || 0;
+                if (w === 0 && h === 0) continue;
+                items.push({ category: material.categoria || 'Outros', w, h, qtd: item.qtd || 1 });
+            }
+            if (items.length === 0) continue;
+            preparadas.push({ load, loadKey: load.id || load.tag, items, largura: this._simulateMinWidth(items, cfg) });
+        }
+
+        // Calcula a largura usada por cada armário existente (só os que não
+        // têm ajuste manual de largura são candidatos a receber carga nova;
+        // armário com largura fixada pelo usuário não é reabastecido à força).
+        const cabIdsRec = Object.keys(assignments);
+        const larguraUsada = {};
+        for (const cabId of cabIdsRec) {
+            const cabData = assignments[cabId];
+            const itensCab = [];
+            const fontes = [cabData.loads, cabData.faces?.front?.loads, cabData.faces?.rear?.loads];
+            for (const lobj of fontes) {
+                if (!lobj) continue;
+                for (const mats of Object.values(lobj)) {
+                    for (const [matId, ass] of Object.entries(mats || {})) {
+                        const m = materiais.find(x => x.id === matId);
+                        if (!m) continue;
+                        const w = parseFloat(m.largura_mm) || 0;
+                        const h = parseFloat(m.altura_mm) || 0;
+                        if (w === 0 && h === 0) continue;
+                        itensCab.push({ category: m.categoria || 'Outros', w, h, qtd: ass.qtd || 1 });
+                    }
+                }
+            }
+            larguraUsada[cabId] = itensCab.length ? this._simulateMinWidth(itensCab, cfg) : 0;
+        }
+
+        // Best-fit: cada carga nova vai para o armário onde couber restando
+        // menos espaço (evita buracos e distribui melhor). Se nenhuma couber,
+        // vai para o de maior capacidade restante.
+        let alocadas = 0;
+        for (const prep of preparadas.sort((a, b) => b.largura - a.largura)) {
+            let melhor = null;
+            let melhorRestante = Infinity;
+            let maiorRestante = -1;
+            let alvoId = cabIdsRec[0];
+            for (const cabId of cabIdsRec) {
+                const larguraCab = parseInt(assignments[cabId].width) || 600;
+                const restante = larguraCab - larguraUsada[cabId];
+                if (prep.largura <= restante && restante < melhorRestante) {
+                    melhor = cabId;
+                    melhorRestante = restante;
+                }
+                if (restante > maiorRestante) { maiorRestante = restante; alvoId = cabId; }
+            }
+            const destino = melhor || alvoId;
+            const alvo = assignments[destino];
+            const destinoLoads = alvo.loads || (alvo.loads = {});
+            if (!destinoLoads[prep.loadKey]) destinoLoads[prep.loadKey] = {};
+            const typical = tipicos.find(t => t.id === prep.load.typicalId);
             for (const item of typical.items) {
                 const material = materiais.find(m => m.id === item.materialId);
                 if (!material) continue;
@@ -3699,9 +3950,10 @@ export const layout = {
                 const d = parseFloat(material.profundidade_mm) || 0;
                 if (w === 0 && h === 0 && d === 0) continue;
                 const matId = material.id;
-                if (!alvo.loads[load.tag][matId]) alvo.loads[load.tag][matId] = { qtd: 0 };
-                alvo.loads[load.tag][matId].qtd += item.qtd || 1;
+                if (!destinoLoads[prep.loadKey][matId]) destinoLoads[prep.loadKey][matId] = { qtd: 0 };
+                destinoLoads[prep.loadKey][matId].qtd += item.qtd || 1;
             }
+            larguraUsada[destino] = larguraUsada[destino] + prep.largura;
             alocadas++;
         }
 
