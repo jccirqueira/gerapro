@@ -79,7 +79,9 @@ painel vai ficar antes de comprar os materiais ou fabricar.
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-O layout só funciona quando TODOS os itens abaixo estão preenchidos:
+O layout só funciona quando TODOS os itens abaixo estão preenchidos. Uma
+ferramenta chamada CHECKLIST DE PRONTIDÃO mostra, dentro da aba, o que já
+está pronto e o que falta (com um link direto para corrigir cada item).
 
   1. FORMA DE SEGREGAÇÃO: O equipamento deve ter uma forma de segregação
      compatível na Ficha Técnica: "Forma 1", "Forma 2a" ou "Forma 2b".
@@ -89,8 +91,8 @@ O layout só funciona quando TODOS os itens abaixo estão preenchidos:
      materiais usar.
 
   3. MATERIAIS COM DIMENSÕES: Os materiais usados nos típicos precisam
-     ter largura (mm) e altura (mm) preenchidos no cadastro. Sem as
-     dimensões, o sistema não consegue posicionar os componentes.
+     ter largura (mm), altura (mm) e profundidade (mm) preenchidos no
+     cadastro. Sem as dimensões, o sistema não consegue posicionar.
 
   4. LAYOUT CONFIG (opcional): Você pode configurar:
      - Posição das canaletas (esquerda/direita)
@@ -100,9 +102,10 @@ O layout só funciona quando TODOS os itens abaixo estão preenchidos:
 
 ╔══════════════════════════════════════════════════════════════════════════════════╗
 ║                                                                                  ║
-║   ✅ DICA: Se o layout não aparecer, a primeira coisa a verificar é se          ║
-║   as cargas têm típicos associados (aba Cargas) e se os materiais têm           ║
-║   largura e altura preenchidas (cadastro de Materiais > dimensões mm).          ║
+║   ✅ DICA: Se o layout não aparecer, a primeira coisa a verificar é o          ║
+║   CHECKLIST DE PRONTIDÃO na própria aba: ele mostra, item por item, o que      ║
+║   já está pronto e o que falta (cargas sem típico, materiais sem dimensão,     ║
+║   forma de segregação), com link direto para corrigir em cada tela.            ║
 ║                                                                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════════╝
 
@@ -117,11 +120,35 @@ ETAPA 1 — ACESSAR O LAYOUT
 
   • Abra uma Proposta Técnica.
   • Vá até a seção do equipamento (ex: CCM-01).
-  • Na aba "Layout Sugerido" você vê o desenho gerado automaticamente.
+  • Na aba "Layout Sugerido" você vê o CHECKLIST DE PRONTIDÃO.
 
-ETAPA 2 — ENTENDER A TELA
+ETAPA 2 — SEGUIR O CHECKLIST DE PRONTIDÃO
 
-  O layout mostra:
+  Antes do desenho existir, a aba mostra um painel com 4 itens:
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │ ☑ PRONTIDÃO DO LAYOUT                                                       │
+  │                                                                              │
+  │  ☑ Forma de Segregação ....... Forma 2b                                      │
+  │  ☑ Cargas com típico ......... 3 de 3 carga(s) com típico                    │
+  │  ☑ Materiais dimensionados ... 12 de 12 material(is) com L×A×P               │
+  │  ☐ Armários ................... Nenhum armário definido                      │
+  │                                                                              │
+  │         [🪄 Gerar layout automaticamente]                                    │
+  │         Distribui as cargas nos armários e gera o desenho.                   │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+  • Cada item fica VERDE quando pronto e AMARELO quando falta algo,
+    com link direto ("Ir para Cargas", "Ficha Técnica", etc.).
+  • Quando tudo que depende de você está pronto, aparece o botão
+    "Gerar layout automaticamente". Clique nele para criar o layout.
+
+  IMPORTANTE: o sistema NÃO cria o layout sozinho. Nada é gerado (nem
+  armário, nem custo de chaparia) enquanto você não clica em Gerar.
+
+ETAPA 3 — ENTENDER A TELA
+
+  Depois de gerar, o layout mostra:
   ┌──────────────────────────────────────────────────────────────────────────────┐
   │                                                                              │
   │  4 CARDs de resumo:                                                          │
@@ -131,8 +158,8 @@ ETAPA 2 — ENTENDER A TELA
   │  │          │ │  1850mm  │ │  2000mm  │ │ 2300mm   │                      │
   │  └──────────┘ └──────────┘ └──────────┘ └──────────┘                      │
   │                                                                              │
-  │  Botões: [⚙ Configurar] [📄 Exportar PDF] [📐 Exportar DXF] [☐ Vista    │
-  │  Lateral]                                                              │
+  │  Botões: [⚙ Configurar] [📄 Exportar PDF] [📐 Exportar DXF] [Exportar QET]  │
+  │          [📦 Gerar Chaparia] [☑ Auto Chaparia] [☐ Vista Lateral]            │
   │                                                                              │
   │  ┌──────────────────────────────────────────────────────────────────────┐   │
   │  │                     DESENHO DO LAYOUT                                │   │
@@ -154,14 +181,19 @@ ETAPA 2 — ENTENDER A TELA
   │                                                                              │
   └──────────────────────────────────────────────────────────────────────────────┘
 
-ETAPA 3 — AJUSTAR LARGURAS DOS ARMÁRIOS
+  Quando o layout está pronto, o checklist vira uma BARRA COMPACTA com o
+  botão [🔄 Recompor layout] — use-o se você adicionou cargas novas depois
+  de gerar. Ele aloca apenas o que falta e PRESERVA seus ajustes manuais
+  de largura (larguras com ajuste manual nunca são recalculadas).
+
+ETAPA 4 — AJUSTAR LARGURAS DOS ARMÁRIOS
 
   • Abaixo do desenho, cada armário tem um dropdown de largura:
     [400mm | 600mm | 800mm | 1000mm]
   • Selecione a largura desejada. O layout é recalculado na hora.
   • Você também pode adicionar ou remover armários.
 
-ETAPA 4 — CONFIGURAR O LAYOUT (OPCIONAL)
+ETAPA 5 — CONFIGURAR O LAYOUT (OPCIONAL)
 
   Clique no botão "⚙ Configurar" para abrir o painel de configuração onde
   você pode ajustar:
@@ -191,7 +223,7 @@ ETAPA 4 — CONFIGURAR O LAYOUT (OPCIONAL)
   │ • Relé: [5]mm         • Borne: [2]mm                                        │
   └──────────────────────────────────────────────────────────────────────────────┘
 
-ETAPA 5 — EXPORTAR
+ETAPA 6 — EXPORTAR
 
   Você tem 3 opções de saída:
 
@@ -209,7 +241,7 @@ ETAPA 5 — EXPORTAR
 
   A Vista Lateral, se ativada, também é incluída no PDF e no DXF.
 
-ETAPA 6 — VISTA LATERAL (CORTE) — OPCIONAL
+ETAPA 7 — VISTA LATERAL (CORTE) — OPCIONAL
 
   Ao lado dos botões de exportação há um checkbox "☐ Vista Lateral". Quando
   marcado, o sistema exibe um corte transversal do painel (profundidade ×
@@ -384,8 +416,12 @@ alocados, agrupados por armário:
 O Layout Sugerido é uma ferramenta ORIENTATIVA. Ele tem as seguintes
 limitações importantes:
 
-  • FORMAS DE SEGREGAÇÃO: Só funciona com Forma 1, Forma 2a e Forma 2b.
-    Para Forma 3, 4a, 4b o layout não é gerado (o sistema avisa).
+  • FORMAS DE SEGREGAÇÃO: Formas 1, 2a e 2b usam o fluxo padrão
+    (checklist → Gerar layout). Formas 3 e 4 (estrutura modular) só
+    funcionam com os fabricantes KitFrame e Eletropoll — nelas, além do
+    fluxo automático, existe o botão "Criar Arranjo Otimizado" que
+    monta o layout com gavetas otimizadas. Outros fabricantes nas
+    Formas 3/4 ficam bloqueados (o checklist avisa).
 
   • DIMENSIONAMENTO ELÉTRICO: O layout NÃO substitui um projeto elétrico
     detalhado. Ele não calcula esforços térmicos, curto-circuito, nem
@@ -512,15 +548,21 @@ limitações importantes:
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-PROBLEMA: "Layout não disponível — Disponível apenas para Formas de Segregação..."
-  Causa: A forma de segregação do equipamento não é compatível.
-  SOLUÇÃO: Vá na Ficha Técnica do equipamento e mude a segregação para
-  "Forma 1", "Forma 2a" ou "Forma 2b".
+PROBLEMA: A aba Layout mostra o checklist com itens amarelos
+  Causa: Falta algum requisito (forma, cargas com típico ou dimensões).
+  SOLUÇÃO: O próprio checklist diz o que falta e traz um link direto
+  para corrigir (Ficha Técnica, Cargas, etc.). Complete os itens até
+  todos ficarem verdes e clique em "Gerar layout automaticamente".
 
 PROBLEMA: "Nenhuma carga vinculada a típicos"
   Causa: As cargas do equipamento não têm típicos associados.
   SOLUÇÃO: Vá na aba Cargas, edite cada carga e selecione um Típico
   (ex: "PD-001 — Partida Direta 5CV").
+
+PROBLEMA: Adicionei cargas novas e o layout não as mostrou
+  Causa: O desenho só é atualizado quando você manda.
+  SOLUÇÃO: Clique em "🔄 Recompor layout" (barra compacta acima do
+  desenho). Ele aloca apenas as cargas novas e preserva seus ajustes.
 
 PROBLEMA: O layout mostra só retângulos vazios (sem nomes)
   Causa: Os materiais podem não ter largura/altura preenchidas.
