@@ -193,7 +193,27 @@ ETAPA 4 — AJUSTAR LARGURAS DOS ARMÁRIOS
   • Selecione a largura desejada. O layout é recalculado na hora.
   • Você também pode adicionar ou remover armários.
 
-ETAPA 5 — CONFIGURAR O LAYOUT (OPCIONAL)
+ETAPA 5 — ALOCAÇÃO POR CARGA
+
+  Quando o layout tem mais de um armário, o painel "Alocação por Carga"
+  (abaixo dos controles de armário) lista cada carga com um dropdown:
+
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │ ↔ ALOCAÇÃO POR CARGA  — Mova cargas inteiras entre armários                │
+  │                                                                              │
+  │  [ M1 ]  TAG-01 2  →  [ TAG-01            ▼]                                │
+  │  [ M2 ]  TAG-01    →  [ TAG-01 2          ▼]                                │
+  │  [ M3 ]  não alocada → [ TAG-01 2          ▼]                               │
+  └──────────────────────────────────────────────────────────────────────────────┘
+
+  • Ao escolher outro armário, TODOS os materiais daquela carga acompanham
+    (em vez de alocar item por item na Lista de Materiais).
+  • Em montagem Back to Back, as opções são por face (— Frontal / — Traseira).
+  • O sistema distribui automaticamente as cargas entre armários quando elas
+    não cabem em um só (máximo 1000mm por armário). Se uma carga sozinha
+    passar de 1000mm, um aviso explica que é preciso ajustar ou dividir.
+
+ETAPA 6 — CONFIGURAR O LAYOUT (OPCIONAL)
 
   Clique no botão "⚙ Configurar" para abrir o painel de configuração onde
   você pode ajustar:
@@ -223,7 +243,7 @@ ETAPA 5 — CONFIGURAR O LAYOUT (OPCIONAL)
   │ • Relé: [5]mm         • Borne: [2]mm                                        │
   └──────────────────────────────────────────────────────────────────────────────┘
 
-ETAPA 6 — EXPORTAR
+ETAPA 7 — EXPORTAR
 
   Você tem 3 opções de saída:
 
@@ -241,7 +261,7 @@ ETAPA 6 — EXPORTAR
 
   A Vista Lateral, se ativada, também é incluída no PDF e no DXF.
 
-ETAPA 7 — VISTA LATERAL (CORTE) — OPCIONAL
+ETAPA 8 — VISTA LATERAL (CORTE) — OPCIONAL
 
   Ao lado dos botões de exportação há um checkbox "☐ Vista Lateral". Quando
   marcado, o sistema exibe um corte transversal do painel (profundidade ×
@@ -587,9 +607,10 @@ PROBLEMA: A Lista de Materiais está vazia
   de alocação para distribuir os materiais entre os armários.
 
 PROBLEMA: Os componentes estão aparecendo em armário errado
-  Causa: A alocação manual pode ter sido feita incorretamente.
-  SOLUÇÃO: Na BOM, você pode mover materiais entre armários usando
-  os controles de alocação. Use "Auto-alocar" para redistribuir.
+  Causa: A alocação pode ter sido feita incorretamente.
+  SOLUÇÃO: Use o painel "Alocação por Carga" — selecione a carga no
+  dropdown e mova-a para o armário certo (todos os materiais da carga
+  acompanham). Para ajuste fino de um item, use os controles da BOM.
 
 PROBLEMA: O layout não tem canaletas no DXF
   Causa: A configuração de layout pode não ter canaletas definidas.
