@@ -411,16 +411,17 @@ export const layout = {
         const loadsWithTipico = (eq.loads || []).filter(l => l.typicalId && (l.id || l.tag));
         if (cabIds.length === 0 || loadsWithTipico.length === 0) return '';
 
-        // Opções de destino (B2B: uma opção por armário × face).
-        const opcoes = cabIds.flatMap(cabId => {
+        // Opções de destino (B2B: uma opção por armário × face). Recebe a
+        // localização atual para marcar a opção selecionada de cada linha.
+        const opcoesPara = (atual) => cabIds.flatMap(cabId => {
             const nome = assignments[cabId].name || cabId;
             return isB2B
                 ? [
-                    `<option value="${cabId}|front">${nome} — Frontal</option>`,
-                    `<option value="${cabId}|rear">${nome} — Traseira</option>`
+                    { valor: `${cabId}|front`, rotulo: `${nome} — Frontal` },
+                    { valor: `${cabId}|rear`, rotulo: `${nome} — Traseira` }
                 ]
-                : [`<option value="${cabId}">${nome}</option>`];
-        }).join('');
+                : [{ valor: `${cabId}`, rotulo: `${nome}` }];
+        }).map(o => `<option value="${o.valor}" ${o.valor === atual ? 'selected' : ''}>${o.rotulo}</option>`).join('');
 
         // Onde cada carga está hoje (percorre armários e faces).
         const localizarCarga = (loadKey) => {
@@ -437,17 +438,18 @@ export const layout = {
         const linhas = loadsWithTipico.map(load => {
             const loadKey = load.id || load.tag;
             const atual = localizarCarga(loadKey);
+            const faceAtual = atual.includes('|') ? atual.split('|')[1] : null;
             const cabAtual = atual ? assignments[atual.split('|')[0]] : null;
             const nomeAtual = !atual
                 ? '<span style="color:#b45309;font-weight:600;">não alocada</span>'
-                : (cabAtual?.name || atual);
+                : ((cabAtual?.name || atual) + (faceAtual ? (faceAtual === 'front' ? ' — Frontal' : ' — Traseira') : ''));
             return `
             <div class="ls-alc-row">
                 <span class="ls-alc-tag" title="${load.desc || ''}">${load.tag || loadKey}</span>
                 <span class="ls-alc-atual">${nomeAtual}</span>
                 <i class="ph ph-arrow-right ls-alc-arrow"></i>
                 <select class="ls-cab-select" onchange="window.propostaTecnicaModule._moverCargaArmario('${loadKey}', this.value)">
-                    ${opcoes}
+                    ${opcoesPara(atual)}
                 </select>
             </div>`;
         }).join('');
