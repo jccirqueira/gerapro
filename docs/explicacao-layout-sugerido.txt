@@ -313,6 +313,24 @@ o layout mostra AMBAS as vistas:
   • Os componentes são distribuídos de forma independente em cada face.
   • No DXF, as duas vistas aparecem lado a lado no mesmo arquivo.
 
+VISTAS COLAPSÁVEIS:
+
+  Com Back to Back o layout pode ter até 4 vistas (Frontal e Traseira,
+  Interna e Externa) além da Lateral — para não ocupar a tela inteira,
+  cada título de vista é CLICÁVEL:
+
+    ▼ VISTA FRONTAL INTERNA     (aberta — clique fecha)
+    ▶ VISTA FRONTAL EXTERNA     (fechada — clique abre)
+
+  • Padrão: as vistas INTERNAS começam abertas e as EXTERNAS fechadas
+    (são derivadas das internas, de uso mais ocasional).
+  • No topo há o botão [⤡ Colapsar tudo] / [⤢ Expandir tudo] para
+    alternar todas de uma vez.
+  • Sua escolha fica guardada: ao voltar para a aba (ou depois de um
+    Recompor), as vistas continuam como você deixou.
+  • A Vista Lateral continua sendo ligada/desligada pelo checkbox
+    "☐ Vista Lateral" do cabeçalho.
+
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
