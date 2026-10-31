@@ -3748,9 +3748,19 @@ export const layout = {
         // 4. Armários
         const cabs = Object.keys(eq.layoutConfig?.cabinetAssignments || {}).length;
 
-        // Tudo pronto e layout já gerado? O resumo já comunica isso — checklist redundante.
+        // Tudo pronto e layout já gerado? Checklist redundante — mas mantém uma
+        // barra compacta com o "Recompor" (só completa cargas novas, preserva
+        // larguras manuais), para não deixar o usuário sem via de ação.
         const tudoPronto = temForma && formaFabricanteOk && comTipico > 0 && usados.size > 0 && semDim === 0 && cabs > 0;
-        if (tudoPronto) return '';
+        if (tudoPronto) {
+            return `
+            <div class="ls-checklist ls-checklist--compact">
+                <button class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._recomporLayout()" style="gap:4px;" title="Aloca cargas ainda não alocadas e recalcula larguras sem ajuste manual. Seus ajustes são preservados.">
+                    <i class="ph ph-arrows-clockwise"></i> Recompor layout
+                </button>
+                <span class="ls-checklist-hint">Layout pronto — recomponha se adicionou cargas novas.</span>
+            </div>`;
+        }
 
         const item = (ok, label, detalhe, acaoHtml) => `
             <div class="ls-check-item ${ok ? 'ls-check-ok' : 'ls-check-pend'}">

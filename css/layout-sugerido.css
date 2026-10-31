@@ -171,6 +171,13 @@
     flex-wrap: wrap;
 }
 .ls-checklist-hint { font-size: 12px; color: var(--color-text-muted); }
+.ls-checklist--compact {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 18px;
+    margin-bottom: 12px;
+}
 .ls-checklist-blocked {
     margin-top: 10px;
     padding-top: 10px;
