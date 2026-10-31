@@ -1358,6 +1358,10 @@ export const core = {
         const cabinets = eq.layoutConfig?.cabinetAssignments;
         if (!cabinets || Object.keys(cabinets).length === 0) return null;
 
+        // Larguras derivadas Formas 3/4 frescas: a chaparia casa por
+        // largura EXATA — valor desatualizado acharia a chaparia errada.
+        this._syncForma34Widths(eq);
+
         const fabricante = eq.technical?.fabricante || '';
         const bomBase = painelType?.items || [];
         const chapariaLists = store.getState().chapariaLists || [];

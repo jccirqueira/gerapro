@@ -690,6 +690,7 @@ export const bom = {
         const idx = this.activeEquipmentIndex;
         const eqs = [...(data.equipments || [])];
         eqs[idx] = eq;
+        this._syncForma34Widths(eq); // larguras derivadas antes de derivar enclosures
         this._syncLayoutToEnclosures(eq);
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Layout] store notify error:', e); if (typeof app?.toast === 'function') app.toast('Erro ao salvar configuração do layout', 'error'); }
         if (this.activeSubTab === 'layout') {

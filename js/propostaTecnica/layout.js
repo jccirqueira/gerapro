@@ -3824,6 +3824,93 @@ export const layout = {
         return grupos;
     },
 
+    // ── Formas 3/4 (KitFrame/Eletropoll): criação explícita ──────────────────
+    //
+    // Antes a auto-criação acontecia DENTRO do suggestLayout, durante o
+    // render (efeito colateral no store). Agora é só no clique de "Gerar
+    // layout" — o render fica 100% puro.
+
+    _criarArmarioForma34(eq, loadsWithTipico, tipicos, materiais, isB2B) {
+        const isEletropoll = eq.technical?.fabricante === 'Eletropoll';
+        const ccw = isEletropoll ? 400 : 200;
+        let gavetaW = 600;
+        const tipoGaveta = eq.technical?.tipoGaveta || 'Fixo';
+        if (isEletropoll) {
+            for (const load of (eq.loads || [])) {
+                if (!load.tag) continue;
+                const epRes = this._getEletropollDrawerHeight(load, tipoGaveta);
+                if (epRes && !epRes.consultar && epRes.width && epRes.width > gavetaW) gavetaW = epRes.width;
+            }
+        }
+        const cabId = 'cab_' + Date.now();
+        const cabConfig = JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()));
+        cabConfig.colunaCabosWidth = ccw;
+        const cabEntry = {
+            name: eq.tag || (isEletropoll ? 'Eletropoll' : 'KitFrame'),
+            width: (isEletropoll ? gavetaW : 600) + ccw,
+            height: 2300,
+            depth: 600,
+            loads: {},
+            faces: {
+                front: { loads: {}, layoutConfig: null },
+                rear: { loads: {}, layoutConfig: null }
+            },
+            layoutConfig: cabConfig
+        };
+        const destinoLoads = isB2B ? cabEntry.faces.front.loads : cabEntry.loads;
+        let alocadas = 0;
+        for (const load of loadsWithTipico) {
+            const loadKey = load.id || load.tag;
+            if (!loadKey) continue;
+            const typical = tipicos.find(t => t.id === load.typicalId);
+            if (!typical || !typical.items) continue;
+            destinoLoads[loadKey] = {};
+            for (const item of typical.items) {
+                const m = materiais.find(x => x.id === item.materialId);
+                if (!m) continue;
+                const w = parseFloat(m.largura_mm) || 0;
+                const h = parseFloat(m.altura_mm) || 0;
+                const d = parseFloat(m.profundidade_mm) || 0;
+                if (w === 0 && h === 0 && d === 0) continue;
+                const matId = m.id;
+                if (!destinoLoads[loadKey][matId]) destinoLoads[loadKey][matId] = { qtd: 0 };
+                destinoLoads[loadKey][matId].qtd += item.qtd || 1;
+            }
+            alocadas++;
+        }
+        if (alocadas === 0) return null;
+        eq.layoutConfig.cabinetAssignments[cabId] = cabEntry;
+        return { width: cabEntry.width, cargas: alocadas, excedeu: false };
+    },
+
+    // Sincroniza no store as larguras DERIVADAS de Formas 3/4 — KitFrame:
+    // 600 + coluna de cabos; Eletropoll: largura da gaveta + 400. Era feito
+    // dentro do render (suggestLayout gravava cabData.width); agora nas
+    // ações explícitas, para o render não ter efeitos colaterais.
+    _syncForma34Widths(eq) {
+        if (!eq || !eq.layoutConfig || !eq.layoutConfig.cabinetAssignments) return;
+        const seg = eq.technical?.segregacao || '';
+        if (!this._isForma34EstruturaModular(seg, eq.technical?.fabricante)) return;
+        const isEletropoll = eq.technical?.fabricante === 'Eletropoll';
+        const tipoGaveta = eq.technical?.tipoGaveta || 'Fixo';
+        let gavetaW = 600;
+        if (isEletropoll) {
+            for (const load of (eq.loads || [])) {
+                if (!load.tag) continue;
+                const epRes = this._getEletropollDrawerHeight(load, tipoGaveta);
+                if (epRes && !epRes.consultar && epRes.width && epRes.width > gavetaW) gavetaW = epRes.width;
+            }
+        }
+        for (const cab of Object.values(eq.layoutConfig.cabinetAssignments)) {
+            if (isEletropoll) {
+                cab.width = gavetaW + 400;
+            } else {
+                const ccw = (cab.layoutConfig && cab.layoutConfig.colunaCabosWidth) || 200;
+                cab.width = 600 + ccw;
+            }
+        }
+    },
+
     _gerarLayoutAutomatico() {
         const data = store.getState().activeTechnicalProposal;
         const eq = data?.equipments?.[this.activeEquipmentIndex];
@@ -3853,57 +3940,71 @@ export const layout = {
         const tipicos = store.getState().tipicos || [];
         const materiais = store.getState().materiais || [];
 
-        // Fase 3: distribui as cargas em grupos que cabem em cada armário.
-        const grupos = this._distribuirCargasEmGrupos(loadsWithTipico, tipicos, materiais);
-        if (grupos.length === 0) {
-            app.toast('Não foi possível dimensionar as cargas — verifique os materiais com dimensão no catálogo.', 'warning');
-            return;
-        }
+        // Criação explícita por tipo de segregação:
+        // - Formas 3/4 (KitFrame/Eletropoll): 1 armário com largura derivada
+        // - Demais: distribuição em grupos que cabem em cada armário (Fase 3)
+        const isForma34 = this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
+        const criados = []; // { width, cargas, excedeu } de cada armário criado
 
-        const STANDARD_WIDTHS = [400, 600, 800, 1000];
-        const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
-        const alturaPainel = parseInt(eq.technical?.alturaPainel) || 2200;
-        const heightStd = isForma2 ? 2300 : alturaPainel + 100;
-        const nomeBase = eq.tag || 'Armário';
-        const baseTs = Date.now();
-        const multi = grupos.length > 1;
-
-        grupos.forEach((grupo, gi) => {
-            let widthStd = 600;
-            for (const sw of STANDARD_WIDTHS) { if (grupo.largura <= sw) { widthStd = sw; break; } widthStd = sw; }
-            const cabId = 'cab_' + (baseTs + gi);
-            const nome = multi ? `${nomeBase} ${gi + 1}` : nomeBase;
-            const cabEntry = {
-                name: nome,
-                width: widthStd,
-                height: heightStd,
-                depth: grupo.maxDepth || 600,
-                loads: {},
-                faces: {
-                    front: { loads: {}, layoutConfig: null },
-                    rear: { loads: {}, layoutConfig: null }
-                },
-                layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
-            };
-            const destinoLoads = isB2B ? cabEntry.faces.front.loads : cabEntry.loads;
-            for (const carga of grupo.cargas) {
-                const typical = tipicos.find(t => t.id === carga.load.typicalId);
-                if (!typical || !typical.items) continue;
-                destinoLoads[carga.loadKey] = {};
-                for (const item of typical.items) {
-                    const m = materiais.find(x => x.id === item.materialId);
-                    if (!m) continue;
-                    const w = parseFloat(m.largura_mm) || 0;
-                    const h = parseFloat(m.altura_mm) || 0;
-                    const d = parseFloat(m.profundidade_mm) || 0;
-                    if (w === 0 && h === 0 && d === 0) continue;
-                    const matId = m.id;
-                    if (!destinoLoads[carga.loadKey][matId]) destinoLoads[carga.loadKey][matId] = { qtd: 0 };
-                    destinoLoads[carga.loadKey][matId].qtd += item.qtd || 1;
-                }
+        if (isForma34) {
+            const criado = this._criarArmarioForma34(eq, loadsWithTipico, tipicos, materiais, isB2B);
+            if (!criado) {
+                app.toast('Não foi possível dimensionar as cargas — verifique os materiais com dimensão no catálogo.', 'warning');
+                return;
             }
-            eq.layoutConfig.cabinetAssignments[cabId] = cabEntry;
-        });
+            criados.push(criado);
+        } else {
+            const grupos = this._distribuirCargasEmGrupos(loadsWithTipico, tipicos, materiais);
+            if (grupos.length === 0) {
+                app.toast('Não foi possível dimensionar as cargas — verifique os materiais com dimensão no catálogo.', 'warning');
+                return;
+            }
+            const STANDARD_WIDTHS = [400, 600, 800, 1000];
+            const isForma2 = seg === 'Forma 2a' || seg === 'Forma 2b';
+            const alturaPainel = parseInt(eq.technical?.alturaPainel) || 2200;
+            const heightStd = isForma2 ? 2300 : alturaPainel + 100;
+            const nomeBase = eq.tag || 'Armário';
+            const baseTs = Date.now();
+            const multi = grupos.length > 1;
+
+            grupos.forEach((grupo, gi) => {
+                let widthStd = 600;
+                for (const sw of STANDARD_WIDTHS) { if (grupo.largura <= sw) { widthStd = sw; break; } widthStd = sw; }
+                const cabId = 'cab_' + (baseTs + gi);
+                const nome = multi ? `${nomeBase} ${gi + 1}` : nomeBase;
+                const cabEntry = {
+                    name: nome,
+                    width: widthStd,
+                    height: heightStd,
+                    depth: grupo.maxDepth || 600,
+                    loads: {},
+                    faces: {
+                        front: { loads: {}, layoutConfig: null },
+                        rear: { loads: {}, layoutConfig: null }
+                    },
+                    layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+                };
+                const destinoLoads = isB2B ? cabEntry.faces.front.loads : cabEntry.loads;
+                for (const carga of grupo.cargas) {
+                    const typical = tipicos.find(t => t.id === carga.load.typicalId);
+                    if (!typical || !typical.items) continue;
+                    destinoLoads[carga.loadKey] = {};
+                    for (const item of typical.items) {
+                        const m = materiais.find(x => x.id === item.materialId);
+                        if (!m) continue;
+                        const w = parseFloat(m.largura_mm) || 0;
+                        const h = parseFloat(m.altura_mm) || 0;
+                        const d = parseFloat(m.profundidade_mm) || 0;
+                        if (w === 0 && h === 0 && d === 0) continue;
+                        const matId = m.id;
+                        if (!destinoLoads[carga.loadKey][matId]) destinoLoads[carga.loadKey][matId] = { qtd: 0 };
+                        destinoLoads[carga.loadKey][matId].qtd += item.qtd || 1;
+                    }
+                }
+                eq.layoutConfig.cabinetAssignments[cabId] = cabEntry;
+                criados.push({ width: widthStd, cargas: grupo.cargas.length, excedeu: grupo.largura > 1000 });
+            });
+        }
 
         const idx = this.activeEquipmentIndex;
         const eqs = [...(data.equipments || [])];
@@ -3926,18 +4027,13 @@ export const layout = {
 
         this._recalcularLayout();
         this.renderSubTab();
-        const larguras = grupos.map(g => {
-            let w = 600;
-            for (const sw of STANDARD_WIDTHS) { if (g.largura <= sw) { w = sw; break; } w = sw; }
-            return { w, excedeu: g.largura > 1000 };
-        });
-        const resumoCab = larguras.map(l => `${l.w}mm`).join(' + ');
-        const totalCargas = grupos.reduce((s, g) => s + g.cargas.length, 0);
-        const temEstouro = larguras.some(l => l.excedeu);
+        const resumoCab = criados.map(c => `${c.width}mm`).join(' + ');
+        const totalCargas = criados.reduce((s, c) => s + c.cargas, 0);
+        const temEstouro = criados.some(c => c.excedeu);
         const alertaEstouro = temEstouro
             ? ' ⚠️ Há carga(s) maior(es) que 1000mm — não coube em um armário padrão; ajuste manual ou divida a carga.'
             : '';
-        app.toast(`Layout gerado: ${grupos.length} armário(s) (${resumoCab}), ${totalCargas} carga(s) alocada(s).${alertaEstouro}${msgChaparia}`, temEstouro ? 'warning' : 'success', 6000);
+        app.toast(`Layout gerado: ${criados.length} armário(s) (${resumoCab}), ${totalCargas} carga(s) alocada(s).${alertaEstouro}${msgChaparia}`, temEstouro ? 'warning' : 'success', 6000);
     },
 
     _recomporLayout() {
@@ -3948,6 +4044,9 @@ export const layout = {
         const assignments = eq.layoutConfig.cabinetAssignments;
         const cabIds = Object.keys(assignments);
         if (cabIds.length === 0) { this._gerarLayoutAutomatico(); return; }
+
+        // Larguras derivadas Formas 3/4 frescas antes do best-fit ler.
+        this._syncForma34Widths(eq);
 
         const montagem = eq.technical?.montagem || 'Em Linha';
         const isB2B = montagem === 'Back to Back';
@@ -4045,7 +4144,13 @@ export const layout = {
             }
             const destino = melhor || alvoId;
             const alvo = assignments[destino];
-            const destinoLoads = alvo.loads || (alvo.loads = {});
+            // B2B: render lê faces.front — alocar na raiz deixaria invisível.
+            if (isB2B) {
+                if (!alvo.faces) alvo.faces = { front: { loads: {}, layoutConfig: null }, rear: { loads: {}, layoutConfig: null } };
+                if (!alvo.faces.front) alvo.faces.front = { loads: {}, layoutConfig: null };
+                if (!alvo.faces.front.loads) alvo.faces.front.loads = {};
+            }
+            const destinoLoads = isB2B ? alvo.faces.front.loads : (alvo.loads || (alvo.loads = {}));
             if (!destinoLoads[prep.loadKey]) destinoLoads[prep.loadKey] = {};
             const typical = tipicos.find(t => t.id === prep.load.typicalId);
             for (const item of typical.items) {
@@ -4636,12 +4741,13 @@ export const layout = {
                                 }
                             }
                             forma34width = maxGavetaW + ccw;
-                            cabData.width = forma34width;
                         } else {
                             ccw = cabConfig.colunaCabosWidth || 200;
                             forma34width = 600 + ccw;
-                            cabData.width = forma34width;
                         }
+                        // Largura derivada NÃO é gravada aqui (render puro) —
+                        // a persistência é feita por _syncForma34Widths(), nas
+                        // ações explícitas (recalcular/chaparia/recompor).
                         // Build colunas/gavetas for KitFrame/Eletropoll
                         const parentForLoads = face ? cabData.faces?.[face] : cabData;
                         const cabLoads = parentForLoads?.loads || {};
@@ -4659,99 +4765,10 @@ export const layout = {
                 }
             }
         } else {
-            // Auto-create cabinet for KitFrame/Eletropoll when no assignments exist
-            const isForma34Auto = this._isForma34EstruturaModular(eq.technical?.segregacao || '', eq.technical?.fabricante);
-            if (isForma34Auto) {
-                if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
-                if (!eq.layoutConfig.cabinetAssignments) eq.layoutConfig.cabinetAssignments = {};
-                const cabId = 'cab_' + Date.now();
-                const isEletropollAuto = eq.technical?.fabricante === 'Eletropoll';
-                const ccwAuto = isEletropollAuto ? 400 : 200;
-                let autoGavetaW = 600;
-                const tipoGavetaAuto = eq.technical?.tipoGaveta || 'Fixo';
-                if (isEletropollAuto) {
-                    for (const load of (eq.loads || [])) {
-                        if (!load.tag) continue;
-                        const epRes = this._getEletropollDrawerHeight(load, tipoGavetaAuto);
-                        if (epRes && !epRes.consultar && epRes.width && epRes.width > autoGavetaW) {
-                            autoGavetaW = epRes.width;
-                        }
-                    }
-                }
-                eq.layoutConfig.cabinetAssignments[cabId] = {
-                    name: eq.tag || (isEletropollAuto ? 'Eletropoll' : 'KitFrame'),
-                    width: (isEletropollAuto ? autoGavetaW : 600) + ccwAuto,
-                    height: 2300,
-                    depth: 600,
-                    loads: {},
-                    faces: {
-                        front: { loads: {}, layoutConfig: null },
-                        rear: { loads: {}, layoutConfig: null }
-                    },
-                    layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
-                };
-                // Assign all loads to the cabinet
-                const parent = eq.layoutConfig.cabinetAssignments[cabId];
-                for (const load of loadsWithTipico) {
-                    if (!load.tag) continue;
-                    if (!parent.loads[load.tag]) parent.loads[load.tag] = {};
-                    for (const bucket of Object.values(materialBuckets)) {
-                        if (bucket.loadTags.has(load.tag)) {
-                            const matId = bucket.material.id;
-                            if (!parent.loads[load.tag][matId]) parent.loads[load.tag][matId] = { qtd: 0 };
-                            parent.loads[load.tag][matId].qtd += bucket.totalQtd;
-                        }
-                    }
-                }
-                // Re-run the assignments loop
-                const newAssignments = eq.layoutConfig.cabinetAssignments;
-                if (newAssignments && Object.keys(newAssignments).length > 0) {
-                    for (const [cabId2, cabData2] of Object.entries(newAssignments)) {
-                        const items2 = [];
-                        let maxD2 = 0;
-                        const parent2 = face ? cabData2.faces?.[face] : cabData2;
-                        const mergedSource2 = {};
-                        const loadsMatIds2 = new Set();
-                        if (parent2?.loads) {
-                            for (const mats of Object.values(parent2.loads)) {
-                                for (const [matId, ass] of Object.entries(mats || {})) {
-                                    loadsMatIds2.add(matId);
-                                    if (!mergedSource2[matId]) mergedSource2[matId] = { qtd: 0 };
-                                    mergedSource2[matId].qtd += ass.qtd || 0;
-                                }
-                            }
-                        }
-                        for (const [matId, ass] of Object.entries(mergedSource2)) {
-                            const bucket = materialBuckets[matId];
-                            if (!bucket) continue;
-                            const m = bucket.material;
-                            const cat = m.categoria || 'Outros';
-                            const w = parseFloat(m.largura_mm) || 0;
-                            const h2 = parseFloat(m.altura_mm) || 0;
-                            const d = parseFloat(m.profundidade_mm) || 0;
-                            if (d > maxD2) maxD2 = d;
-                            const qtd = ass.qtd || 0;
-                            if (qtd > 0 && w > 0 && h2 > 0) {
-                                items2.push({ desc: m.descricao || m.codigoInterno || '-', qtd, tags: [...(bucket.loadTags || [])].join(', '), category: cat, w, h: h2, d, color: this._getCategoryColor(cat), _matId: matId });
-                            }
-                        }
-                        const cabConfig2 = cabData2.layoutConfig || this._getDefaultLayoutConfig();
-                        const forma34width2 = isEletropollAuto ? (cabData2.width || (autoGavetaW + 400)) : (600 + ccwAuto);
-                        const cabPanelHAuto = 2300;
-                        const parentForLoadsAuto = face ? cabData2.faces?.[face] : cabData2;
-                        const cabLoadsAuto = parentForLoadsAuto?.loads || {};
-                        const cargaListAuto = (eq.loads || []).filter(l => l.tag && cabLoadsAuto[l.tag]);
-                        const reserveComboAuto = cabData2._reserveCombo || (face ? cabData2.faces?.[face]?._reserveCombo : null);
-                        const { colunas: colunasAuto, excessLoads: excessLoadsAuto } = this._autoStackGavetas(cargaListAuto, cabLoadsAuto, 1, cabConfig2.gavetaMode || 'sequential', reserveComboAuto, eq.technical?.fabricante, eq.technical?.tipoGaveta || 'Fixo');
-                        const gavetasFlatAuto = colunasAuto.flatMap(c => c.gavetas);
-                        cabinets.push({ _cabId: cabId2, _assignData: cabData2, name: (cabData2.name || cabId2) + suf, layoutConfig: cabConfig2, items: items2, doorItems: [], _fabricante: eq.technical?.fabricante, width: forma34width2, height: cabPanelHAuto, depth: cabData2.depth || maxD2 || 600, calculatedWidth: forma34width2, _userWidth: forma34width2, _face: face || null, segregacao: eq.technical?.segregacao || '', _gavetas: gavetasFlatAuto, _colunas: colunasAuto, _excessLoads: excessLoadsAuto });
-                        totalCalculatedWidth += forma34width2;
-                        totalSuggestedWidth += forma34width2;
-                    }
-                }
-            } else {
-                return { cabinets: [], hasLoads: true };
-            }
+            // Render puro: NADA é criado aqui. O layout é gerado só a
+            // pedido do usuário (botão "Gerar layout" → _gerarLayoutAutomatico,
+            // que também trata Formas 3/4 via _criarArmarioForma34).
+            return { cabinets: [], hasLoads: true };
         }
 
         if (isRear) cabinets.reverse();
