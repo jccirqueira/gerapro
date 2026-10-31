@@ -3568,30 +3568,10 @@ export const layout = {
             return;
         }
 
-        for (const cab of cabinets) {
-            const cabId = 'cab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-            const name = (cab.name || 'Armário').replace(/[FT]$/, '');
-            const width = parseInt(cab.width) || 600;
-            const height = parseInt(cab.height) || 2200;
-            const depth = parseInt(cab.depth) || 600;
-
-            // Atribui a carga ao armário de origem que o suggestLayout escolheu
-            const loads = {};
-            if (cab._assignData?.loads) {
-                for (const [loadTag, mats] of Object.entries(cab._assignData.loads)) {
-                    loads[loadTag] = JSON.parse(JSON.stringify(mats || {}));
-                }
-            }
-
-            eq.layoutConfig.cabinetAssignments[cabId] = {
-                name, width, height, depth, loads,
-                faces: {
-                    front: { loads: JSON.parse(JSON.stringify(loads)), layoutConfig: null },
-                    rear: { loads: {}, layoutConfig: null }
-                },
-                layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
-            };
-        }
+        // O suggestLayout já persistiu os armários gerados em
+        // eq.layoutConfig.cabinetAssignments — aqui só sinalizamos a store
+        // e re-renderizamos, sem duplicar nada.
+        const nCabs = Object.keys(eq.layoutConfig.cabinetAssignments || {}).length;
 
         const idx = this.activeEquipmentIndex;
         const eqs = [...(data.equipments || [])];
@@ -3608,7 +3588,7 @@ export const layout = {
 
         this._recalcularLayout();
         this.renderSubTab();
-        app.toast(`Layout gerado: ${cabinets.length} armário(s). Ajuste as dimensões abaixo se necessário.`, 'success');
+        app.toast(`Layout gerado: ${nCabs} armário(s). Ajuste as dimensões abaixo se necessário.`, 'success');
     },
 
     _recomporLayout() {
@@ -4327,7 +4307,97 @@ export const layout = {
                     }
                 }
             } else {
-                return { cabinets: [], hasLoads: true };
+                // Auto-create cabinet for standard forms (1/2) when none exist —
+                // same happy path as Formas 3/4: one cabinet, all loads assigned.
+                if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
+                if (!eq.layoutConfig.cabinetAssignments) eq.layoutConfig.cabinetAssignments = {};
+                const cabIdStd = 'cab_' + Date.now();
+                const segStd = eq.technical?.segregacao || '';
+                const isForma2Std = segStd === 'Forma 2a' || segStd === 'Forma 2b';
+                const alturaPainelStd = parseInt(eq.technical?.alturaPainel) || 2200;
+                const heightStd = isForma2Std ? 2300 : alturaPainelStd + 100;
+
+                // Largura: usa o simulador de largura mínima quando há materiais,
+                // senão cai na largura padrão de 600.
+                const itemsStd = [];
+                let maxDepthStd = 0;
+                for (const bucket of Object.values(materialBuckets)) {
+                    const m = bucket.material;
+                    const w = parseFloat(m.largura_mm) || 0;
+                    const h = parseFloat(m.altura_mm) || 0;
+                    const d = parseFloat(m.profundidade_mm) || 0;
+                    if (d > maxDepthStd) maxDepthStd = d;
+                    if (w > 0 && h > 0) {
+                        itemsStd.push({ category: m.categoria || 'Outros', w, h, qtd: bucket.totalQtd });
+                    }
+                }
+                const calcWStd = itemsStd.length > 0 ? this._simulateMinWidth(itemsStd, this._getDefaultLayoutConfig()) : 600;
+                const widthStd = getStdWidth(Math.max(calcWStd, 600));
+
+                eq.layoutConfig.cabinetAssignments[cabIdStd] = {
+                    name: eq.tag || 'Armário',
+                    width: widthStd,
+                    height: heightStd,
+                    depth: maxDepthStd || 600,
+                    loads: {},
+                    faces: {
+                        front: { loads: {}, layoutConfig: null },
+                        rear: { loads: {}, layoutConfig: null }
+                    },
+                    layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+                };
+                const parentStd = eq.layoutConfig.cabinetAssignments[cabIdStd];
+                for (const load of loadsWithTipico) {
+                    if (!load.tag) continue;
+                    if (!parentStd.loads[load.tag]) parentStd.loads[load.tag] = {};
+                    for (const bucket of Object.values(materialBuckets)) {
+                        if (bucket.loadTags.has(load.tag)) {
+                            const matId = bucket.material.id;
+                            if (!parentStd.loads[load.tag][matId]) parentStd.loads[load.tag][matId] = { qtd: 0 };
+                            parentStd.loads[load.tag][matId].qtd += bucket.totalQtd;
+                        }
+                    }
+                }
+                // Re-run the assignments loop below so the new cabinet is rendered
+                const newAssignmentsStd = eq.layoutConfig.cabinetAssignments;
+                for (const [cabId2, cabData2] of Object.entries(newAssignmentsStd)) {
+                    const items2 = [];
+                    let maxD2 = 0;
+                    const parent2 = face ? cabData2.faces?.[face] : cabData2;
+                    const mergedSource2 = {};
+                    if (parent2?.loads) {
+                        for (const mats of Object.values(parent2.loads)) {
+                            for (const [matId, ass] of Object.entries(mats || {})) {
+                                if (!mergedSource2[matId]) mergedSource2[matId] = { qtd: 0 };
+                                mergedSource2[matId].qtd += ass.qtd || 0;
+                            }
+                        }
+                    }
+                    for (const [matId, ass] of Object.entries(mergedSource2)) {
+                        const bucket = materialBuckets[matId];
+                        if (!bucket) continue;
+                        const m = bucket.material;
+                        const cat = m.categoria || 'Outros';
+                        const w = parseFloat(m.largura_mm) || 0;
+                        const h2 = parseFloat(m.altura_mm) || 0;
+                        const d = parseFloat(m.profundidade_mm) || 0;
+                        if (d > maxD2) maxD2 = d;
+                        const qtd = ass.qtd || 0;
+                        if (qtd > 0 && w > 0 && h2 > 0) {
+                            items2.push({ desc: m.descricao || m.codigoInterno || '-', qtd, tags: [...(bucket.loadTags || [])].join(', '), category: cat, w, h: h2, d, color: this._getCategoryColor(cat), _matId: matId });
+                        }
+                    }
+                    const cabConfig2 = cabData2.layoutConfig || this._getDefaultLayoutConfig();
+                    const parentForLoadsAuto = face ? cabData2.faces?.[face] : cabData2;
+                    const cabLoadsAuto = parentForLoadsAuto?.loads || {};
+                    const cargaListAuto = (eq.loads || []).filter(l => l.tag && cabLoadsAuto[l.tag]);
+                    const calcW2 = items2.length > 0 ? this._simulateMinWidth(items2, cabConfig2) : 200;
+                    const stdW2 = cabData2.width ? getStdWidth(cabData2.width) : getStdWidth(calcW2);
+                    const cabPanelH2 = cabData2.height || heightStd;
+                    cabinets.push({ _cabId: cabId2, _assignData: cabData2, name: (cabData2.name || cabId2) + suf, layoutConfig: cabConfig2, items: items2, doorItems: [], _fabricante: eq.technical?.fabricante, width: stdW2, height: cabPanelH2, depth: cabData2.depth || maxD2 || 600, calculatedWidth: calcW2, _userWidth: cabData2.width || null, _face: face || null, segregacao: segStd });
+                    totalCalculatedWidth += calcW2;
+                    totalSuggestedWidth += stdW2;
+                }
             }
         }
 
