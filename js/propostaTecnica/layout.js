@@ -4363,8 +4363,9 @@ export const layout = {
                         totalSuggestedWidth += forma34width2;
                     }
                 }
-            // Sem auto-criação aqui: o layout é gerado só a pedido do usuário
-            // (botão "Gerar layout" → _gerarLayoutAutomatico).
+            } else {
+                return { cabinets: [], hasLoads: true };
+            }
         }
 
         if (isRear) cabinets.reverse();
