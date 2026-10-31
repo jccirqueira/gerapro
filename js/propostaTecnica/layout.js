@@ -3827,13 +3827,18 @@ export const layout = {
 
         this._recalcularLayout();
         this.renderSubTab();
-        const resumoCab = grupos.map(g => {
+        const larguras = grupos.map(g => {
             let w = 600;
             for (const sw of STANDARD_WIDTHS) { if (g.largura <= sw) { w = sw; break; } w = sw; }
-            return `${w}mm`;
-        }).join(' + ');
+            return { w, excedeu: g.largura > 1000 };
+        });
+        const resumoCab = larguras.map(l => `${l.w}mm`).join(' + ');
         const totalCargas = grupos.reduce((s, g) => s + g.cargas.length, 0);
-        app.toast(`Layout gerado: ${grupos.length} armário(s) (${resumoCab}), ${totalCargas} carga(s) alocada(s).${msgChaparia}`, 'success', 5000);
+        const temEstouro = larguras.some(l => l.excedeu);
+        const alertaEstouro = temEstouro
+            ? ' ⚠️ Há carga(s) maior(es) que 1000mm — não coube em um armário padrão; ajuste manual ou divida a carga.'
+            : '';
+        app.toast(`Layout gerado: ${grupos.length} armário(s) (${resumoCab}), ${totalCargas} carga(s) alocada(s).${alertaEstouro}${msgChaparia}`, temEstouro ? 'warning' : 'success', 6000);
     },
 
     _recomporLayout() {
