@@ -117,6 +117,32 @@
     gap: 24px;
 }
 
+/* ── Fase 4: vistas B2B colapsáveis ── */
+.ls-views-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: -12px;
+}
+.ls-view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    margin: 0 0 8px;
+    transition: opacity 0.15s;
+}
+.ls-view-toggle:hover {
+    opacity: 0.75;
+}
+.ls-view-caret {
+    font-size: 11px;
+    transition: transform 0.15s;
+}
+.ls-view-body {
+    animation: fadeIn 0.2s ease;
+}
+
 /* ── Fase 1: separador de ações (custo vs exportação) ── */
 .ls-actions-sep {
     display: inline-block;

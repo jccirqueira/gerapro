@@ -118,6 +118,19 @@ export const layout = {
 
             const isForma2b2b = seg === 'Forma 2a' || seg === 'Forma 2b' || this._isForma34EstruturaModular(seg, eq.technical?.fabricante);
 
+            // Fase 4: estado de colapso das vistas B2B (persistido em
+            // layoutConfig.viewsCollapsed). Padrão: externas colapsadas
+            // (secundárias), internas expandidas.
+            const vc = eq.layoutConfig?.viewsCollapsed || {};
+            const vcColapsada = (chave) => {
+                if (vc[chave] !== undefined) return vc[chave] === true;
+                return chave === 'extFront' || chave === 'extRear'; // padrão
+            };
+            const temAlgumaExpandida = ['front', 'extFront', 'rear', 'extRear'].some(c => !vcColapsada(c));
+            const btnGlobalLabel = temAlgumaExpandida
+                ? '<i class="ph ph-arrows-in"></i> Colapsar tudo'
+                : '<i class="ph ph-arrows-out"></i> Expandir tudo';
+
             return `
             <div style="animation:fadeIn 0.3s ease;padding:20px;">
                 <div style="max-width:100%;">
@@ -160,31 +173,50 @@ export const layout = {
                     ${this._lsRenderWarnings(cabinets)}
                     ${this._lsProntidao(eq)}
                     <div class="ls-views">
-                        <div>
-                            <h5 class="ls-section-title ls-section-title--front">▸ VISTA FRONTAL INTERNA</h5>
-                            <div class="ls-canvas-box ls-canvas-box--front">
-                                <img id="layout-canvas-front" src="${dataUrlF}" class="ls-canvas-img" alt="Vista Frontal">
+                        <div class="ls-views-bar">
+                            <button type="button" class="btn btn-sm btn-ghost" id="ls_views_toggle_all" onclick="window.propostaTecnicaModule._toggleTodasVistas()" style="font-size:11px;padding:4px 10px;">${btnGlobalLabel}</button>
+                        </div>
+                        <div class="ls-view">
+                            <h5 class="ls-section-title ls-section-title--front ls-view-toggle" id="lsv-h-front" onclick="window.propostaTecnicaModule._toggleVistaB2B('front')" title="Clique para mostrar/ocultar a vista">
+                                <i class="ph ls-view-caret ${vcColapsada('front') ? 'ph-caret-right' : 'ph-caret-down'}" id="lsv-c-front"></i> VISTA FRONTAL INTERNA
+                            </h5>
+                            <div class="ls-view-body" id="lsv-b-front" style="${vcColapsada('front') ? 'display:none' : ''}">
+                                <div class="ls-canvas-box ls-canvas-box--front">
+                                    <img id="layout-canvas-front" src="${dataUrlF}" class="ls-canvas-img" alt="Vista Frontal">
+                                </div>
                             </div>
                         </div>
                         ${hasExternalViewB2B ? `
-                        <div>
-                            <h5 class="ls-section-title ls-section-title--external">▸ VISTA FRONTAL EXTERNA</h5>
-                            <div class="ls-canvas-box ls-canvas-box--external">
-                                <img id="layout-canvas-external-front" src="${dataUrlExtF}" class="ls-canvas-img" alt="Vista Frontal Externa">
+                        <div class="ls-view">
+                            <h5 class="ls-section-title ls-section-title--external ls-view-toggle" id="lsv-h-extFront" onclick="window.propostaTecnicaModule._toggleVistaB2B('extFront')" title="Clique para mostrar/ocultar a vista">
+                                <i class="ph ls-view-caret ${vcColapsada('extFront') ? 'ph-caret-right' : 'ph-caret-down'}" id="lsv-c-extFront"></i> VISTA FRONTAL EXTERNA
+                            </h5>
+                            <div class="ls-view-body" id="lsv-b-extFront" style="${vcColapsada('extFront') ? 'display:none' : ''}">
+                                <div class="ls-canvas-box ls-canvas-box--external">
+                                    <img id="layout-canvas-external-front" src="${dataUrlExtF}" class="ls-canvas-img" alt="Vista Frontal Externa">
+                                </div>
                             </div>
                         </div>
                         ` : ''}
-                        <div>
-                            <h5 class="ls-section-title ls-section-title--rear">▸ VISTA TRASEIRA INTERNA</h5>
-                            <div class="ls-canvas-box ls-canvas-box--rear">
-                                <img id="layout-canvas-rear" src="${dataUrlT}" class="ls-canvas-img" alt="Vista Traseira">
+                        <div class="ls-view">
+                            <h5 class="ls-section-title ls-section-title--rear ls-view-toggle" id="lsv-h-rear" onclick="window.propostaTecnicaModule._toggleVistaB2B('rear')" title="Clique para mostrar/ocultar a vista">
+                                <i class="ph ls-view-caret ${vcColapsada('rear') ? 'ph-caret-right' : 'ph-caret-down'}" id="lsv-c-rear"></i> VISTA TRASEIRA INTERNA
+                            </h5>
+                            <div class="ls-view-body" id="lsv-b-rear" style="${vcColapsada('rear') ? 'display:none' : ''}">
+                                <div class="ls-canvas-box ls-canvas-box--rear">
+                                    <img id="layout-canvas-rear" src="${dataUrlT}" class="ls-canvas-img" alt="Vista Traseira">
+                                </div>
                             </div>
                         </div>
                         ${hasExternalViewB2B ? `
-                        <div>
-                            <h5 class="ls-section-title ls-section-title--external">▸ VISTA TRASEIRA EXTERNA</h5>
-                            <div class="ls-canvas-box ls-canvas-box--external">
-                                <img id="layout-canvas-external-rear" src="${dataUrlExtR}" class="ls-canvas-img" alt="Vista Traseira Externa">
+                        <div class="ls-view">
+                            <h5 class="ls-section-title ls-section-title--external ls-view-toggle" id="lsv-h-extRear" onclick="window.propostaTecnicaModule._toggleVistaB2B('extRear')" title="Clique para mostrar/ocultar a vista">
+                                <i class="ph ls-view-caret ${vcColapsada('extRear') ? 'ph-caret-right' : 'ph-caret-down'}" id="lsv-c-extRear"></i> VISTA TRASEIRA EXTERNA
+                            </h5>
+                            <div class="ls-view-body" id="lsv-b-extRear" style="${vcColapsada('extRear') ? 'display:none' : ''}">
+                                <div class="ls-canvas-box ls-canvas-box--external">
+                                    <img id="layout-canvas-external-rear" src="${dataUrlExtR}" class="ls-canvas-img" alt="Vista Traseira Externa">
+                                </div>
                             </div>
                         </div>
                         ` : ''}
@@ -525,6 +557,73 @@ export const layout = {
         this.renderSubTab();
         const destinoLabel = (assignments[cabDestino].name || cabDestino) + (faceDestino ? (faceDestino === 'front' ? ' — Frontal' : ' — Traseira') : '');
         app.toast(`Carga movida para ${destinoLabel}.`, 'success');
+    },
+
+    // ── Fase 4: vistas B2B colapsáveis ──────────────────────────────────────
+    //
+    // As vistas (frontal/traseira, interna/externa) empilhavam todas expandidas
+    // e ocupavam a tela inteira. Agora cada título alterna a vista e o estado
+    // persiste em layoutConfig.viewsCollapsed (sobrevive a re-renders).
+
+    _toggleVistaB2B(chave) {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
+        const vc = eq.layoutConfig.viewsCollapsed || (eq.layoutConfig.viewsCollapsed = {});
+
+        // Estado atual: padrão é externa colapsada, interna expandida.
+        const atual = vc[chave] !== undefined
+            ? vc[chave] === true
+            : (chave === 'extFront' || chave === 'extRear');
+        vc[chave] = !atual;
+
+        this._aplicarEstadoVistasB2B(vc);
+
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Vistas] store notify error:', e); }
+    },
+
+    _toggleTodasVistas() {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+        if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
+        const vc = eq.layoutConfig.viewsCollapsed || (eq.layoutConfig.viewsCollapsed = {});
+
+        const colapsada = (c) => vc[c] !== undefined ? vc[c] === true : (c === 'extFront' || c === 'extRear');
+        const temExpandida = ['front', 'extFront', 'rear', 'extRear'].some(c => !colapsada(c));
+        // Se há alguma expandida → colapsa todas; senão → expande todas.
+        for (const c of ['front', 'extFront', 'rear', 'extRear']) vc[c] = temExpandida;
+
+        this._aplicarEstadoVistasB2B(vc);
+
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Vistas] store notify error:', e); }
+    },
+
+    // Aplica o estado direto no DOM (sem re-render completo — as imagens dos
+    // canvases são caras e não devem ser re-renderizadas só por um toggle).
+    _aplicarEstadoVistasB2B(vc) {
+        const colapsada = (c) => vc[c] !== undefined ? vc[c] === true : (c === 'extFront' || c === 'extRear');
+        for (const c of ['front', 'extFront', 'rear', 'extRear']) {
+            const col = colapsada(c);
+            const body = document.getElementById('lsv-b-' + c);
+            if (body) body.style.display = col ? 'none' : '';
+            const caret = document.getElementById('lsv-c-' + c);
+            if (caret) { caret.className = 'ph ls-view-caret ' + (col ? 'ph-caret-right' : 'ph-caret-down'); }
+        }
+        const btn = document.getElementById('ls_views_toggle_all');
+        if (btn) {
+            const temExpandida = ['front', 'extFront', 'rear', 'extRear'].some(c => !colapsada(c));
+            btn.innerHTML = temExpandida
+                ? '<i class="ph ph-arrows-in"></i> Colapsar tudo'
+                : '<i class="ph ph-arrows-out"></i> Expandir tudo';
+        }
     },
 
     _lsRenderBom(bomHtml, totalMateriais, bomId) {
