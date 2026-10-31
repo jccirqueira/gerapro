@@ -117,6 +117,69 @@
     gap: 24px;
 }
 
+/* ── Fase 1: separador de ações (custo vs exportação) ── */
+.ls-actions-sep {
+    display: inline-block;
+    width: 1px;
+    height: 22px;
+    background: var(--color-border);
+    margin: 0 6px;
+    vertical-align: middle;
+}
+
+/* ── Fase 1: checklist de prontidão ── */
+.ls-checklist {
+    background: var(--color-bg-panel);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+}
+.ls-checklist-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ls-check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+.ls-check-item:last-of-type { border-bottom: none; }
+.ls-check-item i { font-size: 18px; flex-shrink: 0; }
+.ls-check-ok i { color: var(--color-success); }
+.ls-check-pend i { color: var(--color-border-strong); }
+.ls-check-text { flex: 1; min-width: 0; }
+.ls-check-label { font-size: 13px; font-weight: 600; color: var(--color-text); }
+.ls-check-detail { font-size: 12px; color: var(--color-text-muted); }
+.ls-check-warn { color: var(--color-warning); font-weight: 600; }
+.ls-checklist-action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+    flex-wrap: wrap;
+}
+.ls-checklist-hint { font-size: 12px; color: var(--color-text-muted); }
+.ls-checklist-blocked {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border);
+    font-size: 12px;
+    color: var(--color-warning);
+    line-height: 1.6;
+}
+
 /* ── Warnings ── */
 .ls-warning {
     background: #fef3c7;

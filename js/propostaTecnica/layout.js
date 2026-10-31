@@ -15,21 +15,27 @@ export const layout = {
         const validForms = ['Forma 1', 'Forma 2a', 'Forma 2b', 'Forma 3a', 'Forma 3b', 'Forma 4a', 'Forma 4b'];
         const seg = eq.technical?.segregacao;
         if (!seg || !validForms.includes(seg)) {
-            return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
-                <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
-                <br>
-                <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível</div>
-                <div style="font-size:13px;margin-top:6px;">Selecione uma Forma de Segregação na Ficha Técnica.</div>
+            return `<div style="animation:fadeIn 0.3s ease;padding:20px;">
+                <div class="ls-header">
+                    <div>
+                        <h4 class="ls-header-title">Layout Sugerido: ${eq.tag}</h4>
+                        <div class="ls-header-subtitle">Distribuição física dos armários com base nas cargas × típicos × materiais</div>
+                    </div>
+                </div>
+                ${this._lsProntidao(eq)}
             </div>`;
         }
 
         const fabricante = eq.technical?.fabricante || 'Genérico';
         if (this._isForma34(seg) && !this._isForma34EstruturaModular(seg, fabricante)) {
-            return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
-                <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
-                <br>
-                <div style="font-weight:700;font-size:16px;color:#64748b;">Layout não disponível para este fabricante</div>
-                <div style="font-size:13px;margin-top:6px;">Para Formas <strong>3a, 3b, 4a, 4b</strong>, selecione <strong>KitFrame</strong> ou <strong>Eletropoll</strong> como Fabricante na Ficha Técnica.</div>
+            return `<div style="animation:fadeIn 0.3s ease;padding:20px;">
+                <div class="ls-header">
+                    <div>
+                        <h4 class="ls-header-title">Layout Sugerido: ${eq.tag}</h4>
+                        <div class="ls-header-subtitle">Distribuição física dos armários com base nas cargas × típicos × materiais</div>
+                    </div>
+                </div>
+                ${this._lsProntidao(eq)}
             </div>`;
         }
 
@@ -39,11 +45,14 @@ export const layout = {
         const result = isBackToBack ? this.suggestLayout(eq, 'front') : this.suggestLayout(eq);
 
         if (!result.hasLoads) {
-            return `<div style="text-align:center;padding:60px 40px;color:#94a3b8;">
-                <i class="ph ph-frame-corners" style="font-size:48px;opacity:0.2;margin-bottom:10px;"></i>
-                <br>
-                <div style="font-weight:700;font-size:16px;color:#64748b;">Nenhuma carga vinculada a típicos</div>
-                <div style="font-size:13px;margin-top:6px;">Associe cargas a típicos na aba Cargas para gerar o layout sugerido.</div>
+            return `<div style="animation:fadeIn 0.3s ease;padding:20px;">
+                <div class="ls-header">
+                    <div>
+                        <h4 class="ls-header-title">Layout Sugerido: ${eq.tag}</h4>
+                        <div class="ls-header-subtitle">Distribuição física dos armários com base nas cargas × típicos × materiais</div>
+                    </div>
+                </div>
+                ${this._lsProntidao(eq)}
             </div>`;
         }
 
@@ -65,13 +74,14 @@ export const layout = {
                     <div class="ls-empty">
                         <i class="ph ph-frame-corners" style="font-size:48px;color:#94a3b8;opacity:0.3;margin-bottom:12px;"></i>
                         <div style="font-size:16px;font-weight:700;color:var(--color-text-muted);margin-bottom:16px;">Nenhum armário definido</div>
-                        <button class="btn btn-primary" onclick="window.propostaTecnicaModule._adicionarArmario()" style="font-size:13px;padding:8px 20px;">
-                            + Criar Armário
+                        <button class="btn btn-primary" onclick="window.propostaTecnicaModule._gerarLayoutAutomatico()" style="font-size:13px;padding:8px 20px;">
+                            <i class="ph ph-magic-wand"></i> Gerar layout automaticamente
                         </button>
                         <div class="ls-empty-desc">
-                            Para começar, vá até a <strong>Lista de Materiais</strong> abaixo, selecione uma carga e clique em <strong>"Alocar Carga"</strong> para posicionar todos os materiais nos armários criados.
+                            O sistema distribui as cargas nos armários e gera o desenho. Se preferir montar à mão, use <strong>"+ Adicionar Armário"</strong> na seção de controles abaixo e aloque carga a carga.
                         </div>
                     </div>
+                    ${this._lsProntidao(eq)}
                     ${this._lsRenderBom(bomHtml, totalMateriais, 'bom_body_empty')}
                 </div>
             </div>`;
@@ -133,10 +143,11 @@ export const layout = {
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutQET()" style="gap:4px;">
                                 <i class="ph ph-lightning"></i> Exportar QET
                             </button>
+                            <span class="ls-actions-sep" title="As ações abaixo afetam o custo do equipamento"></span>
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;" title="Insere os itens da chaparia na Lista de Materiais e altera o custo do equipamento">
                                 <input type="checkbox" id="chk_auto_chaparia_b2b" onchange="window.propostaTecnicaModule._onChangeAutoChaparia(this.checked)" ${eq.autoChaparia !== false ? 'checked' : ''}> Auto Chaparia
                             </label>
                             <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
@@ -146,6 +157,7 @@ export const layout = {
                     </div>
                     ${this._lsRenderSummary(cabinets)}
                     ${this._lsRenderWarnings(cabinets)}
+                    ${this._lsProntidao(eq)}
                     <div class="ls-views">
                         <div>
                             <h5 class="ls-section-title ls-section-title--front">▸ VISTA FRONTAL INTERNA</h5>
@@ -232,6 +244,10 @@ export const layout = {
                             <button type="button" class="btn btn-sm btn-primary" onclick="window.propostaTecnicaModule._onCriarArranjoOtimizado()" style="gap:4px;background:#059669;border-color:#059669;">
                                 <i class="ph ph-stars"></i> Criar Arranjo Otimizado
                             </button>` : ''}
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
+                                <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
+                            </label>
+                            <span class="ls-actions-sep" title="Exportações (não alteram o projeto)"></span>
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutPDF()" style="gap:4px;">
                                 <i class="ph ph-file-pdf"></i> Exportar PDF
                             </button>
@@ -241,19 +257,18 @@ export const layout = {
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutQET()" style="gap:4px;">
                                 <i class="ph ph-lightning"></i> Exportar QET
                             </button>
+                            <span class="ls-actions-sep" title="As ações abaixo afetam o custo do equipamento"></span>
                             <button type="button" class="btn btn-sm btn-primary" onclick="app.propostaTecnica._aplicarMateriaisChaparia()" style="gap:4px;background:#d97706;border-color:#d97706;">
                                 <i class="ph ph-package"></i> Gerar Chaparia
                             </button>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;" title="Insere os itens da chaparia na Lista de Materiais e altera o custo do equipamento">
                                 <input type="checkbox" id="chk_auto_chaparia" onchange="window.propostaTecnicaModule._onChangeAutoChaparia(this.checked)" ${eq.autoChaparia !== false ? 'checked' : ''}> Auto Chaparia
-                            </label>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
-                                <input type="checkbox" id="chk_side_view" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
                     </div>
                     ${this._lsRenderSummary(cabinets)}
                     ${this._lsRenderWarnings(cabinets)}
+                    ${this._lsProntidao(eq)}
                     <div class="ls-canvas-box">
                         <img id="layout-canvas" src="${dataUrl}" class="ls-canvas-img" alt="Layout Sugerido">
                         <div class="ls-canvas-label">LAYOUT ORIENTATIVO</div>
@@ -3511,6 +3526,239 @@ export const layout = {
         const overlay = document.getElementById('_layout_config_overlay');
         if (overlay) overlay.remove();
         this._recalcularLayout();
+    },
+
+    // ── Fase 1: geração automática e recomposição do layout ──────────────────
+    //
+    // O suggestLayout() já calcula as larguras e distribui os materiais, mas
+    // para Formas 1/2 ele descarta tudo quando não há cabinetAssignments
+    // persistidos (retorna cabinets vazio). Estes dois métodos persistem essa
+    // sugestão como armários reais — o caminho "feliz" de um clique.
+
+    _gerarLayoutAutomatico() {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq) return;
+
+        const seg = eq.technical?.segregacao || '';
+        const montagem = eq.technical?.montagem || 'Em Linha';
+        const isB2B = montagem === 'Back to Back';
+
+        if (!eq.layoutConfig) eq.layoutConfig = this._getDefaultLayoutConfig();
+        if (!eq.layoutConfig.cabinetAssignments) eq.layoutConfig.cabinetAssignments = {};
+
+        // Já existem armários? Oferece recompor em vez de criar do zero.
+        const existentes = Object.keys(eq.layoutConfig.cabinetAssignments).length;
+        if (existentes > 0) {
+            this._recomporLayout();
+            return;
+        }
+
+        // Reaproveita o motor existente: ele monta a sugestão a partir das
+        // cargas × típicos e devolve as larguras calculadas por armário.
+        const result = isB2B ? this.suggestLayout(eq, 'front') : this.suggestLayout(eq);
+        if (!result.hasLoads) {
+            app.toast('Nenhuma carga com típico e material dimensionado — associe cargas na aba Cargas.', 'warning');
+            return;
+        }
+
+        const cabinets = result.cabinets || [];
+        if (cabinets.length === 0) {
+            app.toast('O sistema não conseguiu sugerir armários. Verifique as dimensões dos materiais no catálogo.', 'warning');
+            return;
+        }
+
+        for (const cab of cabinets) {
+            const cabId = 'cab_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+            const name = (cab.name || 'Armário').replace(/[FT]$/, '');
+            const width = parseInt(cab.width) || 600;
+            const height = parseInt(cab.height) || 2200;
+            const depth = parseInt(cab.depth) || 600;
+
+            // Atribui a carga ao armário de origem que o suggestLayout escolheu
+            const loads = {};
+            if (cab._assignData?.loads) {
+                for (const [loadTag, mats] of Object.entries(cab._assignData.loads)) {
+                    loads[loadTag] = JSON.parse(JSON.stringify(mats || {}));
+                }
+            }
+
+            eq.layoutConfig.cabinetAssignments[cabId] = {
+                name, width, height, depth, loads,
+                faces: {
+                    front: { loads: JSON.parse(JSON.stringify(loads)), layoutConfig: null },
+                    rear: { loads: {}, layoutConfig: null }
+                },
+                layoutConfig: JSON.parse(JSON.stringify(this._getDefaultLayoutConfig()))
+            };
+        }
+
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[GerarLayout] store error:', e); }
+
+        // Chaparia entra na LM na hora, como já faz o fluxo manual.
+        if (eq.autoChaparia !== false) {
+            const itens = this._gerarMateriaisChaparia(eq);
+            if (itens && itens.length > 0) {
+                eq.materials = [...(eq.materials || []).filter(m => m._origin !== 'chaparia'), ...itens];
+            }
+        }
+
+        this._recalcularLayout();
+        this.renderSubTab();
+        app.toast(`Layout gerado: ${cabinets.length} armário(s). Ajuste as dimensões abaixo se necessário.`, 'success');
+    },
+
+    _recomporLayout() {
+        const data = store.getState().activeTechnicalProposal;
+        const eq = data?.equipments?.[this.activeEquipmentIndex];
+        if (!eq || !eq.layoutConfig?.cabinetAssignments) return;
+
+        const assignments = eq.layoutConfig.cabinetAssignments;
+        const cabIds = Object.keys(assignments);
+        if (cabIds.length === 0) { this._gerarLayoutAutomatico(); return; }
+
+        const montagem = eq.technical?.montagem || 'Em Linha';
+        const isB2B = montagem === 'Back to Back';
+        const result = isB2B ? this.suggestLayout(eq, 'front') : this.suggestLayout(eq);
+        if (!result.hasLoads || !result.cabinets?.length) {
+            app.toast('Nada a recompor — verifique cargas e dimensões dos materiais.', 'warning');
+            return;
+        }
+
+        // Nunca recria do zero: só completa o que falta.
+        // 1) Largura calculada apenas para armários sem ajuste manual (_userWidth).
+        // 2) Cargas ainda não alocadas são distribuídas para o primeiro armário.
+        for (const cab of result.cabinets) {
+            if (cab._userWidth == null && cab.calculatedWidth) {
+                const cabData = assignments[cab._cabId];
+                if (cabData) cabData.width = parseInt(cab.calculatedWidth) || cabData.width;
+            }
+        }
+
+        const jaAlocadas = new Set();
+        for (const cabData of Object.values(assignments)) {
+            for (const loadTag of Object.keys(cabData.loads || {})) jaAlocadas.add(loadTag);
+        }
+        const tipicos = store.getState().tipicos || [];
+        const materiais = store.getState().materiais || [];
+        const novas = (eq.loads || []).filter(l => l.typicalId && !jaAlocadas.has(l.tag));
+        const alvo = assignments[cabIds[0]];
+        let alocadas = 0;
+        for (const load of novas) {
+            const typical = tipicos.find(t => t.id === load.typicalId);
+            if (!typical?.items) continue;
+            if (!alvo.loads[load.tag]) alvo.loads[load.tag] = {};
+            for (const item of typical.items) {
+                const material = materiais.find(m => m.id === item.materialId);
+                if (!material) continue;
+                const w = parseFloat(material.largura_mm) || 0;
+                const h = parseFloat(material.altura_mm) || 0;
+                const d = parseFloat(material.profundidade_mm) || 0;
+                if (w === 0 && h === 0 && d === 0) continue;
+                const matId = material.id;
+                if (!alvo.loads[load.tag][matId]) alvo.loads[load.tag][matId] = { qtd: 0 };
+                alvo.loads[load.tag][matId].qtd += item.qtd || 1;
+            }
+            alocadas++;
+        }
+
+        const idx = this.activeEquipmentIndex;
+        const eqs = [...(data.equipments || [])];
+        eqs[idx] = eq;
+        try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Recompor] store error:', e); }
+
+        this._recalcularLayout();
+        this.renderSubTab();
+        app.toast(alocadas > 0
+            ? `Layout recomposto: ${alocadas} carga(s) alocada(s). Ajustes manuais preservados.`
+            : 'Layout recomposto. Ajustes manuais preservados.', 'success');
+    },
+
+    // ── Fase 1: checklist de prontidão ───────────────────────────────────────
+    //
+    // Substitui as quatro "telas de bloqueio" soltas por um painel único que
+    // mostra o que já está pronto e o que falta, com ação direta em cada item
+    // pendente. O usuário vê onde está em vez de adivinhar.
+
+    _lsProntidao(eq) {
+        const seg = eq.technical?.segregacao || '';
+        const validForms = ['Forma 1', 'Forma 2a', 'Forma 2b', 'Forma 3a', 'Forma 3b', 'Forma 4a', 'Forma 4b'];
+        const fabricante = eq.technical?.fabricante || '';
+
+        // 1. Forma de segregação
+        const temForma = validForms.includes(seg);
+        const formaFabricanteOk = !this._isForma34(seg) || this._isForma34EstruturaModular(seg, fabricante);
+
+        // 2. Cargas com típico
+        const loads = eq.loads || [];
+        const comTipico = loads.filter(l => l.typicalId).length;
+
+        // 3. Materiais com dimensão (usa a mesma regra do suggestLayout: L, A e P > 0)
+        const tipicos = store.getState().tipicos || [];
+        const materiais = store.getState().materiais || [];
+        const idsTipicos = new Set(loads.map(l => l.typicalId).filter(Boolean));
+        const usados = new Set();
+        for (const t of tipicos) {
+            if (!idsTipicos.has(t.id) || !t.items) continue;
+            for (const it of t.items) if (it.materialId) usados.add(it.materialId);
+        }
+        let comDim = 0, semDim = 0;
+        for (const id of usados) {
+            const m = materiais.find(x => x.id === id);
+            if (!m) continue;
+            if ((parseFloat(m.largura_mm) || 0) > 0 && (parseFloat(m.altura_mm) || 0) > 0 && (parseFloat(m.profundidade_mm) || 0) > 0) comDim++; else semDim++;
+        }
+
+        // 4. Armários
+        const cabs = Object.keys(eq.layoutConfig?.cabinetAssignments || {}).length;
+
+        const item = (ok, label, detalhe, acaoHtml) => `
+            <div class="ls-check-item ${ok ? 'ls-check-ok' : 'ls-check-pend'}">
+                <i class="ph ${ok ? 'ph-check-circle' : 'ph-circle'}"></i>
+                <div class="ls-check-text">
+                    <div class="ls-check-label">${label}</div>
+                    <div class="ls-check-detail">${detalhe}</div>
+                </div>
+                ${acaoHtml || ''}
+            </div>`;
+
+        const linkFicha = `<button class="btn btn-xs btn-outline" onclick="window.propostaTecnicaModule.switchSubTab('technical')">Ir para Ficha Técnica</button>`;
+        const linkCargas = `<button class="btn btn-xs btn-outline" onclick="window.propostaTecnicaModule.switchSubTab('loads')">Ir para Cargas</button>`;
+
+        const bloqueios = [];
+        if (!temForma) bloqueios.push('Selecione uma <strong>Forma de Segregação</strong> na Ficha Técnica.');
+        else if (!formaFabricanteOk) bloqueios.push(`Formas <strong>3a/3b/4a/4b</strong> exigem <strong>KitFrame</strong> ou <strong>Eletropoll</strong> como Fabricante.`);
+
+        const pronto = temForma && formaFabricanteOk && comTipico > 0 && comDim > 0;
+        const gerarLabel = cabs > 0 ? 'Recompor layout' : 'Gerar layout automaticamente';
+        const gerarOnclick = cabs > 0 ? '_recomporLayout()' : '_gerarLayoutAutomatico()';
+
+        return `
+        <div class="ls-checklist">
+            <div class="ls-checklist-title"><i class="ph ph-list-checks"></i> Prontidão do Layout</div>
+            ${item(temForma && formaFabricanteOk, 'Forma de Segregação',
+                temForma ? (formaFabricanteOk ? seg : `<span class="ls-check-warn">${seg} exige KitFrame/Eletropoll</span>`) : 'Não selecionada',
+                temForma && formaFabricanteOk ? '' : linkFicha)}
+            ${item(comTipico > 0, 'Cargas com típico',
+                loads.length > 0 ? `${comTipico} de ${loads.length} carga(s) com típico` : 'Nenhuma carga cadastrada',
+                comTipico > 0 ? '' : linkCargas)}
+            ${item(usados.size > 0 && semDim === 0, 'Materiais dimensionados',
+                usados.size === 0 ? 'Sem materiais para verificar'
+                    : (semDim === 0 ? `${comDim} de ${comDim} material(is) com L×A×P` : `<span class="ls-check-warn">${semDim} material(is) sem dimensão</span> — incompleto no catálogo`),
+                '')}
+            ${item(cabs > 0, 'Armários', cabs > 0 ? `${cabs} armário(s) definido(s)` : 'Nenhum armário definido', '')}
+            ${!pronto ? '' : `
+            <div class="ls-checklist-action">
+                <button class="btn btn-primary" onclick="window.propostaTecnicaModule.${gerarOnclick}" style="font-size:13px;padding:8px 20px;">
+                    <i class="ph ph-magic-wand"></i> ${gerarLabel}
+                </button>
+                <span class="ls-checklist-hint">Distribui as cargas nos armários e gera o desenho. Você pode ajustar depois.</span>
+            </div>`}
+            ${bloqueios.length > 0 ? `<div class="ls-checklist-blocked">${bloqueios.join('<br>')}</div>` : ''}
+        </div>`;
     },
 
     _adicionarArmario() {
