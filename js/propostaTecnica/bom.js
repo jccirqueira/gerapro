@@ -1071,13 +1071,17 @@ export const bom = {
         eqs[idx] = eq;
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Arranjo] store error:', e); }
 
-        // Auto-insert chaparia if enabled
+        // Auto-insert chaparia if enabled — sempre com feedback de custo
+        // (inserção muda o valor do equipamento; nada silencioso).
         if (eq.autoChaparia !== false) {
             const itens = this._gerarMateriaisChaparia(eq);
             if (itens && itens.length > 0) {
                 eq.materials = [...(eq.materials || []).filter(m => m._origin !== 'chaparia'), ...itens];
-                app.toast(`${itens.length} itens de chaparia inseridos automaticamente na LM.`, 'info');
+                const custoChaparia = itens.reduce((s, i) => s + (i.custo || 0) * i.qtd, 0);
+                app.toast(`${itens.length} itens de chaparia inseridos na LM (${app.formatCurrency(custoChaparia)}).`, 'info');
             }
+        } else {
+            app.toast('Auto Chaparia desligado — chaparia não incluída. Use "Gerar Chaparia" para revisar e inserir.', 'info');
         }
 
         this._redrawLayoutCanvas();

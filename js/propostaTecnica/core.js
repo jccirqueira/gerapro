@@ -1530,6 +1530,11 @@ export const core = {
             return;
         }
 
+        // Situação atual: primeira inserção ou substituição de chaparia existente?
+        const chapariaAnterior = (eq.materials || []).filter(m => m._origin === 'chaparia');
+        const custoAnterior = chapariaAnterior.reduce((s, i) => s + (i.custo || 0) * i.qtd, 0);
+        const ehSubstituicao = chapariaAnterior.length > 0;
+
         // Show preview modal
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
@@ -1576,11 +1581,13 @@ export const core = {
                 </div>
                 <div class="modal-footer">
                     <span style="font-size:11px;color:#64748b;flex:1;">
-                        <i class="ph ph-info"></i> Materiais anteriores com origem "chaparia" serão substituídos.
+                        ${ehSubstituicao
+                            ? `<i class="ph ph-info"></i> Substituirá ${chapariaAnterior.length} item(ns) de chaparia existente — custo: ${app.formatCurrency(custoAnterior)} → ${app.formatCurrency(total)} (diferença ${app.formatCurrency(total - custoAnterior)}).`
+                            : `<i class="ph ph-info"></i> Primeira inserção de chaparia — o custo do equipamento aumentará em ${app.formatCurrency(total)}.`}
                     </span>
                     <button class="btn btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancelar</button>
                     <button class="btn btn-primary" onclick="app.propostaTecnica._confirmarMateriaisChaparia()">
-                        <i class="ph ph-check"></i> Confirmar e Adicionar
+                        <i class="ph ph-check"></i> ${ehSubstituicao ? 'Confirmar e Substituir' : 'Confirmar e Adicionar'}
                     </button>
                 </div>
             </div>

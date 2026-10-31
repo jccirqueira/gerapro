@@ -134,6 +134,10 @@ export const layout = {
                             <button type="button" class="btn btn-sm btn-primary" onclick="window.propostaTecnicaModule._onCriarArranjoOtimizado()" style="gap:4px;background:#059669;border-color:#059669;">
                                 <i class="ph ph-stars"></i> Criar Arranjo Otimizado
                             </button>` : ''}
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
+                                <input type="checkbox" id="chk_side_view_b2b" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
+                            </label>
+                            <span class="ls-actions-sep" title="Exportações (não alteram o projeto)"></span>
                             <button type="button" class="btn btn-sm btn-secondary" onclick="window.propostaTecnicaModule._exportLayoutPDF()" style="gap:4px;">
                                 <i class="ph ph-file-pdf"></i> Exportar PDF
                             </button>
@@ -149,9 +153,6 @@ export const layout = {
                             </button>
                             <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;" title="Insere os itens da chaparia na Lista de Materiais e altera o custo do equipamento">
                                 <input type="checkbox" id="chk_auto_chaparia_b2b" onchange="window.propostaTecnicaModule._onChangeAutoChaparia(this.checked)" ${eq.autoChaparia !== false ? 'checked' : ''}> Auto Chaparia
-                            </label>
-                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--color-text-muted);cursor:pointer;user-select:none;">
-                                <input type="checkbox" id="chk_side_view_b2b" onchange="window.propostaTecnicaModule._toggleSideView()" ${eq.layoutConfig?.showSideView ? 'checked' : ''}> Vista Lateral
                             </label>
                         </div>
                     </div>
@@ -3631,17 +3632,23 @@ export const layout = {
         eqs[idx] = eq;
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[GerarLayout] store error:', e); }
 
-        // Chaparia entra na LM na hora, como já faz o fluxo manual.
+        // Chaparia entra na LM na hora (fluxo automático), mas NUNCA em silêncio:
+        // o custo do equipamento muda e o usuário precisa saber quanto.
+        let msgChaparia = '';
         if (eq.autoChaparia !== false) {
             const itens = this._gerarMateriaisChaparia(eq);
             if (itens && itens.length > 0) {
                 eq.materials = [...(eq.materials || []).filter(m => m._origin !== 'chaparia'), ...itens];
+                const custoChaparia = itens.reduce((s, i) => s + (i.custo || 0) * i.qtd, 0);
+                msgChaparia = ` Chaparia: ${itens.length} item(ns), ${app.formatCurrency(custoChaparia)} incluídos na LM.`;
             }
+        } else {
+            msgChaparia = ' Auto Chaparia desligado — chaparia não incluída (use "Gerar Chaparia" para revisar e inserir).';
         }
 
         this._recalcularLayout();
         this.renderSubTab();
-        app.toast(`Layout gerado: 1 armário (${widthStd}mm de largura). Ajuste as dimensões abaixo se necessário.`, 'success');
+        app.toast(`Layout gerado: 1 armário (${widthStd}mm).${msgChaparia}`, 'success', 5000);
     },
 
     _recomporLayout() {
@@ -3702,6 +3709,17 @@ export const layout = {
         const eqs = [...(data.equipments || [])];
         eqs[idx] = eq;
         try { store.setState({ activeTechnicalProposal: { ...data, equipments: eqs } }); } catch (e) { console.warn('[Recompor] store error:', e); }
+
+        // Chaparia reflete as dimensões dos armários — se o recompor alterou
+        // larguras, regenera quando já havia chaparia e o Auto está ligado.
+        // (Não cria chaparia nova do zero: isso só acontece via botão/gerar.)
+        const jaTemChaparia = (eq.materials || []).some(m => m._origin === 'chaparia');
+        if (jaTemChaparia && eq.autoChaparia !== false) {
+            const itens = this._gerarMateriaisChaparia(eq);
+            if (itens && itens.length > 0) {
+                eq.materials = [...(eq.materials || []).filter(m => m._origin !== 'chaparia'), ...itens];
+            }
+        }
 
         this._recalcularLayout();
         this.renderSubTab();
