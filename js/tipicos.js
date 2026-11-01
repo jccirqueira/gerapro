@@ -26,6 +26,7 @@ const TipicosModule = {
             updateAutoName: this.updateAutoName.bind(this),
             calculateCurrent: this.calculateCurrent.bind(this),
             togglePotencyFields: this.togglePotencyFields.bind(this),
+            onTipoChange: this.onTipoChange.bind(this),
             resetView: this.resetView.bind(this),
             remove: this.remove.bind(this)
         };
