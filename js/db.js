@@ -796,6 +796,8 @@ function initSchema() {
     try { db.exec("ALTER TABLE settings ADD COLUMN company_uf TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Migration: add vendor_defaults column to settings
     try { db.exec("ALTER TABLE settings ADD COLUMN vendor_defaults TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
+    // Migration: tipos customizados de típico (dropdown "Tipo de Típico")
+    try { db.exec("ALTER TABLE settings ADD COLUMN tipos_tipicos_custom TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_bot_token column to settings
     try { db.exec("ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Migration: add template columns to settings
@@ -1861,6 +1863,7 @@ function getSettings(empresaId = 'default') {
         company_color: row.company_color || '',
             loginTheme,
             vendor_defaults: row.vendor_defaults || '[]',
+            tipos_tipicos_custom: row.tipos_tipicos_custom || '[]',
             telegram_bot_token: row.telegram_bot_token || '',
             template_tecnica: row.template_tecnica || 'TEMPLATE_TEC.docx',
             template_comercial: row.template_comercial || 'TEMPLATE_COM.docx',

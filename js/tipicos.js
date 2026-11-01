@@ -207,6 +207,167 @@ const TipicosModule = {
         }
     },
 
+    // ── Fase: Tipo de Típico dinâmico ────────────────────────────────────────
+    //
+    // O catálogo de tipos era hardcoded (e trazia "Cubículo MT", que é tipo
+    // de PAINEL, não de partida). Agora: defaults + tipos criados pelo
+    // usuário (persistidos em settings.tipos_tipicos_custom) + tipos em uso
+    // em típicos existentes (nunca esconder um tipo já cadastrado).
+
+    _tiposPadrao() {
+        return [
+            'Inversor de Frequência',
+            'Soft-Starter',
+            'Partida Direta',
+            'Partida Direta Reversora',
+            'Estrela-Triângulo',
+            'Alimentador',
+            'Entrada Geral',
+            'Medição',
+            'Comando e Sinalização',
+            'Serviços Auxiliares',
+            'Banco de Capacitores'
+        ];
+    },
+
+    _getTiposCustom() {
+        const s = store.getState().settings || {};
+        if (Array.isArray(s._tiposTipicosCustom)) return s._tiposTipicosCustom;
+        try { return JSON.parse(s.tipos_tipicos_custom || '[]'); } catch (e) { return []; }
+    },
+
+    _setTiposCustom(arr) {
+        const s = { ...(store.getState().settings || {}) };
+        s.tipos_tipicos_custom = JSON.stringify(arr);
+        s._tiposTipicosCustom = arr;
+        store.setState({ settings: s });
+    },
+
+    async _salvarTiposCustom(arr) {
+        this._setTiposCustom(arr); // local primeiro — funciona mesmo offline
+        const token = store.getState().auth?.token || '';
+        try {
+            const res = await fetch('/api/settings/tipos-tipicos', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ tipos: arr })
+            });
+            if (!res.ok) console.warn('[Tipicos] servidor recusou tipos custom:', res.status);
+        } catch (e) {
+            console.warn('[Tipicos] falha ao sincronizar tipos custom (mantido local):', e.message);
+        }
+    },
+
+    _getTiposCatalogo() {
+        const fora = [];
+        const push = (t) => {
+            const nome = (t || '').trim();
+            if (nome && !fora.some(x => x.toLowerCase() === nome.toLowerCase())) fora.push(nome);
+        };
+        this._tiposPadrao().forEach(push);
+        this._getTiposCustom().forEach(push);
+        // Tipos em uso em típicos existentes (ex.: dados antigos tipo
+        // "Cubículo MT" continuam editáveis mesmo sem estar no dropdown).
+        (store.getState().tipicos || []).forEach(t => push(t.tipoAcionamento));
+        return fora;
+    },
+
+    _renderTiposOptions(selected) {
+        const cat = this._getTiposCatalogo();
+        const sel = selected || '';
+        const opts = ['<option value="">Selecione...</option>']
+            .concat(cat.map(t => `<option value="${t.replace(/"/g, '&quot;')}" ${t === sel ? 'selected' : ''}>${t}</option>`))
+            .concat([`<option value="__novo__" ${sel === '__novo__' ? 'selected' : ''}>＋ Novo tipo...</option>`]);
+        // Tipo em uso que não está no catálogo (não deveria acontecer):
+        if (sel && sel !== '__novo__' && !cat.some(t => t === sel)) {
+            opts.splice(1, 0, `<option value="${sel.replace(/"/g, '&quot;')}" selected>${sel}</option>`);
+        }
+        return opts.join('\n                                        ');
+    },
+
+    onTipoChange(sel) {
+        if (sel.value === '__novo__') {
+            const anterior = this._ultimoTipoSelecionado || '';
+            this._promptNovoTipo().then(nome => {
+                if (nome) {
+                    const catalogo = this._getTiposCatalogo();
+                    const existe = catalogo.find(t => t.toLowerCase() === nome.toLowerCase());
+                    if (existe) {
+                        sel.value = existe;
+                        window.app.toast(`O tipo "${existe}" já existe na lista.`, 'warning');
+                    } else {
+                        this._salvarTiposCustom([...this._getTiposCustom(), nome]);
+                        const opt = document.createElement('option');
+                        opt.value = nome;
+                        opt.textContent = nome;
+                        sel.insertBefore(opt, sel.querySelector('option[value="__novo__"]'));
+                        sel.value = nome;
+                        window.app.toast(`Tipo "${nome}" adicionado à lista.`, 'success');
+                    }
+                    this._ultimoTipoSelecionado = sel.value;
+                } else {
+                    sel.value = anterior; // cancelou: volta ao valor anterior
+                }
+                this.togglePotencyFields();
+            });
+            return;
+        }
+        this._ultimoTipoSelecionado = sel.value;
+        this.togglePotencyFields();
+    },
+
+    _promptNovoTipo() {
+        return new Promise((resolve) => {
+            const html = `
+                <div id="modal-novo-tipo-overlay" class="modal-overlay" style="z-index: 99999;">
+                    <div class="modal" role="dialog" aria-modal="true" style="max-width: 420px;">
+                        <div class="modal-header">
+                            <h3><i class="ph ph-tag"></i> Novo Tipo de Típico</h3>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label">Nome do Tipo *</label>
+                                <input type="text" id="input-novo-tipo" class="form-control" placeholder="Ex: Arranjo de Barramento" maxlength="60" autocomplete="off">
+                            </div>
+                            <div style="font-size:11px;color:#94a3b8;margin-top:8px;">O tipo fica disponível na lista deste e de próximos típicos.</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-cancel" id="btn-novo-tipo-cancel">Cancelar</button>
+                            <button class="btn btn-primary" id="btn-novo-tipo-ok"><i class="ph ph-plus"></i> Adicionar</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+
+            const overlay = document.getElementById('modal-novo-tipo-overlay');
+            const input = document.getElementById('input-novo-tipo');
+            const btnOk = document.getElementById('btn-novo-tipo-ok');
+            const btnCancel = document.getElementById('btn-novo-tipo-cancel');
+
+            const close = (resultado) => {
+                overlay.remove();
+                resolve(resultado);
+            };
+            const confirmar = () => {
+                const nome = (input.value || '').trim();
+                if (nome.length < 2) {
+                    window.app.toast('Digite um nome com pelo menos 2 caracteres.', 'warning');
+                    input.focus();
+                    return;
+                }
+                close(nome);
+            };
+
+            btnOk.onclick = confirmar;
+            btnCancel.onclick = () => close(null);
+            overlay.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') close(null);
+                if (e.key === 'Enter') { e.preventDefault(); confirmar(); }
+            });
+            input.focus();
+        });
+    },
+
     renderBuilder() {
         const state = this.currentBuilderState;
 
@@ -244,20 +405,8 @@ const TipicosModule = {
                             <div class="row" style="display: flex; gap: 10px;">
                                 <div class="form-group" style="flex: 1.5;">
                                     <label class="form-label">Tipo de Típico</label>
-                                    <select id="t-tipoAcionamento" class="form-control" onchange="app.tipicos.togglePotencyFields()">
-                                        <option value="">Selecione...</option>
-                                        <option value="Inversor de Frequência">Inversor de Frequência</option>
-                                        <option value="Soft-Starter">Soft-Starter</option>
-                                        <option value="Partida Direta">Partida Direta</option>
-                                        <option value="Partida Direta Reversora">Partida Direta Reversora</option>
-                                        <option value="Estrela-Triângulo">Estrela-Triângulo</option>
-                                        <option value="Alimentador">Alimentador</option>
-                                        <option value="Entrada Geral">Entrada Geral</option>
-                                        <option value="Medição">Medição</option>
-                                        <option value="Comando e Sinalização">Comando e Sinalização</option>
-                                        <option value="Serviços Auxiliares">Serviços Auxiliares</option>
-                                        <option value="Banco de Capacitores">Banco de Capacitores</option>
-                                        <option value="Cubículo MT">Cubículo MT</option>
+                                    <select id="t-tipoAcionamento" class="form-control" onchange="app.tipicos.onTipoChange(this)">
+                                        ${this._renderTiposOptions(state.tipoAcionamento)}
                                     </select>
                                 </div>
                                 <div id="group-regime" class="form-group" style="flex: 1;">
@@ -1193,7 +1342,10 @@ const TipicosModule = {
         }
 
         this.currentBuilderState.nome = nome;
-        this.currentBuilderState.tipoAcionamento = document.getElementById('t-tipoAcionamento').value;
+        // Guarda: se o diálogo de novo tipo estava aberto ao salvar,
+        // "__novo__" não é um tipo válido — usa o último selecionado.
+        const tipoSel = document.getElementById('t-tipoAcionamento').value;
+        this.currentBuilderState.tipoAcionamento = tipoSel === '__novo__' ? (this._ultimoTipoSelecionado || '') : tipoSel;
         this.currentBuilderState.regimeAcionamento = document.getElementById('t-regimeAcionamento').value;
         this.currentBuilderState.comunicacao = document.getElementById('t-comunicacao').value;
         this.currentBuilderState.potencia = document.getElementById('t-potencia').value;
