@@ -37,6 +37,12 @@ const TipicosModule = {
             // Re-render list if active
             const container = document.getElementById('tipicos-list-container');
             if (container) this.renderList(state.tipicos);
+            // Sync inicial pode chegar com o construtor já aberto: atualiza
+            // as options do select de tipo (tipos custom vêm no settings).
+            const selTipo = document.getElementById('t-tipoAcionamento');
+            if (selTipo && this.viewMode === 'form' && selTipo.value !== '__novo__') {
+                selTipo.innerHTML = this._renderTiposOptions(selTipo.value);
+            }
         });
 
         // Initial attach if needed
