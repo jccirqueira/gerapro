@@ -4729,7 +4729,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                const row = db.prepare('SELECT tipos_tipicos_custom FROM settings WHERE empresa_id = ?').get(empresaId);
+                const row = db.getDb().prepare('SELECT tipos_tipicos_custom FROM settings WHERE empresa_id = ?').get(empresaId);
                 let tipos = [];
                 try { tipos = JSON.parse(row?.tipos_tipicos_custom || '[]'); } catch (e) { tipos = []; }
                 sendJson(res, 200, { success: true, data: { tipos } });
@@ -4744,11 +4744,11 @@ const server = http.createServer(async (req, res) => {
                 const body = await readBody(req);
                 const tipos = Array.isArray(body.tipos) ? body.tipos.filter(t => typeof t === 'string' && t.trim()) : [];
                 const empresaId = tokenUser.empresa_id || 'default';
-                const existing = db.prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+                const existing = db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
                 if (existing) {
-                    db.prepare('UPDATE settings SET tipos_tipicos_custom = ? WHERE empresa_id = ?').run(JSON.stringify(tipos), empresaId);
+                    db.getDb().prepare('UPDATE settings SET tipos_tipicos_custom = ? WHERE empresa_id = ?').run(JSON.stringify(tipos), empresaId);
                 } else {
-                    db.prepare('INSERT INTO settings (empresa_id, tipos_tipicos_custom) VALUES (?, ?)').run(empresaId, JSON.stringify(tipos));
+                    db.getDb().prepare('INSERT INTO settings (empresa_id, tipos_tipicos_custom) VALUES (?, ?)').run(empresaId, JSON.stringify(tipos));
                 }
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
