@@ -492,7 +492,8 @@ const TipicosModule = {
                                     <label id="label-tensao" class="form-label">Tensão (V)</label>
                                     <select id="t-tensao" class="form-control" onchange="app.tipicos.calculateCurrent()">
                                         <option value="">Selecione...</option>
-                                        <option value="24" ${state.tensao === '24' ? 'selected' : ''}>24</option>
+                                        <option value="24VCA" ${state.tensao === '24VCA' || state.tensao === '24' ? 'selected' : ''}>24VCA</option>
+                                        <option value="24VCC" ${state.tensao === '24VCC' ? 'selected' : ''}>24VCC</option>
                                         <option value="110" ${state.tensao === '110' ? 'selected' : ''}>110</option>
                                         <option value="125" ${state.tensao === '125' ? 'selected' : ''}>125</option>
                                         <option value="220" ${state.tensao === '220' ? 'selected' : ''}>220</option>
@@ -887,7 +888,8 @@ const TipicosModule = {
                 const currentVal = selectTensao.value;
                 selectTensao.innerHTML = `
                     <option value="">Selecione...</option>
-                    <option value="24">24</option>
+                    <option value="24VCA">24VCA</option>
+                    <option value="24VCC">24VCC</option>
                     <option value="110">110</option>
                     <option value="125">125</option>
                     <option value="220">220</option>
@@ -913,7 +915,8 @@ const TipicosModule = {
                 `;
                 // Try to restore value if it matches BT options
                 if (!currentVal.includes(',') && currentVal !== '') {
-                    selectTensao.value = currentVal;
+                    // Compat: '24' antigo migra para '24VCA' (opção renomeada)
+                    selectTensao.value = currentVal === '24' ? '24VCA' : currentVal;
                 } else if (!isInitial) {
                     selectTensao.value = '';
                 } else {
