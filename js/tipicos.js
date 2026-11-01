@@ -27,6 +27,7 @@ const TipicosModule = {
             calculateCurrent: this.calculateCurrent.bind(this),
             togglePotencyFields: this.togglePotencyFields.bind(this),
             onTipoChange: this.onTipoChange.bind(this),
+            onTensaoChange: this.onTensaoChange.bind(this),
             resetView: this.resetView.bind(this),
             remove: this.remove.bind(this)
         };
@@ -490,7 +491,7 @@ const TipicosModule = {
                                 </div>
                                 <div class="form-group" style="flex: 1;">
                                     <label id="label-tensao" class="form-label">Tensão (V)</label>
-                                    <select id="t-tensao" class="form-control" onchange="app.tipicos.calculateCurrent()">
+                                    <select id="t-tensao" class="form-control" onchange="app.tipicos.onTensaoChange(this)">
                                         <option value="">Selecione...</option>
                                         <option value="24VCA" ${state.tensao === '24VCA' || state.tensao === '24' ? 'selected' : ''}>24VCA</option>
                                         <option value="24VCC" ${state.tensao === '24VCC' ? 'selected' : ''}>24VCC</option>
@@ -534,7 +535,7 @@ const TipicosModule = {
                                         <option value="100" ${state.icc === '100' ? 'selected' : ''}>100</option>
                                     </select>
                                 </div>
-                                <div class="form-group" style="flex: 1;">
+                                <div class="form-group" id="group-frequencia" style="flex: 1;">
                                     <label id="label-frequencia" class="form-label">Frequência (Hz)</label>
                                     <select id="t-frequencia" class="form-control" onchange="app.tipicos.updateAutoName()">
                                         <option value="">Selecione...</option>
@@ -736,6 +737,25 @@ const TipicosModule = {
 
         // Handle initial potency visibility
         this.togglePotencyFields(true);
+    },
+
+    // 24VCC é tensão CONTÍNUA — não existe frequência. O campo Frequência
+    // (Hz) some ao selecionar 24VCC e o valor é limpo (não guardar
+    // frequência invisível nos dados).
+    _updateFreqVisibility() {
+        const group = document.getElementById('group-frequencia');
+        const selectFreq = document.getElementById('t-frequencia');
+        if (!group || !selectFreq) return;
+        const tensaoEl = document.getElementById('t-tensao');
+        const tensao = tensaoEl ? tensaoEl.value : '';
+        const isDC = tensao === '24VCC';
+        group.style.display = isDC ? 'none' : '';
+        if (isDC && selectFreq.value) selectFreq.value = '';
+    },
+
+    onTensaoChange(sel) {
+        this._updateFreqVisibility();
+        this.calculateCurrent();
     },
 
     togglePotencyFields(isInitial = false) {
@@ -1027,6 +1047,9 @@ const TipicosModule = {
                 if (!isInitial) document.getElementById('t-potenciaKvar').value = '';
             }
         }
+
+        // Visibilidade de Frequência depende da tensão (24VCC = DC, sem Hz)
+        this._updateFreqVisibility();
 
         if (!isInitial) this.updateAutoName();
     },
