@@ -4450,6 +4450,10 @@ const ComprasModule = {
             ipi: num(this._xmlTag(total, 'vIPI')),
             pis: num(this._xmlTag(total, 'vPIS')),
             cofins: num(this._xmlTag(total, 'vCOFINS')),
+            // Reforma 2027 (LC 214/2025): grupo CBS/IBS na NF-e — ausente
+            // em XMLs antigos (permanece 0).
+            cbs: num(this._xmlTag(total, 'vCBS')),
+            ibs: num(this._xmlTag(total, 'vIBS')),
             transportadora: this._xmlTag(transp, 'xNome'),
             volumes: num(this._xmlTag(transp, 'qVol')),
             emitente: this._xmlTag(emit, 'xNome'),
@@ -4609,6 +4613,11 @@ const ComprasModule = {
         this.render();
         const casados = (this._xmlRevisao.pares || []).length;
         window.app.toast(`XML lido: NF ${res.cabecalho.numero} · ${res.itens.length} item(ns) · ${casados} casado(s) com o pedido. Revise e confirme.`, 'success');
+        // Reforma 2027: sem CBS destacada na NF de 2027+ o crédito de entrada
+        // da CBS não se forma no Lucro Real — alerta o operador (não bloqueia).
+        if (String(res.cabecalho.data_emissao || '') >= '2027-01-01' && !(res.cabecalho.cbs > 0)) {
+            window.app.toast('XML de 2027 SEM CBS destacada (vCBS = 0): confirme com o fornecedor — sem destaque, o crédito de CBS da entrada não se forma (Lucro Real).', 'warning', 8000);
+        }
     },
 
     /* Aplica o cabeçalho do XML ao staging e monta a estrutura de revisão
@@ -4631,6 +4640,8 @@ const ComprasModule = {
             ipi: cab.ipi,
             pis: cab.pis,
             cofins: cab.cofins,
+            cbs: cab.cbs,
+            ibs: cab.ibs,
             transportadora: cab.transportadora || st.nota.transportadora,
             volumes: cab.volumes
         });
@@ -4880,7 +4891,7 @@ const ComprasModule = {
 
     setNotaCampo(campo, valor) {
         if (!this._notaStaging) return;
-        const num = ['valor_frete', 'valor_desconto', 'icms', 'ipi', 'pis', 'cofins', 'volumes'];
+        const num = ['valor_frete', 'valor_desconto', 'icms', 'ipi', 'pis', 'cofins', 'cbs', 'ibs', 'volumes'];
         this._notaStaging.nota[campo] = num.includes(campo) ? (parseFloat(valor) || 0) : valor;
         this._atualizaTotaisNota();
     },
@@ -4974,6 +4985,8 @@ const ComprasModule = {
             ipi: parseFloat(n.ipi) || 0,
             pis: parseFloat(n.pis) || 0,
             cofins: parseFloat(n.cofins) || 0,
+            cbs: parseFloat(n.cbs) || 0,
+            ibs: parseFloat(n.ibs) || 0,
             transportadora: n.transportadora || '',
             volumes: parseFloat(n.volumes) || 0,
             conferida: conferencia.status === 'conferida' ? 1 : 0,
@@ -5451,6 +5464,10 @@ const ComprasModule = {
                                 <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(n.valor_desconto) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('valor_desconto', this.value)"></div>
                             <div class="cp-field"><label>ICMS (R$)</label>
                                 <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(n.icms) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('icms', this.value)"></div>
+                            <div class="cp-field"><label>CBS (R$) <span style="color:#94a3b8;font-size:10px;">2027</span></label>
+                                <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(n.cbs) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('cbs', this.value)"></div>
+                            <div class="cp-field"><label>IBS (R$) <span style="color:#94a3b8;font-size:10px;">teste 2027</span></label>
+                                <input type="number" step="0.01" min="0" class="form-control" value="${parseFloat(n.ibs) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('ibs', this.value)"></div>
                             <div class="cp-field"><label>Volumes</label>
                                 <input type="number" step="1" min="0" class="form-control" value="${parseFloat(n.volumes) || 0}" ${podeEditar ? '' : 'readonly'} oninput="app.compras.setNotaCampo('volumes', this.value)"></div>
                         </div>

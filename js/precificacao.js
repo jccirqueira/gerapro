@@ -477,19 +477,22 @@ class PrecificacaoModule {
             }
             return (item.qtd || 0) * custo * taxa / 100;
         };
-        // Modelo 2027: a entrada creditável é CBS (não existe mais PIS/COFINS);
-        // mesma base de materiais com a alíquota CBS vigente (crédito financeiro
-        // — casos especiais ajustáveis no campo manual de crédito da precificação).
+        // Modelo 2027: a entrada creditável é CBS (não existe mais PIS/COFINS).
+        // Alíquota POR MATERIAL quando preenchida no cadastro fiscal (o valor
+        // destacado na NF do fornecedor — inclui 0 = isento); vazio = usa a
+        // alíquota global de Configurações (crédito financeiro amplo).
         const calcCredCbs = (item) => {
             const ov = item.materialId ? overrides[item.materialId]?.custo : undefined;
             let custo;
+            const mat = item.materialId ? materiais.find(m => m.id === item.materialId) : null;
             if (ov != null) {
                 custo = ov;
             } else {
-                const mat = item.materialId ? materiais.find(m => m.id === item.materialId) : null;
                 custo = mat?.custo != null ? mat.custo : (item.custo ?? 0);
             }
-            return (item.qtd || 0) * custo * aliqCbs / 100;
+            const cbsMat = mat && mat.cbs != null && String(mat.cbs).trim() !== '' ? Number(mat.cbs) : NaN;
+            const taxa = Number.isFinite(cbsMat) ? cbsMat : aliqCbs;
+            return (item.qtd || 0) * custo * taxa / 100;
         };
 
         const somarLista = (lista) => {

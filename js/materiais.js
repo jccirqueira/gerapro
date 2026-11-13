@@ -11,6 +11,7 @@ const CAMPOS_MATERIAIS = [
     { key: 'ncm', label: 'NCM', required: false },
     { key: 'icms', label: 'ICMS (%)', required: false },
     { key: 'ipi', label: 'IPI (%)', required: false },
+    { key: 'cbs', label: 'CBS (%)', required: false },
     { key: 'ufFornecedor', label: 'UF Fornecedor', required: false },
     { key: 'grupoSiemens', label: 'Grupo Siemens', required: false },
     { key: 'area', label: 'Área', required: false },
@@ -619,11 +620,17 @@ ${store.canDelete() ? `                            <button class="btn btn-ghost 
                                         <input type="text" name="ncm" class="form-control" value="${data.ncm || ''}">
                                     </div>
                                     <div class="form-group" style="flex: 1;">
-                                        <label class="form-label">Origem</label>
-                                        <select name="origem" class="form-control">
+                                        <label class="form-label">Origem (CST)</label>
+                                        <select name="origem" class="form-control" title="CST de origem da mercadoria (Tabela I do Convênio s/nº 1986/MA). Define o tratamento de crédito e ST na entrada.">
                                             <option value="0" ${data.origem === '0' ? 'selected' : ''}>0 - Nacional</option>
                                             <option value="1" ${data.origem === '1' ? 'selected' : ''}>1 - Importação Direta</option>
                                             <option value="2" ${data.origem === '2' ? 'selected' : ''}>2 - Importado no Mercado</option>
+                                            <option value="3" ${data.origem === '3' ? 'selected' : ''}>3 - Nacional (Import. 40-70%)</option>
+                                            <option value="4" ${data.origem === '4' ? 'selected' : ''}>4 - Nacional (Proc. Básicos)</option>
+                                            <option value="5" ${data.origem === '5' ? 'selected' : ''}>5 - Nacional (Import. ≤ 40%)</option>
+                                            <option value="6" ${data.origem === '6' ? 'selected' : ''}>6 - Import. Direta (sem similar)</option>
+                                            <option value="7" ${data.origem === '7' ? 'selected' : ''}>7 - Import. Mercado (sem similar)</option>
+                                            <option value="8" ${data.origem === '8' ? 'selected' : ''}>8 - Nacional (Import. > 70%)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -634,7 +641,7 @@ ${store.canDelete() ? `                            <button class="btn btn-ghost 
                                     </div>
                                     <div class="form-group" style="flex: 1;">
                                         <label class="form-label">IPI (%)</label>
-                                        <input type="number" step="0.1" name="ipi" class="form-control" value="${data.ipi || '10'}">
+                                        <input type="number" step="0.1" name="ipi" class="form-control" value="${data.ipi != null && data.ipi !== '' ? data.ipi : ((store.getState().settings?.modeloTributario || '2027') !== '2026' ? '0' : '10')}">
                                     </div>
                                 </div>
                                 <div class="row" style="display: flex; gap: 16px;">
@@ -645,6 +652,15 @@ ${store.canDelete() ? `                            <button class="btn btn-ghost 
                                     <div class="form-group" style="flex: 1;">
                                         <label class="form-label">COFINS (%)</label>
                                         <input type="number" step="0.01" name="cofins" class="form-control" value="${data.cofins || '7.60'}">
+                                    </div>
+                                </div>
+                                <div class="row" style="display: flex; gap: 16px;">
+                                    <div class="form-group" style="flex: 1;">
+                                        <label class="form-label">CBS (%) <span style="color:#94a3b8;font-size:10px;" title="LC 214/2025 — substitui o PIS/COFINS a partir de 2027. Preencha com a alíquota destacada na NF do fornecedor; vazio = usa a alíquota global (Configurações da Empresa).">2027</span></label>
+                                        <input type="number" step="0.01" name="cbs" class="form-control" value="${data.cbs != null && data.cbs !== '' ? data.cbs : ''}" placeholder="${(store.getState().settings?.aliqCbs ?? 11.2)}">
+                                    </div>
+                                    <div class="form-group" style="flex: 1; display: flex; align-items: center;">
+                                        <span style="font-size:10.5px;color:#94a3b8;"><i class="ph ph-info"></i> No modelo 2027 este é o percentual creditável da entrada. PIS/COFINS e IPI valem só no modelo 2026.</span>
                                     </div>
                                 </div>
                                 <div class="form-group">

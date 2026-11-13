@@ -656,11 +656,12 @@
         screenshot: 'prints/materiais/impostos.png',
         campos: [
           { nome: 'NCM', descricao: 'Código NCM do material para classificação fiscal. Campo obrigatório.' },
-          { nome: 'Origem', descricao: 'Origem do produto: 0 - Nacional, 1 - Importação Direta, 2 - Importado no Mercado.' },
+          { nome: 'Origem', descricao: 'CST de origem da mercadoria (Tabela I do Convênio s/nº 1986/MA): 0 - Nacional | 1 - Importação Direta | 2 - Importado no Mercado | 3 - Nacional (Import. 40-70%) | 4 - Nacional (Proc. Básicos) | 5 - Nacional (Import. ≤40%) | 6 - Import. Direta (sem similar) | 7 - Import. Mercado (sem similar) | 8 - Nacional (Import. >70%). Base para o tratamento de crédito e ST na entrada.' },
           { nome: 'ICMS (%)', descricao: 'Percentual de ICMS incidente sobre o material.' },
-          { nome: 'IPI (%)', descricao: 'Percentual de IPI incidente.' },
-          { nome: 'PIS (%)', descricao: 'Percentual de PIS.' },
-          { nome: 'COFINS (%)', descricao: 'Percentual de COFINS.' }
+          { nome: 'IPI (%)', descricao: 'Percentual de IPI (crédito da entrada). No modelo 2027 o padrão de novos materiais é 0 (IPI zerado — LC 214/2025).' },
+          { nome: 'PIS (%)', descricao: 'Percentual de PIS (só modelo 2026).' },
+          { nome: 'COFINS (%)', descricao: 'Percentual de COFINS (só modelo 2026).' },
+          { nome: 'CBS (%)', descricao: 'Percentual de CBS creditável da entrada (modelo 2027, LC 214/2025). Preencha com o destaque da NF do fornecedor; vazio = usa a alíquota global de Configurações (11,2%). Valor 0 = fornecedor sem CBS destacada (sem crédito).' }
         ]
       },
       {
@@ -2034,7 +2035,7 @@
         titulo: 'Nota Fiscal (fecha o ciclo)',
         texto: 'Cada recebimento é lançado pelo botão **Lançar NF** do pedido. Um pedido aceita N notas fiscais — entregas parciais. O item entra com a quantidade efetivamente recebida; quantidade zero fica de fora da NF.\n\n**Importação do XML da NF-e (recomendado):** no formulário da NF, o botão **Importar XML** recebe o arquivo XML emitido pela SEFAZ (o mesmo da portal da NF-e). O sistema lê o cabeçalho (número, série, chave de acesso, emitente, transportadora, volumes), os valores (produtos, frete, desconto, impostos) e os itens, e faz o casamento automático com os itens do pedido em três níveis de confiança:\n- **Código exato** — código do item do pedido presente na NF (mais confiável).\n- **Descrição similar** — casamento por palavras da descrição (Jaccard ≥ 0,55), com desempate pela quantidade.\n- **Só na NF** — item que não existe no pedido; fica para revisão manual.\n\nNada é gravado às cegas: aparece o banner de **revisão** com o resumo do casamento e os campos preenchidos. Confira, corrija o que precisar e só então clique em **Salvar NF**. O botão **Desfazer** restaura o formulário ao estado anterior ao importar. O mesmo XML pode ser reimportado sem virar duplicata — a chave de acesso deduplica. O preenchimento manual continua disponível sem o XML.\n\nA conferência é automática ao salvar: quantidade e preço da NF × pedido. Divergência (tolerância de preço de 0,5%) muda o status da NF para **Divergente** e exibe o alerta na tela. O estorno posterior reverte exatamente tudo: baixa no pedido, preço no catálogo e lançamento na DRE.\n\nO que o recebimento faz automaticamente:\n- Baixa item a item no pedido (quantidade recebida) — o pedido vira Parcial ou Recebido.\n- Grava o preço real em `price_history` com origem compra — o Banco de Materiais se auto-alimenta.\n- Lançamento automático na DRE do projeto (categoria material, tipo real) — estimado × real instantâneo.\n- Quando todos os pedidos foram recebidos, a requisição vira **Recebida**.',
         campos: [
-          { nome: 'Importar XML', descricao: 'Arquivo XML da NF-e (SEFAZ) — preenche cabeçalho, valores e itens com casamento automático e etapa de revisão.' },
+          { nome: 'Importar XML', descricao: 'Arquivo XML da NF-e (SEFAZ) — preenche cabeçalho, valores (incluindo CBS/IBS nos XMLs de 2027 — LC 214/2025) e itens com casamento automático e etapa de revisão. XML de 2027 sem vCBS destacado gera alerta de crédito (não bloqueia).' },
           { nome: 'Número / Série / Chave', descricao: 'Identificação da NF; a chave de acesso pode ser conferida.' },
           { nome: 'Datas', descricao: 'Emissão, recebimento e entrada — a entrada alimenta o KPI "Recebido no mês".' },
           { nome: 'Valores', descricao: 'Produtos, frete, desconto, total e impostos destacados.' },

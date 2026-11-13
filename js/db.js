@@ -180,6 +180,7 @@ function initSchema() {
             ipi REAL DEFAULT 10,
             pis REAL DEFAULT 1.65,
             cofins REAL DEFAULT 7.60,
+            cbs REAL DEFAULT 0,
             modelo TEXT,
             largura_mm REAL DEFAULT 0,
             altura_mm REAL DEFAULT 0,
@@ -805,6 +806,11 @@ function initSchema() {
     // Migration: simulação de Split Payment (LC 214/2025 — retenção de CBS/IBS
     // na liquidação; facultativo em 2027, obrigatório B2B em 2028)
     try { db.exec("ALTER TABLE settings ADD COLUMN split_payment INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    // Migration: Reforma 2027 — CBS por material (destaque de crédito por item)
+    try { db.exec("ALTER TABLE materiais ADD COLUMN cbs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    // Migration: Reforma 2027 — CBS/IBS na NF-e importada (grupo ICMSTot v100)
+    try { db.exec("ALTER TABLE compras_notas ADD COLUMN cbs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { db.exec("ALTER TABLE compras_notas ADD COLUMN ibs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_bot_token column to settings
     try { db.exec("ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Migration: add template columns to settings
@@ -1282,6 +1288,8 @@ function initSchema() {
             ipi REAL DEFAULT 0,
             pis REAL DEFAULT 0,
             cofins REAL DEFAULT 0,
+            cbs REAL DEFAULT 0,
+            ibs REAL DEFAULT 0,
             transportadora TEXT DEFAULT '',
             volumes REAL DEFAULT 0,
             conferida INTEGER DEFAULT 0,
