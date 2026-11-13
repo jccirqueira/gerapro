@@ -351,7 +351,9 @@ class PrecificacaoModule {
             const credits = this.calculateEquipmentCredits(eq);
             if (!data.icmsCredito && credits.credIcms > 0) { data.icmsCredito = credits.credIcms; this.setVal('prec_icms_credito', app.formatCurrencyRaw(credits.credIcms)); }
             if (!data.ipiCredito && credits.credIpi > 0) { data.ipiCredito = credits.credIpi; this.setVal('prec_ipi_credito', app.formatCurrencyRaw(credits.credIpi)); }
-            if (!data.pisCofinsCredito && credits.credPisCof > 0) { data.pisCofinsCredito = credits.credPisCof; this.setVal('prec_pis_cofins_credito', app.formatCurrencyRaw(credits.credPisCof)); }
+            if (this._modeloTrib() === '2027') {
+                if (!data.cbsCredito && credits.credPisCof > 0) { data.cbsCredito = credits.credPisCof; this.setVal('prec_cbs_credito', app.formatCurrencyRaw(credits.credPisCof)); }
+            } else if (!data.pisCofinsCredito && credits.credPisCof > 0) { data.pisCofinsCredito = credits.credPisCof; this.setVal('prec_pis_cofins_credito', app.formatCurrencyRaw(credits.credPisCof)); }
         }
 
         // Bind event listeners to new elements
@@ -430,12 +432,32 @@ class PrecificacaoModule {
         return total;
     }
 
+    /* ── Reforma Tributária (LC 214/2025) — modelo vigente ──────────────────
+       '2027' (default): CBS + IBS no lugar de PIS/COFINS, IPI de saída zerado.
+       '2026': modelo legado PIS/COFINS + IPI. Alíquotas configuráveis em
+       Configurações da Empresa (com defaults TCU: CBS 11,2% / IBS 0,1%). */
+    _modeloTrib() {
+        return store.getState().settings?.modeloTributario === '2026' ? '2026' : '2027';
+    }
+
+    _aliqCbs() {
+        const v = Number(store.getState().settings?.aliqCbs);
+        return Number.isFinite(v) && v > 0 ? v : 11.2;
+    }
+
+    _aliqIbs() {
+        const v = Number(store.getState().settings?.aliqIbs);
+        return Number.isFinite(v) && v >= 0 ? v : 0.1;
+    }
+
     calculateEquipmentCredits(eq) {
         const state = store.getState();
         const tipicos = state.tipicos || [];
         const materiais = state.materiais || [];
         const overrides = state.activeTechnicalProposal?.materialOverrides || {};
         let totalIcms = 0, totalIpi = 0, totalPisCof = 0;
+        const m2027 = this._modeloTrib() === '2027';
+        const aliqCbs = this._aliqCbs();
 
         const calcCred = (item, field, dft) => {
             const ov = item.materialId ? overrides[item.materialId]?.custo : undefined;
@@ -455,30 +477,39 @@ class PrecificacaoModule {
             }
             return (item.qtd || 0) * custo * taxa / 100;
         };
+        // Modelo 2027: a entrada creditável é CBS (não existe mais PIS/COFINS);
+        // mesma base de materiais com a alíquota CBS vigente (crédito financeiro
+        // — casos especiais ajustáveis no campo manual de crédito da precificação).
+        const calcCredCbs = (item) => {
+            const ov = item.materialId ? overrides[item.materialId]?.custo : undefined;
+            let custo;
+            if (ov != null) {
+                custo = ov;
+            } else {
+                const mat = item.materialId ? materiais.find(m => m.id === item.materialId) : null;
+                custo = mat?.custo != null ? mat.custo : (item.custo ?? 0);
+            }
+            return (item.qtd || 0) * custo * aliqCbs / 100;
+        };
+
+        const somarLista = (lista) => {
+            lista.forEach(item => {
+                totalIcms += calcCred(item, 'icms', 18);
+                totalIpi += calcCred(item, 'ipi', 0);
+                totalPisCof += m2027 ? calcCredCbs(item)
+                    : calcCred(item, 'pis', 1.65) + calcCred(item, 'cofins', 7.60);
+            });
+        };
 
         (eq.loads || []).forEach(load => {
             const typical = tipicos.find(t => t.id === load.typicalId);
-            if (typical && typical.items) {
-                typical.items.forEach(item => {
-                    totalIcms += calcCred(item, 'icms', 18);
-                    totalIpi += calcCred(item, 'ipi', 0);
-                    totalPisCof += calcCred(item, 'pis', 1.65) + calcCred(item, 'cofins', 7.60);
-                });
-            }
+            if (typical && typical.items) somarLista(typical.items);
         });
+        somarLista(eq.materials || []);
+        somarLista(eq.automationMaterials || []);
 
-        (eq.materials || []).forEach(item => {
-            totalIcms += calcCred(item, 'icms', 18);
-            totalIpi += calcCred(item, 'ipi', 0);
-            totalPisCof += calcCred(item, 'pis', 1.65) + calcCred(item, 'cofins', 7.60);
-        });
-
-        (eq.automationMaterials || []).forEach(item => {
-            totalIcms += calcCred(item, 'icms', 18);
-            totalIpi += calcCred(item, 'ipi', 0);
-            totalPisCof += calcCred(item, 'pis', 1.65) + calcCred(item, 'cofins', 7.60);
-        });
-
+        // No 2027, "credPisCof" carrega o CRÉDITO DE CBS (mesmo campo no fluxo
+        // da precificação — o label da UI muda conforme o modelo).
         return { credIcms: totalIcms, credIpi: totalIpi, credPisCof: totalPisCof };
     }
 
@@ -521,6 +552,9 @@ class PrecificacaoModule {
     }
 
     getPricingFormHTML(tag, data, costs, regime, isSeuComponent = false, isCubMt = false, isAutPro = false) {
+        const m2027 = this._modeloTrib() === '2027';
+        const aliqCbs = this._aliqCbs();
+        const aliqIbs = this._aliqIbs();
         return `
             <div class="card" style="padding: 24px; border: none; box-shadow: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -574,21 +608,26 @@ class PrecificacaoModule {
                             </div>
                             <!-- Campos de Crédito Tributário -->
                             <div id="wrapper-creditos" style="display: ${regime === 'Simples Nacional' ? 'none' : 'block'}">
-                                <h4 class="text-xs font-bold" style="color: #0369a1; text-transform: uppercase; margin-bottom: 8px;">Créditos sobre Entradas</h4>
+                                <h4 class="text-xs font-bold" style="color: #0369a1; text-transform: uppercase; margin-bottom: 8px;">${m2027 ? 'Créditos sobre Entradas (CBS/ICMS)' : 'Créditos sobre Entradas'}</h4>
                                 <div id="container-creditos" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; background: #f0f9ff; padding: 10px; border-radius: 6px; border: 1px solid #bae6fd;">
                                     <div class="form-group" id="group-credito-icms">
                                         <label class="form-label" style="color: #0369a1;">Créd. ICMS R$</label>
                                         <input type="text" id="prec_icms_credito" class="form-control" value="${app.formatCurrencyRaw(data.icmsCredito || 0)}" style="text-align: right;">
                                     </div>
-                                    <div class="form-group" id="group-credito-pis-cofins">
+                                    <div class="form-group" id="group-credito-pis-cofins" style="display: ${m2027 ? 'none' : 'block'};">
                                         <label class="form-label" style="color: #0369a1;">Créd. PIS/COF R$</label>
                                         <input type="text" id="prec_pis_cofins_credito" class="form-control" value="${app.formatCurrencyRaw(data.pisCofinsCredito || 0)}" style="text-align: right;">
+                                    </div>
+                                    <div class="form-group" id="group-credito-cbs" style="display: ${m2027 ? 'block' : 'none'};">
+                                        <label class="form-label" style="color: #0369a1;">Créd. CBS R$</label>
+                                        <input type="text" id="prec_cbs_credito" class="form-control" value="${app.formatCurrencyRaw(data.cbsCredito || 0)}" style="text-align: right;" title="Crédito CBS sobre as entradas (auto: materiais × alíquota CBS). Ajuste manual para ampliar ao crédito financeiro (energia, software, EPI...).">
                                     </div>
                                     <div class="form-group" id="group-credito-ipi">
                                         <label class="form-label" style="color: #0369a1;">Créd. IPI R$</label>
                                         <input type="text" id="prec_ipi_credito" class="form-control" value="${app.formatCurrencyRaw(data.ipiCredito || 0)}" style="text-align: right;">
                                     </div>
                                 </div>
+                                ${m2027 ? `<div style="font-size:10px;color:#64748b;margin-top:6px;"><i class="ph ph-info"></i> Modelo 2027: o crédito de PIS/COFINS foi substituído pela CBS. No Lucro Real o crédito é financeiro — ajuste o valor manualmente para incluir insumos além dos materiais.</div>` : ''}
                             </div>
 
                             <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-border); display: flex; justify-content: space-between;">
@@ -616,9 +655,17 @@ class PrecificacaoModule {
                                     </div>
                                     <input type="number" id="prec_icms" class="form-control" value="${data.icms || 0}" step="0.01" onchange="app.precificacao.markManualIcms('${tag}')">
                                 </div>
-                                <div class="form-group" id="group-pis-cofins">
+                                <div class="form-group" id="group-pis-cofins" style="display: ${m2027 ? 'none' : 'block'};">
                                     <label class="form-label">PIS/COFINS (%)</label>
                                     <input type="number" id="prec_pis_cofins" class="form-control" value="${data.pisCofins || 9.25}" step="0.01">
+                                </div>
+                                <div class="form-group" id="group-cbs" style="display: ${m2027 ? 'block' : 'none'};">
+                                    <label class="form-label">CBS (%) <span class="text-xs" style="color:#94a3b8;" title="LC 214/2025 — substitui o PIS/COFINS a partir de 2027. Alíquota de referência TCU: 11,2%.">2027</span></label>
+                                    <input type="number" id="prec_cbs" class="form-control" value="${data.cbs ?? aliqCbs}" step="0.01">
+                                </div>
+                                <div class="form-group" id="group-ibs" style="display: ${m2027 ? 'block' : 'none'};">
+                                    <label class="form-label">IBS (%) <span class="text-xs" style="color:#94a3b8;" title="LC 214/2025 — em 2027 é alíquota de teste compensável (0,1% = 0,05% est. + 0,05% mun.).">teste 2027</span></label>
+                                    <input type="number" id="prec_ibs" class="form-control" value="${data.ibs ?? aliqIbs}" step="0.01">
                                 </div>
                                 <div class="form-group" id="group-iss" style="display: ${data.businessType === 'Prestação de Serviços' ? 'block' : 'none'};">
                                     <label class="form-label">ISS (%)</label>
@@ -631,9 +678,10 @@ class PrecificacaoModule {
                                             <input type="checkbox" id="prec_ipi_isento" ${(data.ipiIsento || isSeuComponent || isCubMt) ? 'checked' : ''} ${(isSeuComponent || isCubMt) ? 'disabled' : ''}> Isento
                                         </label>
                                     </div>
-                                    <input type="number" id="prec_ipi" class="form-control" value="${(isSeuComponent || isCubMt) ? 0 : (data.ipi || 9.75)}" step="0.01" ${(isSeuComponent || isCubMt) ? 'disabled style="background:#f1f5f9;color:#94a3b8;"' : ''}>
+                                    <input type="number" id="prec_ipi" class="form-control" value="${(isSeuComponent || isCubMt) ? 0 : (data.ipi != null ? data.ipi : (m2027 ? 0 : 9.75))}" step="0.01" ${(isSeuComponent || isCubMt) ? 'disabled style="background:#f1f5f9;color:#94a3b8;"' : ''}>
                                     ${isSeuComponent ? `<div style="font-size:10px;color:#92400e;margin-top:4px;"><i class="ph ph-lock-simple"></i> IPI zerado — Componente de SEU (NCM 8537.20.90)</div>` : ''}
                                     ${isCubMt ? `<div style="font-size:10px;color:#92400e;margin-top:4px;"><i class="ph ph-lock-simple"></i> IPI zerado — Cubículo de Média Tensão (NCM 8537.20.90)</div>` : ''}
+                                    ${m2027 && !isSeuComponent && !isCubMt ? `<div style="font-size:10px;color:#64748b;margin-top:4px;"><i class="ph ph-info"></i> Modelo 2027: IPI de saída zerado (LC 214/2025 — zerar IPI fora da ZFM). Desmarque "Isento" se algum item ainda tiver IPI.</div>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1514,7 +1562,10 @@ class PrecificacaoModule {
                     const credits = this.calculateEquipmentCredits(eq2);
                     if (credits.credIcms > 0) { this.setVal('prec_icms_credito', app.formatCurrencyRaw(credits.credIcms)); }
                     if (credits.credIpi > 0) { this.setVal('prec_ipi_credito', app.formatCurrencyRaw(credits.credIpi)); }
-                    if (credits.credPisCof > 0) { this.setVal('prec_pis_cofins_credito', app.formatCurrencyRaw(credits.credPisCof)); }
+                    if (credits.credPisCof > 0) {
+                        if (this._modeloTrib() === '2027') this.setVal('prec_cbs_credito', app.formatCurrencyRaw(credits.credPisCof));
+                        else this.setVal('prec_pis_cofins_credito', app.formatCurrencyRaw(credits.credPisCof));
+                    }
                 }
             }
 
@@ -1539,12 +1590,15 @@ class PrecificacaoModule {
 
     applyBusinessRules(businessType) {
         console.log(`[Precificacao] Aplicando regras automáticas para: ${businessType}`);
+        const m2027 = this._modeloTrib() === '2027';
+        const aliqCbs = this._aliqCbs();
 
         if (businessType === 'Prestação de Serviços') {
             this.setVal('prec_icms', 0);
             this.setVal('prec_ipi', 0);
             this.setVal('prec_iss', 5);
-            this.setVal('prec_pis_cofins', 4.65);
+            if (m2027) this.setVal('prec_cbs', aliqCbs);
+            else this.setVal('prec_pis_cofins', 4.65);
             this.setVal('prec_consumiveis', 0);
             
             this.toggleDisplay('group-icms', false);
@@ -1555,31 +1609,39 @@ class PrecificacaoModule {
             // Serviços não costumam ter créditos tributários sobre materiais
             this.setVal('prec_icms_credito', '0,00');
             this.setVal('prec_pis_cofins_credito', '0,00');
+            this.setVal('prec_cbs_credito', '0,00');
             this.setVal('prec_ipi_credito', '0,00');
             this.toggleDisplay('wrapper-creditos', false);
         } else if (businessType === 'Revenda') {
             this.setVal('prec_icms', 18);
             this.setVal('prec_ipi', 0);
             this.setVal('prec_iss', 0);
-            this.setVal('prec_pis_cofins', 9.25);
+            if (m2027) this.setVal('prec_cbs', aliqCbs);
+            else this.setVal('prec_pis_cofins', 9.25);
             
             this.toggleDisplay('group-icms', true);
             this.toggleDisplay('group-ipi', false);
             this.toggleDisplay('group-iss', false);
             this.toggleDisplay('group-consumiveis', true);
 
-            // Revenda tem ICMS e PIS/COFINS, mas IPI entra no custo (sem crédito na entrada)
+            // Revenda tem ICMS e o tributo de saída (PIS/COFINS ou CBS),
+            // mas IPI entra no custo (sem crédito na entrada)
             this.toggleDisplay('wrapper-creditos', true);
             this.toggleDisplay('group-credito-icms', true);
-            this.toggleDisplay('group-credito-pis-cofins', true);
+            this.toggleDisplay('group-credito-pis-cofins', !m2027);
+            this.toggleDisplay('group-credito-cbs', m2027);
             this.toggleDisplay('group-credito-ipi', false);
             this.setVal('prec_ipi_credito', '0,00');
         } else {
             // Industrialização (Padrão)
             this.setVal('prec_icms', 12);
-            this.setVal('prec_ipi', 9.75);
+            // Modelo 2027: IPI de saída zerado (LC 214/2025)
+            this.setVal('prec_ipi', m2027 ? 0 : 9.75);
+            const chkIsento = document.getElementById('prec_ipi_isento');
+            if (chkIsento) chkIsento.checked = m2027;
             this.setVal('prec_iss', 0);
-            this.setVal('prec_pis_cofins', 9.25);
+            if (m2027) this.setVal('prec_cbs', aliqCbs);
+            else this.setVal('prec_pis_cofins', 9.25);
             
             this.toggleDisplay('group-icms', true);
             this.toggleDisplay('group-ipi', true);
@@ -1589,7 +1651,8 @@ class PrecificacaoModule {
             // Industrialização tem todos os créditos
             this.toggleDisplay('wrapper-creditos', true);
             this.toggleDisplay('group-credito-icms', true);
-            this.toggleDisplay('group-credito-pis-cofins', true);
+            this.toggleDisplay('group-credito-pis-cofins', !m2027);
+            this.toggleDisplay('group-credito-cbs', m2027);
             this.toggleDisplay('group-credito-ipi', true);
         }
         
@@ -1674,6 +1737,8 @@ class PrecificacaoModule {
             consumiveis: getVal('prec_consumiveis'),
             icms: getVal('prec_icms'),
             pisCofins: getVal('prec_pis_cofins'),
+            cbs: getVal('prec_cbs') || this._aliqCbs(),
+            ibs: getVal('prec_ibs') || this._aliqIbs(),
             iss: getVal('prec_iss'),
             ipi: getVal('prec_ipi'),
             ipiIsento: document.getElementById('prec_ipi_isento')?.checked || false,
@@ -1683,6 +1748,7 @@ class PrecificacaoModule {
             desconto: getVal('prec_desconto'),
             icmsCredito: getVal('prec_icms_credito', true),
             pisCofinsCredito: getVal('prec_pis_cofins_credito', true),
+            cbsCredito: getVal('prec_cbs_credito', true),
             ipiCredito: getVal('prec_ipi_credito', true),
             das: getVal('prec_das')
         };
@@ -1711,17 +1777,19 @@ class PrecificacaoModule {
         // Créditos de entrada e consumíveis — MESMA base do calculateAll().
         // (Antes, o caminho "Faturamento Direto" usava o material BRUTO, sem
         //  créditos e sem consumíveis — divergente do Resumo Consolidado.)
+        const m2027cred = this._modeloTrib() === '2027';
         const credIcms = getVal('prec_icms_credito', true);
-        const credPisCof = getVal('prec_pis_cofins_credito', true);
+        const credPisCof = m2027cred ? 0 : getVal('prec_pis_cofins_credito', true);
+        const credCbs = m2027cred ? getVal('prec_cbs_credito', true) : 0;
         const credIpi = getVal('prec_ipi_credito', true);
         let matLiquido = matBruto;
         if (regime !== 'Simples Nacional') {
-            matLiquido = matBruto - credIcms - credPisCof - credIpi;
+            matLiquido = matBruto - credIcms - credPisCof - credCbs - credIpi;
         }
         // Créditos efetivamente aplicados no custo (zerados no Simples Nacional)
         const creditosAplicados = regime !== 'Simples Nacional'
-            ? { icms: credIcms, pisCofins: credPisCof, ipi: credIpi }
-            : { icms: 0, pisCofins: 0, ipi: 0 };
+            ? { icms: credIcms, pisCofins: credPisCof, cbs: credCbs, ipi: credIpi }
+            : { icms: 0, pisCofins: 0, cbs: 0, ipi: 0 };
 
         const percConsumiveis = getVal('prec_consumiveis');
         const custoConsumiveis = matLiquido * (percConsumiveis / 100);
@@ -1744,7 +1812,7 @@ class PrecificacaoModule {
                 comissao: 0,
                 faturamento: 'Direto',
                 direto: true,
-                impostos: { base: custoTotal, icms: 0, pisCofins: 0, iss: 0, das: 0, ipi: 0 },
+                impostos: { base: custoTotal, icms: 0, pisCofins: 0, cbs: 0, ibs: 0, iss: 0, das: 0, ipi: 0 },
                 creditos: creditosAplicados,
                 detalhe: { materialBruto: matBruto, consumiveis: custoConsumiveis, mo: labor, despesasDiretas: despesas, custosFixos: 0 }
             };
@@ -1757,15 +1825,23 @@ class PrecificacaoModule {
 
         // 2. Impostos (guarda também o detalhe por tributo — débito sobre a venda)
         let totalImpostosPercent = 0;
-        const pctImp = { icms: 0, pisCofins: 0, iss: 0, das: 0 };
+        const pctImp = { icms: 0, pisCofins: 0, iss: 0, das: 0, cbs: 0, ibs: 0 };
+        const m2027calc = this._modeloTrib() === '2027';
         if (regime === 'Simples Nacional') {
             totalImpostosPercent = getVal('prec_das');
             pctImp.das = totalImpostosPercent;
         } else {
             pctImp.icms = getVal('prec_icms');
-            pctImp.pisCofins = getVal('prec_pis_cofins');
+            if (m2027calc) {
+                // LC 214/2025: CBS substitui o PIS/COFINS e o IBS inicia em
+                // alíquota de teste (2027) — ambos editáveis no form.
+                pctImp.cbs = getVal('prec_cbs');
+                pctImp.ibs = getVal('prec_ibs');
+            } else {
+                pctImp.pisCofins = getVal('prec_pis_cofins');
+            }
             if (businessType === 'Prestação de Serviços') pctImp.iss = getVal('prec_iss');
-            totalImpostosPercent = pctImp.icms + pctImp.pisCofins + pctImp.iss;
+            totalImpostosPercent = pctImp.icms + pctImp.pisCofins + pctImp.cbs + pctImp.ibs + pctImp.iss;
         }
 
         // 3. IPI (precisa ser lido antes do markup para AutPro)
@@ -1834,6 +1910,8 @@ class PrecificacaoModule {
                 base: precoFinalNoIpi,
                 icms: precoFinalNoIpi * (pctImp.icms / 100),
                 pisCofins: precoFinalNoIpi * (pctImp.pisCofins / 100),
+                cbs: precoFinalNoIpi * (pctImp.cbs / 100),
+                ibs: precoFinalNoIpi * (pctImp.ibs / 100),
                 iss: precoFinalNoIpi * (pctImp.iss / 100),
                 das: precoFinalNoIpi * (pctImp.das / 100),
                 ipi: valorIpi
@@ -1850,21 +1928,26 @@ class PrecificacaoModule {
     }
 
     getDefaultPricingData() {
+        const m2027 = this._modeloTrib() === '2027';
         return {
             businessType: 'Industrialização',
             faturamento: 'Próprio',
             consumiveis: 5,
             icms: 12,
             pisCofins: 9.25,
+            cbs: this._aliqCbs(),
+            ibs: this._aliqIbs(),
             iss: 0,
-            ipi: 9.75,
-            ipiIsento: false,
+            // Modelo 2027: IPI de saída zerado (LC 214/2025) — legado mantém 9,75
+            ipi: m2027 ? 0 : 9.75,
+            ipiIsento: m2027,
             custosFixos: 8,
             comissao: 5,
             margemIdeal: 20,
             desconto: 0,
             icmsCredito: 0,
             pisCofinsCredito: 0,
+            cbsCredito: 0,
             ipiCredito: 0,
             das: 0
         };
@@ -1939,15 +2022,23 @@ class PrecificacaoModule {
             console.log('[Precificacao] calculateAll - tag:', tag, 'mat:', matBruto, 'labor:', labor, 'desp:', despesas);
 
             let matLiquido = matBruto;
-            let credIcms = 0, credPisCof = 0, credIpi = 0;
+            let credIcms = 0, credPisCof = 0, credIpi = 0, credCbs = 0;
+            const m2027all = this._modeloTrib() === '2027';
             if (regime !== 'Simples Nacional') {
                 const autoCred = this.calculateEquipmentCredits(eq);
                 credIcms = (data.icmsCredito || 0) || autoCred.credIcms;
-                credPisCof = (data.pisCofinsCredito || 0) || autoCred.credPisCof;
+                if (m2027all) {
+                    // Em 2027 o crédito de entrada é CBS (autoCred.credPisCof
+                    // já calcula com a alíquota CBS quando o modelo é 2027)
+                    credCbs = (data.cbsCredito || 0) || autoCred.credPisCof;
+                    credPisCof = 0;
+                } else {
+                    credPisCof = (data.pisCofinsCredito || 0) || autoCred.credPisCof;
+                }
                 credIpi = (data.ipiCredito || 0) || autoCred.credIpi;
-                matLiquido = matBruto - credIcms - credPisCof - credIpi;
+                matLiquido = matBruto - credIcms - credPisCof - credCbs - credIpi;
             }
-            const creditosAplicados = { icms: credIcms, pisCofins: credPisCof, ipi: credIpi };
+            const creditosAplicados = { icms: credIcms, pisCofins: credPisCof, cbs: credCbs, ipi: credIpi };
 
             const custoConsumiveis = matLiquido * ((data.consumiveis || 0) / 100);
             const custoTotal = matLiquido + custoConsumiveis + labor + despesas;
@@ -1962,7 +2053,7 @@ class PrecificacaoModule {
                     comissao: 0,
                     faturamento: 'Direto',
                     direto: true,
-                    impostos: { base: custoTotal, icms: 0, pisCofins: 0, iss: 0, das: 0, ipi: 0 },
+                    impostos: { base: custoTotal, icms: 0, pisCofins: 0, cbs: 0, ibs: 0, iss: 0, das: 0, ipi: 0 },
                     creditos: creditosAplicados,
                     detalhe: { materialBruto: matBruto, consumiveis: custoConsumiveis, mo: labor, despesasDiretas: despesas, custosFixos: 0 }
                 };
@@ -1970,15 +2061,21 @@ class PrecificacaoModule {
             }
 
             let totalImpostosPercent = 0;
-            const pctImp = { icms: 0, pisCofins: 0, iss: 0, das: 0 };
+            const pctImp = { icms: 0, pisCofins: 0, iss: 0, das: 0, cbs: 0, ibs: 0 };
+            const m2027calc = this._modeloTrib() === '2027';
             if (regime === 'Simples Nacional') {
                 totalImpostosPercent = data.das || 0;
                 pctImp.das = totalImpostosPercent;
             } else {
                 pctImp.icms = data.icms || 0;
-                pctImp.pisCofins = data.pisCofins || 0;
+                if (m2027calc) {
+                    pctImp.cbs = data.cbs ?? this._aliqCbs();
+                    pctImp.ibs = data.ibs ?? this._aliqIbs();
+                } else {
+                    pctImp.pisCofins = data.pisCofins || 0;
+                }
                 if (data.businessType === 'Prestação de Serviços') pctImp.iss = data.iss || 0;
-                totalImpostosPercent = pctImp.icms + pctImp.pisCofins + pctImp.iss;
+                totalImpostosPercent = pctImp.icms + pctImp.pisCofins + pctImp.cbs + pctImp.ibs + pctImp.iss;
             }
 
             const margemIdeal = data.margemIdeal || 0;
@@ -2026,6 +2123,8 @@ class PrecificacaoModule {
                     base: precoFinalNoIpi,
                     icms: precoFinalNoIpi * (pctImp.icms / 100),
                     pisCofins: precoFinalNoIpi * (pctImp.pisCofins / 100),
+                    cbs: precoFinalNoIpi * (pctImp.cbs / 100),
+                    ibs: precoFinalNoIpi * (pctImp.ibs / 100),
                     iss: precoFinalNoIpi * (pctImp.iss / 100),
                     das: precoFinalNoIpi * (pctImp.das / 100),
                     ipi: valorIpi
@@ -2084,8 +2183,8 @@ class PrecificacaoModule {
 
         const s = {
             receitaNoIpi: 0, ipi: 0, receitaComIpi: 0, custo: 0, lucro: 0,
-            icms: 0, pisCofins: 0, iss: 0, das: 0, ipiDebito: 0,
-            creditos: { icms: 0, pisCofins: 0, ipi: 0 },
+            icms: 0, pisCofins: 0, cbs: 0, ibs: 0, iss: 0, das: 0, ipiDebito: 0,
+            creditos: { icms: 0, pisCofins: 0, cbs: 0, ipi: 0 },
             materialBruto: 0, consumiveis: 0, mo: 0, despesasDiretas: 0,
             custosFixos: 0
         };
@@ -2100,6 +2199,8 @@ class PrecificacaoModule {
             if (imp) {
                 s.icms += imp.icms || 0;
                 s.pisCofins += imp.pisCofins || 0;
+                s.cbs += imp.cbs || 0;
+                s.ibs += imp.ibs || 0;
                 s.iss += imp.iss || 0;
                 s.das += imp.das || 0;
                 s.ipiDebito += imp.ipi || 0;
@@ -2108,6 +2209,7 @@ class PrecificacaoModule {
             if (cr) {
                 s.creditos.icms += cr.icms || 0;
                 s.creditos.pisCofins += cr.pisCofins || 0;
+                s.creditos.cbs += cr.cbs || 0;
                 s.creditos.ipi += cr.ipi || 0;
             }
             const d = x.detalhe;

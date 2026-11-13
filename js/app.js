@@ -1435,6 +1435,9 @@ const App = {
         if (document.getElementById('conf-email')) document.getElementById('conf-email').value = conf.email || '';
         if (document.getElementById('conf-regime')) document.getElementById('conf-regime').value = conf.regimeTributario || 'Lucro Real';
         if (document.getElementById('conf-ipi')) document.getElementById('conf-ipi').value = state.settings?.defaultIpi || 9.75;
+        if (document.getElementById('conf-modelo-trib')) document.getElementById('conf-modelo-trib').value = state.settings?.modeloTributario || '2027';
+        if (document.getElementById('conf-cbs')) document.getElementById('conf-cbs').value = state.settings?.aliqCbs ?? 11.2;
+        if (document.getElementById('conf-ibs')) document.getElementById('conf-ibs').value = state.settings?.aliqIbs ?? 0.1;
         if (document.getElementById('conf-company-color')) document.getElementById('conf-company-color').value = conf.companyColor || '#0055AA';
 
         // Fill address fields (individual or fallback parse from legacy address string)
@@ -1738,7 +1741,14 @@ const App = {
 
         store.setState({ 
             company,
-            settings: { ...store.getState().settings, defaultIpi: parseFloat(document.getElementById('conf-ipi').value) || 9.75, laborRates }
+            settings: {
+                ...store.getState().settings,
+                defaultIpi: parseFloat(document.getElementById('conf-ipi').value) || 9.75,
+                modeloTributario: document.getElementById('conf-modelo-trib')?.value || '2027',
+                aliqCbs: parseFloat(document.getElementById('conf-cbs')?.value) || 11.2,
+                aliqIbs: parseFloat(document.getElementById('conf-ibs')?.value) || 0.1,
+                laborRates
+            }
         });
         // Persist company data to server
         const _tkSC = store.getState().auth?.token;
@@ -1767,6 +1777,9 @@ const App = {
                 template_comercial: company.templateComercial || 'TEMPLATE_COM.docx',
                 template_completa: company.templateCompleta || 'TEMPLATE_TEC_COM.docx',
                 vendor_defaults: _s.vendor_defaults || '[]',
+                aliq_cbs: _s.aliqCbs ?? 11.2,
+                aliq_ibs: _s.aliqIbs ?? 0.1,
+                modelo_tributario: _s.modeloTributario || '2027',
                 loginTheme: _s.loginTheme || {}
             })
         }).then(r => {

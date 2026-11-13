@@ -61,12 +61,15 @@ const DRE_CATEGORIAS = [
     { key: 'impostos',         label: 'Impostos sobre Vendas',  sinal: '−', grupo: 'deducoes',     maiorMelhor: false, icone: 'ph-percent' },
     { key: 'icms',             label: 'ICMS sobre Vendas (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-drop' },
     { key: 'pis_cofins',       label: 'PIS/COFINS sobre Vendas (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-coins' },
+    { key: 'cbs',              label: 'CBS sobre Vendas (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-coins' },
+    { key: 'ibs',              label: 'IBS sobre Vendas (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-percent' },
     { key: 'iss',              label: 'ISS sobre Serviços (débito)', sinal: '−', grupo: 'deducoes',  maiorMelhor: false, icone: 'ph-briefcase' },
     { key: 'das',              label: 'DAS — Simples Nacional (débito)', sinal: '−', grupo: 'deducoes', maiorMelhor: false, icone: 'ph-file-text' },
     { key: 'ipi',              label: 'IPI a Recolher (débito)', sinal: '−', grupo: 'deducoes',     maiorMelhor: false, icone: 'ph-fire' },
     { key: 'material',         label: 'Materiais',              sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-cube' },
     { key: 'cred_icms',        label: 'Créd. ICMS (Entrada)',   sinal: '+', grupo: 'custos',       maiorMelhor: true,  icone: 'ph-arrow-down-left' },
     { key: 'cred_pis_cofins',  label: 'Créd. PIS/COFINS (Entrada)', sinal: '+', grupo: 'custos',   maiorMelhor: true,  icone: 'ph-seal-check' },
+    { key: 'cred_cbs',         label: 'Créd. CBS (Entrada)', sinal: '+', grupo: 'custos', maiorMelhor: true, icone: 'ph-seal-check' },
     { key: 'cred_ipi',         label: 'Créd. IPI (Entrada)',    sinal: '+', grupo: 'custos',       maiorMelhor: true,  icone: 'ph-certificate' },
     { key: 'mo',               label: 'Mão de Obra',            sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-users-three' },
     { key: 'despesas_diretas', label: 'Despesas Diretas',       sinal: '−', grupo: 'custos',       maiorMelhor: false, icone: 'ph-wrench' },
@@ -928,12 +931,18 @@ const ProjetosModule = {
         const jaTem = new Set(this._custosDoProjeto(projetoId, 'estimado').map(c => c.categoria));
         const receita = Number(projeto.valor_contrato) || 0;
         const regime = store.getState().company?.regimeTributario || 'Lucro Real';
-        const pImpostos = regime === 'Simples Nacional' ? DRE_SEED_PADRAO.impostosSN : DRE_SEED_PADRAO.impostos;
+        const settings = store.getState().settings || {};
+        const m2027 = (settings.modeloTributario || '2027') === '2027';
+        // Seed do modo legado (sem precificação salva): espelha o modelo
+        // tributário vigente — 2027: ICMS 12 + CBS + IBS; 2026: 21,25%.
+        const pImpostos = regime === 'Simples Nacional'
+            ? DRE_SEED_PADRAO.impostosSN
+            : (m2027 ? 12 + (Number(settings.aliqCbs) || 11.2) + (Number(settings.aliqIbs) || 0.1) : DRE_SEED_PADRAO.impostos);
 
         const novos = [];
         const snap = this._resumoPrecificacao(projeto.origem_id);
         // Se já existe linha de imposto (inclusive o agregado legado), não cria o detalhado
-        const temImposto = ['impostos', 'icms', 'pis_cofins', 'iss', 'das', 'ipi'].some(k => jaTem.has(k));
+        const temImposto = ['impostos', 'icms', 'pis_cofins', 'cbs', 'ibs', 'iss', 'das', 'ipi'].some(k => jaTem.has(k));
 
         if (snap && receita > 0) {
             /* ============================================================
@@ -959,6 +968,8 @@ const ProjetosModule = {
                 [
                     ['icms',       snap.icms,       `ICMS sobre vendas (débito)${pct(snap.icms, base)} sobre o preço s/ IPI${esc}`],
                     ['pis_cofins', snap.pisCofins,  `PIS/COFINS sobre vendas (débito)${pct(snap.pisCofins, base)} sobre o preço s/ IPI${esc}`],
+                    ['cbs',        snap.cbs,        `CBS sobre vendas (débito)${pct(snap.cbs, base)} sobre o preço s/ IPI${esc}`],
+                    ['ibs',        snap.ibs,        `IBS sobre vendas (débito)${pct(snap.ibs, base)} sobre o preço s/ IPI${esc}`],
                     ['iss',        snap.iss,        `ISS sobre serviços (débito)${pct(snap.iss, base)}${esc}`],
                     ['das',        snap.das,        `DAS — Simples Nacional (débito)${pct(snap.das, snap.receitaComIpi)} da receita${esc}`],
                     ['ipi',        snap.ipi,        `IPI a recolher (débito) — repasse do IPI destacado na nota${esc}`]
@@ -979,6 +990,7 @@ const ProjetosModule = {
             [
                 ['cred_icms',       snap.creditos.icms,      'Crédito de ICMS da entrada — abate o custo do material'],
                 ['cred_pis_cofins', snap.creditos.pisCofins, 'Crédito de PIS/COFINS da entrada — abate o custo do material'],
+                ['cred_cbs',        snap.creditos.cbs,       'Crédito de CBS da entrada — abate o custo do material'],
                 ['cred_ipi',        snap.creditos.ipi,       'Crédito de IPI da entrada — abate o custo do material']
             ].forEach(([cat, v, desc]) => {
                 const val = (v || 0) * fator;
@@ -1006,7 +1018,7 @@ const ProjetosModule = {
                 });
             }
             if (!jaTem.has('comissao') && (snap.comissao || 0) * fator > 0.005) {
-                const baseCom = base - ((snap.icms || 0) + (snap.pisCofins || 0) + (snap.iss || 0));
+                const baseCom = base - ((snap.icms || 0) + (snap.pisCofins || 0) + (snap.cbs || 0) + (snap.ibs || 0) + (snap.iss || 0));
                 novos.push({
                     categoria: 'comissao', valor: snap.comissao * fator, origem: 'precificacao',
                     descricao: `Comissão de vendas${pct(snap.comissao, baseCom)} sobre o líquido de impostos (R$ da precificação)${esc}`
