@@ -941,8 +941,10 @@ const ProjetosModule = {
 
         const novos = [];
         const snap = this._resumoPrecificacao(projeto.origem_id);
-        // Se já existe linha de imposto (inclusive o agregado legado), não cria o detalhado
-        const temImposto = ['impostos', 'icms', 'pis_cofins', 'cbs', 'ibs', 'iss', 'das', 'ipi'].some(k => jaTem.has(k));
+        // Nota: a criação das linhas de imposto é POR LINHA (!jaTem.has(cat))
+        // — linhas antigas do modelo anterior não são duplicadas, e linhas
+        // novas (ex.: CBS/IBS na migração 2027) são criadas mesmo quando
+        // outras linhas de imposto já existem.
 
         if (snap && receita > 0) {
             /* ============================================================
@@ -964,8 +966,7 @@ const ProjetosModule = {
                     descricao: 'Valor do contrato — preço final com IPI da precificação' + esc
                 });
             }
-            if (!temImposto) {
-                [
+            [
                     ['icms',       snap.icms,       `ICMS sobre vendas (débito)${pct(snap.icms, base)} sobre o preço s/ IPI${esc}`],
                     ['pis_cofins', snap.pisCofins,  `PIS/COFINS sobre vendas (débito)${pct(snap.pisCofins, base)} sobre o preço s/ IPI${esc}`],
                     ['cbs',        snap.cbs,        `CBS sobre vendas (débito)${pct(snap.cbs, base)} sobre o preço s/ IPI${esc}`],
@@ -979,7 +980,6 @@ const ProjetosModule = {
                         novos.push({ categoria: cat, valor: val, origem: 'precificacao', descricao: desc });
                     }
                 });
-            }
             const materialVal = Math.max(((snap.materialBruto || 0) + (snap.consumiveis || 0)) * fator, 0);
             if (!jaTem.has('material')) {
                 novos.push({
