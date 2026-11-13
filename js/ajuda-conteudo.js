@@ -517,7 +517,7 @@
         id: 'visao-geral',
         titulo: 'Visão Geral',
         screenshot: 'prints/precificacao/visao-geral.png',
-        texto: 'O módulo de Precificação permite calcular o preço de venda dos equipamentos da proposta técnica com base em:\n\n- Custos diretos (materiais, consumíveis, mão-de-obra, despesas, frete)\n- Créditos (ICMS, PIS/COFINS, IPI)\n- Impostos (DAS, ICMS, PIS/COFINS, ISS, IPI)\n- Margem de lucro e custos fixos\n- Comissões e descontos\n\nO sistema oferece três visualizações: por TAG, por SEU (agrupado) e consolidado.'
+        texto: 'O módulo de Precificação permite calcular o preço de venda dos equipamentos da proposta técnica com base em:\n\n- Custos diretos (materiais, consumíveis, mão-de-obra, despesas, frete)\n- Créditos (ICMS, CBS, PIS/COFINS, IPI)\n- Impostos (DAS, ICMS, CBS, IBS, PIS/COFINS, ISS, IPI)\n- Margem de lucro e custos fixos\n- Comissões e descontos\n\nO sistema oferece três visualizações: por TAG, por SEU (agrupado) e consolidado.\n\n**Modelo tributário (LC 214/2025):** em Configurações da Empresa você escolhe o modelo — **2027** (padrão: CBS ~11,2% + IBS teste 0,1% no lugar do PIS/COFINS, IPI de saída zerado) ou **2026** (legado: PIS/COFINS 9,25% + IPI). As alíquotas de CBS/IBS são editáveis no mesmo formulário (referência TCU: CBS 11,3% − 0,1pp = 11,2%; IBS 2027 = 0,1%). O campo Créd. CBS auto-preenche sobre os materiais e pode ser ajustado manualmente para o crédito financeiro amplo do Lucro Real (energia, software, EPI...).'
       },
       {
         id: 'modos',
@@ -535,12 +535,14 @@
           { nome: 'Mão de Obra (MOD + ENG)', descricao: 'Custo total de mão-de-obra. Campo somente leitura.' },
           { nome: 'Despesas Logística', descricao: 'Valor de despesas logísticas. Campo somente leitura.' },
           { nome: 'Custo Administrativo (%)', descricao: 'Percentual de custo administrativo/frete.' },
-          { nome: 'Créditos (ICMS, PIS/COF, IPI)', descricao: 'Valores de créditos tributários a abater.' },
+          { nome: 'Créditos (ICMS, CBS/PIS/COF, IPI)', descricao: 'Valores de créditos tributários a abater. No modelo 2027 o crédito de PIS/COFINS é substituído pelo Créd. CBS (auto sobre materiais, ajustável para o crédito financeiro).' },
           { nome: 'Alíquota DAS', descricao: 'Alíquota unificada do Simples Nacional.' },
           { nome: 'ICMS (%)', descricao: 'Percentual de ICMS.' },
-          { nome: 'PIS/COFINS (%)', descricao: 'Percentual de PIS e COFINS.' },
+          { nome: 'PIS/COFINS (%)', descricao: 'Percentual de PIS e COFINS. Somente no modelo 2026 (legado) — no 2027 é substituído por CBS/IBS.' },
+          { nome: 'CBS (%)', descricao: 'Contribuição sobre Bens e Serviços (modelo 2027, LC 214/2025). Substitui o PIS/COFINS; referência TCU 11,2%. Editável em Configurações.' },
+          { nome: 'IBS (%)', descricao: 'Imposto sobre Bens e Serviços (modelo 2027). Em 2027 é alíquota de teste compensável — referência 0,1%. Editável em Configurações.' },
           { nome: 'ISS (%)', descricao: 'Percentual de ISS (para prestação de serviços).' },
-          { nome: 'IPI (%)', descricao: 'Percentual de IPI. Pode ser marcado como Isento.' },
+          { nome: 'IPI (%)', descricao: 'Percentual de IPI. Pode ser marcado como Isento. No modelo 2027 o padrão é zerado (LC 214/2025 — zerar IPI fora da ZFM).' },
           { nome: 'Custos Fixos / Admin (%)', descricao: 'Percentual de custos fixos e administrativos.' },
           { nome: 'Comissão Vendas (%)', descricao: 'Percentual de comissão sobre vendas.' },
           { nome: 'Margem Lucro Ideal (%)', descricao: 'Percentual de margem de lucro desejada.' },
@@ -984,14 +986,17 @@
         id: 'dados-empresa',
         titulo: 'Dados da Empresa',
         screenshot: 'prints/configuracoes/dados-empresa.png',
-        texto: 'Configure os dados da empresa que serão utilizados na impressão dos documentos:\n\n- Nome da Empresa\n- CNPJ\n- Endereço Completo\n- E-mail de Contato\n- Regime Tributário (Lucro Real, Lucro Presumido, Simples Nacional)\n- IPI Padrão (%)',
+        texto: 'Configure os dados da empresa que serão utilizados na impressão dos documentos:\n\n- Nome da Empresa\n- CNPJ\n- Endereço Completo\n- E-mail de Contato\n- Regime Tributário (Lucro Real, Lucro Presumido, Simples Nacional)\n- IPI Padrão (%)\n- Modelo Tributário (2027 — Reforma Tributária, ou 2026 legado)\n- CBS (%) e IBS (%) — alíquotas vigentes',
         campos: [
           { nome: 'Nome da Empresa', descricao: 'Nome da empresa para exibição nos documentos.' },
           { nome: 'CNPJ', descricao: 'CNPJ da empresa para documentos fiscais.' },
           { nome: 'Endereço Completo', descricao: 'Endereço da matriz para documentos.' },
           { nome: 'E-mail de Contato', descricao: 'E-mail principal para contato.' },
           { nome: 'Regime Tributário', descricao: 'Regime tributário da empresa: Lucro Real, Lucro Presumido ou Simples Nacional.' },
-          { nome: 'IPI Padrão (%)', descricao: 'Alíquota padrão de IPI para novos materiais.' }
+          { nome: 'IPI Padrão (%)', descricao: 'Alíquota padrão de IPI para novos materiais.' },
+          { nome: 'Modelo Tributário', descricao: 'Modelo de cálculo: 2027 (CBS + IBS, IPI de saída zerado — LC 214/2025, padrão) ou 2026 (legado PIS/COFINS + IPI). Vale para novas precificações e propostas.' },
+          { nome: 'CBS (%)', descricao: 'Alíquota da CBS no modelo 2027. Referência TCU: 11,3% − 0,1pp = 11,2%. Ajuste aqui se o Senado alterar.' },
+          { nome: 'IBS (%)', descricao: 'Alíquota do IBS no modelo 2027. Em 2027 é teste (0,1% = 0,05% estadual + 0,05% municipal); cresce gradualmente até 2033.' }
         ]
       },
       {
@@ -1921,7 +1926,7 @@
       {
         id: 'dre',
         titulo: 'Aba DRE (Estimado × Real)',
-        texto: 'A DRE mostra a rentabilidade do projeto: quatro cards de resumo (Receita Líquida, Custos Diretos, Despesas Operacionais e Lucro Líquido com a margem) e uma tabela por conta com os lados **Estimado** e **Real**, a **variação** em R$ e % (verde quando favorável, vermelho quando não é) e subtotais encadeados: RECEITA LÍQUIDA, LUCRO BRUTO e LUCRO LÍQUIDO.\n\nGrupos de contas: Receita; (−) Deduções sobre Vendas (impostos — com a Precificação salva, cada tributo em sua linha: ICMS, PIS/COFINS, ISS/DAS e IPI a recolher); (−) Custos Diretos (materiais, os Créditos Tributários de ENTRADA — Créd. ICMS, PIS/COFINS e IPI — que abatem o material, mão de obra, despesas diretas e subcontratação); (−) Despesas Operacionais (custos fixos, comissão, viagens, frete e outras).\n\n**Gerar Estimado** cria as linhas de estimativa a partir do Valor do Contrato:\n- Receita = valor do contrato.\n- Com **Precificação salva** na proposta: valores EXATOS por linha — débitos (ICMS, PIS/COFINS, ISS/DAS e IPI) e os Créditos de Entrada (ICMS, PIS/COFINS e IPI) que abatem o material; sem precificação (modo legado), 21,25% no Lucro Real ou 4% no Simples Nacional.\n- Custos fixos e comissão: os valores em R$ calculados na Precificação (modo legado: 8% e 5% sobre a receita).\n- Material (bruto + consumíveis) e Mão de Obra: custo exato da Precificação (modo legado: nascem zerados para você completar pelo orçamento).\n\nO botão é idempotente: só cria linhas que ainda não existem e avisa quando o estimado já está completo.\n\n**Novo Lançamento** registra qualquer linha (conta da DRE, tipo estimado ou real, data, descrição e valor). Os lançamentos individuais aparecem embaixo da tabela, editáveis e excluíveis. Os custos reais também chegam sozinhos do módulo Compras: cada NF recebida lança o custo de material automaticamente.\n\nA toolbar tem **Gerar Estimado**, **Novo Lançamento** e **XLSX Detalhado** — export com 4 abas: **DRE** (resumo executivo: estimado × real, subtotais e margem), **Detalhamento** (cada conta aberta com TODOS os lançamentos, subtotais por conta e variação), **Lançamentos** (base completa com autofiltro, pronta para tabela dinâmica do Excel) e **Análise** (indicadores-chave, participação na receita líquida, maiores desvios e alertas — por exemplo, contas com real sem estimado ou lançamento sem data). Todas as abas seguem o padrão do sistema: banner com identificação do projeto, cabeçalho em MAIÚSCULAS negrito centralizado, linhas zebradas e as duas primeiras linhas congeladas.',
+        texto: 'A DRE mostra a rentabilidade do projeto: quatro cards de resumo (Receita Líquida, Custos Diretos, Despesas Operacionais e Lucro Líquido com a margem) e uma tabela por conta com os lados **Estimado** e **Real**, a **variação** em R$ e % (verde quando favorável, vermelho quando não é) e subtotais encadeados: RECEITA LÍQUIDA, LUCRO BRUTO e LUCRO LÍQUIDO.\n\nGrupos de contas: Receita; (−) Deduções sobre Vendas (impostos — com a Precificação salva, cada tributo em sua linha: ICMS, CBS, IBS, PIS/COFINS, ISS/DAS e IPI a recolher); (−) Custos Diretos (materiais, os Créditos Tributários de ENTRADA — Créd. ICMS, CBS, PIS/COFINS e IPI — que abatem o material, mão de obra, despesas diretas e subcontratação); (−) Despesas Operacionais (custos fixos, comissão, viagens, frete e outras).\n\n**Gerar Estimado** cria as linhas de estimativa a partir do Valor do Contrato:\n- Receita = valor do contrato.\n- Com **Precificação salva** na proposta: valores EXATOS por linha — débitos (ICMS, CBS/IBS, PIS/COFINS, ISS/DAS e IPI) e os Créditos de Entrada (ICMS, CBS, PIS/COFINS e IPI) que abatem o material; sem precificação (modo legado), 21,25% no Lucro Real ou 4% no Simples Nacional.\n- Custos fixos e comissão: os valores em R$ calculados na Precificação (modo legado: 8% e 5% sobre a receita).\n- Material (bruto + consumíveis) e Mão de Obra: custo exato da Precificação (modo legado: nascem zerados para você completar pelo orçamento).\n\nO botão é idempotente: só cria linhas que ainda não existem e avisa quando o estimado já está completo.\n\n**Novo Lançamento** registra qualquer linha (conta da DRE, tipo estimado ou real, data, descrição e valor). Os lançamentos individuais aparecem embaixo da tabela, editáveis e excluíveis. Os custos reais também chegam sozinhos do módulo Compras: cada NF recebida lança o custo de material automaticamente.\n\nA toolbar tem **Gerar Estimado**, **Novo Lançamento** e **XLSX Detalhado** — export com 4 abas: **DRE** (resumo executivo: estimado × real, subtotais e margem), **Detalhamento** (cada conta aberta com TODOS os lançamentos, subtotais por conta e variação), **Lançamentos** (base completa com autofiltro, pronta para tabela dinâmica do Excel) e **Análise** (indicadores-chave, participação na receita líquida, maiores desvios e alertas — por exemplo, contas com real sem estimado ou lançamento sem data). Todas as abas seguem o padrão do sistema: banner com identificação do projeto, cabeçalho em MAIÚSCULAS negrito centralizado, linhas zebradas e as duas primeiras linhas congeladas.',
         campos: [
           { nome: 'Conta (linha da DRE)', descricao: 'Receita Bruta, Impostos, Materiais, Mão de Obra, Despesas Diretas, Subcontratação, Custos Fixos, Comissão, Viagens, Frete e Outras.' },
           { nome: 'Tipo', descricao: 'Estimado (orçamento) ou Real (o que saiu de fato).' },

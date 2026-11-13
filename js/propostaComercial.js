@@ -827,6 +827,9 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
     _renderTabEscopo(data) {
         const techData = store.getState().activeProposal || {};
         const techScopeItems = techData.scopeItems || [];
+        // Modelo tributário vigente (LC 214/2025) — defaults dos textos fiscais
+        // que vão para o DOCX comercial. Valores já salvos nunca são alterados.
+        const m2027trib = (store.getState().settings?.modeloTributario || '2027') !== '2026';
         const supplyItems = data.supplyItems && data.supplyItems.length > 0
             ? data.supplyItems
             : [{ text: 'Em atenção a vossa solicitação, apresentamos nossa Proposta Comercial...' }];
@@ -883,9 +886,9 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 <label class="form-label">3 - Impostos (Configuração)</label>
                 <div style="display:flex;gap:15px;">
                     <div style="flex:1;"><label class="form-label" style="font-size:11px;">Impostos Inclusos (Texto)</label>
-                        <input type="text" name="impostos_texto" class="form-control" value="${data.impostos_texto||'ICMS, PIS, COFINS Inclusos'}"></div>
+                        <input type="text" name="impostos_texto" class="form-control" value="${data.impostos_texto || (m2027trib ? 'ICMS, CBS e IBS Inclusos' : 'ICMS, PIS, COFINS Inclusos')}"></div>
                     <div style="flex:1;"><label class="form-label" style="font-size:11px;">IPI Geral (Texto)</label>
-                        <input type="text" name="ipi_texto" class="form-control" value="${data.ipi_texto||'A incluir conforme tabela'}"></div>
+                        <input type="text" name="ipi_texto" class="form-control" value="${data.ipi_texto || (m2027trib ? 'Isento — IPI zerado em 2027 (LC 214/2025)' : 'A incluir conforme tabela')}"></div>
                 </div>
             </div>
         </div>`;
