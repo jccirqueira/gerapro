@@ -422,8 +422,10 @@ na partida do motor.
      mudar depois, edite o típico e ajuste os valores manualmente — não há
      botão de recálculo automático.
 
-  ✅ Cada material guarda também ICMS, IPI e UF do fornecedor — essas
-     informações são usadas na Precificação para calcular créditos de impostos.
+  ✅ Cada material guarda também ICMS, IPI, CBS, Origem (CST) e UF do
+     fornecedor — essas informações são usadas na Precificação para
+     calcular os créditos de imposto de entrada (PIS/COFINS no modelo
+     2026; CBS no modelo 2027, LC 214/2025).
 
   ✅ Você pode editar a QUANTIDADE diretamente na tabela (campo editável).
 

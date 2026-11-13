@@ -113,16 +113,34 @@ para o sistema.
 │                           │    Opções: Lucro Real / Lucro Presumido /           │
 │                           │    Simples Nacional.                                │
 │                           │                                                     │
-│ IPI Padrão (%)            │ Percentual de IPI que será usado como padrão        │
-│                           │ para novos equipamentos. Normalmente 9,75%.         │
-│                           │                                                     │
+│ IPI Padrão (%)            │ Percentual de IPI de referência para cadastros.      │
+│                           │ MODELO 2027: novos materiais nascem com IPI = 0      │
+│                           │ (LC 214/2025 — zerar IPI fora da ZFM).               │
+│                           │                                                      │
+│ Modelo Tributário ⭐       │ Define o modelo de cálculo da Precificação:          │
+│                           │ 2027 = CBS + IBS no lugar do PIS/COFINS e IPI de     │
+│                           │ saída zerado (PADRÃO — LC 214/2025);                 │
+│                           │ 2026 = legado PIS/COFINS + IPI.                      │
+│                           │                                                      │
+│ CBS (%)                   │ Alíquota da CBS no modelo 2027 (padrão 11,2% =       │
+│                           │ TCU 11,3% − 0,1pp). Ajuste se o Senado alterar.      │
+│                           │                                                      │
+│ IBS (%)                   │ Alíquota do IBS no modelo 2027 (padrão 0,1% =        │
+│                           │ teste 0,05% est. + 0,05% mun.; cresce até 2033.      │
+│                           │                                                      │
+│ Simular Split             │ Retém CBS/IBS no ato do recebimento (LC 214/2025).   │
+│ Payment                   │ Ativo: a aba Condições de Pagamento da Proposta      │
+│                           │ Comercial mostra o valor líquido por evento.         │
+│                           │ Facultativo em 2027; obrigatório B2B em 2028.        │
+│                           │ Só se aplica ao modelo 2027 fora do Simples.         │
+│                           │                                                      │
 │ Cor do Badge              │ Cor de fundo do badge da empresa no cabeçalho       │
 │                           │ do sistema (ao lado do nome).                       │
 └───────────────────────────┴─────────────────────────────────────────────────────┘
 
 💡 Dica: O Regime Tributário é CRÍTICO para a Precificação. Se sua empresa
    for Simples Nacional, o sistema usa uma alíquota única (DAS) e os outros
-   impostos (ICMS, PIS/COFINS, IPI) são ignorados. Se for Lucro Real, todos
+   impostos (ICMS, CBS/IBS, PIS/COFINS ou IPI) são ignorados. Se for Lucro Real, todos
    os impostos são calculados individualmente.
 
 

@@ -89,15 +89,17 @@ muda completamente quais impostos serão calculados.
 │ TIPO                │ O QUE SIGNIFICA                                          │
 ├──────────────────────┼──────────────────────────────────────────────────────────┤
 │ Industrialização    │ Você mesmo fabrica os equipamentos. É o mais comum.      │
-│                      │ ICMS = 12%, IPI = 9,75%, PIS/COFINS = 9,25%.           │
+│                      │ MODELO 2027: ICMS = 12% (CONFAZ pode aplicar 18%),     │
+│                      │ CBS = 11,2%, IBS = 0,1%, IPI = 0 (zerado — LC 214/2025).│
 │                      │                                                          │
 │ Revenda             │ Você compra pronto e revende.                             │
-│                      │ ICMS = 18%, IPI = 0%, PIS/COFINS = 9,25%.              │
-│                      │ (não tem IPI porque você não fabricou)                   │
+│                      │ MODELO 2027: ICMS = 18%, CBS = 11,2%, IBS = 0,1%,       │
+│                      │ IPI = 0 (não fabricou e o IPI de saída zerou em 2027).   │
 │                      │                                                          │
 │ Prestação de        │ Você só presta o serviço (sem fornecimento de material). │
-│ Serviços            │ ICMS = 0%, ISS = 5%, IPI = 0%, PIS/COFINS = 4,65%.      │
-│                      │ (não tem ICMS porque é serviço, não mercadoria)          │
+│ Serviços            │ MODELO 2027: ISS = 5%, CBS = 11,2%, IBS = 0,1%,          │
+│                      │ ICMS = 0%, IPI = 0.                                      │
+│                      │ (ICMS não incide porque é serviço, não mercadoria)       │
 └──────────────────────┴──────────────────────────────────────────────────────────┘
 
 ✅ Ao mudar o Tipo de Negócio, os impostos são ajustados automaticamente.
@@ -106,6 +108,24 @@ Você ainda pode ajustar manualmente se precisar.
 ✅ Existe também uma diferença no Regime Tributário da empresa (configurado em
    Ajustes > Dados da Empresa). Se a empresa for Simples Nacional, o imposto é
    unificado em uma alíquota única chamada DAS, e os outros impostos somem.
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║  📌 MODELO TRIBUTÁRIO (Reforma — LC 214/2025)                                 ║
+║                                                                                ║
+║  Em Ajustes > Dados da Empresa você escolhe o MODELO:                         ║
+║                                                                                ║
+║  • 2027 (PADRÃO): CBS ~11,2% + IBS 0,1% no lugar do PIS/COFINS;              ║
+║    IPI de saída zerado. Alíquotas editáveis no mesmo formulário                ║
+║    (referência TCU: CBS 11,3% − 0,1pp = 11,2%; IBS teste 2027 = 0,1%).       ║
+║  • 2026 (LEGADO): PIS/COFINS 9,25% + IPI — para propostas do modelo antigo.   ║
+║                                                                                ║
+║  Com o 2027: o campo PIS/COFINS SOME da tela e aparecem CBS (%) e IBS (%);    ║
+║  o IPI nasce zerado com "Isento" marcado; o crédito de entrada vira            ║
+║  "Créd. CBS" (auto sobre os materiais, ajustável manualmente para             ║
+║  incluir o crédito financeiro amplo do Lucro Real — energia, software, EPI).   ║
+║  Há também o toggle "Simular Split Payment" (retenção de CBS/IBS no           ║
+║  recebimento — ver seção de Condições na Proposta Comercial).                 ║
+╚════════════════════════════════════════════════════════════════════════════════╝
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -163,15 +183,21 @@ precificação daquele equipamento. Vamos ver campo por campo.
 
   --- Créditos sobre Entradas (não aparece no Simples Nacional) ---
   Crédito ICMS (R$) ───────── Valor de ICMS que você pode abater (crédito fiscal).
-  Crédito PIS/COFINS (R$) ─── Crédito de PIS e COFINS.
+  Crédito PIS/COFINS (R$) ─── Crédito de PIS e COFINS. (MODELO 2026 — some no 2027)
+  Crédito CBS (R$) ─────────── Crédito de CBS da entrada. (MODELO 2027 — no lugar
+                               do PIS/COFINS; some no modelo 2026)
   Crédito IPI (R$) ────────── Crédito de IPI.
 
   💡 Para QUALQUER equipamento, esses créditos são preenchidos
-     AUTOMATICAMENTE a partir das alíquotas de ICMS, IPI, PIS e COFINS
-     de cada material no catálogo (típicos de partida, materiais
-     diretos e materiais de automação). O bloco aparece para todos os
-     regimes que não sejam Simples Nacional (Lucro Real e Lucro
-     Presumido). Você ainda pode ajustá-los manualmente.
+     AUTOMATICAMENTE. No modelo 2026, a partir das alíquotas de ICMS, IPI,
+     PIS e COFINS de cada material no catálogo; no modelo 2027, a CBS usa
+     a alíquota POR MATERIAL quando preenchida no cadastro fiscal
+     (o destaque da NF do fornecedor; vazio = alíquota global 11,2%).
+     💰 No Lucro Real o crédito é FINANCEIRO: ajuste o "Créd. CBS" na mão
+     para incluir insumos além dos materiais (energia, software, EPI,
+     ferramentas) — a CBS creditável é sobre TODO o gasto qualificado.
+     O bloco aparece para todos os regimes que não sejam Simples Nacional
+     (Lucro Real e Lucro Presumido).
 
 Custo Total (R$) ────────── ⛔ Automático. É a soma de tudo acima.
 
@@ -194,15 +220,27 @@ Custo Total (R$) ────────── ⛔ Automático. É a soma de tu
                                valor veio da tabela. Se você digitar outro valor,
                                ele é mantido como manual (e o selo some).
 
-  PIS/COFINS (%) ──────────── Contribuições federais.
+  PIS/COFINS (%) ──────────── Contribuições federais. (SOMENTE MODELO 2026 —
+                               some da tela no modelo 2027)
                                Industrialização/Revenda: 9,25% | Serviços: 4,65%
+
+  CBS (%) ──────────────────── MODELO 2027 (LC 214/2025): substitui o
+                               PIS/COFINS. Referência TCU: 11,2%
+                               (editável em Ajustes > Dados da Empresa).
+
+  IBS (%) ──────────────────── MODELO 2027: em 2027 é alíquota de teste
+                               compensável: 0,1% (0,05% estadual + 0,05%
+                               municipal). Cresce gradualmente até 2033.
 
   ISS (%) ─────────────────── Só aparece para Prestação de Serviços. Ex: 5%.
 
   IPI (%) ─────────────────── Imposto sobre Produtos Industrializados.
-                               Só aparece para Industrialização. Padrão: 9,75%.
+                               Só aparece para Industrialização. Padrão:
+                               MODELO 2027 = 0 (zerado — LC 214/2025, zerar
+                               IPI fora da ZFM) | MODELO 2026 = 9,75%.
 
   Isento de IPI ──────────── ☑ Marque se o equipamento for isento de IPI.
+                               No modelo 2027 o checkbox nasce marcado.
                                Para equipamentos de SEU (subestação) e CUB-MT,
                                isso é marcado automaticamente.
 
@@ -237,10 +275,21 @@ Custo Total (R$) ────────── ⛔ Automático. É a soma de tu
 
 Vamos usar um exemplo concreto para ficar mais fácil.
 
-EXEMPLO:
+EXEMPLO (modelo 2026 — legado):
   Custo Total do equipamento: R$ 10.000,00
   ICMS: 12% | PIS/COFINS: 9,25% | IPI: 9,75%
   Custos Fixos: 8% | Comissão: 5% | Margem Ideal: 20%
+
+  📌 NO MODELO 2027 (padrão) os números mudam assim:
+  • No lugar de PIS/COFINS(9,25%): CBS(11,2%) + IBS(0,1%) = 11,3%
+    → o total de percentuais federais sobe ~2 pontos (9,25% → 11,3%),
+      o que empurra um pouco o preço final para cima.
+  • O IPI some da conta (zerado): não existe a etapa 5 do cálculo
+    (preço final = preço final sem IPI).
+  • O crédito de entrada que abate o material vira Créd. CBS
+    (auto: materiais × 11,2%, ajustável para o crédito financeiro).
+  • Com o Lucro Real, o markup usa: ICMS + CBS + IBS + Custos Fixos +
+    Comissão + Margem — mesma fórmula, tributos novos.
 
 ╔══════════════════════════════════════════════════════════════════════════════════╗
 ║                                                                                  ║
@@ -319,7 +368,8 @@ automaticamente. Ele mostra:
 │ Preço Final c/ IPI   │ O preço TOTAL que o cliente vai pagar (com IPI).        │
 │                      │ ✅ Destacado em azul — é o número mais importante.       │
 │                      │                                                          │
-│ Total de Impostos    │ Soma de ICMS + PIS/COFINS (e ISS se for serviço).       │
+│ Total de Impostos    │ Soma dos tributos de saída: ICMS + PIS/COFINS (2026)  │
+│                      │ ou ICMS + CBS + IBS (2027) + ISS se for serviço.       │
 │                      │                                                          │
 │ Custos Fixos         │ Quanto do preço vai para custos administrativos.         │
 │                      │                                                          │
@@ -334,8 +384,9 @@ automaticamente. Ele mostra:
 └──────────────────────┴──────────────────────────────────────────────────────────┘
 
 📌 Por baixo dos panos, cada cálculo também grava os impostos
-   DETALHADOS por tributo (ICMS, PIS/COFINS, ISS, DAS e IPI) e o
-   detalhe dos custos (material, consumíveis, mão de obra, despesas).
+   DETALHADOS por tributo (ICMS, PIS/COFINS ou CBS/IBS conforme o
+   modelo, ISS, DAS e IPI) e o detalhe dos custos (material,
+   consumíveis, mão de obra, despesas).
    É esse detalhe que alimenta o Resumo Consolidado e o resumo
    tributário salvo na proposta (ver seção 10).
 
@@ -465,9 +516,10 @@ RESUMO TRIBUTÁRIO do projeto inteiro e o salva junto com a Proposta Técnica.
 
   • Receita sem IPI, valor do IPI e receita total COM IPI
   • Custo total e lucro
-  • Impostos DETALHADOS por tributo (débito): ICMS, PIS/COFINS, ISS,
-    DAS e IPI
-  • Créditos de impostos de entrada (o que você pode abater)
+  • Impostos DETALHADOS por tributo (débito): ICMS, PIS/COFINS (2026)
+    ou CBS/IBS (2027), ISS, DAS e IPI
+  • Créditos de impostos de entrada (o que você pode abater — Créd.
+    ICMS, Créd. PIS/COFINS no 2026 ou Créd. CBS no 2027, Créd. IPI)
   • Detalhe dos custos: material, consumíveis, mão de obra e despesas
   • A Infraestrutura (BDI próprio) entra em custo, receita e lucro,
     mas sem impostos por item
@@ -503,7 +555,8 @@ equipamento. Você não precisa configurar nada — mas é bom saber:
 
 💡 AUTPRO (pastas AUT_*) — Comissão especial:
    • A comissão vira 0,5% sobre o valor BRUTO (preço + IPI) em vez do
-     percentual padrão informado no campo
+     percentual padrão informado no campo — no MODELO 2027 o IPI é 0,
+     então a taxa efetiva é simplesmente 0,5% sobre o preço sem IPI
    • Teto de R$ 30.000,00 por proposta: o que exceder o teto é
      devolvido ao lucro
    • No Resumo Consolidado, um banner mostra a comissão Bruta, a
@@ -652,9 +705,20 @@ ETAPA 7 — SALVAR TUDO
 │                       │ Varia conforme o Tipo de Negócio.                       │
 │                       │                                                         │
 │ PIS/COFINS            │ Contribuições federais sobre o faturamento.             │
+│                       │ SOMENTE modelo 2026 (legado) — no 2027 é substituído    │
+│                       │ pela CBS.                                               │
+│                       │                                                         │
+│ CBS                   │ Contribuição sobre Bens e Serviços (LC 214/2025).       │
+│                       │ MODELO 2027: substitui o PIS/COFINS na saída (11,2%)   │
+│                       │ e gera crédito sobre as entradas (crédito financeiro).   │
+│                       │                                                         │
+│ IBS                   │ Imposto sobre Bens e Serviços (LC 214/2025).            │
+│                       │ MODELO 2027: em 2027 entra como teste (0,1%);          │
+│                       │ substitui o ICMS e o ISS entre 2029 e 2033.             │
 │                       │                                                         │
 │ ISS                   │ Imposto Sobre Serviços. É municipal.                    │
 │                       │ Só aparece para Prestação de Serviços.                  │
+│                       │ Coexiste com a CBS/IBS até 2029+ (fim gradual).         │
 │                       │                                                         │
 │ DAS                   │ Documento de Arrecadação do Simples Nacional.           │
 │                       │ É uma alíquota ÚNICA que substitui todos os outros      │
@@ -725,12 +789,15 @@ ETAPA 7 — SALVAR TUDO
 │            são somente leitura porque vêm da Proposta Técnica. Para alterar,   │
 │            mexa nos Típicos, Composições ou Despesas.                           │
 │                                                                                 │
-│  PROBLEMA: "Os créditos de ICMS/IPI estão zerados"                             │
-│  SOLUÇÃO:  O sistema preenche os créditos AUTOMATICAMENTE a partir das         │
-│            alíquotas de ICMS, IPI, PIS e COFINS de cada material do            │
-│            catálogo (típicos de partida, materiais diretos e automação).       │
-│            Se ficaram zerados, é porque esses materiais não têm alíquota       │
-│            informada — preencha no cadastro ou ajuste o crédito na mão.        │
+│  PROBLEMA: "Os créditos de ICMS/IPI/CBS estão zerados"                          │
+│  SOLUÇÃO:  O sistema preenche os créditos AUTOMATICAMENTE: no modelo            │
+│            2026, a partir das alíquotas de ICMS, IPI, PIS e COFINS de           │
+│            cada material; no modelo 2027, o Créd. CBS usa a alíquota            │
+│            POR MATERIAL do cadastro fiscal (destaque da NF do                   │
+│            fornecedor) ou a global 11,2% (Ajustes > Dados da                    │
+│            Empresa). Se zerar: preencha a alíquota no material ou               │
+│            ajuste o crédito na mão — no Lucro Real o crédito é                  │
+│            financeiro (energia, software, EPI entram).                          │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 

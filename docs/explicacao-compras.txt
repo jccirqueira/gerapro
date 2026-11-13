@@ -371,7 +371,8 @@ No formulário da NF, o botão Importar XML recebe o arquivo XML emitido pela
 SEFAZ (o mesmo baixado do portal da NF-e). O arquivo é lido no próprio
 navegador — aceita o padrão da SEFAZ (nfeProc) e também o XML NFe avulso. O
 sistema lê o cabeçalho (número, série, chave de acesso, emitente,
-transportadora, volumes), os valores (produtos, frete, desconto, impostos) e os
+transportadora, volumes), os valores (produtos, frete, desconto, impostos —
+incluindo CBS e IBS nos XMLs de 2027, LC 214/2025) e os
 itens — e faz o casamento automático dos itens da NF com os do pedido em três
 níveis de confiança:
 
@@ -388,6 +389,13 @@ níveis de confiança:
 
 O mesmo XML pode ser reimportado sem virar duplicata — a chave de acesso
 deduplica. Sem XML, o preenchimento manual continua funcionando normalmente.
+
+📌 ALERTA DE CRÉDITO (XML de 2027): se a NF tem emissão a partir de
+   01/01/2027 e o valor vCBS vier zerado, o sistema avisa que a CBS não
+   foi destacada pelo fornecedor — sem destaque, o crédito de CBS da
+   entrada não se forma no Lucro Real (o aviso não bloqueia a importação;
+   confirme com o fornecedor). Os valores CBS/IBS entram na nota e ficam
+   visíveis nos campos "CBS (R$)" e "IBS (R$)" do formulário.
 
 A conferência é automática ao salvar: quantidade e preço da NF × pedido.
 Divergência acima da tolerância (R$ 0,005 por item) muda o status da NF para

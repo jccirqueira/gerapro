@@ -280,11 +280,11 @@ encadeados: RECEITA LÍQUIDA → LUCRO BRUTO → LUCRO LÍQUIDO.
 ├───────────────────────────┼────────────────────────────────────────────────┤
 │ (+) Receita               │ Receita Bruta.                                 │
 │ (−) Deduções sobre Vendas │ Impostos sobre Vendas e débitos por tributo:   │
-│                           │ ICMS, PIS/COFINS, ISS, DAS e IPI.              │
+│                           │ ICMS, CBS, IBS, PIS/COFINS, ISS, DAS e IPI.     │
 │ (−) Custos Diretos        │ Materiais, Mão de Obra, Despesas Diretas,      │
 │                           │ Subcontratação e os Créditos de Entrada:       │
-│                           │ Créd. ICMS, Créd. PIS/COFINS e Créd. IPI —     │
-│                           │ entram com sinal + e REDUZEM o custo.          │
+│                           │ Créd. ICMS, Créd. CBS, Créd. PIS/COFINS e       │
+│                           │ Créd. IPI — entram com sinal + e REDUZEM o custo.│
 │ (−) Despesas Operacionais │ Custos Fixos/Admin., Comissão, Viagens, Frete, │
 │                           │ Outras.                                        │
 └───────────────────────────┴────────────────────────────────────────────────┘
@@ -303,7 +303,8 @@ encadeados: RECEITA LÍQUIDA → LUCRO BRUTO → LUCRO LÍQUIDO.
 │  o regime tributário e os percentuais padrão:                                   │
 │                                                                                 │
 │  • Receita = valor do contrato (nos dois caminhos).                             │
-│  • Impostos: 21,25% no Lucro Real ou 4% (DAS) no Simples Nacional.              │
+│ • Impostos: modelo 2026 = 21,25% (Lucro Real) ou 4% (DAS);                      │
+│   modelo 2027 = 12% ICMS + CBS 11,2% + IBS 0,1%.                                │
 │  • Custos fixos 8% e comissão 5% sobre a receita.                               │
 │  • Materiais e Mão de Obra nascem zerados para você completar pelo orçamento.   │
 │                                                                                 │
@@ -471,12 +472,13 @@ instantâneo, sem digitar nada duas vezes.
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│PROBLEMA: "Os impostos não batem com o meu contador"                             │
-│SOLUÇÃO: Com Precificação salva, os impostos entram detalhados por tributo       │
-│            (ICMS, PIS/COFINS, ISS, DAS e IPI), como foram calculados lá. Sem    │
-│            precificação, o Gerar Estimado usa o regime tributário (21,25%       │
-│            Lucro Real / 4% Simples Nacional) — configure o regime certo em      │
-│            Configurações e ajuste o valor à mão quando preciso.                 │
+│ PROBLEMA: "Os impostos não batem com o meu contador"                            │
+│ SOLUÇÃO: Com Precificação salva, os impostos entram detalhados por              │
+│             tributo (ICMS, CBS/IBS, PIS/COFINS, ISS, DAS e IPI), como           │
+│             foram calculados lá. Sem precificação, o Gerar Estimado usa         │
+│             o regime: modelo 2026 = 21,25% Lucro Real / 4% Simples;             │
+│             modelo 2027 = 12% ICMS + CBS + IBS (mesmo Simples: 4%).             │
+│             Ajuste o valor à mão quando preciso.                                │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐

@@ -35,7 +35,18 @@ Agora traduzindo para o GeraPro:
   • O ICMS muda conforme esses dois estados
 
 O sistema novo faz esse cálculo automaticamente, usando a tabela oficial do CONFAZ
-(Conselho Nacional de Política Fazendária — o órgão que define essas regras).
+(Conselho Nacional de Política Fazendária - o órgão que define essas regras).
+
+📌 REFORMA TRIBUTÁRIA (2027 — LC 214/2025): o ICMS NÃO muda em 2027 — a
+   tabela CONFAZ continua válida e continua sendo aplicada exatamente como
+   descrito aqui. O que muda é que se SOMAM dois tributos federais novos,
+   calculados à parte na Precificação: a CBS (~11,2%) e o IBS (alíquota de
+   teste de 0,1% em 2027). Ou seja: em 2027 o imposto sobre a venda =
+   ICMS (por UF, como sempre) + CBS + IBS.
+   Depois, entre 2029 e 2033, o próprio ICMS será substituído gradualmente
+   pelo IBS e esta tabela perde espaço — até lá, continue usando este
+   documento normalmente. Detalhes do modelo 2027 em
+   "explicacao-precificacao.txt" (seção Modelo Tributário).
 
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐

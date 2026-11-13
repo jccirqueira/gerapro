@@ -56,7 +56,7 @@ Dentro do GeraPro, PLC e REM funcionam de forma praticamente idêntica.
 │  3. Configura a Lista de I/O (racks, slots, canais)                           │
 │  4. O sistema GERA AUTOMATICAMENTE a Lista de Materiais                       │
 │  5. Você ajusta os materiais (quantidades, fornecedores, impostos)            │
-│  6. ❗ Os créditos de ICMS/IPI vão automaticamente para a Precificação        │
+│  6. ❗ Os créditos de ICMS/CBS/IPI vão automaticamente para a Precificação    │
 │  7. Você fatura o projeto                                                      │
 │                                                                                 │
 │  ✅ Diferente de outros equipamentos, o PLC tem uma integração forte entre     │
@@ -331,12 +331,12 @@ O que é gerado automaticamente:
    2. Nos Típicos I/O (bornes por canal, fusíveis, relés, etc.)
    3. No catálogo de materiais cadastrado no sistema
 
-💰 Colunas de ICMS e IPI:
-   Cada item da lista tem colunas de ICMS (%) e IPI (%) que vêm do catálogo
-   de materiais. Esses valores são usados para calcular os créditos de
-   imposto na Precificação — ou seja, você não precisa digitar nada lá.
+💰 Colunas de ICMS, IPI e CBS:
+   Cada item da lista tem colunas de ICMS (%), IPI (%) e CBS (%) que vêm
+   do catálogo de materiais. Esses valores são usados para calcular os
+   créditos de imposto na Precificação — você não precisa digitar nada
+   lá. (No modelo 2027 o crédito de entrada é a CBS.)
 
-🔧 Catálogo de Fornecedores:
    Cada item tem uma coluna "Ref. Catálogo" que permite selecionar o
    fornecedor e o código do material. Se o item não tiver correspondência
    automática, você pode escolher manualmente.
@@ -457,10 +457,10 @@ Este é o grande diferencial do sistema para PLC. Veja o fluxo completo:
    │  LISTA DE   │──────▶│  LISTA DE       │──────▶│  PRECIFICAÇÃO   │
    │  I/O        │       │  MATERIAIS      │       │                 │
    │             │       │                 │       │                 │
-   │ Racks       │       │ Bornes, cabos,  │       │ Créditos ICMS   │
-   │ Slots       │       │ relés, fontes,  │       │ Créditos IPI    │
-   │ Canais      │       │ estrutura, etc. │       │ Créditos PIS/   │
-   │ Tags        │       │ com ICMS e IPI  │       │ COFINS          │
+   │ Racks       │       │ Bornes, cabos,  │       │ Créd. ICMS e CBS│
+   │ Slots       │       │ relés, fontes,  │       │ Créd. IPI, PIS/ │
+   │ Canais      │       │ estrutura, etc. │       │ e COFINS        │
+   │ Tags        │       │ c/ ICMS,IPI,CBS │       │ COFINS          │
    │             │       │                 │       │                 │
    └─────────────┘       └─────────────────┘       └─────────────────┘
 

@@ -399,7 +399,8 @@ Isso permite duas ferramentas úteis:
 │                           │          │ sistema converte para 12%.              │
 │                           │          │                                         │
 │ IPI (%)                   │ Não      │ Alíquota de IPI do material.             │
-│                           │          │                                         │
+│ CBS (%)                   │ Não      │ Alíquota de CBS do material.             │
+│                           │          │ Modelo 2027 (LC 214/2025).               │
 │ UF Fornecedor             │ Não      │ Estado do fornecedor (SP, MG, etc.)     │
 │                           │          │ Usado no cálculo de ICMS por UF.        │
 │                           │          │                                         │
