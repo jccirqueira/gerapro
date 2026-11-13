@@ -180,7 +180,7 @@ function initSchema() {
             ipi REAL DEFAULT 10,
             pis REAL DEFAULT 1.65,
             cofins REAL DEFAULT 7.60,
-            cbs REAL DEFAULT 0,
+            cbs REAL,
             modelo TEXT,
             largura_mm REAL DEFAULT 0,
             altura_mm REAL DEFAULT 0,
@@ -806,8 +806,11 @@ function initSchema() {
     // Migration: simulação de Split Payment (LC 214/2025 — retenção de CBS/IBS
     // na liquidação; facultativo em 2027, obrigatório B2B em 2028)
     try { db.exec("ALTER TABLE settings ADD COLUMN split_payment INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    // Migration: Reforma 2027 — CBS por material (destaque de crédito por item)
-    try { db.exec("ALTER TABLE materiais ADD COLUMN cbs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    // Migration: Reforma 2027 — CBS por material (destaque de crédito por item).
+    // DEFAULT NULL de propósito: NULL/vazio = usa a alíquota global; 0 explícito
+    // = fornecedor sem CBS destacada (sem crédito). DEFAULT 0 preencheria os
+    // cadastros existentes como "isento" e zeraria o crédito.
+    try { db.exec("ALTER TABLE materiais ADD COLUMN cbs REAL"); } catch (e) { /* column may already exist */ }
     // Migration: Reforma 2027 — CBS/IBS na NF-e importada (grupo ICMSTot v100)
     try { db.exec("ALTER TABLE compras_notas ADD COLUMN cbs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE compras_notas ADD COLUMN ibs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
