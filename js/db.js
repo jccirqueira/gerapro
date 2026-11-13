@@ -802,6 +802,9 @@ function initSchema() {
     try { db.exec("ALTER TABLE settings ADD COLUMN aliq_cbs REAL DEFAULT 11.2"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE settings ADD COLUMN aliq_ibs REAL DEFAULT 0.1"); } catch (e) { /* column may already exist */ }
     try { db.exec("ALTER TABLE settings ADD COLUMN modelo_tributario TEXT DEFAULT '2027'"); } catch (e) { /* column may already exist */ }
+    // Migration: simulação de Split Payment (LC 214/2025 — retenção de CBS/IBS
+    // na liquidação; facultativo em 2027, obrigatório B2B em 2028)
+    try { db.exec("ALTER TABLE settings ADD COLUMN split_payment INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_bot_token column to settings
     try { db.exec("ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Migration: add template columns to settings
@@ -1871,6 +1874,7 @@ function getSettings(empresaId = 'default') {
             aliqCbs: row.aliq_cbs ?? 11.2,
             aliqIbs: row.aliq_ibs ?? 0.1,
             modeloTributario: row.modelo_tributario || '2027',
+            splitPayment: !!row.split_payment,
             telegram_bot_token: row.telegram_bot_token || '',
             template_tecnica: row.template_tecnica || 'TEMPLATE_TEC.docx',
             template_comercial: row.template_comercial || 'TEMPLATE_COM.docx',
@@ -2018,7 +2022,7 @@ function saveSettings(data, empresaId = 'default') {
             'company_email', 'company_logoUrl', 'company_regimeTributario', 'company_color',
             'vendor_defaults', 'telegram_bot_token',
             'template_tecnica', 'template_comercial', 'template_completa',
-            'aliq_cbs', 'aliq_ibs', 'modelo_tributario'
+            'aliq_cbs', 'aliq_ibs', 'modelo_tributario', 'split_payment'
         ];
         for (const f of fields) {
             if (data[f] === undefined) data[f] = existing[f];
@@ -2033,7 +2037,7 @@ function saveSettings(data, empresaId = 'default') {
             company_name = ?, company_cnpj = ?, company_address = ?, company_logradouro = ?, company_numero = ?, company_cep = ?, company_cidade = ?, company_uf = ?, company_email = ?, company_logoUrl = ?, company_regimeTributario = ?, company_color = ?,
             login_theme = ?, vendor_defaults = ?, telegram_bot_token = ?,
             template_tecnica = ?, template_comercial = ?, template_completa = ?,
-            aliq_cbs = ?, aliq_ibs = ?, modelo_tributario = ?
+            aliq_cbs = ?, aliq_ibs = ?, modelo_tributario = ?, split_payment = ?
             WHERE empresa_id = ?`);
         stmt.run(
             data.theme || 'light', data.defaultMarkup ?? 30, data.defaultTax ?? 18, data.defaultIpi ?? 9.75,
@@ -2051,6 +2055,7 @@ function saveSettings(data, empresaId = 'default') {
             data.aliq_cbs ?? 11.2,
             data.aliq_ibs ?? 0.1,
             data.modelo_tributario || '2027',
+            data.split_payment ? 1 : 0,
             empresaId
         );
     } else {
@@ -2058,8 +2063,8 @@ function saveSettings(data, empresaId = 'default') {
             company_name, company_cnpj, company_address, company_logradouro, company_numero, company_cep, company_cidade, company_uf, company_email, company_logoUrl, company_regimeTributario, company_color,
             login_theme, vendor_defaults, telegram_bot_token,
             template_tecnica, template_comercial, template_completa,
-            aliq_cbs, aliq_ibs, modelo_tributario)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            aliq_cbs, aliq_ibs, modelo_tributario, split_payment)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         stmt.run(
             empresaId, data.theme || 'light', data.defaultMarkup ?? 30, data.defaultTax ?? 18, data.defaultIpi ?? 9.75,
             data.company_name || '', data.company_cnpj || '', data.company_address || '',
@@ -2075,7 +2080,8 @@ function saveSettings(data, empresaId = 'default') {
             data.template_completa || 'TEMPLATE_TEC_COM.docx',
             data.aliq_cbs ?? 11.2,
             data.aliq_ibs ?? 0.1,
-            data.modelo_tributario || '2027'
+            data.modelo_tributario || '2027',
+            data.split_payment ? 1 : 0
         );
     }
 }

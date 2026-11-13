@@ -667,6 +667,17 @@
                                 <div style="font-size:11px;color:#94a3b8;margin-top:6px;">
                                     <i class="ph ph-info"></i> Modelo 2027: PIS/COFINS é substituído pela CBS e o IPI de saída vai a zero (LC 214/2025 + zerar IPI em 2027). CBS de referência TCU: 11,3% − 0,1pp = <b>11,2%</b>; IBS em teste 2027: <b>0,1%</b> (0,05% est. + 0,05% mun.) — ajuste aqui se o Senado alterar as alíquotas.
                                 </div>
+                                <div class="form-group" style="margin-top:16px;">
+                                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                                        <input type="checkbox" id="conf-split" style="margin-top:3px;width:16px;height:16px;">
+                                        <span style="font-size:12.5px;">
+                                            <b>Simular Split Payment</b> — retenção de CBS/IBS no ato do recebimento (LC 214/2025).
+                                            Quando ativo, a aba <b>Condições de Pagamento</b> da Proposta Comercial mostra, em cada evento,
+                                            o valor <b>líquido para o caixa</b> (bruto − CBS/IBS retidos). Facultativo em 2027; obrigatório B2B em 2028.
+                                            Só se aplica ao modelo 2027 fora do Simples Nacional.
+                                        </span>
+                                    </label>
+                                </div>
                                 <div class="form-group" style="margin-top:16px;display:flex;align-items:center;gap:12px;">
                                     <label class="form-label" style="margin-bottom:0;">Cor do Badge da Empresa</label>
                                     <input type="color" id="conf-company-color" value="#0055AA" style="width:48px;height:36px;border:1px solid var(--color-border);border-radius:6px;padding:2px;cursor:pointer;" aria-label="Cor do badge da empresa">

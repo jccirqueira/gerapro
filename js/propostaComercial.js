@@ -894,6 +894,42 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         </div>`;
     },
 
+    /* ── Split Payment (LC 214/2025) ────────────────────────────────────────
+       Retenção de CBS/IBS no ato da liquidação financeira. Facultativo em
+       2027, obrigatório B2B em 2028. Só faz sentido no modelo 2027 e fora
+       do Simples Nacional (DAS unificado). */
+    _splitInfo() {
+        const s = store.getState().settings || {};
+        const regime = store.getState().company?.regimeTributario || 'Lucro Real';
+        const ativo = !!s.splitPayment && (s.modeloTributario || '2027') !== '2026' && regime !== 'Simples Nacional';
+        const cbs = Number(s.aliqCbs);
+        const ibs = Number(s.aliqIbs);
+        const aliqCbs = Number.isFinite(cbs) && cbs >= 0 ? cbs : 11.2;
+        const aliqIbs = Number.isFinite(ibs) && ibs >= 0 ? ibs : 0.1;
+        return { ativo, aliqCbs, aliqIbs, aliq: aliqCbs + aliqIbs };
+    },
+
+    // Recalcula a célula de líquido da linha quando o % do evento muda
+    _recalcPgtoSplit(input) {
+        const row = input.closest('tr');
+        const alvo = row ? row.querySelector('.pgto-split-td') : null;
+        if (!alvo) return;
+        const info = this._splitInfo();
+        if (!info.ativo) { alvo.innerHTML = ''; return; }
+        const pct = parseFloat(String(input.value || '0').replace('%', '').replace(/\s/g, '').replace(',', '.')) || 0;
+        const base = parseFloat(input.dataset.base || '0') || 0;
+        const liqPct = pct * (1 - info.aliq / 100);
+        if (base > 0) {
+            const bruto = base * pct / 100;
+            const liq = bruto * (1 - info.aliq / 100);
+            alvo.innerHTML = `<div style="font-size:12.5px;font-weight:700;color:#065f46;">${app.formatCurrency(liq)}</div>
+                              <div style="font-size:10px;color:#94a3b8;">bruto ${app.formatCurrency(bruto)} · retém ${info.aliq.toFixed(2).replace('.', ',')}%</div>`;
+        } else {
+            alvo.innerHTML = `<div style="font-size:12.5px;font-weight:700;color:#065f46;">${liqPct.toFixed(2).replace('.', ',')}%</div>
+                              <div style="font-size:10px;color:#94a3b8;">líq. do total</div>`;
+        }
+    },
+
     _renderTabCondicoes(data) {
         // Build payment events - migrate legacy if needed
         let events = data.pagamento_eventos;
@@ -904,11 +940,33 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                 events = [{ percentual: '100%', descricao: '' }];
             }
         }
+        // Split payment: base de cálculo = soma dos itens de Investimento
+        const split = this._splitInfo();
+        const baseInv = (data.itens || []).reduce((soma, it) => {
+            const qtd = parseFloat(String(it.qtd || '0').replace(',', '.')) || 0;
+            const preco = app.parseCurrency(String(it.price != null ? it.price : '0')) || 0;
+            return soma + qtd * preco;
+        }, 0);
+        const parsePct = (v) => parseFloat(String(v || '0').replace('%', '').replace(/\s/g, '').replace(',', '.')) || 0;
+        const liqCell = (ev) => {
+            if (!split.ativo) return '';
+            const pct = parsePct(ev.percentual);
+            const liqPct = pct * (1 - split.aliq / 100);
+            if (baseInv > 0) {
+                const bruto = baseInv * pct / 100;
+                const liq = bruto * (1 - split.aliq / 100);
+                return `<div style="font-size:12.5px;font-weight:700;color:#065f46;">${app.formatCurrency(liq)}</div>
+                        <div style="font-size:10px;color:#94a3b8;">bruto ${app.formatCurrency(bruto)} · retém ${split.aliq.toFixed(2).replace('.', ',')}%</div>`;
+            }
+            return `<div style="font-size:12.5px;font-weight:700;color:#065f46;">${liqPct.toFixed(2).replace('.', ',')}%</div>
+                    <div style="font-size:10px;color:#94a3b8;">líq. do total</div>`;
+        };
         const eventRows = events.map((ev, i) => `
             <tr class="pagamento-evento-row">
                 <td style="padding:8px;font-weight:600;white-space:nowrap;">${i+1}° EVENTO DE PAGAMENTO</td>
-                <td style="padding:8px;"><input type="text" name="pgto_evento_percentual_${i}" class="form-control" value="${ev.percentual||''}" placeholder="%" style="width:100px;"></td>
+                <td style="padding:8px;"><input type="text" name="pgto_evento_percentual_${i}" class="form-control" value="${ev.percentual||''}" placeholder="%" style="width:100px;" data-base="${baseInv}" oninput="app.propostaComercial._recalcPgtoSplit(this)"></td>
                 <td style="padding:8px;"><input type="text" name="pgto_evento_descricao_${i}" class="form-control" value="${ev.descricao||''}" placeholder="Descrição"></td>
+                ${split.ativo ? `<td style="padding:8px;vertical-align:top;" class="pgto-split-td">${liqCell(ev)}</td>` : ''}
                 <td style="padding:8px;text-align:center;"><button type="button" onclick="if(this.closest('tbody').querySelectorAll('.pagamento-evento-row').length>1)this.closest('tr').remove()" class="btn-icon" style="color:#ef4444;" title="Remover"><i class="ph ph-trash"></i></button></td>
             </tr>
         `).join('');
@@ -922,6 +980,7 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                                 <th style="padding:10px 8px;text-align:left;color:#1e3a8a;font-size:12px;">Evento</th>
                                 <th style="padding:10px 8px;text-align:left;color:#1e3a8a;font-size:12px;width:120px;">%</th>
                                 <th style="padding:10px 8px;text-align:left;color:#1e3a8a;font-size:12px;">Descrição</th>
+                                ${split.ativo ? `<th style="padding:10px 8px;text-align:left;color:#065f46;font-size:12px;width:170px;" title="Split payment: valor líquido que entra no caixa após retenção de CBS/IBS na liquidação (LC 214/2025)">Líq. p/ Caixa (−CBS/IBS)</th>` : ''}
                                 <th style="padding:10px 8px;text-align:center;color:#1e3a8a;font-size:12px;width:50px;"></th>
                             </tr>
                         </thead>
@@ -930,6 +989,11 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
                         </tbody>
                     </table>
                 </div>
+                ${split.ativo ? `<div style="margin-top:8px;font-size:11.5px;color:#065f46;background:#ecfdf5;border:1px solid #bbf7d0;border-radius:6px;padding:8px 10px;">
+                    <i class="ph ph-info"></i> <b>Split Payment simulado (LC 214/2025):</b> a cada liquidação o banco retém <b>${split.aliqCbs.toFixed(2).replace('.', ',')}% de CBS + ${split.aliqIbs.toFixed(2).replace('.', ',')}% de IBS = ${split.aliq.toFixed(2).replace('.', ',')}%</b> e repassa direto ao Fisco — o valor acima é o que entra no caixa.
+                    Facultativo em 2027; obrigatório em operações B2B a partir de 2028. O tributo retido NÃO é perda: gera/apura crédito normalmente na apuração.
+                    ${baseInv > 0 ? `Base considerada: soma dos itens de Investimento = ${app.formatCurrency(baseInv)}.` : 'Sem itens de Investimento preenchidos — mostre apenas o percentual líquido.'}
+                </div>` : ''}
                 <button type="button" class="btn btn-sm btn-secondary" onclick="app.propostaComercial.addPagamentoEventoRow()" style="margin-top:8px;">+ Adicionar Evento</button>
             </div>
             <div class="form-group" style="margin-top:15px;">
@@ -2150,10 +2214,14 @@ ${store.canEdit() ? `                        <button class="btn-icon" onclick="a
         const row = document.createElement('tr');
         row.className = 'pagamento-evento-row';
         row.style.borderBottom = '1px solid #f1f5f9';
+        const split = this._splitInfo();
+        // Base de cálculo: reaproveita a data-base das linhas já renderizadas
+        const baseAttr = body.querySelector('input[data-base]')?.dataset.base || '0';
         row.innerHTML = `
             <td style="padding:8px;font-weight:600;white-space:nowrap;">${index+1}° EVENTO DE PAGAMENTO</td>
-            <td style="padding:8px;"><input type="text" name="pgto_evento_percentual_${index}" class="form-control" placeholder="%" style="width:100px;"></td>
+            <td style="padding:8px;"><input type="text" name="pgto_evento_percentual_${index}" class="form-control" placeholder="%" style="width:100px;" data-base="${baseAttr}" oninput="app.propostaComercial._recalcPgtoSplit(this)"></td>
             <td style="padding:8px;"><input type="text" name="pgto_evento_descricao_${index}" class="form-control" placeholder="Descrição"></td>
+            ${split.ativo ? `<td style="padding:8px;vertical-align:top;" class="pgto-split-td"></td>` : ''}
             <td style="padding:8px;text-align:center;"><button type="button" onclick="if(this.closest('tbody').querySelectorAll('.pagamento-evento-row').length>1)this.closest('tr').remove()" class="btn-icon" style="color:#ef4444;" title="Remover"><i class="ph ph-trash"></i></button></td>
         `;
         body.appendChild(row);

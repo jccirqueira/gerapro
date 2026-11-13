@@ -332,7 +332,7 @@
         titulo: 'Condições Comerciais',
         screenshot: 'prints/proposta-comercial/condicoes.png',
         campos: [
-          { nome: 'Condição de Pagamento', descricao: 'Define o evento, parcela e faturamento (ex: Conta Entrega, 100%, 30 ddl).' },
+          { nome: 'Condição de Pagamento', descricao: 'Define o evento, parcela e faturamento (ex: Conta Entrega, 100%, 30 ddl). Com o Split Payment ativo (Configurações), cada evento ganha a coluna Líq. p/ Caixa — o valor que entra no caixa após a retenção de CBS/IBS na liquidação (LC 214/2025); o % também recalcula ao vivo.' },
           { nome: 'Classificação Fiscal (NCM)', descricao: 'Código NCM do produto. Pode ser bloqueado automaticamente conforme o tipo de equipamento (SEU/CUB-MT força NCM 8537.20).' },
           { nome: 'Prazo de Entrega', descricao: 'Prazo estimado para entrega do fornecimento.' },
           { nome: 'Validade da Proposta', descricao: 'Prazo de validade da proposta comercial.' },
@@ -996,7 +996,8 @@
           { nome: 'IPI Padrão (%)', descricao: 'Alíquota padrão de IPI para novos materiais.' },
           { nome: 'Modelo Tributário', descricao: 'Modelo de cálculo: 2027 (CBS + IBS, IPI de saída zerado — LC 214/2025, padrão) ou 2026 (legado PIS/COFINS + IPI). Vale para novas precificações e propostas.' },
           { nome: 'CBS (%)', descricao: 'Alíquota da CBS no modelo 2027. Referência TCU: 11,3% − 0,1pp = 11,2%. Ajuste aqui se o Senado alterar.' },
-          { nome: 'IBS (%)', descricao: 'Alíquota do IBS no modelo 2027. Em 2027 é teste (0,1% = 0,05% estadual + 0,05% municipal); cresce gradualmente até 2033.' }
+          { nome: 'IBS (%)', descricao: 'Alíquota do IBS no modelo 2027. Em 2027 é teste (0,1% = 0,05% estadual + 0,05% municipal); cresce gradualmente até 2033.' },
+          { nome: 'Simular Split Payment', descricao: 'Retenção de CBS/IBS no ato do recebimento (LC 214/2025). Quando ativo, a aba Condições de Pagamento da Proposta Comercial mostra o valor líquido por evento (bruto − CBS/IBS retidos). Facultativo em 2027, obrigatório B2B em 2028; só se aplica ao modelo 2027 fora do Simples Nacional.' }
         ]
       },
       {
