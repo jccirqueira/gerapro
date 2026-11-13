@@ -33,6 +33,7 @@ const PropostaComercialModule = {
             switchTab: this.switchTab.bind(this),
             addRevisionRow: this.addRevisionRow.bind(this),
             addPagamentoEventoRow: this.addPagamentoEventoRow.bind(this),
+            _recalcPgtoSplit: this._recalcPgtoSplit.bind(this),
             handleUnidadeChange: this.handleUnidadeChange.bind(this)
         };
 
