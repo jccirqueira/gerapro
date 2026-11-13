@@ -229,12 +229,14 @@
         id: 'layout-sugerido',
         titulo: 'Layout Sugerido',
         screenshot: 'prints/proposta-tecnica/layout-sugerido.png',
-        texto: 'A sub-tab "Layout" no equipamento exibe a distribuição física dos armários baseada nas cargas, típicos e materiais associados. Disponível para as Formas 1, 2a e 2b de segregação interna.\n\nO layout apresenta:\n- Cards de resumo: número de armários, largura calculada, largura instalada\n- Visualização em canvas com desenho esquemático dos armários\n- Dimensões individuais de cada invólucro\n- Exportação para PDF do layout gerado',
+        texto: 'A sub-tab "Layout" no equipamento exibe a distribuição física dos armários baseada nas cargas, típicos e materiais associados. Disponível para as Formas 1/2 (interna) e Formas 3/4 com KitFrame/Eletropoll.\n\n**Checklist de Prontidão** (topo): mostra item a item o que falta — forma de segregação, cargas com típico, materiais dimensionados, armários — com link direto para corrigir. Quando tudo está pronto aparece o botão **🪄 Gerar layout automaticamente** (nada é criado antes do clique) e, com layout existente, a barra **🔄 Recompor layout** (aloca só o que falta, preserva ajustes manuais de largura).\n\n**Motor de distribuição:** quando as cargas não cabem em um armário (máx. 1000mm), o sistema cria vários armários (first-fit pela largura simulada de cada carga). Carga maior que 1000mm gera aviso de estouro.\n\n**Alocação por Carga:** painel com um dropdown por carga para mover cargas INTEIRAS entre armários (todos os materiais acompanham) — em Back to Back, por face (Frontal/Traseira). Evita a alocação item a item da BOM.\n\n**Vistas B2B colapsáveis:** em Back to Back, cada vista (Frontal/Traseira, Interna/Externa) tem título clicável ▼/▶ com "Colapsar/Expandir tudo"; padrão: internas abertas, externas fechadas; a escolha fica salva.\n\n**Botões:** Configurar | Exportar PDF/DXF/QET | Gerar Chaparia (modal de confirmação com custo) + Auto Chaparia. No modelo 2027 a exportação DXF usa o "Desenho DXF da Peça" do cadastro de Materiais quando existir (BLOCK/INSERT); sem desenho, retângulo genérico.',
         passos: [
           'Acesse um equipamento na proposta técnica.',
-          'Na sub-tab "Layout", visualize a distribuição dos armários.',
-          'Confira os cards de resumo com as métricas de dimensão.',
-          'Clique em "Exportar PDF" para gerar o documento do layout.'
+          'Na sub-tab "Layout", siga o Checklist de Prontidão até tudo ficar verde.',
+          'Clique em "Gerar layout automaticamente" (ou "Recompor layout" se já existe).',
+          'Ajuste larguras pelos controles dos armários e distribua cargas pelo painel "Alocação por Carga".',
+          'Em Back to Back, colapse as vistas pelo título de cada uma (▼/▶) ou use "Colapsar/Expandir tudo".',
+          'Exporte com "Exportar PDF" / "Exportar DXF" / "Exportar QET"; use "Gerar Chaparia" quando for incluir a chaparia na LM (modal mostra o custo).'
         ]
       },
       {
@@ -1725,7 +1727,7 @@
         id: 'visao-geral',
         titulo: 'Visão Geral',
         screenshot: 'prints/despesas/visao-geral.png',
-        texto: 'O módulo de Despesas permite estimar os custos logísticos e operacionais do projeto. Vem pré-carregado com 29 itens padrão que cobrem:\n\n- Representação e comissões\n- Alimentação e hospedagem\n- Locação de veículos e passagens aéreas\n- ART, uniformes e EPIs\n- Táxi, estacionamento e internet\n- Plataformas, containers e ferramentas\n- Andaimes e frete\n- Embalagem de exportação e desembaraço aduaneiro\n\nCada item possui campos de PIS, COFINS e ISS para cálculo fiscal preciso. O total geral é recalculado automaticamente.'
+        texto: 'O módulo de Despesas permite estimar os custos logísticos e operacionais do projeto. Vem pré-carregado com 29 itens padrão que cobrem:\n\n- Representação e comissões\n- Alimentação e hospedagem\n- Locação de veículos e passagens aéreas\n- ART, uniformes e EPIs\n- Táxi, estacionamento e internet\n- Plataformas, containers e ferramentas\n- Andaimes e frete\n- Embalagem de exportação e desembaraço aduaneiro\n\nCada item possui campos de PIS, COFINS, CBS (modelo 2027) e ISS — percentuais de REFERÊNCIA para o fiscal (o total geral é Qtd × Custo Unitário, sem os tributos), recalculado automaticamente.'
       },
       {
         id: 'itens',
@@ -1742,8 +1744,9 @@
           { nome: 'Descrição da Despesa', descricao: 'Nome da despesa. Ex: Alimentação, Hotel, Passagem Aérea.' },
           { nome: 'Qtd', descricao: 'Quantidade de unidades da despesa.' },
           { nome: 'Custo Unitário (R$)', descricao: 'Preço unitário da despesa.' },
-          { nome: 'PIS (%)', descricao: 'Percentual de PIS incidente. Editável por item.' },
-          { nome: 'COFINS (%)', descricao: 'Percentual de COFINS incidente. Editável por item.' },
+          { nome: 'PIS (%)', descricao: 'Percentual de PIS incidente (modelo 2026). Editável por item. Só referência — não altera o total bruto.' },
+          { nome: 'COFINS (%)', descricao: 'Percentual de COFINS incidente (modelo 2026). Editável por item. Só referência — não altera o total bruto.' },
+          { nome: 'CBS (%)', descricao: 'Percentual de CBS creditável da despesa (modelo 2027, LC 214/2025). Editável por item. Só referência — não altera o total bruto.' },
           { nome: 'ISS (%)', descricao: 'Percentual de ISS incidente. Editável por item.' },
           { nome: 'Total Bruto', descricao: 'Qtd × Custo Unitário. Calculado automaticamente.' }
         ]

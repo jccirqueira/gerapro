@@ -101,6 +101,7 @@ const DespesasModule = {
                                 <th style="width: 130px; text-align: right;">Custo Unit. (R$)</th>
                                 <th style="width: 80px; text-align: center;">PIS %</th>
                                 <th style="width: 80px; text-align: center;">COFINS %</th>
+                                <th style="width: 80px; text-align: center;" title="LC 214/2025 — substitui o PIS/COFINS a partir de 2027. Referência por item (não altera o total bruto).">CBS %</th>
                                 <th style="width: 80px; text-align: center;">ISS %</th>
                                 <th style="width: 140px; text-align: right;">Total Bruto (R$)</th>
                                 <th style="width: 50px;"></th>
@@ -111,7 +112,7 @@ const DespesasModule = {
                         </tbody>
                         <tfoot>
                             <tr style="background: var(--color-bg-alt); font-weight: bold;">
-                                <td colspan="6" style="text-align: right; padding: 12px;">TOTAL GERAL DE DESPESAS:</td>
+                                <td colspan="7" style="text-align: right; padding: 12px;">TOTAL GERAL DE DESPESAS:</td>
                                 <td id="despesas-total-geral" style="text-align: right; color: var(--color-primary); font-size: 16px;">R$ 0,00</td>
                                 <td></td>
                             </tr>
@@ -142,6 +143,9 @@ const DespesasModule = {
                 </td>
                 <td>
                     <input type="text" class="form-control" value="${item.cofins}%" onblur="window.despesasModule.updateItemPercent(${index}, 'cofins', this.value)" style="text-align: center;">
+                </td>
+                <td>
+                    <input type="text" class="form-control" value="${item.cbs || 0}%" onblur="window.despesasModule.updateItemPercent(${index}, 'cbs', this.value)" style="text-align: center;" title="Alíquota de CBS creditável desta despesa (modelo 2027). Referência — não altera o total bruto.">
                 </td>
                 <td>
                     <input type="text" class="form-control" value="${item.iss}%" onblur="window.despesasModule.updateItemPercent(${index}, 'iss', this.value)" style="text-align: center;">

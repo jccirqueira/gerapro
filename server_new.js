@@ -4684,16 +4684,16 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const existing = db.prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+                const existing = db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
                 if (existing) {
-                    db.prepare('UPDATE settings SET template_tecnica = ?, template_comercial = ?, template_completa = ? WHERE empresa_id = ?').run(
+                    db.getDb().prepare('UPDATE settings SET template_tecnica = ?, template_comercial = ?, template_completa = ? WHERE empresa_id = ?').run(
                         body.template_tecnica || 'TEMPLATE_TEC.docx',
                         body.template_comercial || 'TEMPLATE_COM.docx',
                         body.template_completa || 'TEMPLATE_TEC_COM.docx',
                         empresaId
                     );
                 } else {
-                    db.prepare('INSERT INTO settings (empresa_id, template_tecnica, template_comercial, template_completa) VALUES (?, ?, ?, ?)').run(
+                    db.getDb().prepare('INSERT INTO settings (empresa_id, template_tecnica, template_comercial, template_completa) VALUES (?, ?, ?, ?)').run(
                         empresaId,
                         body.template_tecnica || 'TEMPLATE_TEC.docx',
                         body.template_comercial || 'TEMPLATE_COM.docx',
@@ -4711,11 +4711,11 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const existing = db.prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+                const existing = db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
                 if (existing) {
-                    db.prepare('UPDATE settings SET vendor_defaults = ? WHERE empresa_id = ?').run(JSON.stringify(body.vendorDefaults || []), empresaId);
+                    db.getDb().prepare('UPDATE settings SET vendor_defaults = ? WHERE empresa_id = ?').run(JSON.stringify(body.vendorDefaults || []), empresaId);
                 } else {
-                    db.prepare('INSERT INTO settings (empresa_id, vendor_defaults) VALUES (?, ?)').run(empresaId, JSON.stringify(body.vendorDefaults || []));
+                    db.getDb().prepare('INSERT INTO settings (empresa_id, vendor_defaults) VALUES (?, ?)').run(empresaId, JSON.stringify(body.vendorDefaults || []));
                 }
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
