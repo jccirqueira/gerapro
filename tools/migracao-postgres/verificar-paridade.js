@@ -25,18 +25,20 @@ async function main() {
   const sóPG = pt.filter(x => !st.includes(x));
   console.log('TABELAS → SQLite: ' + st.length + ' | PG: ' + pt.length + ' | só SQLite: [' + sóSQLite + '] | só PG: [' + sóPG + ']');
 
-  // ── colunas por tabela ──
-  let colOk = 0; const difs = [];
+  // ── colunas por tabela (case-insensitive: PG grava minúsculo) ──
+  let colOk = 0; const difs = []; const extras = [];
   for (const t of st) {
-    const sc = sqlite.prepare(`PRAGMA table_info("${t}")`).all().map(r => r.name);
-    const pc = (await pg.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position`, [t])).rows.map(r => r.column_name);
-    const faltaPG = sc.filter(x => !pc.includes(x));
-    const sobraPG = pc.filter(x => !sc.includes(x));
-    if (faltaPG.length || sobraPG.length) difs.push(`${t}: faltaPG=[${faltaPG}] sobraPG=[${sobraPG}]`);
+    const sc = sqlite.prepare(`PRAGMA table_info("${t}")`).all().map(r => r.name.toLowerCase());
+    const pc = (await pg.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1`, [t])).rows.map(r => r.column_name.toLowerCase());
+    const faltaPG = sc.filter(x => !pc.includes(x));   // Falta = falha real
+    const sobraPG = pc.filter(x => !sc.includes(x));   // Sobra = evolução do initSchema (informativo)
+    if (faltaPG.length) difs.push(`${t}: faltaPG=[${faltaPG}]`);
     else colOk++;
+    if (sobraPG.length) extras.push(`${t}: +${sobraPG.join(',')}`);
   }
-  console.log('COLUNAS → tabelas idênticas: ' + colOk + '/' + st.length);
+  console.log('COLUNAS → tabelas completas: ' + colOk + '/' + st.length);
   difs.forEach(d => console.log('  !! ' + d));
+  if (extras.length) { console.log('  ℹ colunas extras no PG (initSchema vs SQLite local defasado):'); extras.forEach(e => console.log('     ' + e)); }
 
   // ── tipos PG ──
   const tipos = await pg.query("SELECT data_type, count(*) n FROM information_schema.columns WHERE table_schema='public' GROUP BY data_type ORDER BY n DESC");

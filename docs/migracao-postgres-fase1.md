@@ -13,7 +13,7 @@
 | **F1** | Infra local + schema traduzido + verificação de paridade + plano | ✅ **Concluída** |
 | **F2** | Driver `pg` + refatoração síncrono→assíncrono (`db.js`, `server_new.js`) | ✅ **Concluída** (local) |
 | **F3** | Dialeto SQL (`?`→`$1`, `INSERT OR REPLACE`→`ON CONFLICT`, DDL final) | ✅ **Concluída** (executada junto da F2) |
-| **F4** | Migração dos dados (SQLite → PostgreSQL) + sequências | ⬜ Pendente |
+| **F4** | Migração dos dados (SQLite → PostgreSQL) + sequências | ✅ **Concluída** (local) |
 | **F5** | Validação completa (contagens, âncoras de negócio, browser) | ⬜ Pendente |
 | **F6** | Cutover em produção com rollback + backup `pg_dump` automático | ⬜ Pendente |
 
@@ -171,11 +171,18 @@ projetos, propostas_completas
 - [x] `initSchema()` em dialeto PG (AUTOINCREMENT→IDENTITY, `"user"` citado).
 - [x] `getDb()` encapsulado no shim de compatibilidade.
 
-### F4 — Migração dos dados
-- [ ] Exportar SQLite (por tabela, tipo-aware) → importar via `COPY` no PG.
-- [ ] Ajustar sequence do `price_history.id` (`setval`) após importar.
-- [ ] Preservar `NULL` × `0` (lição do `materiais.cbs`) e `DEFAULT ''`.
-- [ ] Contagens por tabela antes/depois (baseline da seção 4).
+### F4 — Migração dos dados ✅ (16/11/2026)
+- [x] Pré-flight de tipos (bigint/double só números, NOT NULL, colunas) — 0 problemas.
+- [x] `TRUNCATE ... RESTART IDENTITY` + INSERTs em lote de 400 (FKs em `session_replication_role = replica` durante a cópia).
+- [x] Sequências de identidade ajustadas (`setval`).
+- [x] **25.677 linhas importadas em 4,5s** — contagens 60/60 idênticas, 5 FKs sem órfãs,
+      `SUM(custo)` de materiais idêntico (R$ 413.068.694,97).
+- [x] Leitura via camada da app: **17/17** (case map, tipos, sync completo, ILIKE, seeds).
+- [x] Boot com dados reais: seeds/migrações pulados corretamente; Telegram bot inicializou com o token migrado.
+
+> **Nota:** o SQLite local está defasado em 8 colunas (Fases A–E só rodaram na VPS) — o
+> `initSchema` as criou no PG com defaults (ex.: `aliq_cbs` → 11,2 via `??`). Na F6 a fonte
+> real (VPS) já as tem populadas.
 
 ### F5 — Validação
 - [ ] Paridade de linhas (25.677) e somas de conferência (ex.: `SUM(custo)` de materiais).
@@ -212,7 +219,13 @@ projetos, propostas_completas
 | DDL PostgreSQL gerado | `tools/migracao-postgres/postgres-schema.sql` |
 | Tradutor SQLite → PG | `tools/migracao-postgres/traduzir-e-aplicar.js` |
 | Verificador de paridade | `tools/migracao-postgres/verificar-paridade.js` |
+| Codemod async/await (F2) | `tools/migracao-postgres/codemod-async.js` |
+| Auditor de await (F2) | `tools/migracao-postgres/auditor-async.js` |
+| Smoke test da camada (F2) | `tools/migracao-postgres/smoke-db.js` |
+| Migração de dados (F4) | `tools/migracao-postgres/migrar-dados.js` |
+| Leitura com dados reais (F4) | `tools/migracao-postgres/leitura-f4.js` |
+| Mapa de case das colunas | `js/pg-case-map.json` |
 | Este plano | `docs/migracao-postgres-fase1.md` |
 
-> Os scripts usam `require('pg')` — na F2 o `pg` entra em `package.json`.
-> Enquanto isso: `npm install pg` para rodá-los.
+> Ferramentas usam `require('pg')` (em `package.json` desde a F2) e o codemod/auditor
+> precisam de `npm i -D acorn`.
