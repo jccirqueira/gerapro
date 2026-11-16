@@ -46,8 +46,14 @@ de produção quebravam a importação) e os diretórios faltantes do cluster lo
 (código + `.env.bak`) → `docker start gerapro` → volta ao SQLite (`gerapro.db` intacto).
 O container `gerapro-postgres` pode continuar rodando sem efeito colateral.
 
-**Pós-cutover pendente (decisão do usuário):** cópia **off-site** dos dumps
-(opções: puxar para o PC+OneDrive, `rclone` para Google Drive, ou nuvem paga — ver conversa).
+**Pós-cutover: cópia off-site configurada (16/11/2026):**
+- **VPS:** cron `30 3 * * *` → `pg_dump -Fc` em `/home/cacir/backups/pg/` (rotação 14 dias)
+- **PC:** tarefa agendada **"GeraPro Backup Pull"** (diária 11:00, `StartWhenAvailable`
+  = roda quando o PC ligar) → `tools/backup-offsite/puxar-backups.ps1` busca os dumps
+  **novos** (nomes com timestamp) + espelha os backups legados do SQLite →
+  **`C:\Users\jcc14\OneDrive\GeraProBackups\`** com rotação local de 14 dias
+- **OneDrive** sincroniza para a nuvem = esquema **3-2-1** (VPS + PC + nuvem)
+- Validado: execução manual + execução agendada (`LastTaskResult = 0`)
 
 > **⚠️ Deploy:** o código das Fases 2–3 exige PostgreSQL — **não deployar na VPS até o F6**
 > (produção continua em SQLite; os commits vão para a branch `migracao-postgres`).
