@@ -15,7 +15,39 @@
 | **F3** | Dialeto SQL (`?`→`$1`, `INSERT OR REPLACE`→`ON CONFLICT`, DDL final) | ✅ **Concluída** (executada junto da F2) |
 | **F4** | Migração dos dados (SQLite → PostgreSQL) + sequências | ✅ **Concluída** (local) |
 | **F5** | Validação completa (contagens, âncoras de negócio, browser) | ✅ **Concluída** (local) |
-| **F6** | Cutover em produção com rollback + backup `pg_dump` automático | ⬜ Pendente |
+| **F6** | Cutover em produção com rollback + backup `pg_dump` automático | ✅ **Concluída** (16/11/2026) |
+
+---
+
+## 6. F6 — Cutover de produção (16/11/2026) — CONCLUÍDO
+
+**Ensaio prévio (F6a):** cópia do `gerapro.db` de produção → banco local `gerapro_rehearsal`
+→ schema + migração + verificação + leitura — **65.483 linhas sem falhas** antes de tocar na VPS.
+O ensaio pegou 2 bugs reais: encoding **WIN1252** (caracteres tipográficos U+2010 nos dados
+de produção quebravam a importação) e os diretórios faltantes do cluster local.
+
+**Execução (F6b) — janela de ~5 minutos:**
+
+| Passo | Resultado |
+|---|---|
+| Container `gerapro-postgres` (postgres:16-alpine, UTF8, rede `cacir-pdv_default`, volume `/opt/gerapro-postgres`) | ✅ |
+| Backup SQLite pré-cutover | ✅ `/home/cacir/backups/gerapro-sqlite-pre-pg-*.db` (+ `.env.bak` + código antigo em `/home/cacir/gerapro-rollback-pre-pg/`) |
+| Upload dos 17 arquivos (blobs LF, MD5 conferido) | ✅ |
+| `.env` com `PGHOST=gerapro-postgres` etc. | ✅ |
+| Boot + `npm install` (pg) + schema/seeds | ✅ |
+| Migração dos dados reais | ✅ **65.483 linhas em 5,7s — 0 falhas** |
+| Verificação na VPS | ✅ 60/60 tabelas, 60/60 colunas, 5/5 FKs, `SUM(custo)` idêntico — única "divergência": `crm_stages` 0→8 (seeds que o SQLite nunca teve — F2) |
+| Restart limpo | ✅ **Telegram bot inicializado com o token real** |
+| Bateria de URLs | ✅ 200 (static/JS) + 401 (APIs vivas) |
+| Browser de produção (login real) | ✅ Dashboard **Pipeline R$ 526,8k / 25 oportunidades**, Ticket médio R$ 37k, Materiais **1 de 398 páginas**, Precificação — **0 erros de console** |
+| Backup automático | ✅ cron `30 3 * * *` → `/home/cacir/backups/pg/gerapro-*.dump` (pg_dump -Fc, rotação 14 dias, testado: 3,8MB) |
+
+**Rollback (se necessário):** `docker stop gerapro` → restaurar `/home/cacir/gerapro-rollback-pre-pg/`
+(código + `.env.bak`) → `docker start gerapro` → volta ao SQLite (`gerapro.db` intacto).
+O container `gerapro-postgres` pode continuar rodando sem efeito colateral.
+
+**Pós-cutover pendente (decisão do usuário):** cópia **off-site** dos dumps
+(opções: puxar para o PC+OneDrive, `rclone` para Google Drive, ou nuvem paga — ver conversa).
 
 > **⚠️ Deploy:** o código das Fases 2–3 exige PostgreSQL — **não deployar na VPS até o F6**
 > (produção continua em SQLite; os commits vão para a branch `migracao-postgres`).
