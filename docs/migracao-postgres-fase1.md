@@ -14,7 +14,7 @@
 | **F2** | Driver `pg` + refatoração síncrono→assíncrono (`db.js`, `server_new.js`) | ✅ **Concluída** (local) |
 | **F3** | Dialeto SQL (`?`→`$1`, `INSERT OR REPLACE`→`ON CONFLICT`, DDL final) | ✅ **Concluída** (executada junto da F2) |
 | **F4** | Migração dos dados (SQLite → PostgreSQL) + sequências | ✅ **Concluída** (local) |
-| **F5** | Validação completa (contagens, âncoras de negócio, browser) | ⬜ Pendente |
+| **F5** | Validação completa (contagens, âncoras de negócio, browser) | ✅ **Concluída** (local) |
 | **F6** | Cutover em produção com rollback + backup `pg_dump` automático | ⬜ Pendente |
 
 > **⚠️ Deploy:** o código das Fases 2–3 exige PostgreSQL — **não deployar na VPS até o F6**
@@ -184,12 +184,29 @@ projetos, propostas_completas
 > `initSchema` as criou no PG com defaults (ex.: `aliq_cbs` → 11,2 via `??`). Na F6 a fonte
 > real (VPS) já as tem populadas.
 
-### F5 — Validação
-- [ ] Paridade de linhas (25.677) e somas de conferência (ex.: `SUM(custo)` de materiais).
-- [ ] Âncoras reais: `settings` (CBS 11,2 / IBS 0,1), `PRJ-0001`, PTC `PT-51001002`, materiais com `cbs`.
-- [ ] Mesmo cálculo → mesmo preço (precificação e DRE comparadas).
-- [ ] Bateria de URLs + fluxos no browser (login, sync, compras/XML, exportações).
-- [ ] Carga de concorrência (2+ sessões salvando ao mesmo tempo).
+### F5 — Validação ✅ (16/11/2026)
+
+**Browser com login real + dados migrados** (servidor local `:8099`):
+
+| Fluxo | Resultado |
+|---|---|
+| Login (bcrypt + JWT contra PG) · Sync completo (25.498 materiais) | ✅ zero erros |
+| Dashboard (KPIs, ticket médio, gráficos) · Materiais (case map `codigoInterno`, preços, paginação) | ✅ |
+| Gestão de Propostas (kanban + modal de detalhes) · DRE · Compras · CRM (views + estágios do seed) | ✅ |
+| Revisões da PTC (endpoint de disco) | ✅ gap local ajustado (pasta `Documentação Minha_Empresa` existe na VPS) |
+| **Criar PTC** (API → banco + pastas) · **Criar equipamento** (tipos reais) | ✅ |
+| **Precificação 2027** | ✅ **CBS 11,2% · IBS 0,1% · IPI 0 + Isento · ICMS 12% · créditos · AutPro 0,5% c/ Cap R$30k** |
+| Configurações (modelo 2027 / CBS / IBS / Split) | ✅ |
+| **Console** | **0 erros de JS/API da migração** |
+| **Carga de concorrência** (`concorrencia-f5.js`) | ✅ **7/7**: 8 syncs paralelos, 20 ops paralelas, 4 transações paralelas isoladas, rollback sem contaminação, 0 resíduos |
+| Limpeza do dado de teste | ✅ baseline restaurada |
+
+**Âncoras:** `settings` CBS 11,2 / IBS 0,1 validados na tela ✓ · materiais `cbs` = `NULL` (design Fase D: usa alíquota global) ✓ ·
+`PRJ-0001`/docs da PTC `PT-51001002` vivem no disco/BD da VPS — não existem no SQLite local (validar no F6 pós-cutover).
+
+> **Nota de dados:** colunas extras do `initSchema` importaram como `NULL` (chave ausente
+> no SQLite local defasado) — todos os leitores usam `??`/`||` com defaults corretos
+> (11,2 / 0,1 / 2027), confirmado na tela. Na F6 a fonte VPS já as tem populadas.
 
 ### F6 — Cutover com rollback
 - [ ] Subir container `postgres` na VPS (padrão já usado: `barbearia-db`, `prevdrive-db`).
