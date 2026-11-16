@@ -3,6 +3,7 @@
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 const { Client } = require('pg');
+try { require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') }); } catch (_) {}
 
 const REPO = path.join(__dirname, '..', '..');
 const PG_CONF = {
@@ -14,7 +15,7 @@ const PG_CONF = {
 };
 
 async function main() {
-  const sqlite = new DatabaseSync(path.join(REPO, 'data', 'gerapro.db'), { readOnly: true });
+  const sqlite = new DatabaseSync(process.env.GERAPRO_SQLITE || path.join(REPO, 'data', 'gerapro.db'), { readOnly: true });
   const pg = new Client(PG_CONF);
   await pg.connect();
 

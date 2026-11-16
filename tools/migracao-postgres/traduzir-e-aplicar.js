@@ -6,9 +6,10 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 const { Client } = require('pg');
+try { require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') }); } catch (_) {}
 
 const REPO = path.join(__dirname, '..', '..');
-const SRC_SQLITE = path.join(REPO, 'data', 'gerapro.db');
+const SRC_SQLITE = process.env.GERAPRO_SQLITE || path.join(REPO, 'data', 'gerapro.db');
 const OUT = path.join(__dirname, 'postgres-schema.sql');
 
 const PG_CONF = {

@@ -184,7 +184,9 @@ CREATE TABLE "compras_notas" (
   "status" TEXT DEFAULT 'recebida',
   "observacoes" TEXT DEFAULT '',
   "created_at" TEXT,
-  "updated_at" TEXT
+  "updated_at" TEXT,
+  "cbs" DOUBLE PRECISION DEFAULT 0,
+  "ibs" DOUBLE PRECISION DEFAULT 0
 );
 CREATE TABLE "compras_pedido_itens" (
   "id" TEXT PRIMARY KEY,
@@ -691,7 +693,8 @@ CREATE TABLE "materiais" (
   "uffornecedor" TEXT DEFAULT '',
   "gruposiemens" TEXT DEFAULT '',
   "favorito" BIGINT DEFAULT 0,
-  "dxf_block" TEXT
+  "dxf_block" TEXT,
+  "cbs" DOUBLE PRECISION DEFAULT 0
 );
 CREATE TABLE "orcamentos" (
   "id" TEXT PRIMARY KEY,
@@ -913,7 +916,12 @@ CREATE TABLE "settings" (
   "template_tecnica" TEXT DEFAULT 'TEMPLATE_TEC.docx',
   "template_comercial" TEXT DEFAULT 'TEMPLATE_COM.docx',
   "template_completa" TEXT DEFAULT 'TEMPLATE_TEC_COM.docx',
-  "company_color" TEXT DEFAULT '#0055AA'
+  "company_color" TEXT DEFAULT '#0055AA',
+  "tipos_tipicos_custom" TEXT DEFAULT '[]',
+  "aliq_cbs" DOUBLE PRECISION DEFAULT 11.2,
+  "aliq_ibs" DOUBLE PRECISION DEFAULT 0.1,
+  "modelo_tributario" TEXT DEFAULT '2027',
+  "split_payment" BIGINT DEFAULT 0
 );
 CREATE TABLE "tipicos" (
   "id" TEXT PRIMARY KEY,
