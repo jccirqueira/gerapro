@@ -9,7 +9,7 @@ CREATE TABLE "ai_settings" (
   "model" TEXT DEFAULT 'qwen2.5:14b',
   "api_key" TEXT DEFAULT '',
   "ollama_url" TEXT DEFAULT 'http://localhost:11434',
-  "updatedAt" TEXT,
+  "updatedat" TEXT,
   "timeout_minutes" BIGINT DEFAULT 10,
   "use_cache" BIGINT DEFAULT 1
 );
@@ -20,17 +20,17 @@ CREATE TABLE "cargas" (
   "descricao" TEXT,
   "potencia" TEXT,
   "tensao" TEXT,
-  "typicalId" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT
+  "typicalid" TEXT,
+  "createdat" TEXT,
+  "updatedat" TEXT
 );
 CREATE TABLE "chaparia_lists" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
   "name" TEXT,
   "items" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
+  "createdat" TEXT,
+  "updatedat" TEXT,
   "fabricante" TEXT DEFAULT '',
   "descricao" TEXT DEFAULT '',
   "largura_mm" DOUBLE PRECISION DEFAULT 0,
@@ -40,28 +40,28 @@ CREATE TABLE "chaparia_lists" (
 CREATE TABLE "clientes" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
-  "razaoSocial" TEXT,
-  "nomeFantasia" TEXT,
+  "razaosocial" TEXT,
+  "nomefantasia" TEXT,
   "cnpj" TEXT,
   "segmento" TEXT,
   "cnae" TEXT,
-  "inscricaoEstadual" TEXT,
-  "inscricaoMunicipal" TEXT,
+  "inscricaoestadual" TEXT,
+  "inscricaomunicipal" TEXT,
   "cep" TEXT,
   "logradouro" TEXT,
   "numero" TEXT,
   "bairro" TEXT,
   "cidade" TEXT,
   "estado" TEXT,
-  "contatoNome" TEXT,
-  "contatoCargo" TEXT,
+  "contatonome" TEXT,
+  "contatocargo" TEXT,
   "email" TEXT,
   "telefone" TEXT,
   "logo" TEXT DEFAULT '',
   "observacoes" TEXT,
   "contatos" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
+  "createdat" TEXT,
+  "updatedat" TEXT,
   "codigo_cliente" TEXT DEFAULT ''
 );
 CREATE TABLE "comparison_results" (
@@ -462,16 +462,16 @@ CREATE TABLE "cubiculos" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
   "nome" TEXT,
-  "tipoAcionamento" TEXT,
-  "regimeAcionamento" TEXT,
+  "tipoacionamento" TEXT,
+  "regimeacionamento" TEXT,
   "comunicacao" TEXT,
   "potencia" TEXT,
-  "potenciaKvar" TEXT,
+  "potenciakvar" TEXT,
   "tensao" TEXT,
   "icc" TEXT,
   "frequencia" TEXT,
-  "correnteApx" TEXT,
-  "correntePlaca" TEXT,
+  "correnteapx" TEXT,
+  "correnteplaca" TEXT,
   "fp" DOUBLE PRECISION,
   "fs" DOUBLE PRECISION,
   "rendimento" DOUBLE PRECISION,
@@ -480,14 +480,14 @@ CREATE TABLE "cubiculos" (
   "drives" TEXT,
   "aplicacao" TEXT,
   "descricao_word" TEXT,
-  "custoTotal" DOUBLE PRECISION DEFAULT 0,
+  "custototal" DOUBLE PRECISION DEFAULT 0,
   "items" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
-  "correnteNominal" TEXT DEFAULT '',
+  "createdat" TEXT,
+  "updatedat" TEXT,
+  "correntenominal" TEXT DEFAULT '',
   "nbi" TEXT DEFAULT '',
   "instalacao" TEXT DEFAULT '',
-  "releProtecao" TEXT DEFAULT ''
+  "releprotecao" TEXT DEFAULT ''
 );
 CREATE TABLE "empresas" (
   "id" TEXT PRIMARY KEY,
@@ -513,36 +513,36 @@ CREATE TABLE "extraction_history" (
 CREATE TABLE "fornecedores" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
-  "razaoSocial" TEXT,
-  "nomeFantasia" TEXT,
+  "razaosocial" TEXT,
+  "nomefantasia" TEXT,
   "cnpj" TEXT,
   "segmento" TEXT,
   "cnae" TEXT,
-  "inscricaoEstadual" TEXT,
-  "inscricaoMunicipal" TEXT,
+  "inscricaoestadual" TEXT,
+  "inscricaomunicipal" TEXT,
   "cep" TEXT,
   "logradouro" TEXT,
   "numero" TEXT,
   "bairro" TEXT,
   "cidade" TEXT,
   "estado" TEXT,
-  "contatoNome" TEXT,
-  "contatoCargo" TEXT,
+  "contatonome" TEXT,
+  "contatocargo" TEXT,
   "email" TEXT,
   "telefone" TEXT,
   "observacoes" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
-  "prazoEntrega" TEXT DEFAULT '',
-  "condicaoPagamento" TEXT DEFAULT ''
+  "createdat" TEXT,
+  "updatedat" TEXT,
+  "prazoentrega" TEXT DEFAULT '',
+  "condicaopagamento" TEXT DEFAULT ''
 );
 CREATE TABLE "load_lists" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
   "name" TEXT,
   "items" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT
+  "createdat" TEXT,
+  "updatedat" TEXT
 );
 CREATE TABLE "mail_settings" (
   "id" TEXT PRIMARY KEY,
@@ -661,8 +661,8 @@ CREATE TABLE "manufatura_resultados_teste" (
 CREATE TABLE "materiais" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
-  "codigoInterno" TEXT,
-  "codigoFabricante" TEXT,
+  "codigointerno" TEXT,
+  "codigofabricante" TEXT,
   "fabricante" TEXT,
   "categoria" TEXT,
   "area" TEXT,
@@ -673,8 +673,8 @@ CREATE TABLE "materiais" (
   "corrente" TEXT,
   "custo" DOUBLE PRECISION DEFAULT 0,
   "markup" DOUBLE PRECISION DEFAULT 0,
-  "precoSugerido" TEXT,
-  "leadTime" DOUBLE PRECISION DEFAULT 5,
+  "precosugerido" TEXT,
+  "leadtime" DOUBLE PRECISION DEFAULT 5,
   "ncm" TEXT,
   "origem" TEXT,
   "icms" DOUBLE PRECISION DEFAULT 18,
@@ -685,11 +685,11 @@ CREATE TABLE "materiais" (
   "largura_mm" DOUBLE PRECISION DEFAULT 0,
   "altura_mm" DOUBLE PRECISION DEFAULT 0,
   "profundidade_mm" DOUBLE PRECISION DEFAULT 0,
-  "lastUpdateDate" TEXT,
-  "lastUpdateTitle" TEXT,
-  "createdAt" TEXT,
-  "ufFornecedor" TEXT DEFAULT '',
-  "grupoSiemens" TEXT DEFAULT '',
+  "lastupdatedate" TEXT,
+  "lastupdatetitle" TEXT,
+  "createdat" TEXT,
+  "uffornecedor" TEXT DEFAULT '',
+  "gruposiemens" TEXT DEFAULT '',
   "favorito" BIGINT DEFAULT 0,
   "dxf_block" TEXT
 );
@@ -697,12 +697,12 @@ CREATE TABLE "orcamentos" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
   "numero" TEXT,
-  "clienteId" TEXT,
-  "clienteName" TEXT,
+  "clienteid" TEXT,
+  "clientename" TEXT,
   "obra" TEXT,
   "status" TEXT,
-  "markupGlobal" DOUBLE PRECISION DEFAULT 30,
-  "impostoGlobal" DOUBLE PRECISION DEFAULT 18,
+  "markupglobal" DOUBLE PRECISION DEFAULT 30,
+  "impostoglobal" DOUBLE PRECISION DEFAULT 18,
   "subtotal" DOUBLE PRECISION DEFAULT 0,
   "total" DOUBLE PRECISION DEFAULT 0,
   "condicao_pagamento" TEXT,
@@ -714,8 +714,8 @@ CREATE TABLE "orcamentos" (
   "transporte" TEXT,
   "despesas" TEXT,
   "items" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT
+  "createdat" TEXT,
+  "updatedat" TEXT
 );
 CREATE TABLE "paineis" (
   "id" TEXT PRIMARY KEY,
@@ -734,10 +734,10 @@ CREATE TABLE "paineis" (
   "cat_instalacao" TEXT,
   "cat_gp" TEXT,
   "cat_cor" TEXT,
-  "custoTotal" DOUBLE PRECISION DEFAULT 0,
+  "custototal" DOUBLE PRECISION DEFAULT 0,
   "items" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT
+  "createdat" TEXT,
+  "updatedat" TEXT
 );
 CREATE TABLE "pipeline_items" (
   "id" TEXT PRIMARY KEY,
@@ -747,12 +747,12 @@ CREATE TABLE "pipeline_items" (
   "valor" DOUBLE PRECISION DEFAULT 0,
   "status" TEXT DEFAULT 'prospect',
   "origem" TEXT,
-  "origemId" TEXT,
+  "origemid" TEXT,
   "observacoes" TEXT,
-  "ultimoContato" TEXT,
-  "proximoFollowup" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
+  "ultimocontato" TEXT,
+  "proximofollowup" TEXT,
+  "createdat" TEXT,
+  "updatedat" TEXT,
   "interacoes" TEXT,
   "vendedor" TEXT DEFAULT '',
   "tipo" TEXT DEFAULT 'tecnica_comercial',
@@ -778,7 +778,7 @@ CREATE TABLE "price_import_templates" (
   "name" TEXT,
   "fabricante" TEXT,
   "columns" TEXT,
-  "updatedAt" TEXT,
+  "updatedat" TEXT,
   PRIMARY KEY ("fornecedor_id", "empresa_id")
 );
 CREATE TABLE "projeto_custos" (
@@ -857,8 +857,8 @@ CREATE TABLE "propostas_comerciais" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
   "dados" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT
+  "createdat" TEXT,
+  "updatedat" TEXT
 );
 CREATE TABLE "propostas_completas" (
   "id" TEXT PRIMARY KEY,
@@ -871,8 +871,8 @@ CREATE TABLE "propostas_tecnicas" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
   "dados" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT
+  "createdat" TEXT,
+  "updatedat" TEXT
 );
 CREATE TABLE "regras_derivacao" (
   "id" TEXT PRIMARY KEY,
@@ -889,9 +889,9 @@ CREATE TABLE "regras_derivacao" (
 CREATE TABLE "settings" (
   "empresa_id" TEXT PRIMARY KEY DEFAULT 'default',
   "theme" TEXT DEFAULT 'light',
-  "defaultMarkup" DOUBLE PRECISION DEFAULT 30,
-  "defaultTax" DOUBLE PRECISION DEFAULT 18,
-  "defaultIpi" DOUBLE PRECISION DEFAULT 9.75,
+  "defaultmarkup" DOUBLE PRECISION DEFAULT 30,
+  "defaulttax" DOUBLE PRECISION DEFAULT 18,
+  "defaultipi" DOUBLE PRECISION DEFAULT 9.75,
   "company_name" TEXT DEFAULT '',
   "company_cnpj" TEXT DEFAULT '',
   "company_address" TEXT DEFAULT '',
@@ -901,8 +901,8 @@ CREATE TABLE "settings" (
   "company_cidade" TEXT DEFAULT '',
   "company_uf" TEXT DEFAULT '',
   "company_email" TEXT DEFAULT '',
-  "company_logoUrl" TEXT DEFAULT '',
-  "company_regimeTributario" TEXT DEFAULT 'Lucro Real',
+  "company_logourl" TEXT DEFAULT '',
+  "company_regimetributario" TEXT DEFAULT 'Lucro Real',
   "login_theme" TEXT DEFAULT '{}',
   "ai_provider" TEXT DEFAULT 'ollama',
   "ai_model" TEXT DEFAULT 'qwen2.5:14b',
@@ -919,16 +919,16 @@ CREATE TABLE "tipicos" (
   "id" TEXT PRIMARY KEY,
   "empresa_id" TEXT NOT NULL DEFAULT 'default',
   "nome" TEXT,
-  "tipoAcionamento" TEXT,
-  "regimeAcionamento" TEXT,
+  "tipoacionamento" TEXT,
+  "regimeacionamento" TEXT,
   "comunicacao" TEXT,
   "potencia" TEXT,
-  "potenciaKvar" TEXT,
+  "potenciakvar" TEXT,
   "tensao" TEXT,
   "icc" TEXT,
   "frequencia" TEXT,
-  "correnteApx" TEXT,
-  "correntePlaca" TEXT,
+  "correnteapx" TEXT,
+  "correnteplaca" TEXT,
   "fp" DOUBLE PRECISION,
   "fs" DOUBLE PRECISION,
   "rendimento" DOUBLE PRECISION,
@@ -937,11 +937,11 @@ CREATE TABLE "tipicos" (
   "drives" TEXT,
   "aplicacao" TEXT,
   "descricao_word" TEXT,
-  "custoTotal" DOUBLE PRECISION DEFAULT 0,
+  "custototal" DOUBLE PRECISION DEFAULT 0,
   "items" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
-  "tensaoComando" TEXT DEFAULT ''
+  "createdat" TEXT,
+  "updatedat" TEXT,
+  "tensaocomando" TEXT DEFAULT ''
 );
 CREATE TABLE "unidades_cliente" (
   "id" TEXT PRIMARY KEY,
@@ -956,8 +956,8 @@ CREATE TABLE "unidades_cliente" (
   "cidade" TEXT,
   "estado" TEXT,
   "proximo_sequencial" BIGINT DEFAULT 1,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
+  "createdat" TEXT,
+  "updatedat" TEXT,
   "contatos" TEXT DEFAULT '[]',
   UNIQUE("empresa_id", "cliente_id", "codigo_unidade")
 );
@@ -978,8 +978,8 @@ CREATE TABLE "vendedores" (
   "nome" TEXT,
   "email" TEXT,
   "telefone" TEXT,
-  "createdAt" TEXT,
-  "updatedAt" TEXT,
+  "createdat" TEXT,
+  "updatedat" TEXT,
   "meta_mensal" DOUBLE PRECISION DEFAULT 0
 );
 
@@ -1030,11 +1030,11 @@ CREATE INDEX "idx_crm_tarefas_responsavel" ON "crm_tarefas"("responsavel");
 CREATE INDEX "idx_crm_tarefas_vencimento" ON "crm_tarefas"("data_vencimento");
 CREATE INDEX "idx_extraction_history_proposal" ON "extraction_history"("proposal_id");
 CREATE INDEX "idx_materiais_categoria" ON "materiais"("categoria");
-CREATE INDEX "idx_materiais_codigoFabricante" ON "materiais"("codigoFabricante");
-CREATE INDEX "idx_materiais_codigoInterno" ON "materiais"("codigoInterno");
+CREATE INDEX "idx_materiais_codigofabricante" ON "materiais"("codigofabricante");
+CREATE INDEX "idx_materiais_codigointerno" ON "materiais"("codigointerno");
 CREATE INDEX "idx_materiais_empresa" ON "materiais"("empresa_id");
 CREATE INDEX "idx_materiais_fabricante" ON "materiais"("fabricante");
-CREATE INDEX "idx_materiais_grupoSiemens" ON "materiais"("grupoSiemens");
+CREATE INDEX "idx_materiais_gruposiemens" ON "materiais"("gruposiemens");
 CREATE INDEX "idx_price_history_material" ON "price_history"("material_id");
 CREATE INDEX "idx_projeto_custos_empresa" ON "projeto_custos"("empresa_id");
 CREATE INDEX "idx_projeto_custos_projeto" ON "projeto_custos"("empresa_id", "projeto_id", "tipo");

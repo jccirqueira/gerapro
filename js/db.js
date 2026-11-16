@@ -1,70 +1,214 @@
 /**
  * Database Module
- * SQLite via Node.js built-in DatabaseSync (Node 22+)
- * Schema, CRUD helpers, sync operations
+ * PostgreSQL via node-postgres (Pool) — Fase 2 da migração SQLite → PostgreSQL
+ *
+ * Camada única de acesso do GeraPro. API compatível com o driver anterior:
+ *   db.prepare(sql).all/get/run(...), db.exec(sql), getDb(), withTransaction(fn)
+ * Dialeto: placeholders ? → $1..$n; INSERT OR IGNORE/REPLACE → ON CONFLICT (_toPg).
  */
 
 const crypto = require('crypto');
-const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
+const { Pool, types } = require('pg');
+const { AsyncLocalStorage } = require('async_hooks');
 
-const DB_DIR = path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DB_DIR, 'gerapro.db');
+// int8/bigint (OID 20) → Number: nosso mapeou INTEGER→BIGINT e os dados ficam
+// muito abaixo de 2^53; sem isso count(*)/flags voltariam como string ("0").
+types.setTypeParser(20, v => parseInt(v, 10));
 
-let db = null;
+// Garante as variáveis PG* do .env antes de criar o pool (dotenv é idempotente)
+try { require('dotenv').config({ path: path.join(__dirname, '..', '.env') }); } catch (_) { /* opcional */ }
 
-// Initialize at module load
-getDb();
-
-function getDb() {
-    if (!db) {
-        if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-        db = new DatabaseSync(DB_PATH);
-        db.exec('PRAGMA journal_mode = WAL');
-        db.exec('PRAGMA foreign_keys = ON');
-        initSchema();
+// ── Pool de conexões (config via variáveis PG*; padrão localhost) ──
+let _pool = null;
+function _getPool() {
+    if (!_pool) {
+        _pool = new Pool({
+            host: process.env.PGHOST || 'localhost',
+            port: +(process.env.PGPORT || 5432),
+            user: process.env.PGUSER || 'gerapro',
+            password: process.env.PGPASSWORD || 'gerapro_local_2026',
+            database: process.env.PGDATABASE || 'gerapro',
+        });
     }
-    return db;
+    return _pool;
 }
 
-// Executa fn() dentro de uma transação SQLite; em caso de erro, ROLLBACK completo.
-// Suporta aninhamento via SAVEPOINT (ex.: bulk que chama update() com priceHistory,
-// que internamente grava price_history em outra transação).
-// (node:sqlite não possui a API .transaction() do better-sqlite3)
-let _txDepth = 0;
-function withTransaction(fn) {
-    if (_txDepth > 0) {
-        const sp = 'gerapro_sp_' + _txDepth;
-        _txDepth++;
-        db.exec('SAVEPOINT ' + sp);
-        try {
-            const result = fn();
-            db.exec('RELEASE ' + sp);
-            return result;
-        } catch (e) {
-            try { db.exec('ROLLBACK TO ' + sp); db.exec('RELEASE ' + sp); } catch (_) { /* já abortada */ }
-            throw e;
-        } finally {
-            _txDepth--;
+// ── Contextos assíncronos: transação (cliente fixo) e init (evita reentrância) ──
+const _txStore = new AsyncLocalStorage();   // guarda { client, depth }
+const _initStore = new AsyncLocalStorage(); // true enquanto roda o init
+
+function _conn() {
+    const tx = _txStore.getStore();
+    return tx ? tx.client : _getPool();
+}
+
+// Mapa tabela → colunas da PK (gerado do schema real; fonte: tools/migracao-postgres)
+const _PK_MAP = {
+    "empresas": ["id"], "clientes": ["id"], "fornecedores": ["id"], "materiais": ["id"],
+    "price_history": ["id"], "paineis": ["id"], "tipicos": ["id"], "cargas": ["id"],
+    "orcamentos": ["id"], "load_lists": ["id"], "propostas_tecnicas": ["id"],
+    "propostas_comerciais": ["id"], "settings": ["empresa_id"], "ai_settings": ["empresa_id"],
+    "price_import_templates": ["fornecedor_id", "empresa_id"], "chaparia_lists": ["id"],
+    "regras_derivacao": ["id"], "pipeline_items": ["id"], "vendedores": ["id"],
+    "composicoes": ["id"], "proposal_counters": ["data"], "cubiculos": ["id"],
+    "usuarios": ["id"], "propostas_completas": ["id"], "crm_leads": ["id"],
+    "crm_interacoes": ["id"], "crm_tarefas": ["id"], "crm_email_templates": ["id"],
+    "mail_settings": ["id"], "crm_stages": ["id"], "crm_email_log": ["id"],
+    "manufatura_projetos": ["id"], "manufatura_colunas": ["id"], "manufatura_gavetas": ["id"],
+    "manufatura_componentes": ["id"], "manufatura_historico": ["id"],
+    "manufatura_perfis_teste": ["id"], "manufatura_resultados_teste": ["id"],
+    "manufatura_anexos": ["id"], "unidades_cliente": ["id"], "crm_notas": ["id"],
+    "crm_webhooks": ["id"], "crm_sequencias": ["id"], "extraction_history": ["id"],
+    "comparison_sessions": ["id"], "comparison_results": ["id"], "crm_automacoes": ["id"],
+    "crm_metas": ["id"], "projetos": ["id"], "projeto_fases": ["id"],
+    "projeto_custos": ["id"], "compras_requisicoes": ["id"], "compras_requisicao_itens": ["id"],
+    "compras_cotacoes": ["id"], "compras_cotacao_itens": ["id"], "compras_pedidos": ["id"],
+    "compras_pedido_itens": ["id"], "compras_notas": ["id"], "compras_nota_itens": ["id"],
+    "projeto_tarefas": ["id"],
+};
+
+const _qi = (id) => '"' + String(id).toLowerCase() + '"'; // PG dobra sem aspas: gravar minúsculo
+
+// Substitui ? por $1..$n ignorando literais de string
+function _bindParams(sql) {
+    let out = '', quote = null, n = 0;
+    for (let i = 0; i < sql.length; i++) {
+        const ch = sql[i];
+        if (quote) {
+            out += ch;
+            if (ch === quote) {
+                if (sql[i + 1] === quote) { out += sql[i + 1]; i++; }
+                else quote = null;
+            }
+            continue;
+        }
+        if (ch === "'" || ch === '"') { quote = ch; out += ch; continue; }
+        if (ch === '?') { out += '$' + (++n); continue; }
+        out += ch;
+    }
+    return out;
+}
+
+// Converte dialeto SQLite → PostgreSQL + placeholders
+function _toPg(sql) {
+    // INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+    if (/^INSERT\s+OR\s+IGNORE\b/i.test(sql)) {
+        return _bindParams(sql.replace(/^INSERT\s+OR\s+IGNORE\b/i, 'INSERT')) + ' ON CONFLICT DO NOTHING';
+    }
+    // INSERT OR REPLACE INTO t (cols) → ON CONFLICT (pk) DO UPDATE SET ...
+    const m = sql.match(/^INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_0-9]+)\s*\(([^)]+)\)/i);
+    if (m) {
+        const tabela = m[1];
+        const cols = m[2].split(',').map(s => s.trim().replace(/"/g, ''));
+        const pk = _PK_MAP[tabela] || ['id'];
+        const setCols = cols.filter(c => !pk.includes(c));
+        let out = _bindParams(sql.replace(/^INSERT\s+OR\s+REPLACE\b/i, 'INSERT'));
+        out += ' ON CONFLICT (' + pk.map(_qi).join(', ') + ') DO UPDATE SET ';
+        out += (setCols.length ? setCols : [pk[0]])
+            .map(c => _qi(c) + ' = EXCLUDED.' + _qi(c)).join(', ');
+        return out;
+    }
+    return _bindParams(sql);
+}
+
+// ── Init preguiçoso (1× por processo): schema + seeds ──
+let _initPromise = null;
+function _ensureInit() {
+    if (!_initPromise) {
+        _initPromise = _initStore.run(true, () => (async () => {
+            await initSchema();
+            await ensureSystemData();
+        })()).catch(e => { _initPromise = null; throw e; });
+    }
+    return _initPromise;
+}
+async function _maybeInit() {
+    if (_initStore.getStore()) return; // reentrante: é o próprio init chamando a si
+    await _ensureInit();
+}
+
+async function _query(sql, params) {
+    await _maybeInit();
+    const conn = _conn();
+    const pgSql = _toPg(sql);
+    return (params && params.length) ? conn.query(pgSql, params) : conn.query(pgSql);
+}
+
+// ── Case de colunas: SQLite devolve o case original; PG devolve minúsculo ──
+// (js/pg-case-map.json: { minúsculo → original } — restaura para o código)
+let _caseMap = null;
+function _restoreCase(row) {
+    if (!row) return row;
+    if (_caseMap === null) {
+        try { _caseMap = JSON.parse(fs.readFileSync(path.join(__dirname, 'pg-case-map.json'), 'utf8')); }
+        catch (e) { _caseMap = {}; }
+    }
+    let out = null;
+    for (const k of Object.keys(row)) {
+        const orig = _caseMap[k];
+        if (orig !== undefined && orig !== k) {
+            if (!out) out = { ...row };
+            out[orig] = out[k];
+            delete out[k];
         }
     }
-    db.exec('BEGIN IMMEDIATE TRANSACTION');
-    _txDepth = 1;
+    return out || row;
+}
+
+// API estilo node:sqlite — db.prepare(sql).all/get/run(...)
+function prepare(sql) {
+    return {
+        all: async (...args) => (await _query(sql, args)).rows.map(_restoreCase),
+        get: async (...args) => _restoreCase((await _query(sql, args)).rows[0]),
+        run: async (...args) => {
+            const r = await _query(sql, args);
+            return { changes: r.rowCount, lastInsertRowid: null };
+        },
+    };
+}
+async function exec(sql) { await _query(sql); }
+
+// Compatibilidade: o servidor usa db.getDb().prepare(...)
+const db = { prepare, exec };
+function getDb() { return db; }
+
+// Executa fn() dentro de transação (cliente dedicado; aninhamento via SAVEPOINT)
+async function withTransaction(fn) {
+    const tx = _txStore.getStore();
+    if (tx) {
+        const sp = 'gerapro_sp_' + tx.depth;
+        tx.depth++;
+        await tx.client.query('SAVEPOINT ' + sp);
+        try {
+            const result = await fn();
+            await tx.client.query('RELEASE ' + sp);
+            return result;
+        } catch (e) {
+            try { await tx.client.query('ROLLBACK TO ' + sp); await tx.client.query('RELEASE ' + sp); } catch (_) { /* já abortada */ }
+            throw e;
+        } finally {
+            tx.depth--;
+        }
+    }
+    const client = await _getPool().connect();
     try {
-        const result = fn();
-        db.exec('COMMIT');
+        await client.query('BEGIN');
+        const result = await _txStore.run({ client, depth: 1 }, fn);
+        await client.query('COMMIT');
         return result;
     } catch (e) {
-        try { db.exec('ROLLBACK'); } catch (_) { /* transação já abortada */ }
+        try { await client.query('ROLLBACK'); } catch (_) { /* transação já abortada */ }
         throw e;
     } finally {
-        _txDepth = 0;
+        client.release();
     }
 }
 
-function initSchema() {
-    db.exec(`
+
+async function initSchema() {
+    await db.exec(`
         CREATE TABLE IF NOT EXISTS empresas (
             id TEXT PRIMARY KEY,
             nome TEXT,
@@ -192,7 +336,7 @@ function initSchema() {
         );
 
         CREATE TABLE IF NOT EXISTS price_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             material_id TEXT NOT NULL REFERENCES materiais(id) ON DELETE CASCADE,
             custo REAL,
             markup REAL,
@@ -740,7 +884,7 @@ function initSchema() {
             host TEXT NOT NULL DEFAULT '',
             port INTEGER DEFAULT 587,
             secure INTEGER DEFAULT 0,
-            user TEXT DEFAULT '',
+            "user" TEXT DEFAULT '',
             pass TEXT DEFAULT '',
             from_name TEXT DEFAULT '',
             from_email TEXT DEFAULT '',
@@ -750,120 +894,120 @@ function initSchema() {
     `);
 
     // Migration: add new columns to ai_settings
-    try { db.exec('ALTER TABLE ai_settings ADD COLUMN timeout_minutes INTEGER DEFAULT 10'); } catch (e) {}
-    try { db.exec('ALTER TABLE ai_settings ADD COLUMN use_cache INTEGER DEFAULT 1'); } catch (e) {}
+    try { await db.exec('ALTER TABLE ai_settings ADD COLUMN timeout_minutes INTEGER DEFAULT 10'); } catch (e) {}
+    try { await db.exec('ALTER TABLE ai_settings ADD COLUMN use_cache INTEGER DEFAULT 1'); } catch (e) {}
 
     // Migration: add interacoes column to existing pipeline_items tables
-    try { db.exec('ALTER TABLE pipeline_items ADD COLUMN interacoes TEXT'); } catch (e) { /* column may already exist */ }
+    try { await db.exec('ALTER TABLE pipeline_items ADD COLUMN interacoes TEXT'); } catch (e) { /* column may already exist */ }
 
     // Migration: add vendedor column to pipeline_items
-    try { db.exec("ALTER TABLE pipeline_items ADD COLUMN vendedor TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE pipeline_items ADD COLUMN vendedor TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add login_theme column to settings (for login customization)
-    try { db.exec("ALTER TABLE settings ADD COLUMN login_theme TEXT DEFAULT '{}'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN login_theme TEXT DEFAULT '{}'"); } catch (e) { /* column may already exist */ }
 
     // Migration: add codigo_cliente column to clientes (for AUTPRO numbering)
-    try { db.exec("ALTER TABLE clientes ADD COLUMN codigo_cliente TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE clientes ADD COLUMN codigo_cliente TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add fabricante, dimensoes columns to chaparia_lists
-    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN fabricante TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN descricao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN largura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN altura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE chaparia_lists ADD COLUMN profundidade_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE chaparia_lists ADD COLUMN fabricante TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE chaparia_lists ADD COLUMN descricao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE chaparia_lists ADD COLUMN largura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE chaparia_lists ADD COLUMN altura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE chaparia_lists ADD COLUMN profundidade_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
 
     // Migration: add probability column to crm_stages (for weighted forecast)
-    try { db.exec("ALTER TABLE crm_stages ADD COLUMN probability INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_stages ADD COLUMN probability INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
 
     // Migration: add anexos column to crm_interacoes (for file attachments)
-    try { db.exec("ALTER TABLE crm_interacoes ADD COLUMN anexos TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_interacoes ADD COLUMN anexos TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
 
     // Migration: add meta_mensal column to vendedores
-    try { db.exec("ALTER TABLE vendedores ADD COLUMN meta_mensal REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE vendedores ADD COLUMN meta_mensal REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
 
     // Migration: add logo column to clientes table
-    try { db.exec("ALTER TABLE clientes ADD COLUMN logo TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE clientes ADD COLUMN logo TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add ai columns to existing settings table
-    try { db.exec('ALTER TABLE settings ADD COLUMN ai_provider TEXT DEFAULT \'ollama\''); } catch (e) { /* column may already exist */ }
-    try { db.exec('ALTER TABLE settings ADD COLUMN ai_model TEXT DEFAULT \'qwen2.5:14b\''); } catch (e) { /* column may already exist */ }
-    try { db.exec('ALTER TABLE settings ADD COLUMN ai_key TEXT DEFAULT \'\''); } catch (e) { /* column may already exist */ }
-    try { db.exec('ALTER TABLE settings ADD COLUMN ai_ollama_url TEXT DEFAULT \'http://localhost:11434\''); } catch (e) { /* column may already exist */ }
+    try { await db.exec('ALTER TABLE settings ADD COLUMN ai_provider TEXT DEFAULT \'ollama\''); } catch (e) { /* column may already exist */ }
+    try { await db.exec('ALTER TABLE settings ADD COLUMN ai_model TEXT DEFAULT \'qwen2.5:14b\''); } catch (e) { /* column may already exist */ }
+    try { await db.exec('ALTER TABLE settings ADD COLUMN ai_key TEXT DEFAULT \'\''); } catch (e) { /* column may already exist */ }
+    try { await db.exec('ALTER TABLE settings ADD COLUMN ai_ollama_url TEXT DEFAULT \'http://localhost:11434\''); } catch (e) { /* column may already exist */ }
     // Migration: add address detail columns to existing settings table
-    try { db.exec("ALTER TABLE settings ADD COLUMN company_logradouro TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN company_numero TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN company_cep TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN company_cidade TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN company_uf TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN company_logradouro TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN company_numero TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN company_cep TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN company_cidade TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN company_uf TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Migration: add vendor_defaults column to settings
-    try { db.exec("ALTER TABLE settings ADD COLUMN vendor_defaults TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN vendor_defaults TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
     // Migration: tipos customizados de típico (dropdown "Tipo de Típico")
-    try { db.exec("ALTER TABLE settings ADD COLUMN tipos_tipicos_custom TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN tipos_tipicos_custom TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
     // Migration: Reforma Tributária 2027 (LC 214/2025) — alíquotas configuráveis
-    try { db.exec("ALTER TABLE settings ADD COLUMN aliq_cbs REAL DEFAULT 11.2"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN aliq_ibs REAL DEFAULT 0.1"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN modelo_tributario TEXT DEFAULT '2027'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN aliq_cbs REAL DEFAULT 11.2"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN aliq_ibs REAL DEFAULT 0.1"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN modelo_tributario TEXT DEFAULT '2027'"); } catch (e) { /* column may already exist */ }
     // Migration: simulação de Split Payment (LC 214/2025 — retenção de CBS/IBS
     // na liquidação; facultativo em 2027, obrigatório B2B em 2028)
-    try { db.exec("ALTER TABLE settings ADD COLUMN split_payment INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN split_payment INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
     // Migration: Reforma 2027 — CBS por material (destaque de crédito por item).
     // DEFAULT NULL de propósito: NULL/vazio = usa a alíquota global; 0 explícito
     // = fornecedor sem CBS destacada (sem crédito). DEFAULT 0 preencheria os
     // cadastros existentes como "isento" e zeraria o crédito.
-    try { db.exec("ALTER TABLE materiais ADD COLUMN cbs REAL"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN cbs REAL"); } catch (e) { /* column may already exist */ }
     // Migration: Reforma 2027 — CBS/IBS na NF-e importada (grupo ICMSTot v100)
-    try { db.exec("ALTER TABLE compras_notas ADD COLUMN cbs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE compras_notas ADD COLUMN ibs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE compras_notas ADD COLUMN cbs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE compras_notas ADD COLUMN ibs REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_bot_token column to settings
-    try { db.exec("ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Migration: add template columns to settings
-    try { db.exec("ALTER TABLE settings ADD COLUMN template_tecnica TEXT DEFAULT 'TEMPLATE_TEC_EMP1.docx'"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN template_comercial TEXT DEFAULT 'TEMPLATE_COM.docx'"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN template_completa TEXT DEFAULT 'TEMPLATE_TEC_COM.docx'"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE settings ADD COLUMN company_color TEXT DEFAULT '#0055AA'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN template_tecnica TEXT DEFAULT 'TEMPLATE_TEC_EMP1.docx'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN template_comercial TEXT DEFAULT 'TEMPLATE_COM.docx'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN template_completa TEXT DEFAULT 'TEMPLATE_TEC_COM.docx'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE settings ADD COLUMN company_color TEXT DEFAULT '#0055AA'"); } catch (e) { /* column may already exist */ }
     // Migration: add tipo, revisao, consolidada columns to pipeline_items
-    try { db.exec("ALTER TABLE pipeline_items ADD COLUMN tipo TEXT DEFAULT 'tecnica_comercial'"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE pipeline_items ADD COLUMN revisao INT DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE pipeline_items ADD COLUMN consolidada INT DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE pipeline_items ADD COLUMN engenheiro_responsavel TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE pipeline_items ADD COLUMN data_entrega TEXT"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE pipeline_items ADD COLUMN descricao_revisao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE pipeline_items ADD COLUMN tipo TEXT DEFAULT 'tecnica_comercial'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE pipeline_items ADD COLUMN revisao INT DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE pipeline_items ADD COLUMN consolidada INT DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE pipeline_items ADD COLUMN engenheiro_responsavel TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE pipeline_items ADD COLUMN data_entrega TEXT"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE pipeline_items ADD COLUMN descricao_revisao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // CRM migrations
-    try { db.exec("ALTER TABLE crm_interacoes ADD COLUMN empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE crm_tarefas ADD COLUMN empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_interacoes ADD COLUMN empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_tarefas ADD COLUMN empresa_id TEXT NOT NULL DEFAULT 'default'"); } catch (e) { /* column may already exist */ }
     // Fase A CRM: referência da sequência que criou a tarefa (dedupe persistente)
-    try { db.exec("ALTER TABLE crm_tarefas ADD COLUMN seq_id TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_tarefas ADD COLUMN seq_id TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Fase C CRM: lixeira (soft delete) + rotting por estágio
-    try { db.exec("ALTER TABLE crm_leads ADD COLUMN deleted_at TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE crm_stages ADD COLUMN dias_rotting INTEGER DEFAULT 7"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_leads ADD COLUMN deleted_at TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_stages ADD COLUMN dias_rotting INTEGER DEFAULT 7"); } catch (e) { /* column may already exist */ }
     // Fase D CRM: menções (@mention) em notas
-    try { db.exec("ALTER TABLE crm_notas ADD COLUMN menoes TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_notas ADD COLUMN menoes TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add provider and api_key to mail_settings
-    try { db.exec("ALTER TABLE mail_settings ADD COLUMN provider TEXT DEFAULT 'smtp'"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE mail_settings ADD COLUMN api_key TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE mail_settings ADD COLUMN provider TEXT DEFAULT 'smtp'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE mail_settings ADD COLUMN api_key TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add tracking columns to crm_email_log
-    try { db.exec("ALTER TABLE crm_email_log ADD COLUMN tracking_token TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE crm_email_log ADD COLUMN opened_at TEXT"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE crm_email_log ADD COLUMN open_count INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE crm_email_log ADD COLUMN user_agent TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("CREATE INDEX IF NOT EXISTS idx_crm_email_log_tracking ON crm_email_log(tracking_token)"); } catch (e) { /* column not yet migrated */ }
+    try { await db.exec("ALTER TABLE crm_email_log ADD COLUMN tracking_token TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_email_log ADD COLUMN opened_at TEXT"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_email_log ADD COLUMN open_count INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE crm_email_log ADD COLUMN user_agent TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("CREATE INDEX IF NOT EXISTS idx_crm_email_log_tracking ON crm_email_log(tracking_token)"); } catch (e) { /* column not yet migrated */ }
 
     // Migration: add sigla to empresas table
-    try { db.exec("ALTER TABLE empresas ADD COLUMN sigla TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE empresas ADD COLUMN sigla TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Migration: add folder_name to empresas table
-    try { db.exec("ALTER TABLE empresas ADD COLUMN folder_name TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE empresas ADD COLUMN folder_name TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
     // Mail settings table
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS mail_settings (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
             host TEXT NOT NULL DEFAULT '',
             port INTEGER DEFAULT 587,
             secure INTEGER DEFAULT 0,
-            user TEXT DEFAULT '',
+            "user" TEXT DEFAULT '',
             pass TEXT DEFAULT '',
             from_name TEXT DEFAULT '',
             from_email TEXT DEFAULT '',
@@ -873,7 +1017,7 @@ function initSchema() {
     `); } catch (e) { /* table may already exist */ }
 
     // Manufatura tables
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_projetos (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -889,7 +1033,7 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_colunas (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -905,7 +1049,7 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_gavetas (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -924,7 +1068,7 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_componentes (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -939,7 +1083,7 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_historico (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -952,7 +1096,7 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_perfis_teste (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -964,7 +1108,7 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_resultados_teste (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -980,7 +1124,7 @@ function initSchema() {
         )
     `); } catch (e) { /* table may already exist */ }
 
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS manufatura_anexos (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -997,7 +1141,7 @@ function initSchema() {
     `); } catch (e) { /* table may already exist */ }
 
     // Gestão de Projetos — criados automaticamente quando uma proposta é Fechada (ganha)
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS projetos (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1022,11 +1166,11 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_empresa ON projetos(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_status ON projetos(empresa_id, status)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_empresa ON projetos(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projetos_status ON projetos(empresa_id, status)'); } catch (e) { /* ignore */ }
 
     // Fase 2 — Fases/cronograma dos projetos (visualização Gantt)
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS projeto_fases (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1044,13 +1188,13 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_empresa ON projeto_fases(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_projeto ON projeto_fases(empresa_id, projeto_id, ordem)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_empresa ON projeto_fases(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_fases_projeto ON projeto_fases(empresa_id, projeto_id, ordem)'); } catch (e) { /* ignore */ }
 
     // Fase 3 — Custos dos projetos (DRE Estimado × Real)
     // tipo: 'estimado' | 'real' ; categoria: chave da linha da DRE (ver DRE_CATEGORIAS em projetos.js)
     // valor é sempre POSITIVO — o sinal da linha é dado pela categoria (receita soma, demais deduzem)
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS projeto_custos (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1065,13 +1209,13 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_empresa ON projeto_custos(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_projeto ON projeto_custos(empresa_id, projeto_id, tipo)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_empresa ON projeto_custos(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_custos_projeto ON projeto_custos(empresa_id, projeto_id, tipo)'); } catch (e) { /* ignore */ }
 
     // Fase 4 — Tarefas dos projetos (subtarefas por fase, exibidas no Gantt)
     // status: pendente | em_andamento | concluido | bloqueada (mesmas chaves de projeto_fases)
     // fase_id aponta para a fase "mãe"; o progresso da fase vira a média das tarefas.
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS projeto_tarefas (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1089,8 +1233,8 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_tarefas_empresa ON projeto_tarefas(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_tarefas_fase ON projeto_tarefas(empresa_id, projeto_id, fase_id, ordem)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_tarefas_empresa ON projeto_tarefas(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_projeto_tarefas_fase ON projeto_tarefas(empresa_id, projeto_id, fase_id, ordem)'); } catch (e) { /* ignore */ }
 
     /* ================================================================
        MÓDULO DE COMPRAS
@@ -1101,7 +1245,7 @@ function initSchema() {
 
     // Requisição de Compras — cabeçalho da LM recebida.
     // origem é AGNÓSTICA da fonte: 'upload' (hoje) | 'manual' | 'proposta' (LM nativa futura).
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_requisicoes (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1126,12 +1270,12 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_empresa ON compras_requisicoes(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_projeto ON compras_requisicoes(empresa_id, projeto_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_status ON compras_requisicoes(empresa_id, status)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_empresa ON compras_requisicoes(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_projeto ON compras_requisicoes(empresa_id, projeto_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_req_status ON compras_requisicoes(empresa_id, status)'); } catch (e) { /* ignore */ }
 
     // Linhas da LM. material_id NULL + nao_cadastrado=1 => o alerta de item não cadastrado.
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_requisicao_itens (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1156,12 +1300,12 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_empresa ON compras_requisicao_itens(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_req ON compras_requisicao_itens(empresa_id, requisicao_id, ordem)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_material ON compras_requisicao_itens(material_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_empresa ON compras_requisicao_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_req ON compras_requisicao_itens(empresa_id, requisicao_id, ordem)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ri_material ON compras_requisicao_itens(material_id)'); } catch (e) { /* ignore */ }
 
     // Cotação — UMA por fornecedor, dentro da requisição (1 requisição → N cotações).
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_cotacoes (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1181,12 +1325,12 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_empresa ON compras_cotacoes(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_req ON compras_cotacoes(empresa_id, requisicao_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_forn ON compras_cotacoes(fornecedor_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_empresa ON compras_cotacoes(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_req ON compras_cotacoes(empresa_id, requisicao_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_cot_forn ON compras_cotacoes(fornecedor_id)'); } catch (e) { /* ignore */ }
 
     // Preço do fornecedor por item da requisição. vencedor=1 marca item a item.
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_cotacao_itens (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1206,12 +1350,12 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_empresa ON compras_cotacao_itens(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_cot ON compras_cotacao_itens(empresa_id, cotacao_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_reqitem ON compras_cotacao_itens(requisicao_item_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_empresa ON compras_cotacao_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_cot ON compras_cotacao_itens(empresa_id, cotacao_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ci_reqitem ON compras_cotacao_itens(requisicao_item_id)'); } catch (e) { /* ignore */ }
 
     // Pedido de Compras — um por fornecedor (1 requisição → N pedidos).
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_pedidos (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1237,12 +1381,12 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_empresa ON compras_pedidos(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_req ON compras_pedidos(empresa_id, requisicao_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_forn ON compras_pedidos(fornecedor_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_empresa ON compras_pedidos(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_req ON compras_pedidos(empresa_id, requisicao_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ped_forn ON compras_pedidos(fornecedor_id)'); } catch (e) { /* ignore */ }
 
     // Linha do pedido. qtd_recebida permite baixa parcial via NF.
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_pedido_itens (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1266,12 +1410,12 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_empresa ON compras_pedido_itens(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_ped ON compras_pedido_itens(empresa_id, pedido_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_material ON compras_pedido_itens(material_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_empresa ON compras_pedido_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_ped ON compras_pedido_itens(empresa_id, pedido_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_pi_material ON compras_pedido_itens(material_id)'); } catch (e) { /* ignore */ }
 
     // NF recebida — N por pedido (entregas parciais).
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_notas (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1304,12 +1448,12 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_empresa ON compras_notas(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_ped ON compras_notas(empresa_id, pedido_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_numero ON compras_notas(numero)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_empresa ON compras_notas(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_ped ON compras_notas(empresa_id, pedido_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_nf_numero ON compras_notas(numero)'); } catch (e) { /* ignore */ }
 
     // Linha da NF — vincula ao item do pedido e registra a baixa.
-    try { db.exec(`
+    try { await db.exec(`
         CREATE TABLE IF NOT EXISTS compras_nota_itens (
             id TEXT PRIMARY KEY,
             empresa_id TEXT NOT NULL DEFAULT 'default',
@@ -1328,55 +1472,55 @@ function initSchema() {
             updated_at TEXT
         )
     `); } catch (e) { /* table may already exist */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_empresa ON compras_nota_itens(empresa_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_nf ON compras_nota_itens(empresa_id, nota_id)'); } catch (e) { /* ignore */ }
-    try { db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_peditem ON compras_nota_itens(pedido_item_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_empresa ON compras_nota_itens(empresa_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_nf ON compras_nota_itens(empresa_id, nota_id)'); } catch (e) { /* ignore */ }
+    try { await db.exec('CREATE INDEX IF NOT EXISTS idx_compras_ni_peditem ON compras_nota_itens(pedido_item_id)'); } catch (e) { /* ignore */ }
 
     // Migration: add created_at to usuarios
-    try { db.exec("ALTER TABLE usuarios ADD COLUMN created_at TEXT"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE usuarios ADD COLUMN created_at TEXT"); } catch (e) { /* column may already exist */ }
     // Migration: add telegram_chat_id to usuarios
-    try { db.exec("ALTER TABLE usuarios ADD COLUMN telegram_chat_id TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE usuarios ADD COLUMN telegram_chat_id TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add dimension columns to existing materiais table
-    try { db.exec("ALTER TABLE materiais ADD COLUMN largura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE materiais ADD COLUMN altura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE materiais ADD COLUMN profundidade_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN largura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN altura_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN profundidade_mm REAL DEFAULT 0"); } catch (e) { /* column may already exist */ }
 
     // Migration: add ufFornecedor to materiais table
-    try { db.exec("ALTER TABLE materiais ADD COLUMN ufFornecedor TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN ufFornecedor TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add grupoSiemens to materiais table
-    try { db.exec("ALTER TABLE materiais ADD COLUMN grupoSiemens TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN grupoSiemens TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add favorito to materiais table
-    try { db.exec("ALTER TABLE materiais ADD COLUMN favorito INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN favorito INTEGER DEFAULT 0"); } catch (e) { /* column may already exist */ }
 
     // Migration: add dxf_block to materiais table
-    try { db.exec("ALTER TABLE materiais ADD COLUMN dxf_block TEXT"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE materiais ADD COLUMN dxf_block TEXT"); } catch (e) { /* column may already exist */ }
 
     // Migration: reset markup to 0 for all existing materials
-    try { db.exec("UPDATE materiais SET markup = 0 WHERE markup IS NULL OR markup > 0"); } catch (e) { /* ignore */ }
+    try { await db.exec("UPDATE materiais SET markup = 0 WHERE markup IS NULL OR markup > 0"); } catch (e) { /* ignore */ }
 
     // Migration: custo_anterior guarda o valor vigente ANTES da entrada
     // (ex.: preço do catálogo antes da NF da Fase 4) — permite estornar
     // o preço com exatidão. Em entradas antigas fica NULL.
-    try { db.exec("ALTER TABLE price_history ADD COLUMN custo_anterior REAL"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE price_history ADD COLUMN custo_anterior REAL"); } catch (e) { /* column may already exist */ }
 
     // Fase 5 de Compras: condições habituais do fornecedor (espelho da
     // última negociação) — pré-preenche cotações e alimenta o painel.
-    try { db.exec("ALTER TABLE fornecedores ADD COLUMN prazoEntrega TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE fornecedores ADD COLUMN condicaoPagamento TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE fornecedores ADD COLUMN prazoEntrega TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE fornecedores ADD COLUMN condicaoPagamento TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add tensaoComando to tipicos table
-    try { db.exec("ALTER TABLE tipicos ADD COLUMN tensaoComando TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE tipicos ADD COLUMN tensaoComando TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
     // Migration: add cubiculos columns
-    try { db.exec("ALTER TABLE cubiculos ADD COLUMN correnteNominal TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE cubiculos ADD COLUMN nbi TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE cubiculos ADD COLUMN instalacao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
-    try { db.exec("ALTER TABLE cubiculos ADD COLUMN releProtecao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE cubiculos ADD COLUMN correnteNominal TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE cubiculos ADD COLUMN nbi TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE cubiculos ADD COLUMN instalacao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE cubiculos ADD COLUMN releProtecao TEXT DEFAULT ''"); } catch (e) { /* column may already exist */ }
 
-    try { db.exec("ALTER TABLE unidades_cliente ADD COLUMN contatos TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
+    try { await db.exec("ALTER TABLE unidades_cliente ADD COLUMN contatos TEXT DEFAULT '[]'"); } catch (e) { /* column may already exist */ }
 }
 
 // --- Generic CRUD helpers ---
@@ -1504,38 +1648,11 @@ const SYSTEM_REGRAS = [
     { nome: 'Iluminação interna padrão', tipo_equipamento: '*', prioridade: 4, condicoes: [], acoes: [{ composicao_id: 'comp-c044', quantidade: '1' }] },
 ];
 
-function ensureSystemData() {
-    const row = db.prepare('SELECT COUNT(*) as cnt FROM composicoes').get();
-    if (row.cnt > 0) return;
-
+// Seed de stages do CRM — INDEPENDENTE das composições (antes só rodava no 1º boot).
+async function _ensureCrmStages() {
     const now = new Date().toISOString();
-    const insertComp = db.prepare(`INSERT OR IGNORE INTO composicoes
-        (id, empresa_id, codigo, atividade, unidade, grupo, categoria_profissional,
-         coeficiente_hh, fator_simples, fator_medio, fator_complexo, area_alocacao,
-         created_at, updated_at)
-        VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-
-    for (const c of SYSTEM_COMPOSICOES) {
-        insertComp.run(c.id, c.codigo, c.atividade, c.unidade, c.grupo,
-            c.categoria_profissional, c.coeficiente_hh, c.fator_simples,
-            c.fator_medio, c.fator_complexo, c.area_alocacao, now, now);
-    }
-
-    const insertRegra = db.prepare(`INSERT OR IGNORE INTO regras_derivacao
-        (id, empresa_id, nome, tipo_equipamento, prioridade, regra_ativa,
-         condicoes, acoes, created_at, updated_at)
-        VALUES (?, 'default', ?, ?, ?, 1, ?, ?, ?, ?)`);
-
-    for (const r of SYSTEM_REGRAS) {
-        const id = crypto.randomUUID();
-        insertRegra.run(id, r.nome, r.tipo_equipamento, r.prioridade,
-            JSON.stringify(r.condicoes), JSON.stringify(r.acoes), now, now);
-    }
-
-    console.log('[DB] System data seeded: 50 composições, 14 regras de derivação.');
-
     // Seed default CRM stages if table is empty
-    const stageCount = db.prepare('SELECT COUNT(*) as cnt FROM crm_stages').get();
+    const stageCount = await db.prepare('SELECT COUNT(*) as cnt FROM crm_stages').get();
     if (stageCount.cnt === 0) {
         const DEFAULT_STAGES = [
             { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: '[]', probability: 5 },
@@ -1547,17 +1664,50 @@ function ensureSystemData() {
             { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: '[]', probability: 90 },
             { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: '["nao_qualificado","sem_orcamento","nao_decidiu","concorrente","sem_contato","nao_responde","outro"]', probability: 0 }
         ];
-        const insertStage = db.prepare(`INSERT OR IGNORE INTO crm_stages
+        const insertStage = await db.prepare(`INSERT OR IGNORE INTO crm_stages
             (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at)
             VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         for (const s of DEFAULT_STAGES) {
-            insertStage.run(s.id, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, s.loss_reasons, s.probability, now, now);
+            await insertStage.run(s.id, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, s.loss_reasons, s.probability, now, now);
         }
     }
 }
 
+async function ensureSystemData() {
+    await _ensureCrmStages();
+    const row = await db.prepare('SELECT COUNT(*) as cnt FROM composicoes').get();
+    if (row.cnt > 0) return;
+
+    const now = new Date().toISOString();
+    const insertComp = await db.prepare(`INSERT OR IGNORE INTO composicoes
+        (id, empresa_id, codigo, atividade, unidade, grupo, categoria_profissional,
+         coeficiente_hh, fator_simples, fator_medio, fator_complexo, area_alocacao,
+         created_at, updated_at)
+        VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+    for (const c of SYSTEM_COMPOSICOES) {
+        await insertComp.run(c.id, c.codigo, c.atividade, c.unidade, c.grupo,
+            c.categoria_profissional, c.coeficiente_hh, c.fator_simples,
+            c.fator_medio, c.fator_complexo, c.area_alocacao, now, now);
+    }
+
+    const insertRegra = await db.prepare(`INSERT OR IGNORE INTO regras_derivacao
+        (id, empresa_id, nome, tipo_equipamento, prioridade, regra_ativa,
+         condicoes, acoes, created_at, updated_at)
+        VALUES (?, 'default', ?, ?, ?, 1, ?, ?, ?, ?)`);
+
+    for (const r of SYSTEM_REGRAS) {
+        const id = crypto.randomUUID();
+        await insertRegra.run(id, r.nome, r.tipo_equipamento, r.prioridade,
+            JSON.stringify(r.condicoes), JSON.stringify(r.acoes), now, now);
+    }
+
+    console.log('[DB] System data seeded: 50 composições, 14 regras de derivação.');
+
+
+}
+
 // Seed system data at module load (runs once per database lifetime)
-ensureSystemData();
 
 function getTableInfo(entity) {
     const info = TABLE_MAP[entity];
@@ -1567,11 +1717,11 @@ function getTableInfo(entity) {
 
 const DADOS_BASE_KEYS = ['id', 'empresa_id', 'dados', 'createdAt', 'updatedAt'];
 
-function findAll(entity, empresaId = 'default') {
+async function findAll(entity, empresaId = 'default') {
     const info = getTableInfo(entity);
     if (!info) return [];
-    const stmt = db.prepare(`SELECT * FROM ${info.table} WHERE empresa_id = ?`);
-    const rows = stmt.all(empresaId);
+    const stmt = await db.prepare(`SELECT * FROM ${info.table} WHERE empresa_id = ?`);
+    const rows = await stmt.all(empresaId);
     if (info.dados) {
         return rows.map(row => {
             if (row.dados && typeof row.dados === 'string') {
@@ -1585,11 +1735,11 @@ function findAll(entity, empresaId = 'default') {
     return rows;
 }
 
-function findById(entity, id) {
+async function findById(entity, id) {
     const info = getTableInfo(entity);
     if (!info) return null;
-    const stmt = db.prepare(`SELECT * FROM ${info.table} WHERE ${info.pk} = ?`);
-    const row = stmt.get(id) || null;
+    const stmt = await db.prepare(`SELECT * FROM ${info.table} WHERE ${info.pk} = ?`);
+    const row = await stmt.get(id) || null;
     if (row && info.dados && row.dados && typeof row.dados === 'string') {
         const parsed = JSON.parse(row.dados);
         for (const k of Object.keys(parsed)) {
@@ -1600,7 +1750,7 @@ function findById(entity, id) {
     return row;
 }
 
-function create(entity, data, empresaId = 'default') {
+async function create(entity, data, empresaId = 'default') {
     const info = getTableInfo(entity);
     if (!info) return null;
     let record = { ...data, empresa_id: empresaId };
@@ -1626,10 +1776,10 @@ function create(entity, data, empresaId = 'default') {
         const v = record[k];
         return typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
     });
-    const stmt = db.prepare(`INSERT OR REPLACE INTO ${info.table} (${keys.join(', ')}) VALUES (${placeholders})`);
-    stmt.run(...values);
+    const stmt = await db.prepare(`INSERT OR REPLACE INTO ${info.table} (${keys.join(', ')}) VALUES (${placeholders})`);
+    await stmt.run(...values);
     if (priceHistory && Array.isArray(priceHistory)) {
-        savePriceHistory(record.id, priceHistory);
+        await savePriceHistory(record.id, priceHistory);
     }
     return { ...record, ...(record.dados ? JSON.parse(record.dados) : {}), priceHistory: priceHistory || [] };
 }
@@ -1681,7 +1831,7 @@ function mapSiemensCategory(grupo) {
   return SIEMENS_GROUP_MAP[key] || null;
 }
 
-function bulkImportMateriais(items, empresaId = 'default') {
+async function bulkImportMateriais(items, empresaId = 'default') {
     const info = getTableInfo('materiais');
     if (!info) return { addedIds: [], updatedIds: [], snapshots: {} };
     const now = new Date().toISOString();
@@ -1695,19 +1845,19 @@ function bulkImportMateriais(items, empresaId = 'default') {
     const updateCols = allCols.filter(k => k !== info.pk && k !== 'empresa_id' && k !== 'createdAt');
 
     const updateSetClause = updateCols.map(k => `${k} = ?`).join(', ');
-    const updateStmt = db.prepare(`UPDATE ${info.table} SET ${updateSetClause} WHERE ${info.pk} = ? AND empresa_id = ?`);
+    const updateStmt = await db.prepare(`UPDATE ${info.table} SET ${updateSetClause} WHERE ${info.pk} = ? AND empresa_id = ?`);
 
     const insertPlaceholders = allCols.map(() => '?').join(', ');
-    const insertStmt = db.prepare(`INSERT OR REPLACE INTO ${info.table} (${allCols.join(', ')}) VALUES (${insertPlaceholders})`);
+    const insertStmt = await db.prepare(`INSERT OR REPLACE INTO ${info.table} (${allCols.join(', ')}) VALUES (${insertPlaceholders})`);
 
     const getVal = (obj, k) => {
         const v = obj[k];
         return typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
     };
 
-    const findByCodeStmt = db.prepare('SELECT * FROM materiais WHERE (codigoInterno = ? OR codigoFabricante = ?) AND empresa_id = ? LIMIT 1');
+    const findByCodeStmt = await db.prepare('SELECT * FROM materiais WHERE (codigoInterno = ? OR codigoFabricante = ?) AND empresa_id = ? LIMIT 1');
 
-    db.exec('BEGIN TRANSACTION');
+    await db.exec('BEGIN TRANSACTION');
     try {
         for (const item of items) {
             // Server-side category remap: if categoria is NCM-like and grupoSiemens is available, remap
@@ -1726,20 +1876,20 @@ function bulkImportMateriais(items, empresaId = 'default') {
                 const codeB = item.codigoFabricante ? String(item.codigoFabricante).trim() : '';
                 const params = [];
                 if (codeA && codeB) {
-                    existingMaterial = findByCodeStmt.get(codeA, codeB, empresaId);
+                    existingMaterial = await findByCodeStmt.get(codeA, codeB, empresaId);
                 } else if (codeA) {
-                    const byCode = db.prepare('SELECT * FROM materiais WHERE codigoInterno = ? AND empresa_id = ? LIMIT 1');
-                    existingMaterial = byCode.get(codeA, empresaId);
+                    const byCode = await db.prepare('SELECT * FROM materiais WHERE codigoInterno = ? AND empresa_id = ? LIMIT 1');
+                    existingMaterial = await byCode.get(codeA, empresaId);
                 } else if (codeB) {
-                    const byCode = db.prepare('SELECT * FROM materiais WHERE codigoFabricante = ? AND empresa_id = ? LIMIT 1');
-                    existingMaterial = byCode.get(codeB, empresaId);
+                    const byCode = await db.prepare('SELECT * FROM materiais WHERE codigoFabricante = ? AND empresa_id = ? LIMIT 1');
+                    existingMaterial = await byCode.get(codeB, empresaId);
                 }
             }
 
             if (existingMaterial) {
                 const merged = { ...existingMaterial, ...item, lastUpdateDate: now, lastUpdateTitle: 'Atualização via Importação' };
                 const values = updateCols.map(k => getVal(merged, k));
-                updateStmt.run(...values, existingMaterial.id, empresaId);
+                await updateStmt.run(...values, existingMaterial.id, empresaId);
                 snapshots[existingMaterial.id] = JSON.parse(JSON.stringify(existingMaterial));
                 updatedIds.push(existingMaterial.id);
             } else {
@@ -1752,23 +1902,23 @@ function bulkImportMateriais(items, empresaId = 'default') {
                     lastUpdateTitle: 'Criação via Importação'
                 };
                 const values = allCols.map(k => getVal(record, k));
-                insertStmt.run(...values);
+                await insertStmt.run(...values);
                 addedIds.push(record.id);
             }
         }
-        db.exec('COMMIT');
+        await db.exec('COMMIT');
     } catch (e) {
-        db.exec('ROLLBACK');
+        await db.exec('ROLLBACK');
         throw e;
     }
 
     return { addedIds, updatedIds, snapshots };
 }
 
-function update(entity, id, data, empresaId = null) {
+async function update(entity, id, data, empresaId = null) {
     const info = getTableInfo(entity);
     if (!info) return null;
-    const existing = findById(entity, id);
+    const existing = await findById(entity, id);
     if (!existing) return null;
     // Escopo multi-empresa: registros de outra empresa não podem ser alterados
     if (empresaId && existing.empresa_id !== empresaId) return null;
@@ -1799,37 +1949,37 @@ function update(entity, id, data, empresaId = null) {
         const v = record[k];
         return typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
     });
-    const stmt = db.prepare(`UPDATE ${info.table} SET ${setClause} WHERE ${info.pk} = ? AND empresa_id = ?`);
-    stmt.run(...values, id, record.empresa_id || 'default');
+    const stmt = await db.prepare(`UPDATE ${info.table} SET ${setClause} WHERE ${info.pk} = ? AND empresa_id = ?`);
+    await stmt.run(...values, id, record.empresa_id || 'default');
     if (priceHistory && Array.isArray(priceHistory)) {
-        savePriceHistory(id, priceHistory);
+        await savePriceHistory(id, priceHistory);
     }
     return { ...record, ...(record.dados ? JSON.parse(record.dados) : {}), priceHistory: priceHistory || existing.priceHistory || [] };
 }
 
-function remove(entity, id, empresaId = null) {
+async function remove(entity, id, empresaId = null) {
     const info = getTableInfo(entity);
     if (!info) return false;
     if (empresaId) {
         // Escopo multi-empresa: registros de outra empresa não podem ser excluídos
-        const scoped = db.prepare(`DELETE FROM ${info.table} WHERE ${info.pk} = ? AND empresa_id = ?`);
-        return scoped.run(id, empresaId).changes > 0;
+        const scoped = await db.prepare(`DELETE FROM ${info.table} WHERE ${info.pk} = ? AND empresa_id = ?`);
+        return (await scoped.run(id, empresaId)).changes > 0;
     }
-    const stmt = db.prepare(`DELETE FROM ${info.table} WHERE ${info.pk} = ?`);
-    const result = stmt.run(id);
+    const stmt = await db.prepare(`DELETE FROM ${info.table} WHERE ${info.pk} = ?`);
+    const result = await stmt.run(id);
     return result.changes > 0;
 }
 
 // Atualização em massa de materiais (ex.: reajuste de preços, importação por código).
 // Transacional: ou aplicam todos os itens válidos, ou nada.
-function bulkUpdateMateriais(items, empresaId = 'default') {
+async function bulkUpdateMateriais(items, empresaId = 'default') {
     if (!Array.isArray(items)) throw new Error('Itens devem ser uma lista');
-    return withTransaction(() => {
+    return await withTransaction(async () => {
         let updated = 0;
         for (const item of items) {
             if (!item || typeof item !== 'object' || !item.id) continue;
             // update() faz merge com a linha existente, trata priceHistory à parte e respeita o escopo da empresa
-            if (update('materiais', item.id, item, empresaId)) updated++;
+            if (await update('materiais', item.id, item, empresaId)) updated++;
         }
         return updated;
     });
@@ -1837,28 +1987,28 @@ function bulkUpdateMateriais(items, empresaId = 'default') {
 
 // --- Specialized helpers ---
 
-function getPriceHistory(materialId) {
-    const stmt = db.prepare('SELECT * FROM price_history WHERE material_id = ? ORDER BY date DESC');
-    return stmt.all(materialId);
+async function getPriceHistory(materialId) {
+    const stmt = await db.prepare('SELECT * FROM price_history WHERE material_id = ? ORDER BY date DESC');
+    return await stmt.all(materialId);
 }
 
-function savePriceHistory(materialId, entries) {
-    withTransaction(() => _replacePriceHistoryRows(materialId, entries));
+async function savePriceHistory(materialId, entries) {
+    await withTransaction(async () => await _replacePriceHistoryRows(materialId, entries));
 }
 
 // Versão sem transação — usar apenas quando já dentro de uma transação externa.
-function _replacePriceHistoryRows(materialId, entries) {
-    db.prepare('DELETE FROM price_history WHERE material_id = ?').run(materialId);
-    const ins = db.prepare('INSERT INTO price_history (material_id, custo, markup, date, title, origin, custo_anterior) VALUES (?, ?, ?, ?, ?, ?, ?)');
+async function _replacePriceHistoryRows(materialId, entries) {
+    await db.prepare('DELETE FROM price_history WHERE material_id = ?').run(materialId);
+    const ins = await db.prepare('INSERT INTO price_history (material_id, custo, markup, date, title, origin, custo_anterior) VALUES (?, ?, ?, ?, ?, ?, ?)');
     for (const entry of entries) {
-        ins.run(materialId, entry.custo, entry.markup, entry.date, entry.title, entry.origin || 'manual',
+        await ins.run(materialId, entry.custo, entry.markup, entry.date, entry.title, entry.origin || 'manual',
             entry.custo_anterior === undefined || entry.custo_anterior === null ? null : entry.custo_anterior);
     }
 }
 
-function getSettings(empresaId = 'default') {
-    const stmt = db.prepare('SELECT * FROM settings WHERE empresa_id = ?');
-    const row = stmt.get(empresaId);
+async function getSettings(empresaId = 'default') {
+    const stmt = await db.prepare('SELECT * FROM settings WHERE empresa_id = ?');
+    const row = await stmt.get(empresaId);
     if (!row) return null;
     let loginTheme = {};
     try { loginTheme = JSON.parse(row.login_theme || '{}'); } catch (e) {}
@@ -1893,9 +2043,9 @@ function getSettings(empresaId = 'default') {
         };
     }
 
-function getAiSettings(empresaId = 'default') {
-    const stmt = db.prepare('SELECT * FROM ai_settings WHERE empresa_id = ?');
-    const row = stmt.get(empresaId);
+async function getAiSettings(empresaId = 'default') {
+    const stmt = await db.prepare('SELECT * FROM ai_settings WHERE empresa_id = ?');
+    const row = await stmt.get(empresaId);
     if (row) {
         return {
             provider: row.provider || 'ollama',
@@ -1909,11 +2059,11 @@ function getAiSettings(empresaId = 'default') {
     return { provider: 'ollama', model: 'qwen2.5:14b', apiKey: '', ollamaUrl: 'http://localhost:11434', timeoutMinutes: 10, useCache: true };
 }
 
-function saveAiSettings(data, empresaId = 'default') {
-    const existing = db.prepare('SELECT * FROM ai_settings WHERE empresa_id = ?').get(empresaId);
+async function saveAiSettings(data, empresaId = 'default') {
+    const existing = await db.prepare('SELECT * FROM ai_settings WHERE empresa_id = ?').get(empresaId);
     if (existing) {
-        const stmt = db.prepare(`UPDATE ai_settings SET provider = ?, model = ?, api_key = ?, ollama_url = ?, timeout_minutes = ?, use_cache = ?, updatedAt = ? WHERE empresa_id = ?`);
-        stmt.run(
+        const stmt = await db.prepare(`UPDATE ai_settings SET provider = ?, model = ?, api_key = ?, ollama_url = ?, timeout_minutes = ?, use_cache = ?, updatedAt = ? WHERE empresa_id = ?`);
+        await stmt.run(
             data.provider || 'ollama',
             data.model || 'qwen2.5:14b',
             data.apiKey || '',
@@ -1924,8 +2074,8 @@ function saveAiSettings(data, empresaId = 'default') {
             empresaId
         );
     } else {
-        const stmt = db.prepare(`INSERT INTO ai_settings (empresa_id, provider, model, api_key, ollama_url, timeout_minutes, use_cache, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-        stmt.run(
+        const stmt = await db.prepare(`INSERT INTO ai_settings (empresa_id, provider, model, api_key, ollama_url, timeout_minutes, use_cache, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+        await stmt.run(
             empresaId,
             data.provider || 'ollama',
             data.model || 'qwen2.5:14b',
@@ -1938,9 +2088,9 @@ function saveAiSettings(data, empresaId = 'default') {
     }
 }
 
-function addExtractionHistory(data) {
-    const stmt = db.prepare(`INSERT INTO extraction_history (id, empresa_id, proposal_id, filename, data_json, provider, model, created_at, applied_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    stmt.run(
+async function addExtractionHistory(data) {
+    const stmt = await db.prepare(`INSERT INTO extraction_history (id, empresa_id, proposal_id, filename, data_json, provider, model, created_at, applied_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    await stmt.run(
         data.id || crypto.randomUUID(),
         data.empresa_id || 'default',
         data.proposal_id || '',
@@ -1953,26 +2103,26 @@ function addExtractionHistory(data) {
     );
 }
 
-function listExtractionHistory(empresaId = 'default', proposalId = null) {
+async function listExtractionHistory(empresaId = 'default', proposalId = null) {
     if (proposalId) {
-        return db.prepare('SELECT * FROM extraction_history WHERE empresa_id = ? AND proposal_id = ? ORDER BY created_at DESC').all(empresaId, proposalId);
+        return await db.prepare('SELECT * FROM extraction_history WHERE empresa_id = ? AND proposal_id = ? ORDER BY created_at DESC').all(empresaId, proposalId);
     }
-    return db.prepare('SELECT * FROM extraction_history WHERE empresa_id = ? ORDER BY created_at DESC LIMIT 50').all(empresaId);
+    return await db.prepare('SELECT * FROM extraction_history WHERE empresa_id = ? ORDER BY created_at DESC LIMIT 50').all(empresaId);
 }
 
-function saveComparisonSession(session) {
-    const existing = db.prepare('SELECT * FROM comparison_sessions WHERE id = ?').get(session.id);
+async function saveComparisonSession(session) {
+    const existing = await db.prepare('SELECT * FROM comparison_sessions WHERE id = ?').get(session.id);
     if (existing) {
-        db.prepare(`UPDATE comparison_sessions SET nome = ?, documentos_json = ?, status = ?, updated_at = ? WHERE id = ?`).run(
+        await db.prepare(`UPDATE comparison_sessions SET nome = ?, documentos_json = ?, status = ?, updated_at = ? WHERE id = ?`).run(
             session.nome || 'Comparação',
             session.documentos_json || '[]',
             session.status || 'draft',
             new Date().toISOString(),
             session.id
         );
-        db.prepare('DELETE FROM comparison_results WHERE session_id = ?').run(session.id);
+        await db.prepare('DELETE FROM comparison_results WHERE session_id = ?').run(session.id);
     } else {
-        db.prepare(`INSERT INTO comparison_sessions (id, empresa_id, proposal_id, nome, created_at, updated_at, documentos_json, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        await db.prepare(`INSERT INTO comparison_sessions (id, empresa_id, proposal_id, nome, created_at, updated_at, documentos_json, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
             session.id,
             session.empresa_id || 'default',
             session.proposal_id || '',
@@ -1984,9 +2134,9 @@ function saveComparisonSession(session) {
         );
     }
     if (session.results) {
-        const insertResult = db.prepare(`INSERT INTO comparison_results (id, session_id, descricao, unidade, qtd_documento, qtd_levantamento, diferenca, percentual, status, matched, item_a_json, item_b_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        const insertResult = await db.prepare(`INSERT INTO comparison_results (id, session_id, descricao, unidade, qtd_documento, qtd_levantamento, diferenca, percentual, status, matched, item_a_json, item_b_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         for (const r of session.results) {
-            insertResult.run(
+            await insertResult.run(
                 r.id || crypto.randomUUID(),
                 session.id,
                 r.descricao || '',
@@ -2004,27 +2154,27 @@ function saveComparisonSession(session) {
     }
 }
 
-function listComparisonSessions(empresaId = 'default', proposalId = null) {
+async function listComparisonSessions(empresaId = 'default', proposalId = null) {
     if (proposalId) {
-        return db.prepare('SELECT * FROM comparison_sessions WHERE empresa_id = ? AND proposal_id = ? ORDER BY created_at DESC').all(empresaId, proposalId);
+        return await db.prepare('SELECT * FROM comparison_sessions WHERE empresa_id = ? AND proposal_id = ? ORDER BY created_at DESC').all(empresaId, proposalId);
     }
-    return db.prepare('SELECT * FROM comparison_sessions WHERE empresa_id = ? ORDER BY created_at DESC LIMIT 50').all(empresaId);
+    return await db.prepare('SELECT * FROM comparison_sessions WHERE empresa_id = ? ORDER BY created_at DESC LIMIT 50').all(empresaId);
 }
 
-function getComparisonSession(sessionId) {
-    const session = db.prepare('SELECT * FROM comparison_sessions WHERE id = ?').get(sessionId);
+async function getComparisonSession(sessionId) {
+    const session = await db.prepare('SELECT * FROM comparison_sessions WHERE id = ?').get(sessionId);
     if (!session) return null;
-    session.results = db.prepare('SELECT * FROM comparison_results WHERE session_id = ?').all(sessionId);
+    session.results = await db.prepare('SELECT * FROM comparison_results WHERE session_id = ?').all(sessionId);
     return session;
 }
 
-function deleteComparisonSession(sessionId) {
-    db.prepare('DELETE FROM comparison_results WHERE session_id = ?').run(sessionId);
-    db.prepare('DELETE FROM comparison_sessions WHERE id = ?').run(sessionId);
+async function deleteComparisonSession(sessionId) {
+    await db.prepare('DELETE FROM comparison_results WHERE session_id = ?').run(sessionId);
+    await db.prepare('DELETE FROM comparison_sessions WHERE id = ?').run(sessionId);
 }
 
-function saveSettings(data, empresaId = 'default') {
-    const existing = db.prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+async function saveSettings(data, empresaId = 'default') {
+    const existing = await db.prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
     if (existing) {
         const fields = [
             'theme', 'defaultMarkup', 'defaultTax', 'defaultIpi',
@@ -2044,13 +2194,13 @@ function saveSettings(data, empresaId = 'default') {
     }
     const loginThemeJson = data.loginTheme ? JSON.stringify(data.loginTheme) : '{}';
     if (existing) {
-        const stmt = db.prepare(`UPDATE settings SET theme = ?, defaultMarkup = ?, defaultTax = ?, defaultIpi = ?,
+        const stmt = await db.prepare(`UPDATE settings SET theme = ?, defaultMarkup = ?, defaultTax = ?, defaultIpi = ?,
             company_name = ?, company_cnpj = ?, company_address = ?, company_logradouro = ?, company_numero = ?, company_cep = ?, company_cidade = ?, company_uf = ?, company_email = ?, company_logoUrl = ?, company_regimeTributario = ?, company_color = ?,
             login_theme = ?, vendor_defaults = ?, telegram_bot_token = ?,
             template_tecnica = ?, template_comercial = ?, template_completa = ?,
             aliq_cbs = ?, aliq_ibs = ?, modelo_tributario = ?, split_payment = ?
             WHERE empresa_id = ?`);
-        stmt.run(
+        await stmt.run(
             data.theme || 'light', data.defaultMarkup ?? 30, data.defaultTax ?? 18, data.defaultIpi ?? 9.75,
             data.company_name || '', data.company_cnpj || '', data.company_address || '',
             data.company_logradouro || '', data.company_numero || '', data.company_cep || '', data.company_cidade || '', data.company_uf || '',
@@ -2070,13 +2220,13 @@ function saveSettings(data, empresaId = 'default') {
             empresaId
         );
     } else {
-        const stmt = db.prepare(`INSERT INTO settings (empresa_id, theme, defaultMarkup, defaultTax, defaultIpi,
+        const stmt = await db.prepare(`INSERT INTO settings (empresa_id, theme, defaultMarkup, defaultTax, defaultIpi,
             company_name, company_cnpj, company_address, company_logradouro, company_numero, company_cep, company_cidade, company_uf, company_email, company_logoUrl, company_regimeTributario, company_color,
             login_theme, vendor_defaults, telegram_bot_token,
             template_tecnica, template_comercial, template_completa,
             aliq_cbs, aliq_ibs, modelo_tributario, split_payment)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        stmt.run(
+        await stmt.run(
             empresaId, data.theme || 'light', data.defaultMarkup ?? 30, data.defaultTax ?? 18, data.defaultIpi ?? 9.75,
             data.company_name || '', data.company_cnpj || '', data.company_address || '',
             data.company_logradouro || '', data.company_numero || '', data.company_cep || '', data.company_cidade || '', data.company_uf || '',
@@ -2097,69 +2247,69 @@ function saveSettings(data, empresaId = 'default') {
     }
 }
 
-function saveLoginTheme(loginTheme, empresaId = 'default') {
-    const existing = db.prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+async function saveLoginTheme(loginTheme, empresaId = 'default') {
+    const existing = await db.prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
     const loginThemeJson = JSON.stringify(loginTheme || {});
     if (existing) {
-        db.prepare('UPDATE settings SET login_theme = ? WHERE empresa_id = ?').run(loginThemeJson, empresaId);
+        await db.prepare('UPDATE settings SET login_theme = ? WHERE empresa_id = ?').run(loginThemeJson, empresaId);
     } else {
-        db.prepare(`INSERT INTO settings (empresa_id, login_theme) VALUES (?, ?)`).run(empresaId, loginThemeJson);
+        await db.prepare(`INSERT INTO settings (empresa_id, login_theme) VALUES (?, ?)`).run(empresaId, loginThemeJson);
     }
 }
 
-function getNextProposalNumber() {
+async function getNextProposalNumber() {
     const d = new Date();
     const hoje = String(d.getFullYear()).slice(-2) +
         String(d.getMonth() + 1).padStart(2, '0') +
         String(d.getDate()).padStart(2, '0');
-    const row = db.prepare('SELECT * FROM proposal_counters WHERE data = ?').get(hoje);
+    const row = await db.prepare('SELECT * FROM proposal_counters WHERE data = ?').get(hoje);
     const seq = row ? row.sequencial + 1 : 1;
     if (row) {
-        db.prepare('UPDATE proposal_counters SET sequencial = ? WHERE data = ?').run(seq, hoje);
+        await db.prepare('UPDATE proposal_counters SET sequencial = ? WHERE data = ?').run(seq, hoje);
     } else {
-        db.prepare('INSERT INTO proposal_counters (data, sequencial) VALUES (?, ?)').run(hoje, seq);
+        await db.prepare('INSERT INTO proposal_counters (data, sequencial) VALUES (?, ?)').run(hoje, seq);
     }
     return hoje + String(seq).padStart(2, '0');
 }
 
-function peekNextProposalNumber() {
+async function peekNextProposalNumber() {
     const d = new Date();
     const hoje = String(d.getFullYear()).slice(-2) +
         String(d.getMonth() + 1).padStart(2, '0') +
         String(d.getDate()).padStart(2, '0');
-    const row = db.prepare('SELECT * FROM proposal_counters WHERE data = ?').get(hoje);
+    const row = await db.prepare('SELECT * FROM proposal_counters WHERE data = ?').get(hoje);
     const seq = row ? row.sequencial + 1 : 1;
     return hoje + String(seq).padStart(2, '0');
 }
 
-function getUnidadesByCliente(clienteId, empresaId) {
-    const stmt = db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND empresa_id = ? ORDER BY codigo_unidade');
-    return stmt.all(clienteId, empresaId);
+async function getUnidadesByCliente(clienteId, empresaId) {
+    const stmt = await db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND empresa_id = ? ORDER BY codigo_unidade');
+    return await stmt.all(clienteId, empresaId);
 }
 
-function peekNextAutproSequence(clienteId, codigoUnidade, empresaId) {
-    const stmt = db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND codigo_unidade = ? AND empresa_id = ?');
-    const unidade = stmt.get(clienteId, codigoUnidade, empresaId);
+async function peekNextAutproSequence(clienteId, codigoUnidade, empresaId) {
+    const stmt = await db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND codigo_unidade = ? AND empresa_id = ?');
+    const unidade = await stmt.get(clienteId, codigoUnidade, empresaId);
     if (!unidade) return null;
     return String(unidade.proximo_sequencial).padStart(3, '0');
 }
 
-function consumeNextAutproSequence(clienteId, codigoUnidade, empresaId) {
-    const stmt = db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND codigo_unidade = ? AND empresa_id = ?');
-    const unidade = stmt.get(clienteId, codigoUnidade, empresaId);
+async function consumeNextAutproSequence(clienteId, codigoUnidade, empresaId) {
+    const stmt = await db.prepare('SELECT * FROM unidades_cliente WHERE cliente_id = ? AND codigo_unidade = ? AND empresa_id = ?');
+    const unidade = await stmt.get(clienteId, codigoUnidade, empresaId);
     if (!unidade) return null;
     const seq = unidade.proximo_sequencial;
-    db.prepare('UPDATE unidades_cliente SET proximo_sequencial = ?, updatedAt = ? WHERE id = ?')
+    await db.prepare('UPDATE unidades_cliente SET proximo_sequencial = ?, updatedAt = ? WHERE id = ?')
         .run(seq + 1, new Date().toISOString(), unidade.id);
     return String(seq).padStart(3, '0');
 }
 
-function updatePipelineRevision(id, data, empresaId = 'default') {
-    const existing = db.prepare('SELECT * FROM pipeline_items WHERE id = ? AND empresa_id = ?').get(id, empresaId);
+async function updatePipelineRevision(id, data, empresaId = 'default') {
+    const existing = await db.prepare('SELECT * FROM pipeline_items WHERE id = ? AND empresa_id = ?').get(id, empresaId);
     if (existing?.status === 'fechado') return;
     if (existing) {
-        const stmt = db.prepare(`UPDATE pipeline_items SET revisao = ?, consolidada = ?, status = ?, tipo = ?, data_entrega = ?, descricao_revisao = ?, updatedAt = ? WHERE id = ? AND empresa_id = ?`);
-        stmt.run(
+        const stmt = await db.prepare(`UPDATE pipeline_items SET revisao = ?, consolidada = ?, status = ?, tipo = ?, data_entrega = ?, descricao_revisao = ?, updatedAt = ? WHERE id = ? AND empresa_id = ?`);
+        await stmt.run(
             data.revisao ?? existing.revisao ?? 0,
             data.consolidada ?? existing.consolidada ?? 0,
             data.status || existing.status,
@@ -2173,9 +2323,9 @@ function updatePipelineRevision(id, data, empresaId = 'default') {
     }
 }
 
-function getPriceImportTemplates(empresaId = 'default') {
-    const stmt = db.prepare('SELECT * FROM price_import_templates WHERE empresa_id = ?');
-    const rows = stmt.all(empresaId);
+async function getPriceImportTemplates(empresaId = 'default') {
+    const stmt = await db.prepare('SELECT * FROM price_import_templates WHERE empresa_id = ?');
+    const rows = await stmt.all(empresaId);
     const result = {};
     for (const row of rows) {
         result[row.fornecedor_id] = {
@@ -2188,11 +2338,11 @@ function getPriceImportTemplates(empresaId = 'default') {
     return result;
 }
 
-function savePriceImportTemplate(fornecedorId, data, empresaId = 'default') {
-    const stmt = db.prepare(`INSERT OR REPLACE INTO price_import_templates
+async function savePriceImportTemplate(fornecedorId, data, empresaId = 'default') {
+    const stmt = await db.prepare(`INSERT OR REPLACE INTO price_import_templates
         (fornecedor_id, empresa_id, name, fabricante, columns, updatedAt)
         VALUES (?, ?, ?, ?, ?, ?)`);
-    stmt.run(
+    await stmt.run(
         fornecedorId, empresaId,
         data.name || '', data.fabricante || '',
         JSON.stringify(data.columns || {}),
@@ -2200,19 +2350,20 @@ function savePriceImportTemplate(fornecedorId, data, empresaId = 'default') {
     );
 }
 
-function deletePriceImportTemplate(fornecedorId, empresaId = 'default') {
-    const stmt = db.prepare('DELETE FROM price_import_templates WHERE fornecedor_id = ? AND empresa_id = ?');
-    stmt.run(fornecedorId, empresaId);
+async function deletePriceImportTemplate(fornecedorId, empresaId = 'default') {
+    const stmt = await db.prepare('DELETE FROM price_import_templates WHERE fornecedor_id = ? AND empresa_id = ?');
+    await stmt.run(fornecedorId, empresaId);
 }
 
 // --- Full sync ---
 
-function getFullSync(empresaId = 'default') {
-    const settings = getSettings(empresaId);
-    const stmtSettings = db.prepare('SELECT * FROM settings WHERE empresa_id = ?');
-    const s = stmtSettings.get(empresaId);
+async function getFullSync(empresaId = 'default') {
+    const settings = await getSettings(empresaId);
+    const stmtSettings = await db.prepare('SELECT * FROM settings WHERE empresa_id = ?');
+    const s = await stmtSettings.get(empresaId);
+    const emp = await findEmpresaById(empresaId).catch(() => null);
 
-    const materiais = findAll('materiais', empresaId);
+    const materiais = await findAll('materiais', empresaId);
     const materialIds = materiais.map(m => m.id);
     const priceHistoryMap = {};
     if (materialIds.length > 0) {
@@ -2220,7 +2371,7 @@ function getFullSync(empresaId = 'default') {
         for (let i = 0; i < materialIds.length; i += CHUNK_SIZE) {
             const chunk = materialIds.slice(i, i + CHUNK_SIZE);
             const placeholders = chunk.map(() => '?').join(',');
-            const phRows = db.prepare(`SELECT * FROM price_history WHERE material_id IN (${placeholders}) ORDER BY date DESC`).all(...chunk);
+            const phRows = await db.prepare(`SELECT * FROM price_history WHERE material_id IN (${placeholders}) ORDER BY date DESC`).all(...chunk);
             for (const ph of phRows) {
                 if (!priceHistoryMap[ph.material_id]) priceHistoryMap[ph.material_id] = [];
                 priceHistoryMap[ph.material_id].push(ph);
@@ -2232,65 +2383,65 @@ function getFullSync(empresaId = 'default') {
     }
 
     return {
-        clientes: findAll('clientes', empresaId),
-        fornecedores: findAll('fornecedores', empresaId),
+        clientes: await findAll('clientes', empresaId),
+        fornecedores: await findAll('fornecedores', empresaId),
         materiais,
-        paineis: findAll('paineis', empresaId).map(p => {
+        paineis: (await findAll('paineis', empresaId)).map(p => {
             if (p.items && typeof p.items === 'string') p.items = JSON.parse(p.items);
             return p;
         }),
-        tipicos: findAll('tipicos', empresaId).map(t => {
+        tipicos: (await findAll('tipicos', empresaId)).map(t => {
             if (t.items && typeof t.items === 'string') t.items = JSON.parse(t.items);
             return t;
         }),
-        cubiculos: findAll('cubiculos', empresaId).map(t => {
+        cubiculos: (await findAll('cubiculos', empresaId)).map(t => {
             if (t.items && typeof t.items === 'string') t.items = JSON.parse(t.items);
             return t;
         }),
-        cargas: findAll('cargas', empresaId),
-        orcamentos: findAll('orcamentos', empresaId).map(o => {
+        cargas: await findAll('cargas', empresaId),
+        orcamentos: (await findAll('orcamentos', empresaId)).map(o => {
             if (o.items && typeof o.items === 'string') o.items = JSON.parse(o.items);
             return o;
         }),
-        loadLists: findAll('loadLists', empresaId).map(l => {
+        loadLists: (await findAll('loadLists', empresaId)).map(l => {
             if (l.items && typeof l.items === 'string') l.items = JSON.parse(l.items);
             return l;
         }),
-        chapariaLists: findAll('chapariaLists', empresaId).map(l => {
+        chapariaLists: (await findAll('chapariaLists', empresaId)).map(l => {
             if (l.items && typeof l.items === 'string') l.items = JSON.parse(l.items);
             return l;
         }),
-        propostasTecnicas: findAll('propostasTecnicas', empresaId).map(p => {
+        propostasTecnicas: (await findAll('propostasTecnicas', empresaId)).map(p => {
             if (p.dados && typeof p.dados === 'string') p = { ...p, ...JSON.parse(p.dados) };
             delete p.dados;
             return p;
         }).filter(p => p.id && !(/^PT-\d{13}$/.test(p.id) && !p.ptc_folder && !p.ptcFolder)),
-        pipelineItems: findAll('pipelineItems', empresaId).map(p => {
+        pipelineItems: (await findAll('pipelineItems', empresaId)).map(p => {
             if (p.interacoes && typeof p.interacoes === 'string') p.interacoes = JSON.parse(p.interacoes);
             return p;
         }),
-        propostasComerciais: findAll('propostasComerciais', empresaId).map(p => {
+        propostasComerciais: (await findAll('propostasComerciais', empresaId)).map(p => {
             if (p.dados && typeof p.dados === 'string') p = { ...p, ...JSON.parse(p.dados) };
             delete p.dados;
             return p;
         }).filter(p => p.id && !(/^PC-\d{13}$/.test(p.id) && !p.ptc_folder && !p.ptcFolder)),
-        propostasCompletas: findAll('propostasCompletas', empresaId).map(p => {
+        propostasCompletas: (await findAll('propostasCompletas', empresaId)).map(p => {
             if (p.dados && typeof p.dados === 'string') p = { ...p, ...JSON.parse(p.dados) };
             delete p.dados;
             return p;
         }),
-        vendedores: findAll('vendedores', empresaId),
-        composicoes: findAll('composicoes', empresaId),
-        regrasDerivacao: findAll('regrasDerivacao', empresaId),
+        vendedores: await findAll('vendedores', empresaId),
+        composicoes: await findAll('composicoes', empresaId),
+        regrasDerivacao: await findAll('regrasDerivacao', empresaId),
         settings: settings || { theme: 'light', defaultMarkup: 30, defaultTax: 18, defaultIpi: 9.75 },
-        aiSettings: getAiSettings(empresaId),
+        aiSettings: await getAiSettings(empresaId),
         company: {
             name: s?.company_name || '',
             cnpj: s?.company_cnpj || '',
-            sigla: (() => { try { const e = findEmpresaById(empresaId); return e?.sigla || ''; } catch { return ''; } })(),
-            nome: (() => { try { const e = findEmpresaById(empresaId); return e?.nome || ''; } catch { return ''; } })(),
+            sigla: emp?.sigla || '',
+            nome: emp?.nome || '',
             empresaId,
-            folderName: (() => { try { const e = findEmpresaById(empresaId); return e?.folder_name || empresaId; } catch { return empresaId; } })(),
+            folderName: emp?.folder_name || empresaId,
             address: s?.company_address || '',
             logradouro: s?.company_logradouro || '',
             numero: s?.company_numero || '',
@@ -2307,48 +2458,48 @@ function getFullSync(empresaId = 'default') {
             companyColor: s?.company_color || ''
         },
         loginTheme: (() => { try { return JSON.parse(s?.login_theme || '{}'); } catch (e) { return {}; } })(),
-        priceImportTemplates: getPriceImportTemplates(empresaId),
-        crmLeads: findAll('crmLeads', empresaId).map(l => {
+        priceImportTemplates: await getPriceImportTemplates(empresaId),
+        crmLeads: (await findAll('crmLeads', empresaId)).map(l => {
             if (l.tags && typeof l.tags === 'string') l.tags = JSON.parse(l.tags);
             return l;
         }),
-        crmInteracoes: findAll('crmInteracoes', empresaId),
-        crmTarefas: findAll('crmTarefas', empresaId),
-        crmNotas: findAll('crmNotas', empresaId).map(n => {
+        crmInteracoes: await findAll('crmInteracoes', empresaId),
+        crmTarefas: await findAll('crmTarefas', empresaId),
+        crmNotas: (await findAll('crmNotas', empresaId)).map(n => {
             if (n.menoes && typeof n.menoes === 'string') { try { n.menoes = JSON.parse(n.menoes); } catch (e) { n.menoes = []; } }
             return n;
         }),
-        crmEmailTemplates: findAll('crmEmailTemplates', empresaId),
-        crmStages: findAll('crmStages', empresaId),
-        crmSequencias: findAll('crmSequencias', empresaId),
-        crmAutomacoes: findAll('crmAutomacoes', empresaId).map(a => {
+        crmEmailTemplates: await findAll('crmEmailTemplates', empresaId),
+        crmStages: await findAll('crmStages', empresaId),
+        crmSequencias: await findAll('crmSequencias', empresaId),
+        crmAutomacoes: (await findAll('crmAutomacoes', empresaId)).map(a => {
             if (a.acoes && typeof a.acoes === 'string') { try { a.acoes = JSON.parse(a.acoes); } catch (e) { a.acoes = []; } }
             if (a.condicao && typeof a.condicao === 'string') { try { a.condicao = JSON.parse(a.condicao); } catch (e) { a.condicao = null; } }
             return a;
         }),
-        crmMetas: findAll('crmMetas', empresaId),
-        crmWebhooks: findAll('crmWebhooks', empresaId),
-        manufaturaProjetos: findAll('manufaturaProjetos', empresaId),
-        manufaturaColunas: findAll('manufaturaColunas', empresaId),
-        manufaturaGavetas: findAll('manufaturaGavetas', empresaId),
-        manufaturaComponentes: findAll('manufaturaComponentes', empresaId),
-        manufaturaHistorico: findAll('manufaturaHistorico', empresaId),
-        manufaturaPerfisTeste: findAll('manufaturaPerfisTeste', empresaId),
-        manufaturaResultadosTeste: findAll('manufaturaResultadosTeste', empresaId),
-        manufaturaAnexos: findAll('manufaturaAnexos', empresaId),
-        unidadesCliente: findAll('unidadesCliente', empresaId),
-        projetos: findAll('projetos', empresaId),
-        projetoFases: findAll('projetoFases', empresaId),
-        projetoCustos: findAll('projetoCustos', empresaId),
-        projetoTarefas: findAll('projetoTarefas', empresaId),
-        comprasRequisicoes: findAll('comprasRequisicoes', empresaId),
-        comprasRequisicaoItens: findAll('comprasRequisicaoItens', empresaId),
-        comprasCotacoes: findAll('comprasCotacoes', empresaId),
-        comprasCotacaoItens: findAll('comprasCotacaoItens', empresaId),
-        comprasPedidos: findAll('comprasPedidos', empresaId),
-        comprasPedidoItens: findAll('comprasPedidoItens', empresaId),
-        comprasNotas: findAll('comprasNotas', empresaId),
-        comprasNotaItens: findAll('comprasNotaItens', empresaId)
+        crmMetas: await findAll('crmMetas', empresaId),
+        crmWebhooks: await findAll('crmWebhooks', empresaId),
+        manufaturaProjetos: await findAll('manufaturaProjetos', empresaId),
+        manufaturaColunas: await findAll('manufaturaColunas', empresaId),
+        manufaturaGavetas: await findAll('manufaturaGavetas', empresaId),
+        manufaturaComponentes: await findAll('manufaturaComponentes', empresaId),
+        manufaturaHistorico: await findAll('manufaturaHistorico', empresaId),
+        manufaturaPerfisTeste: await findAll('manufaturaPerfisTeste', empresaId),
+        manufaturaResultadosTeste: await findAll('manufaturaResultadosTeste', empresaId),
+        manufaturaAnexos: await findAll('manufaturaAnexos', empresaId),
+        unidadesCliente: await findAll('unidadesCliente', empresaId),
+        projetos: await findAll('projetos', empresaId),
+        projetoFases: await findAll('projetoFases', empresaId),
+        projetoCustos: await findAll('projetoCustos', empresaId),
+        projetoTarefas: await findAll('projetoTarefas', empresaId),
+        comprasRequisicoes: await findAll('comprasRequisicoes', empresaId),
+        comprasRequisicaoItens: await findAll('comprasRequisicaoItens', empresaId),
+        comprasCotacoes: await findAll('comprasCotacoes', empresaId),
+        comprasCotacaoItens: await findAll('comprasCotacaoItens', empresaId),
+        comprasPedidos: await findAll('comprasPedidos', empresaId),
+        comprasPedidoItens: await findAll('comprasPedidoItens', empresaId),
+        comprasNotas: await findAll('comprasNotas', empresaId),
+        comprasNotaItens: await findAll('comprasNotaItens', empresaId)
     };
 }
 
@@ -2356,12 +2507,12 @@ function getFullSync(empresaId = 'default') {
 
 // --- Empresa / Usuario CRUD ---
 
-function createEmpresa(data) {
+async function createEmpresa(data) {
     const id = data.id || crypto.randomUUID();
     const now = new Date().toISOString();
     const folderName = generateFolderName(id, data.sigla, data.nome);
-    const stmt = db.prepare(`INSERT OR REPLACE INTO empresas (id, nome, cnpj, sigla, plano, ativo, folder_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-    stmt.run(id, data.nome || '', data.cnpj || '', data.sigla || '', data.plano || 'trial', data.ativo !== false ? 1 : 0, folderName, now);
+    const stmt = await db.prepare(`INSERT OR REPLACE INTO empresas (id, nome, cnpj, sigla, plano, ativo, folder_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+    await stmt.run(id, data.nome || '', data.cnpj || '', data.sigla || '', data.plano || 'trial', data.ativo !== false ? 1 : 0, folderName, now);
     return { id, nome: data.nome, cnpj: data.cnpj, sigla: data.sigla, plano: data.plano, folder_name: folderName, ativo: true, created_at: now };
 }
 
@@ -2378,23 +2529,23 @@ function generateFolderName(id, sigla, nome) {
     return `${prefix}_${shortId}`;
 }
 
-function listEmpresas() {
-    const stmt = db.prepare('SELECT * FROM empresas ORDER BY nome');
-    return stmt.all();
+async function listEmpresas() {
+    const stmt = await db.prepare('SELECT * FROM empresas ORDER BY nome');
+    return await stmt.all();
 }
 
-function findEmpresaById(id) {
-    const stmt = db.prepare('SELECT * FROM empresas WHERE id = ?');
-    return stmt.get(id) || null;
+async function findEmpresaById(id) {
+    const stmt = await db.prepare('SELECT * FROM empresas WHERE id = ?');
+    return await stmt.get(id) || null;
 }
 
-function backfillFolderNames() {
-    const empresas = listEmpresas();
+async function backfillFolderNames() {
+    const empresas = await listEmpresas();
     let count = 0;
     for (const emp of empresas) {
         if (!emp.folder_name) {
             const folderName = generateFolderName(emp.id, emp.sigla, emp.nome);
-            db.prepare('UPDATE empresas SET folder_name = ? WHERE id = ?').run(folderName, emp.id);
+            await db.prepare('UPDATE empresas SET folder_name = ? WHERE id = ?').run(folderName, emp.id);
             count++;
         }
     }
@@ -2402,13 +2553,13 @@ function backfillFolderNames() {
     return count;
 }
 
-function updateEmpresa(id, data) {
-    const stmt = db.prepare('UPDATE empresas SET nome = ?, cnpj = ?, sigla = ?, plano = ? WHERE id = ?');
-    stmt.run(data.nome || '', data.cnpj || '', data.sigla || '', data.plano || 'trial', id);
-    return findEmpresaById(id);
+async function updateEmpresa(id, data) {
+    const stmt = await db.prepare('UPDATE empresas SET nome = ?, cnpj = ?, sigla = ?, plano = ? WHERE id = ?');
+    await stmt.run(data.nome || '', data.cnpj || '', data.sigla || '', data.plano || 'trial', id);
+    return await findEmpresaById(id);
 }
 
-function deleteEmpresa(id) {
+async function deleteEmpresa(id) {
     const tables = [
         'usuarios', 'clientes', 'fornecedores', 'materiais',
         'paineis', 'tipicos', 'cubiculos', 'cargas', 'orcamentos',
@@ -2418,41 +2569,41 @@ function deleteEmpresa(id) {
         'settings', 'ai_settings'
     ];
     for (const table of tables) {
-        db.prepare(`DELETE FROM ${table} WHERE empresa_id = ?`).run(id);
+        await db.prepare(`DELETE FROM ${table} WHERE empresa_id = ?`).run(id);
     }
-    db.prepare('DELETE FROM empresas WHERE id = ?').run(id);
+    await db.prepare('DELETE FROM empresas WHERE id = ?').run(id);
     return { success: true };
 }
 
-function createUsuario(data) {
+async function createUsuario(data) {
     const id = data.id || crypto.randomUUID();
     const now = new Date().toISOString();
-    const stmt = db.prepare(`INSERT INTO usuarios (id, empresa_id, email, password, name, nivel, ativo, telegram_chat_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    stmt.run(id, data.empresa_id || 'default', (data.email || '').toLowerCase(), data.password || '', data.name || '', data.nivel || 'engenheiro', data.ativo !== false ? 1 : 0, data.telegram_chat_id || '', now);
+    const stmt = await db.prepare(`INSERT INTO usuarios (id, empresa_id, email, password, name, nivel, ativo, telegram_chat_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    await stmt.run(id, data.empresa_id || 'default', (data.email || '').toLowerCase(), data.password || '', data.name || '', data.nivel || 'engenheiro', data.ativo !== false ? 1 : 0, data.telegram_chat_id || '', now);
     return { id, empresa_id: data.empresa_id, email: data.email, name: data.name, nivel: data.nivel, ativo: true, telegram_chat_id: data.telegram_chat_id, created_at: now };
 }
 
-function findUsuarioByEmail(email) {
-    const stmt = db.prepare('SELECT * FROM usuarios WHERE LOWER(email) = LOWER(?)');
-    return stmt.get(email) || null;
+async function findUsuarioByEmail(email) {
+    const stmt = await db.prepare('SELECT * FROM usuarios WHERE LOWER(email) = LOWER(?)');
+    return await stmt.get(email) || null;
 }
 
-function findUsuarioById(id) {
-    const stmt = db.prepare('SELECT * FROM usuarios WHERE id = ?');
-    return stmt.get(id) || null;
+async function findUsuarioById(id) {
+    const stmt = await db.prepare('SELECT * FROM usuarios WHERE id = ?');
+    return await stmt.get(id) || null;
 }
 
-function listUsuarios(empresaId) {
+async function listUsuarios(empresaId) {
     if (empresaId) {
-        const stmt = db.prepare('SELECT * FROM usuarios WHERE empresa_id = ? ORDER BY name');
-        return stmt.all(empresaId);
+        const stmt = await db.prepare('SELECT * FROM usuarios WHERE empresa_id = ? ORDER BY name');
+        return await stmt.all(empresaId);
     }
-    const stmt = db.prepare('SELECT * FROM usuarios ORDER BY name');
-    return stmt.all();
+    const stmt = await db.prepare('SELECT * FROM usuarios ORDER BY name');
+    return await stmt.all();
 }
 
-function updateUsuario(id, data) {
-    const existing = findUsuarioById(id);
+async function updateUsuario(id, data) {
+    const existing = await findUsuarioById(id);
     if (!existing) return null;
     const fields = [];
     const params = [];
@@ -2468,16 +2619,16 @@ function updateUsuario(id, data) {
     }
     if (fields.length === 0) return existing;
     params.push(id);
-    db.prepare(`UPDATE usuarios SET ${fields.join(', ')} WHERE id = ?`).run(...params);
-    return findUsuarioById(id);
+    await db.prepare(`UPDATE usuarios SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    return await findUsuarioById(id);
 }
 
-function deactivateUsuario(id) {
-    db.prepare('UPDATE usuarios SET ativo = 0 WHERE id = ?').run(id);
+async function deactivateUsuario(id) {
+    await db.prepare('UPDATE usuarios SET ativo = 0 WHERE id = ?').run(id);
 }
 
-function migrateUsersFromJson() {
-    const count = db.prepare('SELECT COUNT(*) as cnt FROM usuarios').get();
+async function migrateUsersFromJson() {
+    const count = await db.prepare('SELECT COUNT(*) as cnt FROM usuarios').get();
     if (count.cnt > 0) return 0; // already migrated
     const fs = require('fs');
     const path = require('path');
@@ -2488,15 +2639,15 @@ function migrateUsersFromJson() {
         const users = JSON.parse(raw);
         if (!Array.isArray(users) || users.length === 0) return 0;
         // Ensure default empresa exists
-        const emp = findEmpresaById('default');
+        const emp = await findEmpresaById('default');
         if (!emp) {
-            createEmpresa({ id: 'default', nome: 'Empresa Padrão', cnpj: '', sigla: 'DEF', plano: 'trial', ativo: true });
+            await createEmpresa({ id: 'default', nome: 'Empresa Padrão', cnpj: '', sigla: 'DEF', plano: 'trial', ativo: true });
         }
         let migrated = 0;
         for (const u of users) {
             try {
-                const stmt = db.prepare(`INSERT OR IGNORE INTO usuarios (id, empresa_id, email, password, name, nivel, ativo, telegram_chat_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-                stmt.run(u.id, u.empresa_id || 'default', (u.email || '').toLowerCase(), u.password, u.name || '', u.nivel || 'engenheiro', u.ativo !== false ? 1 : 0, u.telegram_chat_id || '', u.createdAt || new Date().toISOString());
+                const stmt = await db.prepare(`INSERT OR IGNORE INTO usuarios (id, empresa_id, email, password, name, nivel, ativo, telegram_chat_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+                await stmt.run(u.id, u.empresa_id || 'default', (u.email || '').toLowerCase(), u.password, u.name || '', u.nivel || 'engenheiro', u.ativo !== false ? 1 : 0, u.telegram_chat_id || '', u.createdAt || new Date().toISOString());
                 migrated++;
             } catch (e) { console.warn('[DB] Erro ao migrar usuário', u.email, e.message); }
         }
@@ -2508,24 +2659,24 @@ function migrateUsersFromJson() {
     }
 }
 
-function getEmpresaIdForUser(userId) {
-    const u = findUsuarioById(userId);
+async function getEmpresaIdForUser(userId) {
+    const u = await findUsuarioById(userId);
     return u ? u.empresa_id : 'default';
 }
 
-function migrateFromLegacy(data, empresaId = 'default') {
-    withTransaction(() => {
+async function migrateFromLegacy(data, empresaId = 'default') {
+    await withTransaction(async () => {
         // Insert clientes
         if (data.clientes) {
             for (const c of data.clientes) {
                 const contatos = c.contatos ? JSON.stringify(c.contatos) : '';
-                const stmt = db.prepare(`INSERT OR REPLACE INTO clientes
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO clientes
                     (id, empresa_id, razaoSocial, nomeFantasia, cnpj, segmento, cnae,
                      inscricaoEstadual, inscricaoMunicipal, cep, logradouro, numero,
                      bairro, cidade, estado, contatoNome, contatoCargo, email, telefone,
                      observacoes, contatos, createdAt)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     c.id, empresaId, c.razaoSocial || '', c.nomeFantasia || '', c.cnpj || '',
                     c.segmento || '', c.cnae || '', c.inscricaoEstadual || '', c.inscricaoMunicipal || '',
                     c.cep || '', c.logradouro || '', c.numero || '', c.bairro || '', c.cidade || '',
@@ -2538,13 +2689,13 @@ function migrateFromLegacy(data, empresaId = 'default') {
         // Insert fornecedores
         if (data.fornecedores) {
             for (const f of data.fornecedores) {
-                const stmt = db.prepare(`INSERT OR REPLACE INTO fornecedores
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO fornecedores
                     (id, empresa_id, razaoSocial, nomeFantasia, cnpj, segmento, cnae,
                      inscricaoEstadual, inscricaoMunicipal, cep, logradouro, numero,
                      bairro, cidade, estado, contatoNome, contatoCargo, email, telefone,
                      observacoes, prazoEntrega, condicaoPagamento, createdAt)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     f.id, empresaId, f.razaoSocial || '', f.nomeFantasia || '', f.cnpj || '',
                     f.segmento || '', f.cnae || '', f.inscricaoEstadual || '', f.inscricaoMunicipal || '',
                     f.cep || '', f.logradouro || '', f.numero || '', f.bairro || '', f.cidade || '',
@@ -2560,13 +2711,13 @@ function migrateFromLegacy(data, empresaId = 'default') {
             for (const m of data.materiais) {
                 const ph = m.priceHistory || [];
                 delete m.priceHistory;
-                const stmt = db.prepare(`INSERT OR REPLACE INTO materiais
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO materiais
                     (id, empresa_id, codigoInterno, codigoFabricante, fabricante, categoria, area,
                      descricao, unidade, peso, tensao, corrente, custo, markup, precoSugerido,
                      leadTime, ncm, origem, icms, ipi, pis, cofins, modelo,
                      lastUpdateDate, lastUpdateTitle, createdAt)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     m.id, empresaId, m.codigoInterno || '', m.codigoFabricante || '', m.fabricante || '',
                     m.categoria || '', m.area || '', m.descricao || '', m.unidade || '', m.peso || null,
                     m.tensao || '', m.corrente || '', m.custo || 0, m.markup || 0, m.precoSugerido || '',
@@ -2575,7 +2726,7 @@ function migrateFromLegacy(data, empresaId = 'default') {
                     m.lastUpdateDate || '', m.lastUpdateTitle || '', m.createdAt || new Date().toISOString()
                 );
                 if (ph.length > 0) {
-                    savePriceHistory(m.id, ph);
+                    await savePriceHistory(m.id, ph);
                 }
             }
         }
@@ -2583,12 +2734,12 @@ function migrateFromLegacy(data, empresaId = 'default') {
         // Insert paineis
         if (data.paineis) {
             for (const p of data.paineis) {
-                const stmt = db.prepare(`INSERT OR REPLACE INTO paineis
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO paineis
                     (id, empresa_id, tipo, descricao, altura, largura, profundidade,
                      ip, cor, cat_categoria, cat_tensao, cat_forma, cat_execucao,
                      cat_instalacao, cat_gp, cat_cor, custoTotal, items, createdAt)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     p.id, empresaId, p.tipo || '', p.descricao || '', p.altura || '', p.largura || '',
                     p.profundidade || '', p.ip || '', p.cor || '', p.cat_categoria || '',
                     p.cat_tensao || '', p.cat_forma || '', p.cat_execucao || '', p.cat_instalacao || '',
@@ -2601,13 +2752,13 @@ function migrateFromLegacy(data, empresaId = 'default') {
         // Insert cubiculos
         if (data.cubiculos) {
             for (const t of data.cubiculos) {
-                const stmt = db.prepare(`INSERT OR REPLACE INTO cubiculos
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO cubiculos
                     (id, empresa_id, nome, tipoAcionamento, regimeAcionamento, comunicacao,
                      potencia, potenciaKvar, tensao, correnteNominal, icc, frequencia, nbi,
                      instalacao, correnteApx, correntePlaca, fp, fs, rendimento, reserva,
                      protecao, releProtecao, drives, aplicacao, descricao_word, custoTotal, items, createdAt)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     t.id, empresaId, t.nome || '', t.tipoAcionamento || '', t.regimeAcionamento || '',
                     t.comunicacao || '', t.potencia || '', t.potenciaKvar || '', t.tensao || '',
                     t.correnteNominal || '', t.icc || '', t.frequencia || '', t.nbi || '',
@@ -2622,13 +2773,13 @@ function migrateFromLegacy(data, empresaId = 'default') {
         // Insert tipicos
         if (data.tipicos) {
             for (const t of data.tipicos) {
-                const stmt = db.prepare(`INSERT OR REPLACE INTO tipicos
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO tipicos
                     (id, empresa_id, nome, tipoAcionamento, regimeAcionamento, comunicacao,
                      potencia, potenciaKvar, tensao, icc, frequencia, correnteApx,
                      correntePlaca, fp, fs, rendimento, reserva, protecao, drives,
                      aplicacao, descricao_word, custoTotal, items, createdAt)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     t.id, empresaId, t.nome || '', t.tipoAcionamento || '', t.regimeAcionamento || '',
                     t.comunicacao || '', t.potencia || '', t.potenciaKvar || '', t.tensao || '',
                     t.icc || '', t.frequencia || '', t.correnteApx || '', t.correntePlaca || '',
@@ -2642,10 +2793,10 @@ function migrateFromLegacy(data, empresaId = 'default') {
         // Insert cargas
         if (data.cargas) {
             for (const c of data.cargas) {
-                const stmt = db.prepare(`INSERT OR REPLACE INTO cargas
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO cargas
                     (id, empresa_id, tag, descricao, potencia, tensao, typicalId, createdAt)
                     VALUES (?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     c.id, empresaId, c.tag || '', c.descricao || '', c.potencia || '',
                     c.tensao || '', c.typicalId || '', c.createdAt || new Date().toISOString()
                 );
@@ -2655,14 +2806,14 @@ function migrateFromLegacy(data, empresaId = 'default') {
         // Insert orcamentos
         if (data.orcamentos) {
             for (const o of data.orcamentos) {
-                const stmt = db.prepare(`INSERT OR REPLACE INTO orcamentos
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO orcamentos
                     (id, empresa_id, numero, clienteId, clienteName, obra, status,
                      markupGlobal, impostoGlobal, subtotal, total,
                      condicao_pagamento, condicao_parcela, condicao_faturamento,
                      prazo_entrega, validade, ncm_imposto, transporte, despesas,
                      items, createdAt)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-                stmt.run(
+                await stmt.run(
                     o.id, empresaId, o.numero || '', o.clienteId || '', o.clienteName || '',
                     o.obra || '', o.status || '', o.markupGlobal ?? 30, o.impostoGlobal ?? 18,
                     o.subtotal || 0, o.total || 0,
@@ -2680,8 +2831,8 @@ function migrateFromLegacy(data, empresaId = 'default') {
                 delete dados.id;
                 delete dados.empresa_id;
                 delete dados.createdAt;
-                const stmt = db.prepare(`INSERT OR REPLACE INTO propostas_tecnicas (id, empresa_id, dados, createdAt) VALUES (?,?,?,?)`);
-                stmt.run(p.id, empresaId, JSON.stringify(dados), p.createdAt || new Date().toISOString());
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO propostas_tecnicas (id, empresa_id, dados, createdAt) VALUES (?,?,?,?)`);
+                await stmt.run(p.id, empresaId, JSON.stringify(dados), p.createdAt || new Date().toISOString());
             }
         }
 
@@ -2692,15 +2843,15 @@ function migrateFromLegacy(data, empresaId = 'default') {
                 delete dados.id;
                 delete dados.empresa_id;
                 delete dados.createdAt;
-                const stmt = db.prepare(`INSERT OR REPLACE INTO propostas_comerciais (id, empresa_id, dados, createdAt) VALUES (?,?,?,?)`);
-                stmt.run(p.id, empresaId, JSON.stringify(dados), p.createdAt || new Date().toISOString());
+                const stmt = await db.prepare(`INSERT OR REPLACE INTO propostas_comerciais (id, empresa_id, dados, createdAt) VALUES (?,?,?,?)`);
+                await stmt.run(p.id, empresaId, JSON.stringify(dados), p.createdAt || new Date().toISOString());
             }
         }
 
         // Insert settings + company
         const settings = data.settings || {};
         const company = data.company || {};
-        saveSettings({
+        await saveSettings({
             theme: settings.theme || 'light',
             defaultMarkup: settings.defaultMarkup ?? 30,
             defaultTax: settings.defaultTax ?? 18,
@@ -2721,12 +2872,12 @@ function migrateFromLegacy(data, empresaId = 'default') {
         // Insert priceImportTemplates
         const templates = data.priceImportTemplates || {};
         for (const [fornecedorId, tmpl] of Object.entries(templates)) {
-            savePriceImportTemplate(fornecedorId, tmpl, empresaId);
+            await savePriceImportTemplate(fornecedorId, tmpl, empresaId);
         }
 
         // Insert AI settings if present
         if (data.aiSettings) {
-            saveAiSettings(data.aiSettings, empresaId);
+            await saveAiSettings(data.aiSettings, empresaId);
         }
     });
 }
@@ -2736,29 +2887,31 @@ function migrateFromLegacy(data, empresaId = 'default') {
 // Coleções ausentes do backup são mantidas intactas (backups parciais não apagam o resto).
 
 const _restoreColCache = {};
-function _getTableColumns(table) {
+async function _getTableColumns(table) {
     if (!_restoreColCache[table]) {
-        _restoreColCache[table] = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+        // PG: information_schema (minúsculo) — comparação no restore é case-insensitive
+        const rows = await db.prepare(`SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ?`).all(table);
+        _restoreColCache[table] = new Set(rows.map(c => c.column_name.toLowerCase()));
     }
     return _restoreColCache[table];
 }
 
-function restoreFromBackup(data, empresaId = 'default') {
+async function restoreFromBackup(data, empresaId = 'default') {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
         throw new Error('Backup inválido: o conteúdo não é um objeto JSON');
     }
     const counts = {};
     const ignored = {};
 
-    withTransaction(() => {
+    await withTransaction(async () => {
         for (const entity of Object.keys(TABLE_MAP)) {
             if (data[entity] === undefined) continue;
             const rows = data[entity];
             if (!Array.isArray(rows)) throw new Error(`Backup inválido: "${entity}" deveria ser uma lista`);
             const info = getTableInfo(entity);
-            const cols = _getTableColumns(info.table);
+            const cols = await _getTableColumns(info.table);
 
-            db.prepare(`DELETE FROM ${info.table} WHERE empresa_id = ?`).run(empresaId);
+            await db.prepare(`DELETE FROM ${info.table} WHERE empresa_id = ?`).run(empresaId);
 
             for (const row of rows) {
                 if (!row || typeof row !== 'object' || Array.isArray(row)) {
@@ -2783,7 +2936,7 @@ function restoreFromBackup(data, empresaId = 'default') {
                 // Remove chaves inexistentes no schema atual (backups antigos);
                 // registra o que foi ignorado para o relatório.
                 const keys = Object.keys(record).filter(k => {
-                    if (cols.has(k)) return true;
+                    if (cols.has(k.toLowerCase())) return true;
                     if (!ignored[entity]) ignored[entity] = new Set();
                     ignored[entity].add(k);
                     return false;
@@ -2794,11 +2947,11 @@ function restoreFromBackup(data, empresaId = 'default') {
                     const v = record[k];
                     return typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
                 });
-                db.prepare(`INSERT OR REPLACE INTO ${info.table} (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`)
+                await db.prepare(`INSERT OR REPLACE INTO ${info.table} (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`)
                     .run(...values);
 
                 if (entity === 'materiais' && Array.isArray(priceHistory)) {
-                    _replacePriceHistoryRows(record.id, priceHistory);
+                    await _replacePriceHistoryRows(record.id, priceHistory);
                 }
             }
             counts[entity] = rows.length;
@@ -2808,19 +2961,19 @@ function restoreFromBackup(data, empresaId = 'default') {
         if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
             const s = { ...data.settings };
             // Nunca apagar um token Telegram já configurado com valor vazio vindo do backup
-            const existing = db.prepare('SELECT telegram_bot_token FROM settings WHERE empresa_id = ?').get(empresaId);
+            const existing = await db.prepare('SELECT telegram_bot_token FROM settings WHERE empresa_id = ?').get(empresaId);
             if (!s.telegram_bot_token && existing && existing.telegram_bot_token) {
                 s.telegram_bot_token = existing.telegram_bot_token;
             }
-            saveSettings(s, empresaId);
+            await saveSettings(s, empresaId);
             counts.settings = 1;
         }
 
         // Templates de importação de preços (objeto indexado por fornecedor)
         if (data.priceImportTemplates && typeof data.priceImportTemplates === 'object' && !Array.isArray(data.priceImportTemplates)) {
-            db.prepare('DELETE FROM price_import_templates WHERE empresa_id = ?').run(empresaId);
+            await db.prepare('DELETE FROM price_import_templates WHERE empresa_id = ?').run(empresaId);
             for (const [fornecedorId, tmpl] of Object.entries(data.priceImportTemplates)) {
-                if (tmpl && typeof tmpl === 'object') savePriceImportTemplate(fornecedorId, tmpl, empresaId);
+                if (tmpl && typeof tmpl === 'object') await savePriceImportTemplate(fornecedorId, tmpl, empresaId);
             }
             counts.priceImportTemplates = Object.keys(data.priceImportTemplates).length;
         }
@@ -2835,12 +2988,12 @@ function restoreFromBackup(data, empresaId = 'default') {
     };
 }
 
-function searchMateriais({ q, fabricante, categoria, grupoSiemens, favorito, page = 1, limit = 100 }, empresaId = 'default') {
+async function searchMateriais({ q, fabricante, categoria, grupoSiemens, favorito, page = 1, limit = 100 }, empresaId = 'default') {
     const conditions = ['empresa_id = ?'];
     const params = [empresaId];
 
     if (q) {
-        conditions.push('(codigoInterno LIKE ? OR codigoFabricante LIKE ? OR descricao LIKE ? OR fabricante LIKE ? OR modelo LIKE ?)');
+        conditions.push('(codigoInterno ILIKE ? OR codigoFabricante ILIKE ? OR descricao ILIKE ? OR fabricante ILIKE ? OR modelo ILIKE ?)');
         const p = `%${q}%`;
         params.push(p, p, p, p, p);
     }
@@ -2861,17 +3014,17 @@ function searchMateriais({ q, fabricante, categoria, grupoSiemens, favorito, pag
     }
 
     const where = conditions.join(' AND ');
-    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM materiais WHERE ${where}`);
-    const { total } = countStmt.get(...params);
+    const countStmt = await db.prepare(`SELECT COUNT(*) as total FROM materiais WHERE ${where}`);
+    const { total } = await countStmt.get(...params);
 
     const offset = (page - 1) * limit;
-    const stmt = db.prepare(`SELECT * FROM materiais WHERE ${where} ORDER BY codigoInterno LIMIT ? OFFSET ?`);
-    const rows = stmt.all(...params, limit, offset);
+    const stmt = await db.prepare(`SELECT * FROM materiais WHERE ${where} ORDER BY codigoInterno LIMIT ? OFFSET ?`);
+    const rows = await stmt.all(...params, limit, offset);
 
     const materialIds = rows.map(m => m.id);
     const priceHistoryMap = {};
     if (materialIds.length > 0) {
-        const ph = db.prepare(`SELECT * FROM price_history WHERE material_id IN (${materialIds.map(() => '?').join(',')}) ORDER BY date DESC`).all(...materialIds);
+        const ph = await db.prepare(`SELECT * FROM price_history WHERE material_id IN (${materialIds.map(() => '?').join(',')}) ORDER BY date DESC`).all(...materialIds);
         for (const r of ph) {
             if (!priceHistoryMap[r.material_id]) priceHistoryMap[r.material_id] = [];
             priceHistoryMap[r.material_id].push(r);
@@ -2884,68 +3037,68 @@ function searchMateriais({ q, fabricante, categoria, grupoSiemens, favorito, pag
     return { rows, total, page, limit, pages: Math.ceil(total / limit) };
 }
 
-function getMaterialDxf(materialId) {
-    const row = getDb().prepare("SELECT dxf_block FROM materiais WHERE id = ?").get(materialId);
+async function getMaterialDxf(materialId) {
+    const row = await getDb().prepare("SELECT dxf_block FROM materiais WHERE id = ?").get(materialId);
     return row?.dxf_block || null;
 }
 
-function setMaterialDxf(materialId, content) {
-    getDb().prepare("UPDATE materiais SET dxf_block = ? WHERE id = ?").run(content, materialId);
+async function setMaterialDxf(materialId, content) {
+    await getDb().prepare("UPDATE materiais SET dxf_block = ? WHERE id = ?").run(content, materialId);
 }
 
-function removeMaterialDxf(materialId) {
-    setMaterialDxf(materialId, null);
+async function removeMaterialDxf(materialId) {
+    await setMaterialDxf(materialId, null);
 }
 
-function findMailSettings(empresaId = 'default') {
-    const stmt = getDb().prepare('SELECT * FROM mail_settings WHERE empresa_id = ?');
-    const row = stmt.get(empresaId);
+async function findMailSettings(empresaId = 'default') {
+    const stmt = await getDb().prepare('SELECT * FROM mail_settings WHERE empresa_id = ?');
+    const row = await stmt.get(empresaId);
     return row || null;
 }
 
-function upsertMailSettings(empresaId, data) {
-    const existing = getDb().prepare('SELECT * FROM mail_settings WHERE empresa_id = ?').get(empresaId);
+async function upsertMailSettings(empresaId, data) {
+    const existing = await getDb().prepare('SELECT * FROM mail_settings WHERE empresa_id = ?').get(empresaId);
     const now = new Date().toISOString();
     if (existing) {
         const pass = data.pass !== undefined && data.pass !== '' ? data.pass : existing.pass;
         const apiKey = data.api_key !== undefined && data.api_key !== '' ? data.api_key : existing.api_key;
-        getDb().prepare(`UPDATE mail_settings SET host=?, port=?, secure=?, user=?, pass=?,
+        await getDb().prepare(`UPDATE mail_settings SET host=?, port=?, secure=?, "user"=?, pass=?,
                          from_name=?, from_email=?, provider=?, api_key=?, updated_at=? WHERE empresa_id=?`)
           .run(data.host || '', data.port || 587, data.secure ? 1 : 0, data.user || '',
                pass, data.from_name || '', data.from_email || '',
                data.provider || 'smtp', apiKey || '', now, empresaId);
     } else {
-        getDb().prepare(`INSERT INTO mail_settings
-                         (id, empresa_id, host, port, secure, user, pass, from_name, from_email, provider, api_key, created_at, updated_at)
+        await getDb().prepare(`INSERT INTO mail_settings
+                         (id, empresa_id, host, port, secure, "user", pass, from_name, from_email, provider, api_key, created_at, updated_at)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .run(crypto.randomUUID(), empresaId, data.host || '', data.port || 587,
                data.secure ? 1 : 0, data.user || '', data.pass || '',
                data.from_name || '', data.from_email || '',
                data.provider || 'smtp', data.api_key || '', now, now);
     }
-    return findMailSettings(empresaId);
+    return await findMailSettings(empresaId);
 }
 
-function findAllCrmStages(empresaId = 'default') {
-    return getDb().prepare('SELECT * FROM crm_stages WHERE empresa_id = ? ORDER BY position ASC').all(empresaId);
+async function findAllCrmStages(empresaId = 'default') {
+    return await getDb().prepare('SELECT * FROM crm_stages WHERE empresa_id = ? ORDER BY position ASC').all(empresaId);
 }
 
-function createCrmStage(empresaId, data) {
+async function createCrmStage(empresaId, data) {
     const now = new Date().toISOString();
     const id = data.id || crypto.randomUUID();
-    const maxPos = getDb().prepare('SELECT COALESCE(MAX(position), -1) as m FROM crm_stages WHERE empresa_id = ?').get(empresaId);
+    const maxPos = await getDb().prepare('SELECT COALESCE(MAX(position), -1) as m FROM crm_stages WHERE empresa_id = ?').get(empresaId);
     const position = data.position ?? (maxPos.m + 1);
-    getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    await getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(id, empresaId, data.stage_id || id, data.label || '', data.color || '#6b7280', data.icon || 'ph-dot-outline', position, data.is_default ? 1 : 0, data.is_terminal ? 1 : 0, data.allows_proposal ? 1 : 0, data.tracks_qualificacao ? 1 : 0, data.tracks_conversao ? 1 : 0, data.is_loss ? 1 : 0, JSON.stringify(data.loss_reasons || []), data.probability ?? 0, now, now);
     if (data.is_default) {
-        getDb().prepare('UPDATE crm_stages SET is_default = 0 WHERE empresa_id = ? AND id != ?').run(empresaId, id);
+        await getDb().prepare('UPDATE crm_stages SET is_default = 0 WHERE empresa_id = ? AND id != ?').run(empresaId, id);
     }
-    return getDb().prepare('SELECT * FROM crm_stages WHERE id = ?').get(id);
+    return await getDb().prepare('SELECT * FROM crm_stages WHERE id = ?').get(id);
 }
 
-function updateCrmStage(id, empresaId, data) {
+async function updateCrmStage(id, empresaId, data) {
     const now = new Date().toISOString();
-    const existing = getDb().prepare('SELECT * FROM crm_stages WHERE id = ? AND empresa_id = ?').get(id, empresaId);
+    const existing = await getDb().prepare('SELECT * FROM crm_stages WHERE id = ? AND empresa_id = ?').get(id, empresaId);
     if (!existing) return null;
     const fields = [];
     const values = [];
@@ -2961,30 +3114,30 @@ function updateCrmStage(id, empresaId, data) {
     if (fields.length > 0) {
         fields.push('updated_at=?'); values.push(now);
         values.push(id, empresaId);
-        getDb().prepare(`UPDATE crm_stages SET ${fields.join(', ')} WHERE id = ? AND empresa_id = ?`).run(...values);
+        await getDb().prepare(`UPDATE crm_stages SET ${fields.join(', ')} WHERE id = ? AND empresa_id = ?`).run(...values);
         if (data.is_default) {
-            getDb().prepare('UPDATE crm_stages SET is_default = 0 WHERE empresa_id = ? AND id != ?').run(empresaId, id);
+            await getDb().prepare('UPDATE crm_stages SET is_default = 0 WHERE empresa_id = ? AND id != ?').run(empresaId, id);
         }
     }
-    return getDb().prepare('SELECT * FROM crm_stages WHERE id = ?').get(id);
+    return await getDb().prepare('SELECT * FROM crm_stages WHERE id = ?').get(id);
 }
 
-function deleteCrmStage(id, empresaId) {
-    const existing = getDb().prepare('SELECT * FROM crm_stages WHERE id = ? AND empresa_id = ?').get(id, empresaId);
+async function deleteCrmStage(id, empresaId) {
+    const existing = await getDb().prepare('SELECT * FROM crm_stages WHERE id = ? AND empresa_id = ?').get(id, empresaId);
     if (!existing) return null;
-    getDb().prepare('DELETE FROM crm_stages WHERE id = ? AND empresa_id = ?').run(id, empresaId);
+    await getDb().prepare('DELETE FROM crm_stages WHERE id = ? AND empresa_id = ?').run(id, empresaId);
     return existing;
 }
 
-function reorderCrmStages(empresaId, orderedIds) {
+async function reorderCrmStages(empresaId, orderedIds) {
     for (let i = 0; i < orderedIds.length; i++) {
-        getDb().prepare('UPDATE crm_stages SET position = ?, updated_at = ? WHERE id = ? AND empresa_id = ?').run(i, new Date().toISOString(), orderedIds[i], empresaId);
+        await getDb().prepare('UPDATE crm_stages SET position = ?, updated_at = ? WHERE id = ? AND empresa_id = ?').run(i, new Date().toISOString(), orderedIds[i], empresaId);
     }
-    return findAllCrmStages(empresaId);
+    return await findAllCrmStages(empresaId);
 }
 
-function resetCrmStages(empresaId) {
-    getDb().prepare('DELETE FROM crm_stages WHERE empresa_id = ?').run(empresaId);
+async function resetCrmStages(empresaId) {
+    await getDb().prepare('DELETE FROM crm_stages WHERE empresa_id = ?').run(empresaId);
     const now = new Date().toISOString();
     const DEFAULT_STAGES = [
         { id: 'novo', label: 'Novo', color: '#6b7280', icon: 'ph-dot-outline', position: 0, is_default: 1, is_terminal: 0, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 0, loss_reasons: [], probability: 5 },
@@ -2996,17 +3149,17 @@ function resetCrmStages(empresaId) {
         { id: 'virou_proposta', label: 'Virou Proposta', color: '#2563eb', icon: 'ph-file-arrow-up', position: 6, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 1, is_loss: 0, loss_reasons: [], probability: 90 },
         { id: 'desqualificado', label: 'Desqualificado', color: '#ef4444', icon: 'ph-x-circle', position: 7, is_default: 0, is_terminal: 1, allows_proposal: 0, tracks_qualificacao: 0, tracks_conversao: 0, is_loss: 1, loss_reasons: ['nao_qualificado','sem_orcamento','nao_decidiu','concorrente','sem_contato','nao_responde','outro'], probability: 0 }
     ];
-    const insertStage = getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insertStage = await getDb().prepare(`INSERT INTO crm_stages (id, empresa_id, stage_id, label, color, icon, position, is_default, is_terminal, allows_proposal, tracks_qualificacao, tracks_conversao, is_loss, loss_reasons, probability, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const s of DEFAULT_STAGES) {
-        insertStage.run(s.id, empresaId, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, JSON.stringify(s.loss_reasons), s.probability, now, now);
+        await insertStage.run(s.id, empresaId, s.id, s.label, s.color, s.icon, s.position, s.is_default, s.is_terminal, s.allows_proposal, s.tracks_qualificacao, s.tracks_conversao, s.is_loss, JSON.stringify(s.loss_reasons), s.probability, now, now);
     }
-    return findAllCrmStages(empresaId);
+    return await findAllCrmStages(empresaId);
 }
 
-function logCrmEmail(empresaId, data) {
+async function logCrmEmail(empresaId, data) {
     const now = new Date().toISOString();
     const id = data.id || require('crypto').randomUUID();
-    getDb().prepare(`INSERT INTO crm_email_log
+    await getDb().prepare(`INSERT INTO crm_email_log
         (id, empresa_id, lead_id, to_email, cc, bcc, from_email, from_name, subject, body_preview, status, error_message, provider, message_id, attachments_count, tracking_token, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(id, empresaId,
@@ -3025,24 +3178,24 @@ function logCrmEmail(empresaId, data) {
             data.attachments_count || 0,
             data.tracking_token || '',
             now);
-    return getDb().prepare('SELECT * FROM crm_email_log WHERE id = ?').get(id);
+    return await getDb().prepare('SELECT * FROM crm_email_log WHERE id = ?').get(id);
 }
 
-function findCrmEmailLogByLead(empresaId, leadId, limit = 50) {
+async function findCrmEmailLogByLead(empresaId, leadId, limit = 50) {
     if (leadId) {
-        return getDb().prepare('SELECT * FROM crm_email_log WHERE empresa_id = ? AND lead_id = ? ORDER BY created_at DESC LIMIT ?').all(empresaId, leadId, limit);
+        return await getDb().prepare('SELECT * FROM crm_email_log WHERE empresa_id = ? AND lead_id = ? ORDER BY created_at DESC LIMIT ?').all(empresaId, leadId, limit);
     }
-    return getDb().prepare('SELECT * FROM crm_email_log WHERE empresa_id = ? ORDER BY created_at DESC LIMIT ?').all(empresaId, limit);
+    return await getDb().prepare('SELECT * FROM crm_email_log WHERE empresa_id = ? ORDER BY created_at DESC LIMIT ?').all(empresaId, limit);
 }
 
-function markEmailOpened(token, userAgent) {
+async function markEmailOpened(token, userAgent) {
     if (!token) return null;
-    const row = getDb().prepare('SELECT * FROM crm_email_log WHERE tracking_token = ?').get(token);
+    const row = await getDb().prepare('SELECT * FROM crm_email_log WHERE tracking_token = ?').get(token);
     if (!row) return null;
     const now = new Date().toISOString();
-    getDb().prepare(`UPDATE crm_email_log SET opened_at = COALESCE(opened_at, ?), open_count = open_count + 1, user_agent = ? WHERE tracking_token = ?`)
+    await getDb().prepare(`UPDATE crm_email_log SET opened_at = COALESCE(opened_at, ?), open_count = open_count + 1, user_agent = ? WHERE tracking_token = ?`)
         .run(now, userAgent || '', token);
-    return getDb().prepare('SELECT * FROM crm_email_log WHERE tracking_token = ?').get(token);
+    return await getDb().prepare('SELECT * FROM crm_email_log WHERE tracking_token = ?').get(token);
 }
 
 module.exports = {

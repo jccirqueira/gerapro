@@ -1,6 +1,6 @@
-# Migração SQLite → PostgreSQL — Plano e Fase 1
+# Migração SQLite → PostgreSQL — Plano e Execução
 
-> **Status:** Fase 1 **CONCLUÍDA** (16/11/2026) · Fases 2–6 pendentes
+> **Status:** Fases 1–3 **CONCLUÍDAS** (16/11/2026, local) · Fases 4–6 pendentes
 > **Objetivo:** permitir múltiplas instâncias do app (load balance) e backup com PITR,
 > removendo o único limite estrutural atual do GeraPro.
 
@@ -11,11 +11,14 @@
 | Fase | Escopo | Status |
 |---|---|---|
 | **F1** | Infra local + schema traduzido + verificação de paridade + plano | ✅ **Concluída** |
-| **F2** | Driver `pg` + refatoração síncrono→assíncrono (`db.js`, `server_new.js`) | ⬜ Pendente |
-| **F3** | Dialeto SQL (`?`→`$1`, `INSERT OR REPLACE`→`ON CONFLICT`, DDL final) | ⬜ Pendente |
+| **F2** | Driver `pg` + refatoração síncrono→assíncrono (`db.js`, `server_new.js`) | ✅ **Concluída** (local) |
+| **F3** | Dialeto SQL (`?`→`$1`, `INSERT OR REPLACE`→`ON CONFLICT`, DDL final) | ✅ **Concluída** (executada junto da F2) |
 | **F4** | Migração dos dados (SQLite → PostgreSQL) + sequências | ⬜ Pendente |
 | **F5** | Validação completa (contagens, âncoras de negócio, browser) | ⬜ Pendente |
 | **F6** | Cutover em produção com rollback + backup `pg_dump` automático | ⬜ Pendente |
+
+> **⚠️ Deploy:** o código das Fases 2–3 exige PostgreSQL — **não deployar na VPS até o F6**
+> (produção continua em SQLite; os commits vão para a branch `migracao-postgres`).
 
 ---
 
@@ -81,6 +84,48 @@ sem Docker, sem admin):
 
 ---
 
+### 3.1 Execução da Fase 2+3 (16/11/2026) — CONCLUÍDA
+
+**Como foi feito** (workflow reproduzível pelas ferramentas em `tools/migracao-postgres/`):
+
+1. **Codemod AST** (`codemod-async.js`, acorn): varreu `js/db.js` (400 chamadas) e
+   `server_new.js` (180 chamadas), inseriu `await` + marcou 72+26 funções como `async`,
+   com regra de **wrap entre parênteses** para cadeias de dados
+   (`(await findAll('x')).map(...)` — senão `.map` rodaria no Promise).
+2. **Shim de compatibilidade** no cabeçalho do `db.js`: `prepare().all/get/run`,
+   `exec`, `getDb()` — API idêntica à anterior; `?`→`$1..$n` e
+   `INSERT OR IGNORE/REPLACE`→`ON CONFLICT` convertidos **em runtime** (`_toPg`),
+   com mapa de PKs por tabela.
+3. **Transações**: cliente fixo por contexto via `AsyncLocalStorage`
+   (BEGIN/COMMIT/ROLLBACK + SAVEPOINT aninhado, mesmo comportamento do SQLite).
+4. **Auditoria estática** (`auditor-async.js`): cobre calls sem await, cadeias
+   quebradas e referências soltas — **0 problemas** nos dois arquivos.
+
+**Achados críticos (todos corrigidos):**
+
+| Achado | Correção |
+|---|---|
+| **Case de identificadores**: PG dobra `codigoInterno`→`codigointerno`; o schema foi gravado em minúsculas e os **resultados** voltavam errados | `q()` do tradutor grava minúsculo + **`js/pg-case-map.json`** (40 entradas) restaura o case original em `all()/get()` |
+| **`count(*)`/BIGINT voltavam como string** (`"0" === 0` pulava seeds) | `types.setTypeParser(20, parseInt)` no header |
+| **Palavras reservadas**: coluna `user` em `mail_settings` (queries e DDL) | citada como `"user"` nos 3 pontos |
+| **`initSecrets()` no topo do módulo** virou promise sem esperar | boot religado: `initSecrets().then(() => server.listen(...))` |
+| **`forEach(async ...)`** no update de usuários Telegram (paralelo não-determinístico) | convertido em `for ... of` |
+| **3 IIFEs** em `getFullSync` viravam Promise (`company.sigla = {}`) | hoist: uma única query `findEmpresaById` |
+| **`PRAGMA table_info`** não existe no PG (`_getTableColumns`) | `information_schema` + comparação case-insensitive no restore |
+| **Seed de `crm_stages`** preso no branch "composicoes vazias" | extraído para `_ensureCrmStages()` independente |
+| **`chaparia.js` importava `db.js` no navegador** (bug pré-existente — módulo nunca funcionou) | migrado para `store._syncCreate/_syncDelete` (API) |
+| `ILIKE` no lugar de `LIKE` (paridade case-insensitive do SQLite) | 1 statement (`searchMateriais`) |
+
+**Validação:** smoke test **26/26** (`smoke-db.js`: CRUD, upsert, transações
+commit/rollback, ILIKE, FKs, coluna `user`, seeds, bulk) + boot limpo +
+HTTP (`/`→200, APIs→401) + auditorias estáticas zeradas.
+
+**Ferramentas versionadas:** `codemod-async.js`, `auditor-async.js`, `smoke-db.js`,
+`traduzir-e-aplicar.js`, `verificar-paridade.js`, `postgres-schema.sql`
+(requerem `npm i -D acorn` para o codemod/auditor).
+
+---
+
 ## 4. Inventário do banco atual (baseline para F4)
 
 **24 tabelas com dados = 25.677 linhas** · 36 tabelas vazias
@@ -113,19 +158,18 @@ projetos, propostas_completas
 
 ## 5. Plano das próximas fases
 
-### F2 — Driver + assíncrono (o maior trabalho)
-- [ ] Instalar `pg` nas dependências; criar pool de conexão (lê `.env`: host/port/user/pass/db).
-- [ ] Reescrever `js/db.js` (3.111 linhas, **70 funções**): `DatabaseSync` → `pg`,
-      todos os métodos `async` (`getDb`, `withTransaction`, CRUD genérico, `getFullSync`…).
-- [ ] Adicionar `await` nas **135 chamadas** `.prepare()` (120 em `db.js` + 15 em `server_new.js`).
-- [ ] Manter contrato público idêntico (mesmos nomes/retornos) — zero mudança nos módulos de negócio.
+### F2 — Driver + assíncrono ✅ (16/11/2026)
+- [x] Instalar `pg` nas dependências; pool de conexão (lê `.env` PG*).
+- [x] Reescrever `js/db.js` (3.111→3.2xx linhas, **72 funções async**): `DatabaseSync` → `pg` + AsyncLocalStorage.
+- [x] `await` nas **400 chamadas** de `db.js` + **180** de `server_new.js`.
+- [x] Contrato público idêntico — zero mudança nos módulos de negócio (só `chaparia.js`, que estava quebrado).
 
-### F3 — Dialeto SQL
-- [ ] Parâmetros `?` → `$1…$n` (135 consultas).
-- [ ] `INSERT OR REPLACE` → `INSERT … ON CONFLICT … DO UPDATE` (15).
-- [ ] `INSERT OR IGNORE` → `ON CONFLICT DO NOTHING` (4).
-- [ ] Substituir o `initSchema()` do `db.js` pelo `postgres-schema.sql` (ou gerá-lo do mesmo fonte).
-- [ ] `db.getDb()` exposto no server → encapsular (não vazar driver cru).
+### F3 — Dialeto SQL ✅ (16/11/2026)
+- [x] Parâmetros `?` → `$1…$n` (runtime, `_toPg`).
+- [x] `INSERT OR REPLACE` → `ON CONFLICT (pk) DO UPDATE` (runtime, mapa de PKs).
+- [x] `INSERT OR IGNORE` → `ON CONFLICT DO NOTHING` (runtime).
+- [x] `initSchema()` em dialeto PG (AUTOINCREMENT→IDENTITY, `"user"` citado).
+- [x] `getDb()` encapsulado no shim de compatibilidade.
 
 ### F4 — Migração dos dados
 - [ ] Exportar SQLite (por tabela, tipo-aware) → importar via `COPY` no PG.

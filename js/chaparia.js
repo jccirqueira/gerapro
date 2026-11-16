@@ -375,14 +375,13 @@ const ChapariaModule = {
 
         newState.custoTotal = newState.items.reduce((acc, item) => acc + (item.custo || 0) * (item.qtd || 1), 0);
 
-        const db = await import('./db.js');
         if (newState.id) {
-            db.create('chapariaLists', newState);
+            await store._syncCreate('chapariaLists', newState);
             const list = store.getState().chapariaLists.map(p => p.id === newState.id ? { ...p, ...newState } : p);
             store.setState({ chapariaLists: list });
         } else {
             newState.id = crypto.randomUUID();
-            db.create('chapariaLists', newState);
+            await store._syncCreate('chapariaLists', newState);
             const list = [...(store.getState().chapariaLists || []), newState];
             store.setState({ chapariaLists: list });
         }
@@ -392,8 +391,7 @@ const ChapariaModule = {
 
     async delete(id) {
         if (await window.app.confirm('Remover este típico de chaparia?')) {
-            const db = await import('./db.js');
-            db.remove('chapariaLists', id);
+            await store._syncDelete('chapariaLists', id);
             const list = store.getState().chapariaLists.filter(p => p.id !== id);
             store.setState({ chapariaLists: list });
             window.app.toast('Típico de chaparia removido.', 'info');

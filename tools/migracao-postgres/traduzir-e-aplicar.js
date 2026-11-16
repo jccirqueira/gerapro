@@ -19,7 +19,7 @@ const PG_CONF = {
   database: process.env.PGDATABASE || 'gerapro',
 };
 
-const q = (id) => '"' + String(id).trim().replace(/"/g, '""') + '"';
+const q = (id) => '"' + String(id).trim().replace(/"/g, '""').toLowerCase() + '"'; // PG dobra p/ minúsculas: gravar já minúsculo
 const qList = (lista) => lista.split(',').map(s => q(s)).join(', ');
 
 // ── 1. Extrai os objetos do sqlite_master ──

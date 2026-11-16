@@ -218,9 +218,9 @@ function persistEnvVars(vars) {
     }
 }
 
-function migrateLegacyMailSecrets(newKey) {
+async function migrateLegacyMailSecrets(newKey) {
     // Re-criptografa senhas SMTP / API keys gravadas com a chave legada para a nova chave.
-    const rows = db.getDb().prepare('SELECT empresa_id, pass, api_key FROM mail_settings').all();
+    const rows = await db.getDb().prepare('SELECT empresa_id, pass, api_key FROM mail_settings').all();
     let migrated = 0;
     for (const row of rows) {
         const updates = [];
@@ -234,7 +234,7 @@ function migrateLegacyMailSecrets(newKey) {
             values.push(encryptWithKey(plain, newKey));
         }
         if (updates.length > 0) {
-            db.getDb().prepare('UPDATE mail_settings SET ' + updates.join(', ') + ' WHERE empresa_id = ?')
+            await db.getDb().prepare('UPDATE mail_settings SET ' + updates.join(', ') + ' WHERE empresa_id = ?')
                 .run(...values, row.empresa_id);
             migrated++;
         }
@@ -242,7 +242,7 @@ function migrateLegacyMailSecrets(newKey) {
     return migrated;
 }
 
-function initSecrets() {
+async function initSecrets() {
     // 1) JWT_SECRET — sem ele, qualquer pessoa forja tokens admin
     if (!process.env.JWT_SECRET) {
         const generated = crypto.randomBytes(48).toString('hex');
@@ -265,7 +265,7 @@ function initSecrets() {
     const newKey = crypto.randomBytes(32).toString('hex');
     if (persistEnvVars({ MAIL_ENCRYPTION_KEY: newKey })) {
         try {
-            const migrated = migrateLegacyMailSecrets(newKey);
+            const migrated = await migrateLegacyMailSecrets(newKey);
             MAIL_ENCRYPTION_KEY = newKey;
             console.warn('[Secrets] MAIL_ENCRYPTION_KEY gerada e salva em .env (' + migrated + ' registro(s) de e-mail re-criptografado(s)).');
         } catch (e) {
@@ -282,11 +282,9 @@ function initSecrets() {
     console.warn('[Secrets] Usando a chave legada de e-mail. Defina MAIL_ENCRYPTION_KEY no .env (recomendado em produção).');
 }
 
-initSecrets();
-
-function getAiConfig() {
+async function getAiConfig() {
     try {
-        const dbSettings = db.getAiSettings();
+        const dbSettings = await db.getAiSettings();
         if (dbSettings && dbSettings.provider) {
             return {
                 provider: dbSettings.provider,
@@ -945,7 +943,7 @@ async function handleExportPipelineLog(data, res) {
     }
 }
 
-function handleSaveProposal(data, res, empresaId) {
+async function handleSaveProposal(data, res, empresaId) {
     const { ptcFolder, type, content, revisionFolder } = data; // type: 'tecnica' or 'comercial', revisionFolder: 'Rev1'
 
     if (!ptcFolder || !type || !content) {
@@ -960,7 +958,7 @@ function handleSaveProposal(data, res, empresaId) {
         return;
     }
 
-    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    const ptcPath = await getFullPtcPath(empresaId, ptcFolder);
     let docsDir = path.join(ptcPath, 'Documentação Minha_Empresa');
 
     // If a revision folder is provided, append it to the path
@@ -1003,7 +1001,7 @@ function handleSaveProposal(data, res, empresaId) {
     });
 }
 
-function handleSaveFile(data, res, empresaId) {
+async function handleSaveFile(data, res, empresaId) {
     const { ptcFolder, filename, content, isBase64, revisionFolder, subfolder } = data;
     if (!ptcFolder || !filename || !content) {
         sendJson(res, 400, { success: false, error: 'Missing required fields (ptcFolder, filename, content)' });
@@ -1014,7 +1012,7 @@ function handleSaveFile(data, res, empresaId) {
         return;
     }
     const targetSubfolder = subfolder || 'Documentação Minha_Empresa';
-    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    const ptcPath = await getFullPtcPath(empresaId, ptcFolder);
     let docsDir = path.join(ptcPath, targetSubfolder);
     if (revisionFolder && revisionFolder !== '0' && revisionFolder !== 0) {
         docsDir = path.join(docsDir, revisionFolder);
@@ -1040,8 +1038,8 @@ function handleSaveFile(data, res, empresaId) {
     }
 }
 
-function handleListPtcs(res, empresaId) {
-    const baseDir = getEmpresaPtcDir(empresaId);
+async function handleListPtcs(res, empresaId) {
+    const baseDir = await getEmpresaPtcDir(empresaId);
 
     function scanDir(dir, depth = 0) {
         let results = [];
@@ -1069,7 +1067,7 @@ function handleListPtcs(res, empresaId) {
     }
 }
 
-function handleListPtcFiles(ptcFolder, subfolder, res, empresaId) {
+async function handleListPtcFiles(ptcFolder, subfolder, res, empresaId) {
     if (!ptcFolder) {
         sendJson(res, 400, { success: false, error: 'Missing ptcFolder param' });
         return;
@@ -1079,7 +1077,7 @@ function handleListPtcFiles(ptcFolder, subfolder, res, empresaId) {
         return;
     }
     const targetDir = subfolder || 'Documentação Cliente';
-    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    const ptcPath = await getFullPtcPath(empresaId, ptcFolder);
     const dir = path.join(ptcPath, targetDir);
     if (!isInsideDir(ptcPath, dir)) {
         sendJson(res, 400, { success: false, error: 'Caminho inválido' });
@@ -1106,14 +1104,14 @@ function handleListPtcFiles(ptcFolder, subfolder, res, empresaId) {
     }
 }
 
-function handleGetRevisions(ptcFolder, res, empresaId) {
+async function handleGetRevisions(ptcFolder, res, empresaId) {
     if (!ptcFolder) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: 'Missing PTC Folder' }));
         return;
     }
 
-    const docsDir = path.join(getFullPtcPath(empresaId, ptcFolder), 'Documentação Minha_Empresa');
+    const docsDir = path.join(await getFullPtcPath(empresaId, ptcFolder), 'Documentação Minha_Empresa');
 
     if (!fs.existsSync(docsDir)) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -1146,7 +1144,7 @@ function handleGetRevisions(ptcFolder, res, empresaId) {
     });
 }
 
-function handleLoadProposal(ptcFolder, filename, revisionFolder, res, empresaId) {
+async function handleLoadProposal(ptcFolder, filename, revisionFolder, res, empresaId) {
     if (!ptcFolder || !filename) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: 'Missing params' }));
@@ -1159,7 +1157,7 @@ function handleLoadProposal(ptcFolder, filename, revisionFolder, res, empresaId)
         return;
     }
 
-    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    const ptcPath = await getFullPtcPath(empresaId, ptcFolder);
     let docsDir = path.join(ptcPath, 'Documentação Minha_Empresa');
 
     if (revisionFolder && revisionFolder !== '0' && revisionFolder !== 0) {
@@ -1187,14 +1185,14 @@ function handleLoadProposal(ptcFolder, filename, revisionFolder, res, empresaId)
 
 // --- Revision Management Endpoints ---
 
-function handleGetPtcRevisionsFolders(ptcFolder, res, empresaId) {
+async function handleGetPtcRevisionsFolders(ptcFolder, res, empresaId) {
     if (!ptcFolder) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: 'Missing PTC Folder' }));
         return;
     }
 
-    const ptcPath = getFullPtcPath(empresaId, ptcFolder);
+    const ptcPath = await getFullPtcPath(empresaId, ptcFolder);
     const docsDir = path.join(ptcPath, 'Documentação Minha_Empresa');
 
     if (!fs.existsSync(docsDir)) {
@@ -1240,7 +1238,7 @@ function handleGetPtcRevisionsFolders(ptcFolder, res, empresaId) {
     }
 }
 
-function handleUprevisionPtc(data, res, empresaId) {
+async function handleUprevisionPtc(data, res, empresaId) {
     const { ptcFolder, revisionNum } = data;
     if (!ptcFolder) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1248,7 +1246,7 @@ function handleUprevisionPtc(data, res, empresaId) {
         return;
     }
 
-    const rootPath = getFullPtcPath(empresaId, ptcFolder);
+    const rootPath = await getFullPtcPath(empresaId, ptcFolder);
 
     if (!fs.existsSync(rootPath)) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -1349,7 +1347,7 @@ function handleUprevisionPtc(data, res, empresaId) {
     }
 }
 
-function handleListAllProposals(res, req) {
+async function handleListAllProposals(res, req) {
     const allProposals = {
         tecnicas: [],
         comerciais: []
@@ -1357,9 +1355,9 @@ function handleListAllProposals(res, req) {
 
     try {
         const empresaId = req ? getEmpresaId(req) : 'default';
-        const baseDir = getEmpresaPtcDir(empresaId);
+        const baseDir = await getEmpresaPtcDir(empresaId);
         // Load pipeline items to map each PTC to its sales stage
-        const pipelineItems = db.findAll('pipelineItems', empresaId) || [];
+        const pipelineItems = await db.findAll('pipelineItems', empresaId) || [];
         const pipelineMap = {};
         pipelineItems.forEach(pi => { if (pi.origemId) pipelineMap[pi.origemId] = pi.status; });
 
@@ -1796,7 +1794,7 @@ Retorne este JSON exato:
 
 async function callAIForExtraction(text, promptOverride = null) {
     const prompt = promptOverride || buildExtractionPrompt(text);
-    const cfg = getAiConfig();
+    const cfg = await getAiConfig();
     const model = cfg.provider === 'ollama' ? cfg.ollamaModel : cfg.openaiModel;
 
     if (cfg.useCache) {
@@ -2771,8 +2769,8 @@ async function handleImportDocument(body, res, empresaId) {
         if (!result._error) {
             result._metadata = { extractionMethod: method, charCount: text.length };
             try {
-                const cfg = getAiConfig();
-                db.addExtractionHistory({
+                const cfg = await getAiConfig();
+                await db.addExtractionHistory({
                     id: crypto.randomUUID(),
                     empresa_id: empresaId || 'default',
                     filename: filename,
@@ -2795,7 +2793,7 @@ async function handleImportDocument(body, res, empresaId) {
 // === AI CONNECTION TEST ===
 
 async function testAiConnection() {
-    const cfg = getAiConfig();
+    const cfg = await getAiConfig();
     if (cfg.provider === 'ollama') {
         try {
             const res = await fetch(`${cfg.ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
@@ -2939,25 +2937,25 @@ function saveUsers(users) {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-function getEmpresaFoldername(empresaId) {
-    const emp = db.findEmpresaById(empresaId || 'default');
+async function getEmpresaFoldername(empresaId) {
+    const emp = await db.findEmpresaById(empresaId || 'default');
     return emp?.folder_name || empresaId || 'default';
 }
 
-function getEmpresaTemplatesDir(empresaId) {
-    return path.join(TEMPLATES_DIR, getEmpresaFoldername(empresaId));
+async function getEmpresaTemplatesDir(empresaId) {
+    return path.join(TEMPLATES_DIR, await getEmpresaFoldername(empresaId));
 }
 
-function ensureEmpresaTemplatesDir(empresaId) {
-    const dir = getEmpresaTemplatesDir(empresaId);
+async function ensureEmpresaTemplatesDir(empresaId) {
+    const dir = await getEmpresaTemplatesDir(empresaId);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
     return dir;
 }
 
-function getEmpresaPtcDir(empresaId) {
-    const dir = path.join(PTC_BASE_DIR, getEmpresaFoldername(empresaId));
+async function getEmpresaPtcDir(empresaId) {
+    const dir = path.join(PTC_BASE_DIR, await getEmpresaFoldername(empresaId));
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return dir;
 }
@@ -2979,13 +2977,13 @@ function isInsideDir(baseDir, targetPath) {
     return t === b || t.startsWith(b + path.sep);
 }
 
-function getFullPtcPath(empresaId, ptcFolder) {
+async function getFullPtcPath(empresaId, ptcFolder) {
     if (!isSafePathSegment(ptcFolder)) {
         const err = new Error('Caminho inválido');
         err.statusCode = 400;
         throw err;
     }
-    const baseDir = getEmpresaPtcDir(empresaId);
+    const baseDir = await getEmpresaPtcDir(empresaId);
     const directPath = path.join(baseDir, ptcFolder);
     if (fs.existsSync(directPath)) return directPath;
     // Search recursively inside client/unidade subfolders (for AUTPRO structure)
@@ -3008,8 +3006,8 @@ function getFullPtcPath(empresaId, ptcFolder) {
 }
 
 // Migrate root-level .docx files to templates/default/ on first run
-function migrateRootTemplates() {
-    const defaultDir = getEmpresaTemplatesDir('default');
+async function migrateRootTemplates() {
+    const defaultDir = await getEmpresaTemplatesDir('default');
     if (!fs.existsSync(defaultDir)) {
         fs.mkdirSync(defaultDir, { recursive: true });
     }
@@ -3033,8 +3031,8 @@ function migrateRootTemplates() {
 }
 
 // Migrate root-level PTC folders to GeraPro/default/ on first run
-function migrateRootPtcs() {
-    const defaultDir = getEmpresaPtcDir('default');
+async function migrateRootPtcs() {
+    const defaultDir = await getEmpresaPtcDir('default');
     if (!fs.existsSync(defaultDir)) {
         fs.mkdirSync(defaultDir, { recursive: true });
     }
@@ -3122,10 +3120,10 @@ function formatPrazo(dataEntrega) {
 async function notifyTelegramUsers({ cliente, projeto, acao, responsavel, vendedor, tipo, ptc, engenheiro_responsavel, dataHora, origemTipo, revisao, data_entrega }) {
     if (!telegramBot) return;
     try {
-        const settings = db.getSettings('default');
+        const settings = await db.getSettings('default');
         const token = settings.telegram_bot_token;
         if (!token) { telegramBot = null; return; }
-        const usuarios = db.listUsuarios();
+        const usuarios = await db.listUsuarios();
         const targets = usuarios.filter(u =>
             u.ativo !== false &&
             u.telegram_chat_id &&
@@ -3166,14 +3164,14 @@ async function notifyTelegramUsers({ cliente, projeto, acao, responsavel, vended
 
 // === CREATE PTC ===
 
-function handleCreatePtc(data, res, empresaId) {
+async function handleCreatePtc(data, res, empresaId) {
     const { ptcNumber, ptcTitle, clientName, contact, email, phone, role, type, businessType, vendedor, dates } = data;
     if (!ptcTitle || !clientName) {
         sendJson(res, 400, { success: false, error: 'Título e Cliente são obrigatórios' });
         return;
     }
 
-    const empresa = db.findEmpresaById(empresaId || 'default');
+    const empresa = await db.findEmpresaById(empresaId || 'default');
     const isAUTPRO = empresa?.folder_name?.startsWith('AUT_');
 
     let rootPath;
@@ -3190,13 +3188,13 @@ function handleCreatePtc(data, res, empresaId) {
 
         const titleSlug = ptcTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40);
         folderName = `${seqPadded}-${titleSlug}`;
-        rootPath = path.join(getEmpresaPtcDir(empresaId), clienteFolderName, unidadeFolderName, folderName);
+        rootPath = path.join(await getEmpresaPtcDir(empresaId), clienteFolderName, unidadeFolderName, folderName);
     } else {
         const num = (ptcNumber || String(Date.now()).slice(-4)).replace(/[^a-zA-Z0-9]/g, '');
         effectiveNumber = num;
         const titleSlug = ptcTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '-').slice(0, 40);
         folderName = `${num}-${titleSlug}`;
-        rootPath = path.join(getEmpresaPtcDir(empresaId), folderName);
+        rootPath = path.join(await getEmpresaPtcDir(empresaId), folderName);
     }
 
     if (fs.existsSync(rootPath)) {
@@ -3238,7 +3236,7 @@ function handleCreatePtc(data, res, empresaId) {
 
 async function dispatchWebhooks(entity, event, data, empresaId) {
     try {
-        const webhooks = db.findAll('crmWebhooks', empresaId);
+        const webhooks = await db.findAll('crmWebhooks', empresaId);
         const active = webhooks.filter(w => w.ativo !== false && (!w.eventos || w.eventos.includes(event)));
         for (const wh of active) {
             const payload = JSON.stringify({ event, entity, data, timestamp: new Date().toISOString() });
@@ -3422,13 +3420,13 @@ const server = http.createServer(async (req, res) => {
             const body = await readBody(req);
             const { email, password, name, empresa_id, nivel } = body;
             if (!email || !password || !name) { sendJson(res, 400, { error: 'Email, senha e nome obrigatórios' }); return; }
-            const existing = db.findUsuarioByEmail(email);
+            const existing = await db.findUsuarioByEmail(email);
             if (existing) { sendJson(res, 409, { error: 'Email já cadastrado' }); return; }
             // Política de cadastro:
             //  - Primeira execução (nenhum usuário no sistema): registro aberto → cria o admin inicial.
             //  - Depois disso: apenas administradores autenticados podem criar contas.
             const tokenUser = getTokenUser(req);
-            const hasUsers = db.listUsuarios().length > 0;
+            const hasUsers = (await db.listUsuarios()).length > 0;
             let empId = 'default';
             let userNivel = 'admin';
             if (hasUsers) {
@@ -3446,12 +3444,12 @@ const server = http.createServer(async (req, res) => {
             } else if (empresa_id) {
                 empId = empresa_id;
             }
-            let emp = db.findEmpresaById(empId);
+            let emp = await db.findEmpresaById(empId);
             if (!emp) {
-                emp = db.createEmpresa({ id: empId, nome: 'Empresa Padrão', cnpj: '', sigla: 'DEF', plano: 'trial' });
+                emp = await db.createEmpresa({ id: empId, nome: 'Empresa Padrão', cnpj: '', sigla: 'DEF', plano: 'trial' });
             }
             const hashed = bcrypt.hashSync(password, 10);
-            const newUser = db.createUsuario({ id: crypto.randomUUID(), empresa_id: empId, email, password: hashed, name, nivel: userNivel, ativo: true });
+            const newUser = await db.createUsuario({ id: crypto.randomUUID(), empresa_id: empId, email, password: hashed, name, nivel: userNivel, ativo: true });
             const token = jwt.sign({ id: newUser.id, email: newUser.email, name: newUser.name, nivel: newUser.nivel, empresa_id: empId }, JWT_SECRET, { expiresIn: '7d' });
             const { password: _, ...safeUser } = newUser;
             sendJson(res, 200, { token, user: safeUser });
@@ -3463,7 +3461,7 @@ const server = http.createServer(async (req, res) => {
             const body = await readBody(req);
             const { email, password } = body;
             if (!email || !password) { sendJson(res, 400, { error: 'Email e senha obrigatórios' }); return; }
-            const user = db.findUsuarioByEmail(email);
+            const user = await db.findUsuarioByEmail(email);
             if (!user || !bcrypt.compareSync(password, user.password)) { sendJson(res, 401, { error: 'Credenciais inválidas' }); return; }
             if (!user.ativo) { sendJson(res, 403, { error: 'Usuário desativado' }); return; }
             const token = jwt.sign({ id: user.id, email: user.email, name: user.name, nivel: user.nivel, empresa_id: user.empresa_id }, JWT_SECRET, { expiresIn: '7d' });
@@ -3475,7 +3473,7 @@ const server = http.createServer(async (req, res) => {
         if (pathname === '/api/auth/me' && req.method === 'GET') {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
-            const user = db.findUsuarioById(tokenUser.id);
+            const user = await db.findUsuarioById(tokenUser.id);
             if (!user) { sendJson(res, 401, { error: 'Usuário não encontrado' }); return; }
             const { password: _, ...safeUser } = user;
             sendJson(res, 200, { success: true, user: safeUser });
@@ -3488,7 +3486,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            const users = db.listUsuarios(empresaId)
+            const users = (await db.listUsuarios(empresaId))
                 .filter(u => u.ativo !== false)
                 .map(({ password, ...safe }) => safe);
             sendJson(res, 200, { users });
@@ -3500,7 +3498,7 @@ const server = http.createServer(async (req, res) => {
         if (pathname === '/api/admin/users' && req.method === 'GET') {
             const admin = requireAdmin(req);
             if (!admin) { sendJson(res, 403, { error: 'Acesso restrito' }); return; }
-            const users = db.listUsuarios().map(({ password, ...u }) => u);
+            const users = (await db.listUsuarios()).map(({ password, ...u }) => u);
             sendJson(res, 200, { users });
             return;
         }
@@ -3511,10 +3509,10 @@ const server = http.createServer(async (req, res) => {
             const body = await readBody(req);
             const { email, password, name, nivel, empresa_id } = body;
             if (!email || !password || !name) { sendJson(res, 400, { error: 'Email, senha e nome obrigatórios' }); return; }
-            const existing = db.findUsuarioByEmail(email);
+            const existing = await db.findUsuarioByEmail(email);
             if (existing) { sendJson(res, 409, { error: 'Email já cadastrado' }); return; }
             const hashed = bcrypt.hashSync(password, 10);
-            const newUser = db.createUsuario({ id: crypto.randomUUID(), empresa_id: empresa_id || 'default', email, password: hashed, name, nivel: nivel || 'engenheiro', ativo: true });
+            const newUser = await db.createUsuario({ id: crypto.randomUUID(), empresa_id: empresa_id || 'default', email, password: hashed, name, nivel: nivel || 'engenheiro', ativo: true });
             const { password: _, ...safeUser } = newUser;
             sendJson(res, 200, { success: true, user: safeUser });
             return;
@@ -3527,7 +3525,7 @@ const server = http.createServer(async (req, res) => {
             if (!admin) { sendJson(res, 403, { error: 'Acesso restrito' }); return; }
             if (req.method === 'PUT') {
                 const body = await readBody(req);
-                const user = db.findUsuarioById(userId);
+                const user = await db.findUsuarioById(userId);
                 if (!user) { sendJson(res, 404, { error: 'Usuário não encontrado' }); return; }
                 const updates = {};
                 if (body.name !== undefined) updates.name = body.name;
@@ -3536,16 +3534,16 @@ const server = http.createServer(async (req, res) => {
                 if (body.empresa_id !== undefined) updates.empresa_id = body.empresa_id;
                 if (body.password) updates.password = bcrypt.hashSync(body.password, 10);
                 if (body.telegram_chat_id !== undefined) updates.telegram_chat_id = body.telegram_chat_id;
-                const updated = db.updateUsuario(userId, updates);
+                const updated = await db.updateUsuario(userId, updates);
                 if (!updated) { sendJson(res, 500, { error: 'Erro ao atualizar' }); return; }
                 const { password: _, ...safeUser } = updated;
                 sendJson(res, 200, { success: true, user: safeUser });
                 return;
             }
             if (req.method === 'DELETE') {
-                const user = db.findUsuarioById(userId);
+                const user = await db.findUsuarioById(userId);
                 if (!user) { sendJson(res, 404, { error: 'Usuário não encontrado' }); return; }
-                db.deactivateUsuario(userId);
+                await db.deactivateUsuario(userId);
                 sendJson(res, 200, { success: true });
                 return;
             }
@@ -3556,7 +3554,7 @@ const server = http.createServer(async (req, res) => {
         if (pathname === '/api/empresas' && req.method === 'GET') {
             const admin = requireAdmin(req);
             if (!admin) { sendJson(res, 403, { error: 'Acesso restrito' }); return; }
-            const empresas = db.listEmpresas();
+            const empresas = await db.listEmpresas();
             sendJson(res, 200, { success: true, empresas });
             return;
         }
@@ -3566,9 +3564,9 @@ const server = http.createServer(async (req, res) => {
             if (!admin) { sendJson(res, 403, { error: 'Acesso restrito' }); return; }
             const body = await readBody(req);
             if (!body.nome) { sendJson(res, 400, { error: 'Nome da empresa é obrigatório' }); return; }
-            const emp = db.createEmpresa({ id: crypto.randomUUID(), nome: body.nome, cnpj: body.cnpj || '', sigla: body.sigla || '', plano: body.plano || 'trial', ativo: true });
-            ensureEmpresaTemplatesDir(emp.id);
-            getEmpresaPtcDir(emp.id);
+            const emp = await db.createEmpresa({ id: crypto.randomUUID(), nome: body.nome, cnpj: body.cnpj || '', sigla: body.sigla || '', plano: body.plano || 'trial', ativo: true });
+            await ensureEmpresaTemplatesDir(emp.id);
+            await getEmpresaPtcDir(emp.id);
             sendJson(res, 200, { success: true, empresa: emp });
             return;
         }
@@ -3579,8 +3577,8 @@ const server = http.createServer(async (req, res) => {
             const body = await readBody(req);
             if (!body.id) { sendJson(res, 400, { error: 'ID da empresa é obrigatório' }); return; }
             if (!body.nome) { sendJson(res, 400, { error: 'Nome da empresa é obrigatório' }); return; }
-            db.updateEmpresa(body.id, body);
-            const emp = db.findEmpresaById(body.id);
+            await db.updateEmpresa(body.id, body);
+            const emp = await db.findEmpresaById(body.id);
             sendJson(res, 200, { success: true, empresa: emp });
             return;
         }
@@ -3591,8 +3589,8 @@ const server = http.createServer(async (req, res) => {
             const id = parsedUrl.query.id;
             if (!id) { sendJson(res, 400, { error: 'ID da empresa é obrigatório' }); return; }
             if (id === 'default') { sendJson(res, 400, { error: 'Não é permitido excluir a empresa padrão.' }); return; }
-            const folderName = getEmpresaFoldername(id);
-            db.deleteEmpresa(id);
+            const folderName = await getEmpresaFoldername(id);
+            await db.deleteEmpresa(id);
             try { fs.rmSync(path.join(TEMPLATES_DIR, folderName), { recursive: true, force: true }); } catch (e) { /* ignore */ }
             try { fs.rmSync(path.join(PTC_BASE_DIR, folderName), { recursive: true, force: true }); } catch (e) { /* ignore */ }
             sendJson(res, 200, { success: true });
@@ -3606,13 +3604,13 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const body = await readBody(req);
-                const oldItem = db.findById('pipelineItems', body.id);
+                const oldItem = await db.findById('pipelineItems', body.id);
                 if (oldItem?.status === 'fechado') {
                     sendJson(res, 403, { success: false, error: 'Proposta Fechada não pode ter revisão alterada.' });
                     return;
                 }
                 const empresaId = tokenUser.empresa_id || 'default';
-                db.updatePipelineRevision(body.id, body.data, empresaId);
+                await db.updatePipelineRevision(body.id, body.data, empresaId);
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -3623,7 +3621,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                sendJson(res, 200, { success: true, data: db.getFullSync(empresaId) });
+                sendJson(res, 200, { success: true, data: await db.getFullSync(empresaId) });
             }
             catch (err) { console.error('[Sync] Error:', err); sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -3635,8 +3633,8 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                db.migrateFromLegacy(body, empresaId);
-                sendJson(res, 200, { success: true, data: db.getFullSync(empresaId) });
+                await db.migrateFromLegacy(body, empresaId);
+                sendJson(res, 200, { success: true, data: await db.getFullSync(empresaId) });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
         }
@@ -3654,7 +3652,7 @@ const server = http.createServer(async (req, res) => {
                     sendJson(res, 400, { success: false, error: 'Payload inválido: envie { data: <conteúdo do backup> }.' });
                     return;
                 }
-                const result = db.restoreFromBackup(body.data, empresaId);
+                const result = await db.restoreFromBackup(body.data, empresaId);
                 console.log(`[Backup] Restauração executada por ${adminUser.email} (empresa ${empresaId}):`, JSON.stringify(result.counts));
                 sendJson(res, 200, { success: true, data: result });
             } catch (err) {
@@ -3673,7 +3671,7 @@ const server = http.createServer(async (req, res) => {
                 const items = body.items || [];
                 console.log(`[ImportBulk] Recebidos ${items.length} itens do cliente`);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const result = db.bulkImportMateriais(items, empresaId);
+                const result = await db.bulkImportMateriais(items, empresaId);
                 console.log(`[ImportBulk] Resultado: ${result.addedIds.length} criados, ${result.updatedIds.length} atualizados`);
                 sendJson(res, 200, { success: true, ...result });
             } catch (err) {
@@ -3695,7 +3693,7 @@ const server = http.createServer(async (req, res) => {
                 for (const item of items) {
                     try {
                         const record = { ...item, empresa_id: empresaId, created_at: now, updated_at: now };
-                        db.create('crmLeads', record, empresaId);
+                        await db.create('crmLeads', record, empresaId);
                         created++;
                     } catch (e) {
                         errors.push({ id: item.id, nome: item.nome, error: e.message });
@@ -3724,7 +3722,7 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
                 const empresaId = tokenUser.empresa_id || 'default';
-                const updated = db.bulkUpdateMateriais(body.items, empresaId);
+                const updated = await db.bulkUpdateMateriais(body.items, empresaId);
                 sendJson(res, 200, { success: true, updated });
             } catch (err) {
                 sendJson(res, 400, { success: false, error: 'Falha no reajuste em massa (nenhum dado foi alterado): ' + err.message });
@@ -3745,7 +3743,7 @@ const server = http.createServer(async (req, res) => {
                 const page = parseInt(url.searchParams.get('page') || '1', 10);
                 const limit = parseInt(url.searchParams.get('limit') || '100', 10);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const result = db.searchMateriais({ q, fabricante, categoria, grupoSiemens, favorito, page, limit }, empresaId);
+                const result = await db.searchMateriais({ q, fabricante, categoria, grupoSiemens, favorito, page, limit }, empresaId);
                 sendJson(res, 200, { success: true, ...result });
             } catch (err) {
                 sendJson(res, 500, { success: false, error: err.message });
@@ -3760,7 +3758,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const stages = db.reorderCrmStages(empresaId, body.orderedIds || []);
+                const stages = await db.reorderCrmStages(empresaId, body.orderedIds || []);
                 sendJson(res, 200, { success: true, data: stages });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -3770,7 +3768,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                const stages = db.resetCrmStages(empresaId);
+                const stages = await db.resetCrmStages(empresaId);
                 sendJson(res, 200, { success: true, data: stages });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -3783,7 +3781,7 @@ const server = http.createServer(async (req, res) => {
                 const id = crmStageMatch[1];
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const updated = db.updateCrmStage(id, empresaId, body);
+                const updated = await db.updateCrmStage(id, empresaId, body);
                 if (!updated) { sendJson(res, 404, { success: false, error: 'Estágio não encontrado' }); return; }
                 sendJson(res, 200, { success: true, data: updated });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -3796,12 +3794,12 @@ const server = http.createServer(async (req, res) => {
                 const id = crmStageMatch[1];
                 const empresaId = tokenUser.empresa_id || 'default';
                 // Check if any leads use this stage
-                const leadsCount = db.getDb().prepare('SELECT COUNT(*) as cnt FROM crm_leads WHERE empresa_id = ? AND status = ?').get(empresaId, id);
+                const leadsCount = await db.getDb().prepare('SELECT COUNT(*) as cnt FROM crm_leads WHERE empresa_id = ? AND status = ?').get(empresaId, id);
                 if (leadsCount && leadsCount.cnt > 0) {
                     sendJson(res, 400, { success: false, error: `Existem ${leadsCount.cnt} lead(s) neste estágio. Reatribua-os antes de excluir.` });
                     return;
                 }
-                const deleted = db.deleteCrmStage(id, empresaId);
+                const deleted = await db.deleteCrmStage(id, empresaId);
                 if (!deleted) { sendJson(res, 404, { success: false, error: 'Estágio não encontrado' }); return; }
                 sendJson(res, 200, { success: true, data: deleted });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -3813,7 +3811,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const created = db.createCrmStage(empresaId, body);
+                const created = await db.createCrmStage(empresaId, body);
                 sendJson(res, 200, { success: true, data: created });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -3823,7 +3821,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                const stages = db.findAllCrmStages(empresaId);
+                const stages = await db.findAllCrmStages(empresaId);
                 sendJson(res, 200, { success: true, data: stages });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -3841,15 +3839,15 @@ const server = http.createServer(async (req, res) => {
                 const entity = entityMatch[1];
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const created = db.create(entity, body, empresaId);
+                const created = await db.create(entity, body, empresaId);
 
                 if (CRM_ENTITIES.includes(entity)) {
-                    dispatchWebhooks(entity, 'created', created, empresaId);
+                    await dispatchWebhooks(entity, 'created', created, empresaId);
                 }
 
                 // Auto-log for pipelineItems creation
                 if (entity === 'pipelineItems' && body.tipo && body.origemId) {
-                    const logDir = path.join(getFullPtcPath(empresaId, body.origemId), 'Log das Revisões');
+                    const logDir = path.join(await getFullPtcPath(empresaId, body.origemId), 'Log das Revisões');
                     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
                     const now = new Date();
                     const ts = now.toISOString().replace(/[-:]/g, '').slice(0, 15).replace('T', '_');
@@ -3868,7 +3866,7 @@ const server = http.createServer(async (req, res) => {
                     }, null, 2));
 
                     // Notificação Telegram para criação
-                    notifyTelegramUsers({
+                    await notifyTelegramUsers({
                         cliente: body.cliente || '',
                         projeto: body.projeto || '',
                         acao: descricao,
@@ -3898,7 +3896,7 @@ const server = http.createServer(async (req, res) => {
                 const id = entityMatchWithId[2];
                 const empresaId = tokenUser.empresa_id || 'default';
                 const body = await readBody(req);
-                const oldItem = db.findById(entity, id);
+                const oldItem = await db.findById(entity, id);
                 if (!oldItem || oldItem.empresa_id !== empresaId) {
                     sendJson(res, 404, { success: false, error: 'Registro não encontrado' });
                     return;
@@ -3907,7 +3905,7 @@ const server = http.createServer(async (req, res) => {
                     sendJson(res, 403, { success: false, error: 'Proposta Fechada não pode ter status alterado.' });
                     return;
                 }
-                const item = db.update(entity, id, body, empresaId);
+                const item = await db.update(entity, id, body, empresaId);
 
                 if (entity === 'pipelineItems' && item) {
                     const stageLabels = { prospect: 'Aguardando Início', elaboracao: 'Em Elaboração', enviado: 'Proposta Enviada', negociacao: 'Negociação', fechado: 'Fechado', perdido: 'Perdido' };
@@ -3938,7 +3936,7 @@ const server = http.createServer(async (req, res) => {
                             acao = `Cartão movido de "${stageLabels[oldSt] || oldSt}" para "${stageLabels[newSt] || newSt}"`;
                         }
 
-                        notifyTelegramUsers({
+                        await notifyTelegramUsers({
                             cliente: item.cliente || '',
                             projeto: item.projeto || '',
                             acao,
@@ -3956,7 +3954,7 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 if (CRM_ENTITIES.includes(entity)) {
-                    dispatchWebhooks(entity, 'updated', { old: oldItem, new: item, changes: body }, tokenUser.empresa_id || 'default');
+                    await dispatchWebhooks(entity, 'updated', { old: oldItem, new: item, changes: body }, tokenUser.empresa_id || 'default');
                 }
 
                 sendJson(res, 200, { success: true, item });
@@ -3972,15 +3970,15 @@ const server = http.createServer(async (req, res) => {
                 const entity = entityMatchWithId[1];
                 const id = entityMatchWithId[2];
                 const empresaId = tokenUser.empresa_id || 'default';
-                const item = db.findById(entity, id);
+                const item = await db.findById(entity, id);
                 if (!item || item.empresa_id !== empresaId) {
                     sendJson(res, 404, { success: false, error: 'Registro não encontrado' });
                     return;
                 }
-                db.remove(entity, id, empresaId);
+                await db.remove(entity, id, empresaId);
 
                 if (entity === 'pipelineItems' && item) {
-                    notifyTelegramUsers({
+                    await notifyTelegramUsers({
                         cliente: item.cliente || '',
                         projeto: item.projeto || '',
                         acao: 'Proposta Excluída',
@@ -3997,7 +3995,7 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 if (CRM_ENTITIES.includes(entity)) {
-                    dispatchWebhooks(entity, 'deleted', item, tokenUser.empresa_id || 'default');
+                    await dispatchWebhooks(entity, 'deleted', item, tokenUser.empresa_id || 'default');
                 }
 
                 sendJson(res, 200, { success: true });
@@ -4043,7 +4041,7 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
                 const empresaId = tokenUser.empresa_id || 'default';
-                const dir = ensureEmpresaTemplatesDir(empresaId);
+                const dir = await ensureEmpresaTemplatesDir(empresaId);
                 const safeName = body.fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
                 if (!safeName.endsWith('.docx')) {
                     sendJson(res, 400, { error: 'Apenas arquivos .docx são permitidos' });
@@ -4066,7 +4064,7 @@ const server = http.createServer(async (req, res) => {
                 const empresaId = tokenUser.empresa_id || 'default';
                 const fileName = templateDeleteMatch[1];
                 const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-                const filePath = path.join(getEmpresaTemplatesDir(empresaId), safeName);
+                const filePath = path.join(await getEmpresaTemplatesDir(empresaId), safeName);
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath);
                     console.log(`[Templates] Deleted ${safeName} da empresa ${empresaId}`);
@@ -4087,7 +4085,7 @@ const server = http.createServer(async (req, res) => {
                 const url = new URL(req.url, `http://${req.headers.host}`);
                 const clienteId = url.searchParams.get('cliente_id');
                 if (!clienteId) { sendJson(res, 400, { success: false, error: 'cliente_id é obrigatório' }); return; }
-                const unidades = db.getUnidadesByCliente(clienteId, tokenUser.empresa_id || 'default');
+                const unidades = await db.getUnidadesByCliente(clienteId, tokenUser.empresa_id || 'default');
                 sendJson(res, 200, { success: true, unidades });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4102,9 +4100,9 @@ const server = http.createServer(async (req, res) => {
                 const codigoUnidade = url.searchParams.get('codigo_unidade');
                 if (!clienteId || !codigoUnidade) { sendJson(res, 400, { success: false, error: 'cliente_id e codigo_unidade são obrigatórios' }); return; }
                 const empId = tokenUser.empresa_id || 'default';
-                const seq = db.consumeNextAutproSequence(clienteId, codigoUnidade, empId);
+                const seq = await db.consumeNextAutproSequence(clienteId, codigoUnidade, empId);
                 if (!seq) { sendJson(res, 404, { success: false, error: 'Unidade não encontrada' }); return; }
-                const cliente = db.getDb().prepare('SELECT codigo_cliente FROM clientes WHERE id = ?').get(clienteId);
+                const cliente = await db.getDb().prepare('SELECT codigo_cliente FROM clientes WHERE id = ?').get(clienteId);
                 const codigoCliente = cliente?.codigo_cliente || '000';
                 const numero = `${codigoCliente}${codigoUnidade}${seq}`;
                 sendJson(res, 200, { success: true, numero, codigoCliente, codigoUnidade, sequencial: parseInt(seq) });
@@ -4120,9 +4118,9 @@ const server = http.createServer(async (req, res) => {
                 const clienteId = url.searchParams.get('cliente_id');
                 const codigoUnidade = url.searchParams.get('codigo_unidade');
                 if (!clienteId || !codigoUnidade) { sendJson(res, 400, { success: false, error: 'cliente_id e codigo_unidade são obrigatórios' }); return; }
-                const seq = db.peekNextAutproSequence(clienteId, codigoUnidade, tokenUser.empresa_id || 'default');
+                const seq = await db.peekNextAutproSequence(clienteId, codigoUnidade, tokenUser.empresa_id || 'default');
                 if (!seq) { sendJson(res, 404, { success: false, error: 'Unidade não encontrada' }); return; }
-                const cliente = db.getDb().prepare('SELECT codigo_cliente FROM clientes WHERE id = ?').get(clienteId);
+                const cliente = await db.getDb().prepare('SELECT codigo_cliente FROM clientes WHERE id = ?').get(clienteId);
                 const codigoCliente = cliente?.codigo_cliente || '000';
                 const numero = `${codigoCliente}${codigoUnidade}${seq}`;
                 sendJson(res, 200, { success: true, numero, codigoCliente, codigoUnidade, sequencial: parseInt(seq) });
@@ -4134,7 +4132,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
-                const numero = db.peekNextProposalNumber();
+                const numero = await db.peekNextProposalNumber();
                 sendJson(res, 200, { success: true, numero });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4144,7 +4142,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
-                const numero = db.getNextProposalNumber();
+                const numero = await db.getNextProposalNumber();
                 sendJson(res, 200, { success: true, numero });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4154,19 +4152,19 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleCreatePtc(await readBody(req), res, empresaId); return;
+            await handleCreatePtc(await readBody(req), res, empresaId); return;
         }
         if (pathname === '/api/list-ptcs' && req.method === 'GET') {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleListPtcs(res, empresaId); return;
+            await handleListPtcs(res, empresaId); return;
         }
         if (pathname === '/api/list-ptc-files' && req.method === 'GET') {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleListPtcFiles(parsedUrl.query.ptc, parsedUrl.query.subfolder, res, empresaId);
+            await handleListPtcFiles(parsedUrl.query.ptc, parsedUrl.query.subfolder, res, empresaId);
             return;
         }
         if (pathname === '/api/list-templates' && req.method === 'GET') {
@@ -4174,7 +4172,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                const dir = getEmpresaTemplatesDir(empresaId);
+                const dir = await getEmpresaTemplatesDir(empresaId);
                 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
                 const files = fs.readdirSync(dir)
                     .filter(f => f.endsWith('.docx'))
@@ -4187,13 +4185,13 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleSaveProposal(await readBody(req), res, empresaId); return;
+            await handleSaveProposal(await readBody(req), res, empresaId); return;
         }
         if (pathname === '/api/save-file' && req.method === 'POST') {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleSaveFile(await readBody(req), res, empresaId); return;
+            await handleSaveFile(await readBody(req), res, empresaId); return;
         }
         if (pathname === '/api/load-proposal' && req.method === 'GET') {
             const tokenUser = getTokenUser(req);
@@ -4201,7 +4199,7 @@ const server = http.createServer(async (req, res) => {
             const { ptc, file, revisionFolder } = parsedUrl.query;
             if (!ptc || !file) { sendJson(res, 400, { error: 'Missing ptc or file params' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleLoadProposal(ptc, file, revisionFolder || '', res, empresaId);
+            await handleLoadProposal(ptc, file, revisionFolder || '', res, empresaId);
             return;
         }
         if (pathname === '/api/ptc-revisions-folders' && req.method === 'GET') {
@@ -4209,19 +4207,19 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             if (!parsedUrl.query.ptc) { sendJson(res, 400, { error: 'Missing ptc param' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleGetPtcRevisionsFolders(parsedUrl.query.ptc, res, empresaId);
+            await handleGetPtcRevisionsFolders(parsedUrl.query.ptc, res, empresaId);
             return;
         }
         if (pathname === '/api/uprevision-ptc' && req.method === 'POST') {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const empresaId = tokenUser.empresa_id || 'default';
-            handleUprevisionPtc(await readBody(req), res, empresaId); return;
+            await handleUprevisionPtc(await readBody(req), res, empresaId); return;
         }
         if (pathname === '/api/list-all-proposals' && req.method === 'GET') {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
-            handleListAllProposals(res, req); return;
+            await handleListAllProposals(res, req); return;
         }
 
         // === PIPELINE LOG REVISIONS ===
@@ -4237,7 +4235,7 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
                 const empresaId = tokenUser.empresa_id || 'default';
-                const logDir = path.join(getFullPtcPath(empresaId, ptcFolder), 'Log das Revisões');
+                const logDir = path.join(await getFullPtcPath(empresaId, ptcFolder), 'Log das Revisões');
                 if (!fs.existsSync(logDir)) {
                     fs.mkdirSync(logDir, { recursive: true });
                 }
@@ -4269,7 +4267,7 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
                 const empresaId = tokenUser.empresa_id || 'default';
-                const logDir = path.join(getFullPtcPath(empresaId, ptcFolder), 'Log das Revisões');
+                const logDir = path.join(await getFullPtcPath(empresaId, ptcFolder), 'Log das Revisões');
                 if (!fs.existsSync(logDir)) {
                     fs.mkdirSync(logDir, { recursive: true });
                 }
@@ -4300,7 +4298,7 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
                 const empresaId = tokenUser.empresa_id || 'default';
-                const logDir = path.join(getFullPtcPath(empresaId, ptcFolder), 'Log das Revisões');
+                const logDir = path.join(await getFullPtcPath(empresaId, ptcFolder), 'Log das Revisões');
                 if (!fs.existsSync(logDir)) {
                     sendJson(res, 200, { success: true, logs: [] });
                     return;
@@ -4326,7 +4324,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                sendJson(res, 200, { success: true, data: db.getAiSettings(empresaId) });
+                sendJson(res, 200, { success: true, data: await db.getAiSettings(empresaId) });
             }
             catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4337,7 +4335,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                db.saveAiSettings(await readBody(req), empresaId);
+                await db.saveAiSettings(await readBody(req), empresaId);
                 sendJson(res, 200, { success: true });
             }
             catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -4382,8 +4380,8 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
-                const settings = db.getSettings('default');
-                const filteredUsers = db.listUsuarios().filter(u => u.ativo !== false && (u.nivel === 'admin' || u.nivel === 'engenheiro'))
+                const settings = await db.getSettings('default');
+                const filteredUsers = (await db.listUsuarios()).filter(u => u.ativo !== false && (u.nivel === 'admin' || u.nivel === 'engenheiro'))
                     .map(u => ({ id: u.id, name: u.name, email: u.email, nivel: u.nivel, telegram_chat_id: u.telegram_chat_id || '' }));
                 sendJson(res, 200, { success: true, botToken: settings.telegram_bot_token || '', users: filteredUsers });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -4395,13 +4393,13 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const body = await readBody(req);
-                db.saveSettings({ telegram_bot_token: body.botToken || '' });
+                await db.saveSettings({ telegram_bot_token: body.botToken || '' });
                 if (body.users) {
-                    body.users.forEach(u => {
+                    for (const u of body.users) {
                         if (u.telegram_chat_id !== undefined) {
-                            db.updateUsuario(u.id, { telegram_chat_id: u.telegram_chat_id || '' });
+                            await db.updateUsuario(u.id, { telegram_chat_id: u.telegram_chat_id || '' });
                         }
-                    });
+                    }
                 }
                 initTelegramBot(body.botToken || '');
                 sendJson(res, 200, { success: true });
@@ -4416,7 +4414,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const body = await readBody(req);
-                notifyTelegramUsers(body);
+                await notifyTelegramUsers(body);
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4429,7 +4427,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                const settings = db.findMailSettings(empresaId);
+                const settings = await db.findMailSettings(empresaId);
                 if (settings) {
                     const { pass, api_key, ...safe } = settings;
                     sendJson(res, 200, { success: true, settings: { ...safe, has_api_key: !!api_key } });
@@ -4457,7 +4455,7 @@ const server = http.createServer(async (req, res) => {
                 } else {
                     delete data.api_key;
                 }
-                const result = db.upsertMailSettings(empresaId, data);
+                const result = await db.upsertMailSettings(empresaId, data);
                 const { pass, api_key, ...safe } = result;
                 sendJson(res, 200, { success: true, settings: { ...safe, has_api_key: !!api_key } });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -4484,7 +4482,7 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
 
-                emailSettings = db.findMailSettings(emailEmpresaId);
+                emailSettings = await db.findMailSettings(emailEmpresaId);
                 emailProvider = emailSettings?.provider || 'smtp';
                 if (!emailSettings || !emailSettings.from_email) {
                     sendJson(res, 400, { success: false, error: 'E-mail não configurado. Acesse Configurações > E-mail e configure um provedor.' });
@@ -4513,7 +4511,7 @@ const server = http.createServer(async (req, res) => {
 
                 // Auto-log to crm_email_log
                 try {
-                    db.logCrmEmail(emailEmpresaId, {
+                    await db.logCrmEmail(emailEmpresaId, {
                         lead_id: lead_id || null,
                         to_email: Array.isArray(to) ? to.join(', ') : to,
                         cc: cc ? (Array.isArray(cc) ? cc.join(', ') : cc) : '',
@@ -4533,7 +4531,7 @@ const server = http.createServer(async (req, res) => {
                 // Auto-register interaction if lead_id provided
                 if (lead_id) {
                     try {
-                        db.create('crmInteracoes', {
+                        await db.create('crmInteracoes', {
                             id: crypto.randomUUID(),
                             lead_id,
                             tipo: 'email',
@@ -4552,9 +4550,9 @@ const server = http.createServer(async (req, res) => {
                 console.error('[SendEmail] Error:', err);
                 if (emailBody && emailEmpresaId) {
                     try {
-                        const settingsErr = emailSettings || db.findMailSettings(emailEmpresaId);
+                        const settingsErr = emailSettings || await db.findMailSettings(emailEmpresaId);
                         const providerErr = emailProvider || settingsErr?.provider || 'smtp';
-                        db.logCrmEmail(emailEmpresaId, {
+                        await db.logCrmEmail(emailEmpresaId, {
                             lead_id: emailBody.lead_id || null,
                             to_email: emailBody.to ? (Array.isArray(emailBody.to) ? emailBody.to.join(', ') : emailBody.to) : '',
                             from_email: settingsErr?.from_email || '',
@@ -4581,7 +4579,7 @@ const server = http.createServer(async (req, res) => {
                 const empresaId = tokenUser.empresa_id || 'default';
                 const leadId = parsedUrl.query.lead_id || null;
                 const limit = parseInt(parsedUrl.query.limit || '50', 10);
-                const logs = db.findCrmEmailLogByLead(empresaId, leadId, limit);
+                const logs = await db.findCrmEmailLogByLead(empresaId, leadId, limit);
                 sendJson(res, 200, { success: true, data: logs });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4596,7 +4594,7 @@ const server = http.createServer(async (req, res) => {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
 
-                const settings = db.findMailSettings(empresaId);
+                const settings = await db.findMailSettings(empresaId);
                 const provider = settings?.provider || 'smtp';
                 if (!settings || !settings.from_email) {
                     sendJson(res, 400, { success: false, error: 'E-mail não configurado. Acesse Configurações > E-mail.' });
@@ -4639,7 +4637,7 @@ const server = http.createServer(async (req, res) => {
         if (emailTrackMatch && req.method === 'GET') {
             const token = emailTrackMatch[1];
             try {
-                db.markEmailOpened(token, req.headers['user-agent'] || '');
+                await db.markEmailOpened(token, req.headers['user-agent'] || '');
             } catch (e) {
                 console.warn('[EmailTrack] Error tracking:', e.message);
             }
@@ -4660,7 +4658,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const body = await readBody(req);
-                db.saveLoginTheme(body.loginTheme || {});
+                await db.saveLoginTheme(body.loginTheme || {});
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4672,7 +4670,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                db.saveSettings(body, empresaId);
+                await db.saveSettings(body, empresaId);
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4684,16 +4682,16 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const existing = db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+                const existing = await db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
                 if (existing) {
-                    db.getDb().prepare('UPDATE settings SET template_tecnica = ?, template_comercial = ?, template_completa = ? WHERE empresa_id = ?').run(
+                    await db.getDb().prepare('UPDATE settings SET template_tecnica = ?, template_comercial = ?, template_completa = ? WHERE empresa_id = ?').run(
                         body.template_tecnica || 'TEMPLATE_TEC.docx',
                         body.template_comercial || 'TEMPLATE_COM.docx',
                         body.template_completa || 'TEMPLATE_TEC_COM.docx',
                         empresaId
                     );
                 } else {
-                    db.getDb().prepare('INSERT INTO settings (empresa_id, template_tecnica, template_comercial, template_completa) VALUES (?, ?, ?, ?)').run(
+                    await db.getDb().prepare('INSERT INTO settings (empresa_id, template_tecnica, template_comercial, template_completa) VALUES (?, ?, ?, ?)').run(
                         empresaId,
                         body.template_tecnica || 'TEMPLATE_TEC.docx',
                         body.template_comercial || 'TEMPLATE_COM.docx',
@@ -4711,11 +4709,11 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const existing = db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+                const existing = await db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
                 if (existing) {
-                    db.getDb().prepare('UPDATE settings SET vendor_defaults = ? WHERE empresa_id = ?').run(JSON.stringify(body.vendorDefaults || []), empresaId);
+                    await db.getDb().prepare('UPDATE settings SET vendor_defaults = ? WHERE empresa_id = ?').run(JSON.stringify(body.vendorDefaults || []), empresaId);
                 } else {
-                    db.getDb().prepare('INSERT INTO settings (empresa_id, vendor_defaults) VALUES (?, ?)').run(empresaId, JSON.stringify(body.vendorDefaults || []));
+                    await db.getDb().prepare('INSERT INTO settings (empresa_id, vendor_defaults) VALUES (?, ?)').run(empresaId, JSON.stringify(body.vendorDefaults || []));
                 }
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -4729,7 +4727,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
-                const row = db.getDb().prepare('SELECT tipos_tipicos_custom FROM settings WHERE empresa_id = ?').get(empresaId);
+                const row = await db.getDb().prepare('SELECT tipos_tipicos_custom FROM settings WHERE empresa_id = ?').get(empresaId);
                 let tipos = [];
                 try { tipos = JSON.parse(row?.tipos_tipicos_custom || '[]'); } catch (e) { tipos = []; }
                 sendJson(res, 200, { success: true, data: { tipos } });
@@ -4744,11 +4742,11 @@ const server = http.createServer(async (req, res) => {
                 const body = await readBody(req);
                 const tipos = Array.isArray(body.tipos) ? body.tipos.filter(t => typeof t === 'string' && t.trim()) : [];
                 const empresaId = tokenUser.empresa_id || 'default';
-                const existing = db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
+                const existing = await db.getDb().prepare('SELECT * FROM settings WHERE empresa_id = ?').get(empresaId);
                 if (existing) {
-                    db.getDb().prepare('UPDATE settings SET tipos_tipicos_custom = ? WHERE empresa_id = ?').run(JSON.stringify(tipos), empresaId);
+                    await db.getDb().prepare('UPDATE settings SET tipos_tipicos_custom = ? WHERE empresa_id = ?').run(JSON.stringify(tipos), empresaId);
                 } else {
-                    db.getDb().prepare('INSERT INTO settings (empresa_id, tipos_tipicos_custom) VALUES (?, ?)').run(empresaId, JSON.stringify(tipos));
+                    await db.getDb().prepare('INSERT INTO settings (empresa_id, tipos_tipicos_custom) VALUES (?, ?)').run(empresaId, JSON.stringify(tipos));
                 }
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -4846,12 +4844,12 @@ const server = http.createServer(async (req, res) => {
                     created_at: now,
                     updated_at: now
                 };
-                const created = db.create('manufaturaResultadosTeste', record, empresaId);
+                const created = await db.create('manufaturaResultadosTeste', record, empresaId);
                 if (body.status === 'pass') {
                     try {
-                        const gaveta = db.findById('manufaturaGavetas', body.gaveta_id);
+                        const gaveta = await db.findById('manufaturaGavetas', body.gaveta_id);
                         if (gaveta && gaveta.etapa === 'teste') {
-                            db.update('manufaturaGavetas', body.gaveta_id, { etapa: 'liberado', updated_at: now });
+                            await db.update('manufaturaGavetas', body.gaveta_id, { etapa: 'liberado', updated_at: now });
                         }
                     } catch (e) { /* gaveta may not exist */ }
                 }
@@ -4867,7 +4865,7 @@ const server = http.createServer(async (req, res) => {
                 const url = new URL(req.url, `http://${req.headers.host}`);
                 const tipo = url.searchParams.get('tipo') || '';
                 const empresaId = tokenUser.empresa_id || 'default';
-                const todos = db.findAll('manufaturaPerfisTeste', empresaId);
+                const todos = await db.findAll('manufaturaPerfisTeste', empresaId);
                 const perfis = tipo ? todos.filter(p => p.tipo_gaveta === tipo) : todos;
                 sendJson(res, 200, { success: true, data: perfis });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -4885,15 +4883,15 @@ const server = http.createServer(async (req, res) => {
                 const empresaId = tokenUser.empresa_id || 'default';
                 if (!projectId) { sendJson(res, 400, { error: 'projetoId é obrigatório' }); return; }
 
-                const proj = db.findById('manufaturaProjetos', projectId);
+                const proj = await db.findById('manufaturaProjetos', projectId);
                 if (!proj) { sendJson(res, 404, { error: 'Projeto não encontrado' }); return; }
 
-                const colunas = db.findAll('manufaturaColunas', empresaId).filter(c => c.projeto_id === projectId);
+                const colunas = (await db.findAll('manufaturaColunas', empresaId)).filter(c => c.projeto_id === projectId);
                 const colunaIds = colunas.map(c => c.id);
-                const gavetas = db.findAll('manufaturaGavetas', empresaId).filter(g => colunaIds.includes(g.coluna_id));
+                const gavetas = (await db.findAll('manufaturaGavetas', empresaId)).filter(g => colunaIds.includes(g.coluna_id));
                 const gavetaIds = gavetas.map(g => g.id);
-                const componentes = db.findAll('manufaturaComponentes', empresaId).filter(c => gavetaIds.includes(c.gaveta_id));
-                const resultados = db.findAll('manufaturaResultadosTeste', empresaId).filter(r => gavetaIds.includes(r.gaveta_id));
+                const componentes = (await db.findAll('manufaturaComponentes', empresaId)).filter(c => gavetaIds.includes(c.gaveta_id));
+                const resultados = (await db.findAll('manufaturaResultadosTeste', empresaId)).filter(r => gavetaIds.includes(r.gaveta_id));
 
                 const wb = new (require('exceljs')).Workbook();
                 const ws = wb.addWorksheet('Data Book');
@@ -4977,7 +4975,7 @@ const server = http.createServer(async (req, res) => {
                     usuario: tokenUser.name || '',
                     created_at: now
                 };
-                const created = db.create('manufaturaAnexos', record, empresaId);
+                const created = await db.create('manufaturaAnexos', record, empresaId);
                 sendJson(res, 200, { success: true, item: created });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -4988,7 +4986,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const anexoId = pathname.split('/').pop();
-                const anexo = db.findById('manufaturaAnexos', anexoId);
+                const anexo = await db.findById('manufaturaAnexos', anexoId);
                 if (!anexo) { sendJson(res, 404, { error: 'Anexo não encontrado' }); return; }
                 const empresaId = anexo.empresa_id || tokenUser.empresa_id || 'default';
                 const filePath = path.join(__dirname, 'data', 'anexos_manufatura', empresaId, anexo.caminho);
@@ -5030,7 +5028,7 @@ const server = http.createServer(async (req, res) => {
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
                 const reqId = String(parsedUrl.query.id || '');
-                const requisicao = db.findById('comprasRequisicoes', reqId);
+                const requisicao = await db.findById('comprasRequisicoes', reqId);
                 // Escopo sempre pelo token: nunca confiar no empresa_id do registro.
                 const empresaId = tokenUser.empresa_id || 'default';
                 if (!requisicao || requisicao.empresa_id !== empresaId || !requisicao.arquivo_path) {
@@ -5102,15 +5100,15 @@ const server = http.createServer(async (req, res) => {
             const projectId = parsedUrl.query.id;
             if (!projectId) { sendJson(res, 400, { error: 'id é obrigatório' }); return; }
             try {
-                const proj = db.findById('manufaturaProjetos', projectId);
+                const proj = await db.findById('manufaturaProjetos', projectId);
                 if (!proj) { sendJson(res, 404, { error: 'Projeto não encontrado' }); return; }
                 const empresaId = proj.empresa_id || 'default';
-                const colunas = db.findAll('manufaturaColunas', empresaId).filter(c => c.projeto_id === projectId);
+                const colunas = (await db.findAll('manufaturaColunas', empresaId)).filter(c => c.projeto_id === projectId);
                 const colunaIds = colunas.map(c => c.id);
-                const gavetas = db.findAll('manufaturaGavetas', empresaId).filter(g => colunaIds.includes(g.coluna_id));
+                const gavetas = (await db.findAll('manufaturaGavetas', empresaId)).filter(g => colunaIds.includes(g.coluna_id));
                 const gavetaIds = gavetas.map(g => g.id);
-                const comps = db.findAll('manufaturaComponentes', empresaId).filter(c => gavetaIds.includes(c.gaveta_id));
-                const testes = db.findAll('manufaturaResultadosTeste', empresaId).filter(r => gavetaIds.includes(r.gaveta_id));
+                const comps = (await db.findAll('manufaturaComponentes', empresaId)).filter(c => gavetaIds.includes(c.gaveta_id));
+                const testes = (await db.findAll('manufaturaResultadosTeste', empresaId)).filter(r => gavetaIds.includes(r.gaveta_id));
 
                 const totalGavetas = gavetas.length;
                 const testadas = testes.filter(t => t.status !== 'pendente').length;
@@ -5177,13 +5175,13 @@ const server = http.createServer(async (req, res) => {
                 const { gaveta_id, motivo, gaveta_substituta_id } = body;
                 if (!gaveta_id || !motivo) { sendJson(res, 400, { error: 'gaveta_id e motivo são obrigatórios' }); return; }
 
-                const gaveta = db.findById('manufaturaGavetas', gaveta_id);
+                const gaveta = await db.findById('manufaturaGavetas', gaveta_id);
                 if (!gaveta) { sendJson(res, 404, { error: 'Gaveta não encontrada' }); return; }
 
-                db.update('manufaturaGavetas', gaveta_id, { status: 'cancelado', observacoes: `Substituída: ${motivo}`, updated_at: now });
+                await db.update('manufaturaGavetas', gaveta_id, { status: 'cancelado', observacoes: `Substituída: ${motivo}`, updated_at: now });
 
                 if (gaveta_substituta_id) {
-                    db.update('manufaturaGavetas', gaveta_substituta_id, { coluna_id: gaveta.coluna_id, etapa: 'inicio', status: 'em_andamento', updated_at: now });
+                    await db.update('manufaturaGavetas', gaveta_substituta_id, { coluna_id: gaveta.coluna_id, etapa: 'inicio', status: 'em_andamento', updated_at: now });
                 }
 
                 const histPayload = {
@@ -5195,7 +5193,7 @@ const server = http.createServer(async (req, res) => {
                     dados: JSON.stringify({ motivo, gaveta_substituta_id, gaveta_antiga_tag: gaveta.tag }),
                     created_at: now
                 };
-                db.create('manufaturaHistorico', histPayload, empresaId);
+                await db.create('manufaturaHistorico', histPayload, empresaId);
 
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -5210,11 +5208,11 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 const empresaId = tokenUser.empresa_id || 'default';
-                const settings = db.getSettings(empresaId);
+                const settings = await db.getSettings(empresaId);
                 const tokenBot = settings?.telegram_bot_token || process.env.TELEGRAM_BOT_TOKEN || '';
                 if (!tokenBot) { sendJson(res, 200, { success: true, notified: false, reason: 'No bot token' }); return; }
 
-                const chatIds = db.findAll('usuarios', empresaId)
+                const chatIds = (await db.findAll('usuarios', empresaId))
                     .filter(u => u.telegram_chat_id)
                     .map(u => u.telegram_chat_id);
 
@@ -5243,7 +5241,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             if (!rateLimit('ai:' + clientIp(req), 20, 60000)) { sendJson(res, 429, { error: 'Limite de requisições de IA atingido. Aguarde um minuto.' }); return; }
-            handleImportDocument(await readBody(req), res, tokenUser.empresa_id || 'default');
+            await handleImportDocument(await readBody(req), res, tokenUser.empresa_id || 'default');
             return;
         }
         if (pathname === '/api/export-ai-extraction' && req.method === 'POST') {
@@ -5363,7 +5361,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
                 const proposalId = url.parse(req.url, true).query.proposalId || null;
-                const sessions = db.listComparisonSessions(empresaId, proposalId);
+                const sessions = await db.listComparisonSessions(empresaId, proposalId);
                 sendJson(res, 200, { success: true, sessions });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -5375,7 +5373,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const body = await readBody(req);
                 body.empresa_id = tokenUser.empresa_id || 'default';
-                db.saveComparisonSession(body);
+                await db.saveComparisonSession(body);
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -5386,7 +5384,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
-                const session = db.getComparisonSession(sessionMatch[1]);
+                const session = await db.getComparisonSession(sessionMatch[1]);
                 if (!session) { sendJson(res, 404, { success: false, error: 'Sessão não encontrada' }); return; }
                 sendJson(res, 200, { success: true, session });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
@@ -5397,7 +5395,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             try {
-                db.deleteComparisonSession(sessionMatch[1]);
+                await db.deleteComparisonSession(sessionMatch[1]);
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -5411,7 +5409,7 @@ const server = http.createServer(async (req, res) => {
             try {
                 const empresaId = tokenUser.empresa_id || 'default';
                 const proposalId = url.parse(req.url, true).query.proposalId || null;
-                const history = db.listExtractionHistory(empresaId, proposalId);
+                const history = await db.listExtractionHistory(empresaId, proposalId);
                 sendJson(res, 200, { success: true, history });
             } catch (err) { sendJson(res, 500, { success: false, error: err.message }); }
             return;
@@ -5438,7 +5436,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const materialId = dxfMatch[1];
-            const content = db.getMaterialDxf(materialId);
+            const content = await db.getMaterialDxf(materialId);
             sendJson(res, 200, { dxf_block: content });
             return;
         }
@@ -5499,7 +5497,7 @@ const server = http.createServer(async (req, res) => {
                     return;
                 }
                 const enriched = JSON.stringify({ entities });
-                db.setMaterialDxf(materialId, enriched);
+                await db.setMaterialDxf(materialId, enriched);
                 sendJson(res, 200, { success: true });
             } catch (err) { sendJson(res, 500, { error: err.message }); }
             return;
@@ -5508,7 +5506,7 @@ const server = http.createServer(async (req, res) => {
             const tokenUser = getTokenUser(req);
             if (!tokenUser) { sendJson(res, 401, { error: 'Não autenticado' }); return; }
             const materialId = dxfMatch[1];
-            db.setMaterialDxf(materialId, null);
+            await db.setMaterialDxf(materialId, null);
             sendJson(res, 200, { success: true });
             return;
         }
@@ -5524,12 +5522,13 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-server.listen(PORT, () => {
+// Boot: segredos (JWT/mail) prontos ANTES de aceitar conexões
+initSecrets().then(() => server.listen(PORT, async () => {
     console.log(`Server running at http://localhost:${PORT}/`);
     console.log('Press Ctrl+C to stop.');
     // Migrate users from JSON to SQLite
     try {
-        const migrated = db.migrateUsersFromJson();
+        const migrated = await db.migrateUsersFromJson();
         if (migrated > 0) console.log(`[Server] ${migrated} usuários migrados para SQLite`);
     } catch (e) {
         console.warn('[Server] Erro na migração de usuários:', e.message);
@@ -5537,21 +5536,21 @@ server.listen(PORT, () => {
     // Initialize templates directory and migrate root .docx files
     try {
         if (!fs.existsSync(TEMPLATES_DIR)) fs.mkdirSync(TEMPLATES_DIR, { recursive: true });
-        migrateRootTemplates();
+        await migrateRootTemplates();
         // Backfill folder_name and rename existing folders
-        db.backfillFolderNames();
-        const empresas = db.listEmpresas();
+        await db.backfillFolderNames();
+        const empresas = await db.listEmpresas();
         for (const emp of empresas) {
-            ensureEmpresaTemplatesDir(emp.id);
+            await ensureEmpresaTemplatesDir(emp.id);
             // Rename old UUID-only folder to new folder_name format if it exists
             const oldTemplatesDir = path.join(TEMPLATES_DIR, emp.id);
-            const newTemplatesDir = getEmpresaTemplatesDir(emp.id);
+            const newTemplatesDir = await getEmpresaTemplatesDir(emp.id);
             if (fs.existsSync(oldTemplatesDir) && oldTemplatesDir !== newTemplatesDir) {
                 try { fs.renameSync(oldTemplatesDir, newTemplatesDir); console.log(`[Templates] Renamed ${emp.id} -> ${emp.folder_name}`); } catch (e) { /* folder may already be migrated */ }
             }
             // Same for PTC dirs
             const oldPtcDir = path.join(PTC_BASE_DIR, emp.id);
-            const newPtcDir = getEmpresaPtcDir(emp.id);
+            const newPtcDir = await getEmpresaPtcDir(emp.id);
             if (fs.existsSync(oldPtcDir) && oldPtcDir !== newPtcDir) {
                 try { fs.renameSync(oldPtcDir, newPtcDir); console.log(`[PTC] Renamed ${emp.id} -> ${emp.folder_name}`); } catch (e) { /* folder may already be migrated */ }
             }
@@ -5563,14 +5562,14 @@ server.listen(PORT, () => {
     // Migrate root PTC folders to GeraPro/default/ on first run
     try {
         if (!fs.existsSync(PTC_BASE_DIR)) fs.mkdirSync(PTC_BASE_DIR, { recursive: true });
-        migrateRootPtcs();
+        await migrateRootPtcs();
         console.log('[PTC] Diretório de PTCs inicializado.');
     } catch (e) {
         console.warn('[PTC] Erro na inicialização:', e.message);
     }
     // Initialize Telegram bot if token exists
     try {
-        const settings = db.getSettings('default');
+        const settings = await db.getSettings('default');
         if (settings && settings.telegram_bot_token) {
             initTelegramBot(settings.telegram_bot_token);
         } else {
@@ -5579,4 +5578,7 @@ server.listen(PORT, () => {
     } catch (e) {
         console.warn('[Telegram] Could not init bot at startup:', e.message);
     }
+})).catch(e => {
+    console.error('[Secrets] Falha ao inicializar segredos — servidor não iniciado:', e);
+    process.exit(1);
 });
